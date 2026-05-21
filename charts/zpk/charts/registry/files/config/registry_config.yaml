@@ -1,0 +1,30 @@
+version: 0.1
+auth:
+  token:
+    realm: ${REGISTRY_AUTH_TOKEN_REALM}
+    service: docker-registry
+    issuer: registry.w7.com
+    rootcertbundle: /certs/registry-cert.pem
+log:
+  fields:
+    service: registry
+storage:
+  cache:
+    blobdescriptor: inmemory
+  filesystem:
+    rootdirectory: /var/lib/registry
+  delete:
+    enabled: true
+http:
+  addr: :5000
+  headers:
+    X-Content-Type-Options: [nosniff]
+health:
+  storagedriver:
+    enabled: true
+    interval: 300s
+    threshold: 3
+notifications:
+  events:
+    includereferences: true
+  endpoints:

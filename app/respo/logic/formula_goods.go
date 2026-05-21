@@ -1,0 +1,121 @@
+package logic
+
+import (
+	"errors"
+	"fmt"
+	"strings"
+
+	"github.com/w7panel/w7panel-zpk/common/dao"
+	"github.com/w7panel/w7panel-zpk/common/entity"
+	"github.com/w7panel/w7panel-zpk/common/service/w7"
+	"github.com/w7panel/w7panel-zpk/common/service/w7/devcenter"
+	"github.com/w7panel/w7panel-zpk/common/service/w7/ip"
+	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
+)
+
+const FormulaVersionElse = 9999
+const ServicePackageEnable = 2
+
+type FormulaGoods struct {
+}
+
+func (l FormulaGoods) PublishGoods(formula *Formula, publishGoodsReq devcenter.PublishGoodsReq) error {
+	tags, err := dao.Q.TagFormula.Preload(dao.Q.TagFormula.Tag).Where(dao.Q.TagFormula.FormulaID.Eq(formula.ID)).Find()
+	if err != nil {
+		return err
+	}
+	if len(tags) == 0 {
+		return errors.New("请先设置制品标签")
+	}
+	if len(tags) > 5 {
+		tags = tags[:5]
+	}
+	goodsTags, err := w7.DevCenterGoodsSdk.GoodsLabels(devcenter.GoodsLabelsReq{
+		Page:     1,
+		PageSize: 10000,
+	})
+	if err != nil {
+		return err
+	}
+	goodsTagNameIdMap := make(map[string]int)
+	for _, item := range goodsTags.List {
+		goodsTagNameIdMap[item.Title] = item.Id
+	}
+	for _, item := range tags {
+		tagName := strings.Trim(item.Tag.Name, " ")
+		if _, exists := goodsTagNameIdMap[tagName]; !exists {
+			label, err := w7.DevCenterGoodsSdk.AddLabel(devcenter.AddLabelReq{
+				Title: strings.Trim(tagName, " "),
+			})
+			if err != nil {
+				return err
+			}
+			goodsTagNameIdMap[tagName] = label.Id
+		}
+		publishGoodsReq.LabelIds = append(publishGoodsReq.LabelIds, goodsTagNameIdMap[tagName])
+	}
+
+	publishGoodsReq.Title = formula.Manifest.Application.Name
+	publishGoodsReq.Description = formula.Manifest.Application.Description
+	if publishGoodsReq.Description == "" {
+		publishGoodsReq.Description = publishGoodsReq.Title
+	}
+
+	if formula.GoodsId > 0 {
+		info, err := w7.DevCenterGoodsSdk.PublishGoodsInfo(devcenter.PublishGoodsInfoReq{
+			ConsoleUid: publishGoodsReq.ConsoleUid,
+			Id:         int(formula.GoodsId),
+		})
+		if err != nil {
+			return err
+		}
+		publishGoodsReq.Id = int(formula.GoodsId)
+		publishGoodsReq.Products = info.Products
+	} else {
+		publishGoodsReq.OnShelf = 1
+		publishGoodsReq.AuditStatus = 2
+	}
+	publishGoodsReq.UnitPrice = formula.InstallServiceFee
+	publishGoodsReq.GoodsType = devcenter.W7ZpkGoodsCategoryId
+	publishGoodsReq.Enable = 1
+	publishGoodsReq.Water = 2
+	publishGoodsReq.Extra = map[string]interface{}{
+		"product_type":    formula.ProductType,
+		"is_free_upgrade": formula.IsFreeUpgrade,
+	}
+	domain := facade.GetConfig().GetString("setting.depot.external_domain")
+	publishGoodsReq.RespoUrl = fmt.Sprintf("https://%s/zpk/respo/info/%s", domain, formula.Name)
+
+	goods, err := w7.DevCenterGoodsSdk.PublishGoods(publishGoodsReq)
+	if err != nil {
+		return err
+	}
+
+	err = w7.IpGoodsSdk.SetOrderSetting(ip.SetGoodsSettingReq{
+		GoodsId:         goods.Id,
+		PayNotifyUrl:    fmt.Sprintf("https://%s/%s", domain, "zpk/respo/order/pay-notify"),
+		RefundNotifyUrl: fmt.Sprintf("https://%s/%s", domain, "zpk/respo/order/refund-notify"),
+	})
+	if err != nil {
+		return err
+	}
+
+	goodsInfo, err := w7.DevCenterGoodsSdk.PublishGoodsInfo(devcenter.PublishGoodsInfoReq{
+		ConsoleUid: publishGoodsReq.ConsoleUid,
+		Id:         goods.Id,
+	})
+	if err != nil {
+		return err
+	}
+	goodsProductId := 0
+	if goodsInfo.ProductsInfo != nil && len(goodsInfo.ProductsInfo) > 0 {
+		goodsProductId = goodsInfo.ProductsInfo[0].Id
+	}
+
+	_, err = dao.Formula.Where(dao.Formula.ID.Eq(formula.ID)).Updates(entity.Formula{
+		GoodsID:        int32(goods.Id),
+		GoodsProductID: int32(goodsProductId),
+		RemoteUID:      publishGoodsReq.ConsoleUid,
+	})
+	return err
+}

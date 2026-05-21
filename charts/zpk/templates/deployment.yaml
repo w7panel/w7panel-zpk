@@ -1,0 +1,109 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "zpk.fullname" . }}
+  labels:
+    {{- include "zpk.labels" . | nindent 4 }}
+  annotations:
+    title: 制品库
+    w7.cc.app/title: 制品库
+    w7.cc/create-svc: 'false'
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "zpk.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        zpk.w7.cc/registry-jwt-rotate-nonce: {{ default "" .Values.global.registryJwt.rotateNonce | quote }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "zpk.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "zpk.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ include "zpk.fullname" . }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: SQLITE_DIR
+              value: /home/zpk/db/
+            - name: USER_PASSWORD_SECRET
+              value: w7_zpk
+            - name: REGISTRY_NATIVE_URL
+              value: http://{{.Release.Name}}-registry.{{ .Release.Namespace}}.svc.cluster.local:5000
+            - name: REGISTRY_EXTERNAL_DOMAIN
+              value: {{ .Values.global.DOMAIN }}
+            - name: REGISTRY_NATIVE_USERNAME
+              value: {{ .Values.global.REGISTRY_NATIVE_USERNAME }}
+            - name: REGISTRY_NATIVE_PASSWORD
+              value: {{ .Values.global.REGISTRY_NATIVE_PASSWORD }}
+            - name: REGISTRY_SERVER_RSA_PRIVATE_PATH
+              value: /home/zpk/cert/registry-key.pem
+            - name: REGISTRY_SERVER_RSA_CERT_PATH
+              value: /home/zpk/cert/registry-cert.pem
+            - name: WEBHOOK_TOKEN
+              value: {{ .Values.global.WEBHOOK_TOKEN }}
+            - name: DEPOT_LOCAL_BASE_DIR
+              value: /home/zpk-storage
+            - name: SESSION_COOKIE_DOMAIN
+              value: {{ .Values.global.DOMAIN }}
+          volumeMounts:
+            - mountPath: /home/zpk/cert/registry-cert.pem
+              name: registry-jwt-volume
+              subPath: registry-cert.pem
+            - mountPath: /home/zpk/cert/registry-key.pem
+              name: registry-jwt-volume
+              subPath: registry-key.pem
+            - mountPath: /home/zpk/db
+              name: pvc-storage
+              subPath: sqlite_db
+            - name: pvc-storage
+              subPath: zpk_helm
+              mountPath: /home/zpk-storage/Helm
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /zpk/live
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /zpk/live
+              port: http
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: registry-jwt-volume
+          secret:
+            secretName: {{ include "zpk.registryJwtSecretName" . }}
+        - name: pvc-storage
+          persistentVolumeClaim:
+            claimName: {{ include "zpk.fullname" . }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

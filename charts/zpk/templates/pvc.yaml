@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "zpk.fullname" . }}
+  labels:
+    {{- include "zpk.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - {{ .Values.global.cluster.storageRWMode }}
+  storageClassName: {{ .Values.global.cluster.storageClassName | quote }}
+  resources:
+    requests:
+      storage: {{ .Values.global.cluster.storageSize | quote }}

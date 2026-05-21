@@ -1,0 +1,53 @@
+relation:
+  - table: formula
+    column:
+      service_packages:
+        type: ServicePackagesOption
+        serializer: json
+      version_prices:
+        type: VersionPricesOption
+        serializer: json
+    relate:
+      - table: version
+        foreign_key: id
+        references: version_latest_id
+        type: has_one
+      - table: tag
+        many_2_many: tag_formula
+        foreign_key: id
+        join_foreign_key: formula_id
+        join_references: tag_id
+        references: id
+        type: many_many
+  - table: version
+  - table: tag
+    relate:
+      - table: tag_formula
+        foreign_key: tag_id
+        type: has_many
+  - table: tag_formula
+    relate:
+      - table: formula
+        foreign_key: id
+        references: formula_id
+        type: has_one
+      - table: tag
+        foreign_key: id
+        references: tag_id
+        type: has_one
+  - table: registry_namespace
+  - table: registry_user
+    column:
+      setting:
+        type: SettingOption
+        serializer: json
+  - table: registry_user_permission
+    column:
+      action:
+        type: PermissionActionOption
+  - table: registry_repository
+  - table: registry_repository_deploy_rule
+  - table: registry_repository_tag
+  - table: registry_repository_deploy_rule_match_log
+  - table: order
+  - table: w7panel_user

@@ -1,0 +1,86 @@
+app:
+  name: rangine
+  env: ${APP_ENV-release}
+  server: http
+server:
+  http:
+    host: 0.0.0.0
+    port: ${SERVER_PORT-8000}
+log:
+  default:
+    driver: stack
+    channels:
+      - file
+      - console
+  file:
+    driver: file
+    path: run.log
+    level: info
+  console:
+    driver: console
+    level: debug
+database_switch:
+  state_file: ${SQLITE_DIR}db_switch_state.json
+database:
+  mysql:
+    driver: mysql
+    user_name: ${MYSQL_USERNAME-root}
+    password: ${MYSQL_PASSWORD-123456}
+    host: ${MYSQL_HOST-127.0.0.1}
+    port: ${MYSQL_PORT-3306}
+    db_name: ${MYSQL_DATABASE-w7-cd-artifact}
+    charset: utf8mb4
+    prefix: ims_
+    schema_file: ${MYSQL_SCHEMA_FILE-/home/w7-cd-artifact-online.sql}
+  default:
+    driver: sqlite
+    db_name: ${SQLITE_DIR}zpk.db
+    charset: utf8mb4
+    show_sql: false
+    prefix: ims_
+    logger: db
+    options:
+      _loc: Asia/Shanghai
+cookie:
+  name: ${SESSION_COOKIE_NAME-SESSION_ID}
+  domain: ${SESSION_COOKIE_DOMAIN-}
+  http_only: true
+  secure: ${SESSION_COOKIE_SECURE-true}
+  expires: ${SESSION_COOKIE_MAX_AGE_SECONDS-86400}
+  same_site: none
+setting:
+  secret: ${COMMON_SECRET-rogtdpxguk}
+  depot:
+    external_domain: ${REGISTRY_EXTERNAL_DOMAIN-172.16.1.161:8000}
+    default_icon_path: ${USER_DEFAULT_PATH-/home/icon.png}
+    oci_namespace: ${DEPOT_OCI_NAMESPACE-zpk_oci}
+    # 本地存放目录
+    base_dir: ${DEPOT_BASE_DIR-/tmp/respo}
+    # 需要将zip同步到的远程附件，方便构建时使用
+    storage:
+      local:
+        endpoint: ${DOMAIN_URL}/zip
+        path: ${DEPOT_LOCAL_BASE_DIR-/tmp/respo}
+  registry:
+    intranet_url: ${REGISTRY_NATIVE_URL-}
+    external_domain: ${REGISTRY_EXTERNAL_DOMAIN-}
+    user_pwd_secret: ${USER_PASSWORD_SECRET-test}
+    webhook_token: ${WEBHOOK_TOKEN-test}
+    namespaces_default_visible:
+      ${DEPOT_OCI_NAMESPACE-zpk_oci}: 4
+    list_ignore_namespaces: ${DEPOT_OCI_NAMESPACE-zpk_oci}
+registry_cli:
+  default:
+    url: ${REGISTRY_NATIVE_URL-}
+    external_domain: ${REGISTRY_EXTERNAL_DOMAIN-}
+    username: ${REGISTRY_NATIVE_USERNAME-}
+    password: ${REGISTRY_NATIVE_PASSWORD-}
+    oauth:
+      issuer: registry.w7.com
+      rsa_private_path: ${REGISTRY_SERVER_RSA_PRIVATE_PATH-./registry-key.pem}
+      rsa_cert_path: ${REGISTRY_SERVER_RSA_CERT_PATH-./registry-cert.pem}
+w7:
+  user_agent: ${W&_SDK_USER_AGENT}
+zpk:
+  appid: ${APP_ID}
+  secret: ${APP_SECRET}

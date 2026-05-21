@@ -1,0 +1,99 @@
+kind: CronJob
+apiVersion: batch/v1
+metadata:
+  name: {{ include "registry.fullname" . }}
+  namespace: default
+  annotations:
+    recordApp: '["w7-zpkv2-registry"]'
+    title: 清理镜像仓库
+spec:
+  schedule: 0 0 * * *
+  concurrencyPolicy: Allow
+  suspend: false
+  jobTemplate:
+    metadata:
+      creationTimestamp: null
+      labels:
+        searchJob: {{ include "registry.fullname" . }}gcjob
+        w7.cc/job-source: cronjob
+      annotations:
+        title: 清理镜像仓库
+        w7.cc/job-source: cronjob
+        w7.cc/job-source-name: {{ include "registry.fullname" . }}gc
+        w7.cc/job-source-title: 清理镜像仓库
+    spec:
+      template:
+        metadata:
+          creationTimestamp: null
+          annotations:
+            zpk.w7.cc/registry-jwt-rotate-nonce: {{ default "" .Values.global.registryJwt.rotateNonce | quote }}
+        spec:
+          affinity:
+            podAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                - labelSelector:
+                    matchExpressions:
+                      - key: app.kubernetes.io/name
+                        operator: In
+                        values:
+                          - {{ include "registry.name" . }}
+                      - key: app.kubernetes.io/instance
+                        operator: In
+                        values:
+                          - {{ .Release.Name }}
+                  topologyKey: kubernetes.io/hostname
+          volumes:
+            - name: config-volume
+              configMap:
+                name: {{ include "registry.fullname" . }}-config
+            - name: registry-jwt-volume
+              secret:
+                secretName: {{ include "registry.jwtSecretName" . }}
+            - name: registry-storage
+              persistentVolumeClaim:
+                claimName: {{ include "registry.fullname" . }}
+          containers:
+            -
+              name: {{ include "registry.fullname" . }}job
+              image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+              command:
+                - /bin/sh
+                - '-c'
+                - >-
+                  registry garbage-collect --dry-run
+                  /etc/docker/registry/config.yml
+
+                  registry garbage-collect
+                  /etc/docker/registry/config.yml
+              resources: {}
+              volumeMounts:
+                - mountPath: /etc/docker/registry/config.yml
+                  name: config-volume
+                  subPath: registry_config.yaml
+                - mountPath: /etc/docker/registry/notify_config.yaml
+                  name: config-volume
+                  subPath: registry_notify_config.yaml
+                - mountPath: /etc/docker/registry/entrypoint.sh
+                  name: config-volume
+                  subPath: entrypoint.sh
+                - mountPath: /certs/registry-cert.pem
+                  name: registry-jwt-volume
+                  subPath: registry-cert.pem
+                - mountPath: /certs/registry-key.pem
+                  name: registry-jwt-volume
+                  subPath: registry-key.pem
+                - name: registry-storage
+                  mountPath: /var/lib/registry
+                  subPath: "registry"
+              terminationMessagePath: /dev/termination-log
+              terminationMessagePolicy: File
+              imagePullPolicy: IfNotPresent
+              securityContext: {}
+          restartPolicy: Never
+          terminationGracePeriodSeconds: 30
+          dnsPolicy: ClusterFirst
+          securityContext: {}
+          schedulerName: default-scheduler
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+status: {}

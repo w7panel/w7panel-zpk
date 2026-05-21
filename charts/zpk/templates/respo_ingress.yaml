@@ -1,0 +1,53 @@
+{{- if .Values.ingress.enabled -}}
+{{- $fullName := include "registry.fullname" . -}}
+{{- $svcPort := .Values.service.port -}}
+{{- if and .Values.ingress.className (not (semverCompare ">=1.18-0" .Capabilities.KubeVersion.GitVersion)) }}
+  {{- if not (hasKey .Values.ingress.annotations "kubernetes.io/ingress.class") }}
+  {{- $_ := set .Values.ingress.annotations "kubernetes.io/ingress.class" .Values.ingress.className}}
+  {{- end }}
+{{- end }}
+{{- if semverCompare ">=1.19-0" .Capabilities.KubeVersion.GitVersion -}}
+apiVersion: networking.k8s.io/v1
+{{- else if semverCompare ">=1.14-0" .Capabilities.KubeVersion.GitVersion -}}
+apiVersion: networking.k8s.io/v1beta1
+{{- else -}}
+apiVersion: extensions/v1beta1
+{{- end }}
+kind: Ingress
+metadata:
+  name: {{ $fullName }}-respo
+  labels:
+    {{- include "registry.labels" . | nindent 4 }}
+    group: {{ .Release.Name }}
+    parents: {{ $fullName }}
+  {{- $defaultAnnotations := dict
+    "cert-manager.io/cluster-issuer" "w7-letsencrypt-prod"
+    "cert-manager.io/renew-before" "30m"
+    "higress.io/resource-definer" "higress"
+    "higress.io/ssl-redirect" "false"
+    "kubernetes.io/ingress.class" "higress"
+  }}
+  {{- $annotations := merge $defaultAnnotations (.Values.ingress.annotations | default dict) }}
+  annotations:
+    {{- toYaml $annotations | nindent 4 }}
+    higress.io/enable-rewrite: 'true'
+    higress.io/rewrite-target: /zpk/respo
+spec:
+  tls:
+    - hosts:
+        - {{ .Values.global.DOMAIN }}
+      secretName: {{ .Release.Name }}-tls-secret
+  rules:
+    -
+      host: {{ .Values.global.DOMAIN }}
+      http:
+        paths:
+          -
+            path: /respo
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "zpk.fullname" . }}
+                port:
+                  number: {{ .Values.service.port }}
+{{- end }}

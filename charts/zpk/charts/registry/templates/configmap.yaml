@@ -1,0 +1,19 @@
+# templates/configmap.yaml
+
+{{ $configMapName := printf "%s-config" (include "registry.fullname" .) }}
+{{ $existingConfigMap := lookup "v1" "ConfigMap" .Release.Namespace $configMapName }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $configMapName }}
+data:
+  registry_notify_config.yaml: |-
+    {{ include "registry.notifyEndpointConfig" . | nindent 4 }}
+  registry_config.yaml: |-
+{{ if and $existingConfigMap $existingConfigMap.data (hasKey $existingConfigMap.data "registry_config.yaml") }}
+{{ index $existingConfigMap.data "registry_config.yaml" | nindent 4 }}
+{{ else }}
+{{ .Files.Get "files/config/registry_config.yaml" | nindent 4 }}
+{{ end }}
+  entrypoint.sh: |-
+    {{- .Files.Get "files/config/entrypoint.sh" | nindent 4 }}

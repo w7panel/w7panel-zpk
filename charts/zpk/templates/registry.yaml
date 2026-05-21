@@ -1,0 +1,22 @@
+# 模板文件 templates/secret.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Values.global.DOMAIN }}.zpkoci
+type: kubernetes.io/dockerconfigjson
+data:
+  .dockerconfigjson: {{ include "docker.configjson" . | b64enc }}
+  namespace: {{ "zpkoci" | b64enc }}
+
+# 定义生成 JSON 的辅助模板
+{{- define "docker.configjson" -}}
+  {
+    "auths": {
+    {{ .Values.global.DOMAIN | quote }}: {
+      "username": {{ .Values.global.REGISTRY_NATIVE_USERNAME | quote }},
+      "password": {{ .Values.global.REGISTRY_NATIVE_PASSWORD | quote }},
+      "auth": {{ printf "%s:%s" .Values.global.REGISTRY_NATIVE_USERNAME .Values.global.REGISTRY_NATIVE_PASSWORD | b64enc | quote }}
+    }
+    }
+  }
+{{- end -}}

@@ -93,9 +93,9 @@ global:
     storageSize: "1Gi"
 
   DOMAIN:
-  WEBHOOK_TOKEN: qW3eR9tYu7iO
-  REGISTRY_NATIVE_USERNAME: w7_zpk_Dge8ght
-  REGISTRY_NATIVE_PASSWORD: w7_zpk_Dge8ght34Gted
+  WEBHOOK_TOKEN: qW3eR9t
+  REGISTRY_NATIVE_USERNAME: w7_zpk
+  REGISTRY_NATIVE_PASSWORD: w7_zpk_Gted
   registryJwt:
     secretName: "w7-zpkv2-registry"
     rotateNonce: "20260509"

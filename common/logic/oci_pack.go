@@ -73,12 +73,12 @@ func PackFileListToOci(fileList map[string]string) ([]FileOciDescriptor, error) 
 	return fileDescriptors, nil
 }
 
-func PackHelmToOci(helmPaths []string) ([]FileOciDescriptor, error) {
+func PackHelmToOci(helmPaths map[string]string) ([]FileOciDescriptor, error) {
 	fileDescriptors := make([]FileOciDescriptor, 0)
-	for _, helmPath := range helmPaths {
+	for key, helmPath := range helmPaths {
 		if helmPath != "" && !function.IsEmptyFile(helmPath) {
 			slog.Info("打包 helm", "path", helmPath)
-			ociHelmDescriptor, err := oci.GetOciDescriptorByPath(helmPath, MediaTypeHelmZip+helmPath)
+			ociHelmDescriptor, err := oci.GetOciDescriptorByPath(helmPath, MediaTypeHelmZip+key)
 			if err != nil {
 				return nil, err
 			}
@@ -110,13 +110,13 @@ func PackBackendCodeZipToOci(zipPath string) ([]FileOciDescriptor, error) {
 	return fileDescriptors, nil
 }
 
-func PackFrontedCodeZipToOci(zipPaths []string) ([]FileOciDescriptor, error) {
+func PackFrontedCodeZipToOci(zipPaths map[string]string) ([]FileOciDescriptor, error) {
 	fileDescriptors := make([]FileOciDescriptor, 0)
 	// 放前端包
-	for _, webZipPath := range zipPaths {
+	for key, webZipPath := range zipPaths {
 		if webZipPath != "" && !function.IsEmptyFile(webZipPath) {
 			slog.Info("打包 web zip", "path", webZipPath)
-			ociWebDescriptor, err := oci.GetOciDescriptorByPath(webZipPath, MediaTypeWebCodeZip+webZipPath)
+			ociWebDescriptor, err := oci.GetOciDescriptorByPath(webZipPath, MediaTypeWebCodeZip+key)
 			if err != nil {
 				return nil, err
 			}

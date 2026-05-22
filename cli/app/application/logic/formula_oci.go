@@ -10,8 +10,10 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/w7panel/w7panel-zpk/common/function"
 	commonlogic "github.com/w7panel/w7panel-zpk/common/logic"
 	"github.com/w7panel/w7panel-zpk/common/service/oci"
 	"github.com/w7panel/w7panel-zpk/common/service/w7/base"
@@ -52,6 +54,7 @@ func PackFormulaToOci(session Session) error {
 	descriptors := make([]commonlogic.FileOciDescriptor, 0)
 	layerDescriptors := make([]v1.Descriptor, 0)
 	fileList := map[string]string{}
+	replacedMediaTypes := make([]string, 0)
 	if formulaInfo != nil && formulaInfo.LatestVersion != "" {
 		manifest, err := commonlogic.GetOciManifest(remoteRepository, formulaInfo.LatestVersion)
 		if err != nil && !errors.Is(err, commonlogic.OciManifestNotFoundErr) {
@@ -71,16 +74,21 @@ func PackFormulaToOci(session Session) error {
 		return err
 	}
 
-	replacedMediaTypes := make([]string, 0)
 	replacedMediaTypes = append(replacedMediaTypes, commonlogic.MediaTypeFilesJson)
 	for _, item := range session.Attachments {
 		if _, err := os.Stat(item.Path); err != nil {
 			return fmt.Errorf("attachment %s is not readable: %w", item.Path, err)
 		}
+		fileMd5, err := function.GetFileMD5(item.Path)
+		if err != nil {
+			return err
+		}
 
+		pathInfo := function.GetPathInfo(item.Path)
+		attachKey := fmt.Sprintf("/Storage/%s/%s%s", time.Now().Format("200601"), fileMd5, pathInfo.Extension)
 		switch item.Type {
 		case AttachTypeFrontend:
-			packed, err := commonlogic.PackFrontedCodeZipToOci([]string{item.Path})
+			packed, err := commonlogic.PackFrontedCodeZipToOci(map[string]string{attachKey: item.Path})
 			if err != nil {
 				return err
 			}
@@ -94,7 +102,7 @@ func PackFormulaToOci(session Session) error {
 			descriptors = append(descriptors, packed...)
 			replacedMediaTypes = append(replacedMediaTypes, commonlogic.MediaTypeCodeZip)
 		case AttachTypeHelm:
-			packed, err := commonlogic.PackHelmToOci([]string{item.Path})
+			packed, err := commonlogic.PackHelmToOci(map[string]string{attachKey: item.Path})
 			if err != nil {
 				return err
 			}
@@ -103,6 +111,7 @@ func PackFormulaToOci(session Session) error {
 		default:
 			return fmt.Errorf("unsupported attachment type %q", item.Type)
 		}
+		item.Path = attachKey
 		updateManifestByAttachment(formulaManifest, item)
 	}
 

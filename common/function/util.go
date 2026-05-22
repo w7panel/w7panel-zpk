@@ -6,8 +6,6 @@ import (
 	"encoding/base64"
 	"fmt"
 	"math/rand"
-	"os"
-	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -58,27 +56,6 @@ func ConvertDigitsToLetters(s string) string {
 		}
 		return r // 非数字字符（如原本的 a-f）保持不变
 	}, s)
-}
-
-type pathInfoOut struct {
-	DirName   string
-	BaseName  string
-	Extension string
-	Filename  string
-}
-
-func GetPathInfo(path string) *pathInfoOut {
-	filename := filepath.Base(path)
-	ext := filepath.Ext(filename)
-
-	dirname, basename := filepath.Split(path)
-	basename = basename[:len(basename)-len(ext)]
-	result := &pathInfoOut{}
-	result.DirName = dirname
-	result.BaseName = basename
-	result.Extension = ext
-	result.Filename = filename
-	return result
 }
 
 func CheckFileAllowUpload(filename string) bool {
@@ -135,75 +112,6 @@ func EncodeURIComponent(s string, excluded ...[]byte) string {
 	}
 	b.WriteString(s[written:])
 	return b.String()
-}
-
-func FileExists(path string) bool {
-	_, err := os.Stat(path)
-	if os.IsNotExist(err) {
-		return false
-	}
-	return true
-}
-
-func CreateDirIfNotExist(dirName string, perm os.FileMode) {
-	if _, err := os.Stat(dirName); os.IsNotExist(err) {
-		err := os.MkdirAll(dirName, perm)
-		if err != nil {
-			panic(err)
-		}
-	}
-}
-
-func IsDirEmpty(path string) bool {
-	// 检查路径是否为目录
-	fileInfo, err := os.Stat(path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return true
-		}
-		return true
-	}
-	if !fileInfo.IsDir() {
-		return true
-	}
-
-	// 读取目录条目
-	dir, err := os.Open(path)
-	if err != nil {
-		return true
-	}
-	defer dir.Close()
-
-	entries, err := dir.Readdir(0)
-	if err != nil {
-		return true
-	}
-
-	return len(entries) == 0
-}
-
-func IsEmptyFile(filePath string) bool {
-	fileInfo, err := os.Stat(filePath)
-	if err != nil {
-		return true
-	}
-
-	// 检查文件大小
-	if fileInfo.Size() == 0 {
-		return true
-	}
-	return false
-}
-
-func AppendBytesToFile(filename string, data []byte) error {
-	file, err := os.OpenFile(filename, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	_, err = file.Write(data)
-	return err
 }
 
 // Copy-pasted from libtrust where it is private.

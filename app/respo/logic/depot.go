@@ -546,9 +546,9 @@ func (self *Depot) packToOci(formula *Formula) error {
 		resourcesDescriptor = append(resourcesDescriptor, backendCodeDescriptors...)
 	}
 
-	frontedCodePaths := make([]string, 0)
+	frontedCodePaths := map[string]string{}
 	for _, webZipPath := range formula.WebZipPaths {
-		frontedCodePaths = append(frontedCodePaths, filepath.Join(self.basePath, webZipPath))
+		frontedCodePaths[webZipPath] = filepath.Join(self.basePath, webZipPath)
 	}
 	frontedCodeDescriptors, err := logic.PackFrontedCodeZipToOci(frontedCodePaths)
 	if err != nil {
@@ -556,9 +556,9 @@ func (self *Depot) packToOci(formula *Formula) error {
 	}
 	resourcesDescriptor = append(resourcesDescriptor, frontedCodeDescriptors...)
 
-	helmPaths := make([]string, 0)
+	helmPaths := map[string]string{}
 	for _, path := range formula.HelmPaths {
-		helmPaths = append(helmPaths, filepath.Join(self.basePath, path))
+		helmPaths[path] = filepath.Join(self.basePath, path)
 	}
 	helmFileDescriptors, err := logic.PackHelmToOci(helmPaths)
 	if err != nil {

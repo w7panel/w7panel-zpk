@@ -24,11 +24,11 @@ var DefaultWorkDir = filepath.Join(os.TempDir(), "w7panel-zpk", "oci-pack")
 var OciManifestNotFoundErr = errors.New("oci manifest not found")
 
 const (
-	MediaTypeIcon       = "application/vnd.w7.formula.icon+png"
-	MediaTypeFilesJson  = "application/vnd.w7.formula.files.json+json"
-	MediaTypeCodeZip    = "application/vnd.w7.formula.code.zip+zip"
-	MediaTypeWebCodeZip = "application/vnd.w7.formula.code.web.zip+zip"
-	MediaTypeHelmZip    = "application/vnd.w7.formula.helm.zip+zip"
+	MediaTypeIcon           = "application/vnd.w7.formula.icon+png"
+	MediaTypeFilesJson      = "application/vnd.w7.formula.files.json+json"
+	MediaTypeBackendCodeZip = "application/vnd.w7.formula.code.zip+zip"
+	MediaTypeFrontedCodeZip = "application/vnd.w7.formula.code.web.zip+zip"
+	MediaTypeHelmZip        = "application/vnd.w7.formula.helm.zip+zip"
 )
 
 type FileOciDescriptor struct {
@@ -97,7 +97,7 @@ func PackBackendCodeZipToOci(zipPath string) ([]FileOciDescriptor, error) {
 	fileDescriptors := make([]FileOciDescriptor, 0)
 
 	if zipPath != "" && !function.IsEmptyFile(zipPath) {
-		ociCodeDescriptor, err := oci.GetOciDescriptorByPath(zipPath, MediaTypeCodeZip)
+		ociCodeDescriptor, err := oci.GetOciDescriptorByPath(zipPath, MediaTypeBackendCodeZip)
 		if err != nil {
 			return nil, err
 		}
@@ -116,7 +116,7 @@ func PackFrontedCodeZipToOci(zipPaths map[string]string) ([]FileOciDescriptor, e
 	for key, webZipPath := range zipPaths {
 		if webZipPath != "" && !function.IsEmptyFile(webZipPath) {
 			slog.Info("打包 web zip", "path", webZipPath)
-			ociWebDescriptor, err := oci.GetOciDescriptorByPath(webZipPath, MediaTypeWebCodeZip+key)
+			ociWebDescriptor, err := oci.GetOciDescriptorByPath(webZipPath, MediaTypeFrontedCodeZip+key)
 			if err != nil {
 				return nil, err
 			}
@@ -131,8 +131,11 @@ func PackFrontedCodeZipToOci(zipPaths map[string]string) ([]FileOciDescriptor, e
 	return fileDescriptors, nil
 }
 
-func PushOciToRemote(remoteRepository *remote.Repository, tag string, resourcesDescriptor []FileOciDescriptor) error {
+func PushOciToRemote(remoteRepository *remote.Repository, tag string, resourcesDescriptor []FileOciDescriptor, baseLayers []v1.Descriptor) error {
 	filesDescriptor := make([]v1.Descriptor, 0)
+	if baseLayers != nil && len(baseLayers) > 0 {
+		filesDescriptor = append(filesDescriptor, baseLayers...)
+	}
 	ctx := context.Background()
 	for _, item := range resourcesDescriptor {
 		if item.Content != nil {

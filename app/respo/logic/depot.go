@@ -567,7 +567,7 @@ func (self *Depot) packToOci(formula *Formula) error {
 	resourcesDescriptor = append(resourcesDescriptor, helmFileDescriptors...)
 
 	tag := self.GetFormulaOciTag(formula)
-	err = logic.PushOciToRemote(remoteOci, tag, resourcesDescriptor)
+	err = logic.PushOciToRemote(remoteOci, tag, resourcesDescriptor, nil)
 	slog.Info("打包完成", "name", formula.Name, "tag", tag, "err", err)
 	return err
 }
@@ -634,7 +634,7 @@ func (self *Depot) unPackSourceCodeFromOCI(formula *Formula) error {
 		if !function.FileExists(zipPath) {
 			function.CreateDirIfNotExist(filepath.Dir(zipPath), os.ModePerm)
 			unpackZipCode = true
-			mediaTypes = append(mediaTypes, logic.MediaTypeCodeZip)
+			mediaTypes = append(mediaTypes, logic.MediaTypeBackendCodeZip)
 		}
 	}
 	if formula.WebZipPaths != nil {
@@ -646,7 +646,7 @@ func (self *Depot) unPackSourceCodeFromOCI(formula *Formula) error {
 			}
 		}
 		if unpackWebCode {
-			mediaTypes = append(mediaTypes, logic.MediaTypeWebCodeZip)
+			mediaTypes = append(mediaTypes, logic.MediaTypeBackendCodeZip)
 		}
 	}
 	if formula.HelmPaths != nil {
@@ -692,14 +692,14 @@ func (self *Depot) unPackSourceCodeFromOCI(formula *Formula) error {
 				return err
 			}
 		}
-		if mediaType == logic.MediaTypeCodeZip {
+		if mediaType == logic.MediaTypeBackendCodeZip {
 			err = os.WriteFile(zipPath, data, os.ModePerm)
 			if err != nil {
 				return err
 			}
 		}
 
-		if mediaType == logic.MediaTypeWebCodeZip || mediaType == logic.MediaTypeHelmZip {
+		if mediaType == logic.MediaTypeFrontedCodeZip || mediaType == logic.MediaTypeHelmZip {
 			err = os.WriteFile(filepath.Join(self.basePath, savePath), data, os.ModePerm)
 			if err != nil {
 				return err

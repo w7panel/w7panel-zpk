@@ -1,8 +1,6 @@
 package logic
 
 import (
-	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -18,11 +16,24 @@ import (
 	"github.com/w7panel/w7panel-zpk/common/service/oci"
 	"github.com/w7panel/w7panel-zpk/common/service/w7/base"
 	"github.com/w7panel/w7panel-zpk/common/service/w7/zpk"
-	"oras.land/oras-go/v2"
 	"oras.land/oras-go/v2/registry/remote"
 	"oras.land/oras-go/v2/registry/remote/auth"
 	"sigs.k8s.io/yaml"
 )
+
+type formulaManifestSet struct {
+	manifests map[string]*commonlogic.Manifest
+	paths     map[string]string
+}
+
+func (set *formulaManifestSet) manifest(artifact string) (*commonlogic.Manifest, error) {
+	artifact = strings.Trim(strings.TrimSpace(artifact), "/")
+	manifest, ok := set.manifests[artifact]
+	if !ok {
+		return nil, fmt.Errorf("manifest for artifact %q not found", artifact)
+	}
+	return manifest, nil
+}
 
 func PackFormulaToOci(session Session) error {
 	password, err := DecryptPassword(session.Password)
@@ -103,7 +114,7 @@ func PackFormulaToOci(session Session) error {
 			if strings.HasPrefix(formulaManifest.Web.Url, "file://") {
 				realPath := strings.TrimPrefix(formulaManifest.Web.Url, "file://")
 				if realPath != "" {
-					replacedMediaTypes = append(replacedMediaTypes, commonlogic.MediaTypeWebCodeZip+realPath)
+					replacedMediaTypes = append(replacedMediaTypes, commonlogic.MediaTypeFrontedCodeZip+realPath)
 				}
 			}
 		case AttachTypeBackend:
@@ -112,7 +123,7 @@ func PackFormulaToOci(session Session) error {
 				return err
 			}
 			descriptors = append(descriptors, packed...)
-			replacedMediaTypes = append(replacedMediaTypes, commonlogic.MediaTypeCodeZip)
+			replacedMediaTypes = append(replacedMediaTypes, commonlogic.MediaTypeBackendCodeZip)
 		case AttachTypeHelm:
 			packed, err := commonlogic.PackHelmToOci(map[string]string{attachKey: item.Path})
 			if err != nil {
@@ -140,7 +151,7 @@ func PackFormulaToOci(session Session) error {
 	descriptors = append(descriptors, manifestDescriptors...)
 
 	layerDescriptors = dropFormulaLayers(layerDescriptors, replacedMediaTypes)
-	return pushFormulaManifest(remoteRepository, nextVersion, layerDescriptors, descriptors)
+	return commonlogic.PushOciToRemote(remoteRepository, nextVersion, descriptors, layerDescriptors)
 }
 
 func nextPatchVersion(latestVersion string) (string, error) {
@@ -168,20 +179,6 @@ func getFormulaFileList(remoteRepository *remote.Repository, manifest *v1.Manife
 	})
 
 	return fileList, err
-}
-
-type formulaManifestSet struct {
-	manifests map[string]*commonlogic.Manifest
-	paths     map[string]string
-}
-
-func (set *formulaManifestSet) manifest(artifact string) (*commonlogic.Manifest, error) {
-	artifact = strings.Trim(strings.TrimSpace(artifact), "/")
-	manifest, ok := set.manifests[artifact]
-	if !ok {
-		return nil, fmt.Errorf("manifest for artifact %q not found", artifact)
-	}
-	return manifest, nil
 }
 
 func loadFormulaManifests(session Session, version string, fileList map[string]string) (*formulaManifestSet, error) {
@@ -293,40 +290,4 @@ func dropFormulaLayers(layers []v1.Descriptor, mediaTypes []string) []v1.Descrip
 	}
 
 	return result
-}
-
-func pushFormulaManifest(remoteRepository *remote.Repository, tag string, baseLayers []v1.Descriptor, resources []commonlogic.FileOciDescriptor) error {
-	ctx := context.Background()
-	layers := append([]v1.Descriptor{}, baseLayers...)
-	for _, item := range resources {
-		if item.Content != nil {
-			if err := remoteRepository.Push(ctx, item.Descriptor, bytes.NewReader(item.Content)); err != nil {
-				return err
-			}
-		} else {
-			file, err := os.Open(item.Path)
-			if err != nil {
-				return err
-			}
-			err = remoteRepository.Push(ctx, item.Descriptor, file)
-			file.Close()
-			if err != nil {
-				return err
-			}
-		}
-		layers = append(layers, item.Descriptor)
-	}
-
-	v1.DescriptorEmptyJSON.Platform = &v1.Platform{
-		Architecture: "amd64",
-		OS:           "linux",
-	}
-	manifestDescriptor, err := oras.PackManifest(ctx, remoteRepository, oras.PackManifestVersion1_1, "application/vnd.w7.files.v1+tar", oras.PackManifestOptions{
-		Layers: layers,
-	})
-	if err != nil {
-		return err
-	}
-
-	return remoteRepository.Tag(ctx, manifestDescriptor, tag)
 }

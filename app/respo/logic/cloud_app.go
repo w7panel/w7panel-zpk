@@ -17,6 +17,7 @@ import (
 	"github.com/w7panel/w7panel-zpk/common/dao"
 	"github.com/w7panel/w7panel-zpk/common/entity"
 	"github.com/w7panel/w7panel-zpk/common/function"
+	logic2 "github.com/w7panel/w7panel-zpk/common/logic"
 	"github.com/w7panel/w7panel-zpk/common/service/w7"
 	"github.com/w7panel/w7panel-zpk/common/service/w7/devcenter"
 	"sigs.k8s.io/yaml"
@@ -320,7 +321,7 @@ func (l CloudApp) unpackNotAppVersionToFormula(notAppInfo devcenter.NotApp, notA
 	if err != nil {
 		return err
 	}
-	manifestRow := &Manifest{}
+	manifestRow := &logic2.Manifest{}
 	err = yaml.Unmarshal([]byte(manifestContent), manifestRow)
 	if err != nil {
 		return err

@@ -17,6 +17,7 @@ import (
 	"github.com/w7panel/w7panel-zpk/common/service/w7/zpk"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/core/err_handler"
+	"gorm.io/gen/field"
 	v1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/yaml"
 )
@@ -42,6 +43,25 @@ func (c Formula) Add(ctx *gin.Context) {
 	}
 
 	c.JsonSuccessResponse(ctx)
+}
+
+func (c Formula) BaseInfo(ctx *gin.Context) {
+	type ParamsValidate struct {
+		Identifie string `form:"identifie" json:"identifie" binding:"required"`
+	}
+	params := ParamsValidate{}
+	if !c.Validate(ctx, &params) {
+		return
+	}
+
+	depotLogin := c.getDepot()
+	formula, err := depotLogin.GetFormula(params.Identifie, "", nil)
+	if err != nil {
+		c.JsonResponseWithError(ctx, err, 500)
+		return
+	}
+
+	c.JsonResponseWithoutError(ctx, map[string]interface{}{"latest_version": formula.Version})
 }
 
 func (c Formula) Info(ctx *gin.Context) {
@@ -169,17 +189,17 @@ func (c Formula) Info(ctx *gin.Context) {
 	}
 
 	type FormulaInstallInfo struct {
-		Name        string              `json:"name"`
-		Title       string              `json:"title"`
-		Required    bool                `json:"required"`
-		StartParams []logic.StartParams `json:"start_params"`
-		RequirePvc  bool                `json:"requirepvc"`
-		Volumes     []v1.Volume         `json:"volumes"`
+		Name        string               `json:"name"`
+		Title       string               `json:"title"`
+		Required    bool                 `json:"required"`
+		StartParams []logic2.StartParams `json:"start_params"`
+		RequirePvc  bool                 `json:"requirepvc"`
+		Volumes     []v1.Volume          `json:"volumes"`
 	}
 	installFormulas := make([]FormulaInstallInfo, 0)
 	if params.CName == "" {
 		if formula.Manifest.Platform.StartParams == nil {
-			formula.Manifest.Platform.StartParams = make([]logic.StartParams, 0)
+			formula.Manifest.Platform.StartParams = make([]logic2.StartParams, 0)
 		}
 		if formula.Manifest.Platform.Volumes == nil {
 			formula.Manifest.Platform.Volumes = make([]v1.Volume, 0)
@@ -213,7 +233,7 @@ func (c Formula) Info(ctx *gin.Context) {
 					}
 				}
 				if item.Platform.StartParams == nil {
-					item.Platform.StartParams = make([]logic.StartParams, 0)
+					item.Platform.StartParams = make([]logic2.StartParams, 0)
 				}
 				if item.Platform.Volumes == nil {
 					item.Platform.Volumes = make([]v1.Volume, 0)
@@ -450,7 +470,12 @@ func (c Formula) List(ctx *gin.Context) {
 	if !params.Owner {
 		query = query.Where(dao.Q.Formula.AuditStatus.Eq(logic.FORMULA_AUDIT_SUCCESS))
 	} else {
-		query = query.Where(dao.Q.Formula.RemoteFormulaInfoURL.Eq("")).Or(dao.Q.Formula.RemoteFormulaInfoURL.IsNull())
+		query = query.Where(
+			field.Or(
+				dao.Q.Formula.RemoteFormulaInfoURL.Eq(""),
+				dao.Q.Formula.RemoteFormulaInfoURL.IsNull(),
+			),
+		)
 	}
 	query = query.Where(dao.Q.Formula.Status.In(params.Status...))
 	if params.Tag != "" {

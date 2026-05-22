@@ -15,6 +15,7 @@ import (
 
 	copy2 "github.com/otiai10/copy"
 	"github.com/w7panel/w7panel-zpk/common/function"
+	logic2 "github.com/w7panel/w7panel-zpk/common/logic"
 	v1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/yaml"
 )
@@ -56,8 +57,8 @@ type ChartYAML struct {
 }
 
 type HelmPack struct {
-	Manifest               Manifest
-	SubManifest            map[string]Manifest
+	Manifest               logic2.Manifest
+	SubManifest            map[string]logic2.Manifest
 	IngressNames           map[string]string
 	ShellNames             []string
 	OutputDir              string
@@ -66,8 +67,8 @@ type HelmPack struct {
 	SharedStorageTargetApp string
 }
 
-func NewHelmPack(manifest Manifest, subManifests []*Manifest, outputDir, chartVersion string, isSubFormula bool, sharedStorageTargetApp string) *HelmPack {
-	subManifestMap := make(map[string]Manifest)
+func NewHelmPack(manifest logic2.Manifest, subManifests []*logic2.Manifest, outputDir, chartVersion string, isSubFormula bool, sharedStorageTargetApp string) *HelmPack {
+	subManifestMap := make(map[string]logic2.Manifest)
 	if subManifests != nil {
 		for _, item := range subManifests {
 			if item.Application.Identifie != manifest.Application.Identifie {
@@ -88,7 +89,7 @@ func NewHelmPack(manifest Manifest, subManifests []*Manifest, outputDir, chartVe
 	}
 }
 
-func PackManifestToHelm(manifest Manifest, subManifest []*Manifest, outputDir string, isSubFormula bool, sharedStorageTargetApp string) error {
+func PackManifestToHelm(manifest logic2.Manifest, subManifest []*logic2.Manifest, outputDir string, isSubFormula bool, sharedStorageTargetApp string) error {
 	// 使用 Chart 版本或默认值
 	chartVersion := "0.1.0"
 	if manifest.Platform.Helm.Version != "" {
@@ -137,7 +138,7 @@ func (hc *HelmPack) PackToHelm() error {
 		if err != nil {
 			return err
 		}
-	} else if hc.Manifest.Application.Type == Tradition_App {
+	} else if hc.Manifest.Application.Type == logic2.Tradition_App {
 		if err := hc.generateValuesYaml(helmDir); err != nil {
 			return err
 		}
@@ -876,18 +877,18 @@ func (hc *HelmPack) generateValuesYaml(rootDir string) error {
 	return writeYAMLFile(filePath, values)
 }
 
-func (hc *HelmPack) getWorkloadValues(platform Platform) map[string]interface{} {
+func (hc *HelmPack) getWorkloadValues(platform logic2.Platform) map[string]interface{} {
 	return map[string]interface{}{
 		"kind":           platform.Workload.Type,
-		"isDeployment":   platform.Workload.Type == K8sWorkloadTypeDeployment,
-		"isStatefulSet":  platform.Workload.Type == K8sWorkloadTypeStatefulSet,
-		"isDaemonSet":    platform.Workload.Type == K8sWorkloadTypeDaemonSet,
+		"isDeployment":   platform.Workload.Type == logic2.K8sWorkloadTypeDeployment,
+		"isStatefulSet":  platform.Workload.Type == logic2.K8sWorkloadTypeStatefulSet,
+		"isDaemonSet":    platform.Workload.Type == logic2.K8sWorkloadTypeDaemonSet,
 		"updateStrategy": platform.Workload.UpdateStrategy,
 	}
 }
 
-func (hc *HelmPack) getVolumeClaimTemplateValues(platform Platform) []map[string]interface{} {
-	if platform.Workload.Type != K8sWorkloadTypeStatefulSet {
+func (hc *HelmPack) getVolumeClaimTemplateValues(platform logic2.Platform) []map[string]interface{} {
+	if platform.Workload.Type != logic2.K8sWorkloadTypeStatefulSet {
 		return []map[string]interface{}{}
 	}
 
@@ -967,10 +968,10 @@ func buildStableSubPathTemplate(containerName string, volumeMount v1.VolumeMount
 	)
 }
 
-func (hc *HelmPack) generateContainerV2Values(container ContainerV2, application Application) map[string]interface{} {
+func (hc *HelmPack) generateContainerV2Values(container logic2.ContainerV2, application logic2.Application) map[string]interface{} {
 	ports := make([]v1.ContainerPort, 0)
 	for _, item := range container.Ports {
-		item.Name = GetPortName(item)
+		item.Name = logic2.GetPortName(item)
 		item.HostPort = 0
 		ports = append(ports, item)
 	}
@@ -1617,7 +1618,7 @@ spec:
 	return os.WriteFile(filePath, []byte(jobTemplate), 0644)
 }
 
-func (hc *HelmPack) generateCreateSiteJobTemplate(rootDir string, application Application, tradition Tradition) error {
+func (hc *HelmPack) generateCreateSiteJobTemplate(rootDir string, application logic2.Application, tradition logic2.Tradition) error {
 	depot, _ := NewDepot()
 	zipUrl, _ := depot.GetFormulaBackendZipDownloadUrlByApplication(application, false)
 
@@ -1680,7 +1681,7 @@ spec:
 	return os.WriteFile(filePath, []byte(jobTemplate), 0644)
 }
 
-func (hc *HelmPack) generateRegisterSiteJobTemplate(rootDir string, manifest Manifest) error {
+func (hc *HelmPack) generateRegisterSiteJobTemplate(rootDir string, manifest logic2.Manifest) error {
 	if !manifest.Application.RegisterSite {
 		return nil
 	}
@@ -1740,7 +1741,7 @@ spec:
 	return writeFile(jobFilePath, jobTemplate)
 }
 
-func (hc *HelmPack) generateMicroAppTemplate(rootDir string, manifest Manifest) error {
+func (hc *HelmPack) generateMicroAppTemplate(rootDir string, manifest logic2.Manifest) error {
 	microAppFilePath := filepath.Join(rootDir, "microapp.yaml")
 	if function.FileExists(microAppFilePath) {
 		return nil
@@ -1905,7 +1906,7 @@ func (hc *HelmPack) getGlobalValues() map[string]interface{} {
 }
 
 // 获取 Image 配置
-func (hc *HelmPack) getImageValues(container ContainerV2) map[string]interface{} {
+func (hc *HelmPack) getImageValues(container logic2.ContainerV2) map[string]interface{} {
 	imageName := container.Image
 	if imageName == "" {
 		imageName = GetBuildImageName(hc.Manifest.Application)
@@ -1926,7 +1927,7 @@ func (hc *HelmPack) getImageValues(container ContainerV2) map[string]interface{}
 }
 
 // 获取 Pod 安全上下文
-func (hc *HelmPack) getSecurityContext(container ContainerV2) map[string]interface{} {
+func (hc *HelmPack) getSecurityContext(container logic2.ContainerV2) map[string]interface{} {
 	conf := make(map[string]interface{})
 
 	if container.SecurityContext != nil && container.SecurityContext.RunAsGroup != nil && *container.SecurityContext.RunAsGroup > 0 {
@@ -1945,7 +1946,7 @@ func (hc *HelmPack) getSecurityContext(container ContainerV2) map[string]interfa
 	return conf
 }
 
-func (hc *HelmPack) getJobValues(container ContainerV2) []map[string]interface{} {
+func (hc *HelmPack) getJobValues(container logic2.ContainerV2) []map[string]interface{} {
 	shells := make([]map[string]interface{}, 0)
 	for _, item := range container.Shells {
 		shellWeight := 0
@@ -1985,7 +1986,7 @@ func (hc *HelmPack) getJobValues(container ContainerV2) []map[string]interface{}
 	return shells
 }
 
-func (hc *HelmPack) getBuildImageValues(container ContainerV2, application Application) []map[string]interface{} {
+func (hc *HelmPack) getBuildImageValues(container logic2.ContainerV2, application logic2.Application) []map[string]interface{} {
 	if container.Image != "" || container.CodeAttachUrl == "" {
 		return make([]map[string]interface{}, 0)
 	}
@@ -2009,12 +2010,12 @@ func (hc *HelmPack) getBuildImageValues(container ContainerV2, application Appli
 }
 
 // 获取 Service 配置
-func (hc *HelmPack) getServiceValues(platform Platform) map[string]interface{} {
+func (hc *HelmPack) getServiceValues(platform logic2.Platform) map[string]interface{} {
 	allPorts := make([]interface{}, 0)
 	for _, c := range platform.ContainerV2s {
 		for _, port := range c.Ports {
 			allPorts = append(allPorts, map[string]interface{}{
-				"name":       GetPortName(port),
+				"name":       logic2.GetPortName(port),
 				"port":       port.ContainerPort,
 				"targetPort": port.ContainerPort,
 				"protocol":   string(port.Protocol),
@@ -2032,13 +2033,13 @@ func (hc *HelmPack) getServiceValues(platform Platform) map[string]interface{} {
 }
 
 // 获取 Service 配置
-func (hc *HelmPack) getNodePortServiceValues(platform Platform) map[string]interface{} {
+func (hc *HelmPack) getNodePortServiceValues(platform logic2.Platform) map[string]interface{} {
 	allPorts := make([]interface{}, 0)
 	for _, c := range platform.ContainerV2s {
 		for _, port := range c.Ports {
 			if port.HostPort > 0 {
 				allPorts = append(allPorts, map[string]interface{}{
-					"name":       GetPortName(port),
+					"name":       logic2.GetPortName(port),
 					"port":       port.HostPort,
 					"targetPort": port.ContainerPort,
 					"protocol":   string(port.Protocol),
@@ -2056,7 +2057,7 @@ func (hc *HelmPack) getNodePortServiceValues(platform Platform) map[string]inter
 	}
 }
 
-func (hc *HelmPack) getServiceAccountValues(application Application) map[string]interface{} {
+func (hc *HelmPack) getServiceAccountValues(application logic2.Application) map[string]interface{} {
 	return map[string]interface{}{
 		"create": application.ClusterPrivileged,
 		"annotations": struct {
@@ -2065,7 +2066,7 @@ func (hc *HelmPack) getServiceAccountValues(application Application) map[string]
 	}
 }
 
-func (hc *HelmPack) getIngressDomain(platform Platform) string {
+func (hc *HelmPack) getIngressDomain(platform logic2.Platform) string {
 	domain := ""
 	for _, item := range platform.StartParams {
 		if item.ValuesText == "%DOMAIN_SSL_URL%" || item.ValuesText == "%DOMAIN_URL%" || item.ValuesText == "%DOMAIN_HOST%" {
@@ -2078,19 +2079,19 @@ func (hc *HelmPack) getIngressDomain(platform Platform) string {
 }
 
 // 获取 Ingress 配置
-func (hc *HelmPack) getIngressValues(platform Platform, application Application) map[string]interface{} {
+func (hc *HelmPack) getIngressValues(platform logic2.Platform, application logic2.Application) map[string]interface{} {
 	domain := hc.getIngressDomain(platform)
 	if len(platform.Ingress) == 0 && domain == "" {
 		return map[string]interface{}{}
 	}
 	if len(platform.Ingress) == 0 && len(platform.ContainerV2s) > 0 && len(platform.ContainerV2s[0].Ports) > 0 {
-		platform.Ingress = []Ingress{
-			Ingress{
+		platform.Ingress = []logic2.Ingress{
+			logic2.Ingress{
 				Name: "/",
-				Routes: []IngressRoute{
-					IngressRoute{
+				Routes: []logic2.IngressRoute{
+					logic2.IngressRoute{
 						Path: "/",
-						Backend: IngressBackend{
+						Backend: logic2.IngressBackend{
 							Name:  application.Identifie,
 							Match: "Prefix",
 							Port:  int(platform.ContainerV2s[0].Ports[0].ContainerPort),
@@ -2159,7 +2160,7 @@ func (hc *HelmPack) getIngressValues(platform Platform, application Application)
 	return ingressMap
 }
 
-func (hc *HelmPack) addIngressMatchAnnotations(annotations map[string]interface{}, route IngressRoute) {
+func (hc *HelmPack) addIngressMatchAnnotations(annotations map[string]interface{}, route logic2.IngressRoute) {
 	backend := route.Backend
 
 	// Header 匹配
@@ -2183,7 +2184,7 @@ func (hc *HelmPack) addIngressMatchAnnotations(annotations map[string]interface{
 }
 
 // addIngressRewriteAnnotations 添加 Ingress 重写注解
-func (hc *HelmPack) addIngressRewriteAnnotations(annotations map[string]interface{}, route IngressRoute) {
+func (hc *HelmPack) addIngressRewriteAnnotations(annotations map[string]interface{}, route logic2.IngressRoute) {
 	backend := route.Backend
 
 	// Host 重写
@@ -2199,7 +2200,7 @@ func (hc *HelmPack) addIngressRewriteAnnotations(annotations map[string]interfac
 	}
 }
 
-func (hc *HelmPack) getGpuValues(platform Platform) map[string]interface{} {
+func (hc *HelmPack) getGpuValues(platform logic2.Platform) map[string]interface{} {
 	if platform.Gpu != "" {
 		return map[string]interface{}{
 			"enable": true,
@@ -2212,7 +2213,7 @@ func (hc *HelmPack) getGpuValues(platform Platform) map[string]interface{} {
 	}
 }
 
-func (hc *HelmPack) getStartParamsEnvValues(platform Platform) map[string]interface{} {
+func (hc *HelmPack) getStartParamsEnvValues(platform logic2.Platform) map[string]interface{} {
 	values := make(map[string]interface{})
 	for _, item := range platform.StartParams {
 		values[item.Name] = "{{ " + ".Values." + item.Name + " }}"
@@ -2221,7 +2222,7 @@ func (hc *HelmPack) getStartParamsEnvValues(platform Platform) map[string]interf
 	return values
 }
 
-func GetBuildImageName(application Application) string {
+func GetBuildImageName(application logic2.Application) string {
 	return "registry.local.w7.cc/default/" + application.Identifie + ":" + application.Version
 }
 

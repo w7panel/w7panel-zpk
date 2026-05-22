@@ -165,6 +165,7 @@ func (provider *Provider) Register(httpServer *http_server.Server, console conso
 
 			openApiGroup.Match([]string{"POST", "OPTIONS"}, "/formula/info", controller.Formula{}.Info)
 		}
+		group.Match([]string{"POST", "OPTIONS"}, "/open-api/formula/base-info", controller.Formula{}.BaseInfo)
 	})
 
 	// 初始化本地仓库

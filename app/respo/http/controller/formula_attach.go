@@ -61,7 +61,7 @@ func (c FormulaAttach) SaveFile(ctx *gin.Context) {
 	}
 
 	if params.Filename == "manifest.yaml" {
-		manifest := &logic.Manifest{}
+		manifest := &logic2.Manifest{}
 		err = yaml.Unmarshal([]byte(params.Content), manifest)
 		if err != nil {
 			c.JsonResponseWithError(ctx, errors.New("manifest 解析失败"+err.Error()), 500)
@@ -135,13 +135,13 @@ func (c FormulaAttach) Files(ctx *gin.Context) {
 	returnFileList := map[string]string{}
 	for index, val := range fileList {
 		if strings.HasSuffix(index, "manifest.yaml") {
-			tmpManifest := &logic.Manifest{}
+			tmpManifest := &logic2.Manifest{}
 			err = yaml.Unmarshal([]byte(val), tmpManifest)
 			if err != nil {
 				continue
 			}
-			tmpManifestV2 := logic.ProcessManifestIdentify(*tmpManifest)
-			tmpManifestV2 = logic.GetManifestV2(tmpManifestV2)
+			tmpManifestV2 := logic2.ProcessManifestIdentify(*tmpManifest)
+			tmpManifestV2 = logic2.GetManifestV2(tmpManifestV2)
 			tmpContent, _ := yaml.Marshal(tmpManifestV2)
 			responseManifestMap := map[string]interface{}{}
 			_ = yaml.Unmarshal(tmpContent, &responseManifestMap)

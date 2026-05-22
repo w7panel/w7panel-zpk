@@ -10,6 +10,7 @@ import (
 	"github.com/w7panel/w7panel-zpk/common/dao"
 	"github.com/w7panel/w7panel-zpk/common/entity"
 	"github.com/w7panel/w7panel-zpk/common/function"
+	logic2 "github.com/w7panel/w7panel-zpk/common/logic"
 )
 
 const (
@@ -67,8 +68,8 @@ type Formula struct {
 	LatestVersionId            int32
 	Version                    string
 	Icon                       string
-	Manifest                   *Manifest
-	AllManifest                []*Manifest
+	Manifest                   *logic2.Manifest
+	AllManifest                []*logic2.Manifest
 	ZipPath                    string
 	WebZipPaths                map[string]string
 	HelmPaths                  map[string]string

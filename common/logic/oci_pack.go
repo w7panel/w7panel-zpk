@@ -8,7 +8,6 @@ import (
 	"io"
 	"log/slog"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -54,6 +53,26 @@ func PackIconToOci(iconPath string) ([]FileOciDescriptor, error) {
 	return fileDescriptors, nil
 }
 
+func PackFileListToOci(fileList map[string]string) ([]FileOciDescriptor, error) {
+	fileDescriptors := make([]FileOciDescriptor, 0)
+	if len(fileList) > 0 {
+		fileListContent, err := json.Marshal(fileList)
+		if err != nil {
+			return nil, err
+		}
+		ociFileListDescriptor, err := oci.GetOciDescriptorByData(fileListContent, MediaTypeFilesJson)
+		if err != nil {
+			return nil, err
+		}
+		fileDescriptors = append(fileDescriptors, FileOciDescriptor{
+			Content:    fileListContent,
+			Descriptor: *ociFileListDescriptor,
+		})
+	}
+
+	return fileDescriptors, nil
+}
+
 func PackHelmToOci(helmPaths []string) ([]FileOciDescriptor, error) {
 	fileDescriptors := make([]FileOciDescriptor, 0)
 	for _, helmPath := range helmPaths {
@@ -74,55 +93,10 @@ func PackHelmToOci(helmPaths []string) ([]FileOciDescriptor, error) {
 	return fileDescriptors, nil
 }
 
-func PackBackendCodeZipToOci(zipPath string, fileList map[string]string) ([]FileOciDescriptor, error) {
+func PackBackendCodeZipToOci(zipPath string) ([]FileOciDescriptor, error) {
 	fileDescriptors := make([]FileOciDescriptor, 0)
 
-	if len(fileList) > 0 {
-		fileListContent, err := json.Marshal(fileList)
-		if err != nil {
-			return nil, err
-		}
-		ociFileListDescriptor, err := oci.GetOciDescriptorByData(fileListContent, MediaTypeFilesJson)
-		if err != nil {
-			return nil, err
-		}
-		fileDescriptors = append(fileDescriptors, FileOciDescriptor{
-			Content:    fileListContent,
-			Descriptor: *ociFileListDescriptor,
-		})
-	}
-
 	if zipPath != "" && !function.IsEmptyFile(zipPath) {
-		packDir := filepath.Join(DefaultWorkDir, function.GetRandomString(8))
-		if fileList != nil && len(fileList) > 0 {
-			for name, value := range fileList {
-				if value != "" {
-					tempPath := filepath.Join(packDir, name)
-					function.CreateDirIfNotExist(filepath.Dir(tempPath), os.ModePerm)
-
-					file, err := os.Create(tempPath)
-					if err != nil {
-						return nil, err
-					}
-					_, err = file.WriteString(value)
-					if err != nil {
-						return nil, err
-					}
-					file.Close()
-
-					slog.Info("执行命令", "cmd", "zip -u", zipPath, name, "dir", packDir)
-					cmd := exec.Command("zip", "-u", zipPath, name)
-					cmd.Dir = packDir
-					message, err := cmd.CombinedOutput()
-					if err != nil {
-						return nil, err
-					}
-					slog.Info("执行命令结果", "cmd", "zip -u", zipPath, name, "message", string(message))
-				}
-			}
-			os.RemoveAll(packDir)
-		}
-
 		ociCodeDescriptor, err := oci.GetOciDescriptorByPath(zipPath, MediaTypeCodeZip)
 		if err != nil {
 			return nil, err

@@ -1,0 +1,11 @@
+app:
+  name: zpk-cli
+  env: ${APP_ENV-release}
+log:
+  default:
+    driver: stack
+    channels:
+      - console
+  console:
+    driver: console
+    level: debug

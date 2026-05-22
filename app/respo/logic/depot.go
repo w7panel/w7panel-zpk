@@ -88,7 +88,7 @@ func (self *Depot) GetBasePath() string {
 	return self.basePath
 }
 
-func (self *Depot) GetHelmLocalRelativePath(helm Helm) string {
+func (self *Depot) GetHelmLocalRelativePath(helm logic.Helm) string {
 	if helm.Repository == "" && helm.ChartName != "" {
 		if strings.HasPrefix(helm.ChartName, "/Storage") || strings.HasPrefix(helm.ChartName, "file://") {
 			return strings.TrimPrefix(helm.ChartName, "file://")
@@ -156,10 +156,10 @@ func (self *Depot) AddFormula(name string, version string, user *entity.Registry
 
 	if newCreate {
 		type DefaultManifest struct {
-			Application `json:"application"`
+			logic.Application `json:"application"`
 		}
 		manifest := &DefaultManifest{
-			Application: Application{
+			Application: logic.Application{
 				Name:      name,
 				Identifie: name,
 			},
@@ -198,7 +198,7 @@ func (self *Depot) GetFormula(name string, version string, user *entity.Registry
 		Title:                      row.Title,
 		VersionId:                  row.VersionLatestID,
 		LatestVersionId:            row.VersionLatestID,
-		Manifest:                   &Manifest{},
+		Manifest:                   &logic.Manifest{},
 		ZipPath:                    "",
 		WebZipPaths:                map[string]string{},
 		HelmPaths:                  map[string]string{},
@@ -242,7 +242,7 @@ func (self *Depot) GetFormula(name string, version string, user *entity.Registry
 	list, _ := self.GetFileList(result)
 	for key, value := range list {
 		if strings.Contains(key, "manifest.yaml") {
-			manifestRow := &Manifest{}
+			manifestRow := &logic.Manifest{}
 			err := yaml.Unmarshal([]byte(value), manifestRow)
 			if err != nil {
 				return nil, err
@@ -250,8 +250,8 @@ func (self *Depot) GetFormula(name string, version string, user *entity.Registry
 
 			//处理转换旧数据格式
 			manifestRow.Application.Version = result.Version
-			tmpManifest := ProcessManifestIdentify(*manifestRow)
-			tmpManifest = GetManifestV2(tmpManifest)
+			tmpManifest := logic.ProcessManifestIdentify(*manifestRow)
+			tmpManifest = logic.GetManifestV2(tmpManifest)
 			manifestRow = &tmpManifest
 			if key == "manifest.yaml" {
 				result.Manifest = manifestRow
@@ -297,7 +297,7 @@ func (self *Depot) GetFormulaBackendZipDownloadUrl(formula *Formula, isTemporary
 	return ""
 }
 
-func (self *Depot) GetFormulaBackendZipDownloadUrlByApplication(application Application, isTemporary bool) (string, string) {
+func (self *Depot) GetFormulaBackendZipDownloadUrlByApplication(application logic.Application, isTemporary bool) (string, string) {
 	token := ""
 	if isTemporary {
 		token = function.GetRandomString(20)
@@ -493,16 +493,22 @@ func (self *Depot) packToOci(formula *Formula) error {
 	if err != nil {
 		return err
 	}
-	backendCodePath := ""
-	if strings.HasSuffix(formula.Manifest.Source.Url, ".zip") || strings.HasSuffix(formula.Manifest.Web.Url, ".zip") {
-		backendCodePath = filepath.Join(self.basePath, formula.ZipPath)
-		slog.Info("打包 zip 文件", "name", formula.Name, "path", backendCodePath, "filelist", fileList, "err", err)
-	}
-	backendCodeDescriptors, err := logic.PackBackendCodeZipToOci(backendCodePath, fileList)
+	slog.Info("打包 filelist 文件", "name", formula.Name, "filelist", fileList, "err", err)
+	fileListDescriptors, err := logic.PackFileListToOci(fileList)
 	if err != nil {
 		return err
 	}
-	resourcesDescriptor = append(resourcesDescriptor, backendCodeDescriptors...)
+	resourcesDescriptor = append(resourcesDescriptor, fileListDescriptors...)
+
+	if strings.HasSuffix(formula.Manifest.Source.Url, ".zip") || strings.HasSuffix(formula.Manifest.Web.Url, ".zip") {
+		backendCodePath := filepath.Join(self.basePath, formula.ZipPath)
+		slog.Info("打包 zip 文件", "name", formula.Name, "path", backendCodePath, "err", err)
+		backendCodeDescriptors, err := logic.PackBackendCodeZipToOci(backendCodePath)
+		if err != nil {
+			return err
+		}
+		resourcesDescriptor = append(resourcesDescriptor, backendCodeDescriptors...)
+	}
 
 	frontedCodePaths := make([]string, 0)
 	for _, webZipPath := range formula.WebZipPaths {

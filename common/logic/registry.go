@@ -1,6 +1,8 @@
 package logic
 
 import (
+	"strings"
+
 	"github.com/w7panel/w7panel-zpk/common/service/oci"
 	"github.com/w7panel/w7panel-zpk/common/service/registry"
 	"github.com/w7panel/w7panel-zpk/common/service/registry/client"
@@ -9,6 +11,26 @@ import (
 	"oras.land/oras-go/v2/registry/remote"
 	"oras.land/oras-go/v2/registry/remote/auth"
 )
+
+var DefaultNamespace = "default"
+
+func ParseRepositoryNameAndNamespace(repositoryName string) (string, string) {
+	nameArr := strings.SplitN(repositoryName, "/", 2)
+	targetRepositoryName := repositoryName
+	namespace := DefaultNamespace
+	if len(nameArr) >= 2 {
+		namespace = nameArr[0]
+		targetRepositoryName = nameArr[1]
+	}
+	return targetRepositoryName, namespace
+}
+
+func BuildRepositoryName(repositoryName string, namespace string) string {
+	if namespace != DefaultNamespace {
+		repositoryName = namespace + "/" + repositoryName
+	}
+	return repositoryName
+}
 
 func GetDefaultRemoteOci(registryReference string) (*remote.Repository, error) {
 	return oci.NewRepositoryOci(facade.GetConfig().GetString("registry_cli.default.url"), registryReference, auth.Credential{

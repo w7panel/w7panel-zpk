@@ -1,4 +1,4 @@
-package types
+package registry
 
 type RegistryEvent struct {
 	Events []Event `json:"events"`

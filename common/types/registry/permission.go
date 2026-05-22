@@ -1,4 +1,4 @@
-package types
+package registry
 
 type PermissionScope struct {
 	Type    string   `json:"type" binding:"required,oneof=namespace repository"`

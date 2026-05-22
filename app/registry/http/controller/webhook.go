@@ -3,12 +3,13 @@ package controller
 import (
 	"encoding/json"
 	"errors"
-	"github.com/gin-gonic/gin"
-	"github.com/w7panel/w7panel-zpk/app/registry/types"
-	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
-	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 	"log/slog"
 	"net/http"
+
+	"github.com/gin-gonic/gin"
+	"github.com/w7panel/w7panel-zpk/common/types/registry"
+	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
+	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 )
 
 type WebHook struct {
@@ -21,7 +22,7 @@ func (c WebHook) Hook(ctx *gin.Context) {
 		return
 	}
 
-	var event types.RegistryEvent
+	var event registry.RegistryEvent
 	if err := json.NewDecoder(ctx.Request.Body).Decode(&event); err != nil {
 		c.JsonResponseWithError(ctx, errors.New("invalid JSON"), http.StatusBadRequest)
 		return
@@ -33,19 +34,19 @@ func (c WebHook) Hook(ctx *gin.Context) {
 	for _, e := range event.Events {
 		switch e.Action {
 		case "push":
-			facade.GetEvent().Publish(types.RegistryRepositoryPushedEvent, types.RegistryRepositoryWebHookPayLoad{
+			facade.GetEvent().Publish(registry.RegistryRepositoryPushedEvent, registry.RegistryRepositoryWebHookPayLoad{
 				Event: e,
 			})
 		case "delete":
-			facade.GetEvent().Publish(types.RegistryRepositoryDeletedEvent, types.RegistryRepositoryWebHookPayLoad{
+			facade.GetEvent().Publish(registry.RegistryRepositoryDeletedEvent, registry.RegistryRepositoryWebHookPayLoad{
 				Event: e,
 			})
 		case "pull":
-			facade.GetEvent().Publish(types.RegistryRepositoryPulledEvent, types.RegistryRepositoryWebHookPayLoad{
+			facade.GetEvent().Publish(registry.RegistryRepositoryPulledEvent, registry.RegistryRepositoryWebHookPayLoad{
 				Event: e,
 			})
 		case "mount":
-			facade.GetEvent().Publish(types.RegistryRepositoryMountedEvent, types.RegistryRepositoryWebHookPayLoad{
+			facade.GetEvent().Publish(registry.RegistryRepositoryMountedEvent, registry.RegistryRepositoryWebHookPayLoad{
 				Event: e,
 			})
 		default:

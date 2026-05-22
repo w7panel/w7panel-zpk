@@ -228,7 +228,7 @@ func (c Namespace) Delete(ctx *gin.Context) {
 		c.JsonResponseWithServerError(ctx, errors.New("namespace 不存在"))
 		return
 	}
-	if curNamespace.Name == logic.DefaultNamespace {
+	if curNamespace.Name == logic2.DefaultNamespace {
 		c.JsonResponseWithServerError(ctx, errors.New("default namespace 不可删除"))
 		return
 	}

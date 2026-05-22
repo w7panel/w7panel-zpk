@@ -5,9 +5,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	registrylogic "github.com/w7panel/w7panel-zpk/app/registry/logic"
-	"github.com/w7panel/w7panel-zpk/app/registry/types"
 	"github.com/w7panel/w7panel-zpk/common/dao"
 	"github.com/w7panel/w7panel-zpk/common/entity"
+	"github.com/w7panel/w7panel-zpk/common/types/registry"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 )
 
@@ -59,7 +59,7 @@ func (c Permission) GetNamespacePermission(ctx *gin.Context) {
 		}
 	}
 
-	list := make([]types.NamespacePermissionItem, 0, len(permissions))
+	list := make([]registry.NamespacePermissionItem, 0, len(permissions))
 	for _, item := range permissions {
 		user := userMap[item.UserID]
 		if user == nil {
@@ -71,7 +71,7 @@ func (c Permission) GetNamespacePermission(ctx *gin.Context) {
 			actions = *item.Action
 		}
 
-		list = append(list, types.NamespacePermissionItem{
+		list = append(list, registry.NamespacePermissionItem{
 			UserID:   int(item.UserID),
 			UserName: user.Username,
 			Actions:  actions,
@@ -86,8 +86,8 @@ func (c Permission) GetNamespacePermission(ctx *gin.Context) {
 
 func (c Permission) SetNamespacePermission(ctx *gin.Context) {
 	type ParamsValidate struct {
-		Namespace   string                          `json:"namespace" binding:"required"`
-		Permissions []types.NamespacePermissionItem `json:"permissions"`
+		Namespace   string                             `json:"namespace" binding:"required"`
+		Permissions []registry.NamespacePermissionItem `json:"permissions"`
 	}
 	params := ParamsValidate{}
 	if !c.Validate(ctx, &params) {

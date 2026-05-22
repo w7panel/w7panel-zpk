@@ -175,7 +175,7 @@ func (c Repository) Tags(ctx *gin.Context) {
 		return
 	}
 
-	repositoryName := logic.Repository{}.BuildRepositoryName(curRepository.Name, curRepository.Namespace)
+	repositoryName := logic2.BuildRepositoryName(curRepository.Name, curRepository.Namespace)
 	registryClient := logic2.GetDefaultRegistryClient()
 	tags, _ := registryClient.ListTags(repositoryName)
 	tagInfos := make([]logic.TagInfo, 0)
@@ -254,7 +254,7 @@ func (c Repository) DelTag(ctx *gin.Context) {
 		return
 	}
 
-	repositoryName := logic.Repository{}.BuildRepositoryName(curRepository.Name, curRepository.Namespace)
+	repositoryName := logic2.BuildRepositoryName(curRepository.Name, curRepository.Namespace)
 	registryClient := logic2.GetDefaultRegistryClient()
 	err := registryClient.DeleteManifest(repositoryName, params.Tag)
 	if err != nil {
@@ -283,7 +283,7 @@ func (c Repository) Edit(ctx *gin.Context) {
 		return
 	}
 
-	curRepositoryName := logic.Repository{}.BuildRepositoryName(curRepository.Name, curRepository.Namespace)
+	curRepositoryName := logic2.BuildRepositoryName(curRepository.Name, curRepository.Namespace)
 	if curRepository.Name != params.Name {
 		existsRepository, _ := logic.Repository{}.GetByNameAndNamespace(params.Name, params.Namespace)
 		if existsRepository != nil && existsRepository.ID != curRepository.ID {
@@ -301,7 +301,7 @@ func (c Repository) Edit(ctx *gin.Context) {
 		return
 	}
 
-	newRepositoryName := logic.Repository{}.BuildRepositoryName(curRepository.Name, curRepository.Namespace)
+	newRepositoryName := logic2.BuildRepositoryName(curRepository.Name, curRepository.Namespace)
 	if curRepositoryName != newRepositoryName {
 		registryClient := logic2.GetDefaultRegistryClient()
 		tags, err := registryClient.ListTags(curRepositoryName)

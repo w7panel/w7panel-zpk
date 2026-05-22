@@ -10,10 +10,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/w7panel/w7panel-zpk/app/registry/types"
 	"github.com/w7panel/w7panel-zpk/common/dao"
 	"github.com/w7panel/w7panel-zpk/common/entity"
 	"github.com/w7panel/w7panel-zpk/common/logic"
+	"github.com/w7panel/w7panel-zpk/common/types/registry"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sTypes "k8s.io/apimachinery/pkg/types"
@@ -44,8 +44,8 @@ type Deploy struct {
 	logic.Logic
 }
 
-func (l Deploy) OnRepositoryPushed(payload types.RegistryRepositoryWebHookPayLoad) {
-	repositoryName, namespace := Repository{}.ParseRepositoryNameAndNamespace(payload.Event.Target.Repository)
+func (l Deploy) OnRepositoryPushed(payload registry.RegistryRepositoryWebHookPayLoad) {
+	repositoryName, namespace := logic.ParseRepositoryNameAndNamespace(payload.Event.Target.Repository)
 	repositoryModel, _ := Repository{}.GetByNameAndNamespace(repositoryName, namespace)
 	if repositoryModel == nil {
 		return
@@ -69,7 +69,7 @@ func (l Deploy) OnRepositoryPushed(payload types.RegistryRepositoryWebHookPayLoa
 		return
 	}
 
-	imgName := fmt.Sprintf("%s/%s@%s", facade.GetConfig().GetString("registry_cli.default.external_domain"), Repository{}.BuildRepositoryName(repositoryName, namespace), payload.Event.Target.Digest)
+	imgName := fmt.Sprintf("%s/%s@%s", facade.GetConfig().GetString("registry_cli.default.external_domain"), logic.BuildRepositoryName(repositoryName, namespace), payload.Event.Target.Digest)
 	for _, rule := range deployRules {
 		match := false
 		if deployType == K8sDeployWhenTagAdd && rule.MatchType == K8sDeployRuleTagMatchRegular {

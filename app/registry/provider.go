@@ -6,13 +6,13 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/w7panel/w7panel-zpk/app/registry/http/controller"
 	"github.com/w7panel/w7panel-zpk/app/registry/logic"
-	"github.com/w7panel/w7panel-zpk/app/registry/types"
 	respologic "github.com/w7panel/w7panel-zpk/app/system/logic"
 	"github.com/w7panel/w7panel-zpk/common/dao"
 	"github.com/w7panel/w7panel-zpk/common/entity"
 	"github.com/w7panel/w7panel-zpk/common/function"
 	logic2 "github.com/w7panel/w7panel-zpk/common/logic"
 	"github.com/w7panel/w7panel-zpk/common/middleware"
+	"github.com/w7panel/w7panel-zpk/common/types/registry"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	httpserver "github.com/we7coreteam/w7-rangine-go/v2/src/http/server"
 )
@@ -62,10 +62,10 @@ func (p Provider) registerRoutes(httpServer *httpserver.Server) {
 }
 
 func (p Provider) registerEvent() {
-	_ = facade.GetEvent().Subscribe(types.RegistryRepositoryPrepareEvent, logic.Repository{}.OnRepositoryPrepareOperate)
-	_ = facade.GetEvent().Subscribe(types.RegistryRepositoryPushedEvent, logic.Repository{}.OnRepositoryPushed)
-	_ = facade.GetEvent().Subscribe(types.RegistryRepositoryPulledEvent, logic.Repository{}.OnRepositoryPulled)
-	_ = facade.GetEvent().Subscribe(types.RegistryRepositoryAfterPushedEvent, logic.Deploy{}.OnRepositoryPushed)
+	_ = facade.GetEvent().Subscribe(registry.RegistryRepositoryPrepareEvent, logic.Repository{}.OnRepositoryPrepareOperate)
+	_ = facade.GetEvent().Subscribe(registry.RegistryRepositoryPushedEvent, logic.Repository{}.OnRepositoryPushed)
+	_ = facade.GetEvent().Subscribe(registry.RegistryRepositoryPulledEvent, logic.Repository{}.OnRepositoryPulled)
+	_ = facade.GetEvent().Subscribe(registry.RegistryRepositoryAfterPushedEvent, logic.Deploy{}.OnRepositoryPushed)
 }
 
 func (p Provider) initJwtCert() {
@@ -103,10 +103,10 @@ func (p Provider) initSuperAdmin() {
 }
 
 func (p Provider) initDefaultNamespace() {
-	defaultNamespace, _ := dao.Q.RegistryNamespace.Where(dao.Q.RegistryNamespace.Name.Eq(logic.DefaultNamespace)).First()
+	defaultNamespace, _ := dao.Q.RegistryNamespace.Where(dao.Q.RegistryNamespace.Name.Eq(logic2.DefaultNamespace)).First()
 	if defaultNamespace == nil {
 		namespace := entity.RegistryNamespace{
-			Name:        logic.DefaultNamespace,
+			Name:        logic2.DefaultNamespace,
 			VisibleType: int32(logic.VisibleTypePrivate),
 		}
 		err := dao.Q.RegistryNamespace.Create(&namespace)

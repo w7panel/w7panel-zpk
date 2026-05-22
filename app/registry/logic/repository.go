@@ -14,10 +14,10 @@ import (
 	"github.com/docker/distribution/manifest/manifestlist"
 	"github.com/docker/distribution/manifest/ocischema"
 	"github.com/docker/distribution/manifest/schema2"
-	"github.com/w7panel/w7panel-zpk/app/registry/types"
 	"github.com/w7panel/w7panel-zpk/common/dao"
 	"github.com/w7panel/w7panel-zpk/common/entity"
 	"github.com/w7panel/w7panel-zpk/common/logic"
+	"github.com/w7panel/w7panel-zpk/common/types/registry"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 )
 
@@ -35,24 +35,6 @@ type TagInfo struct {
 
 type Repository struct {
 	logic.Logic
-}
-
-func (l Repository) ParseRepositoryNameAndNamespace(repositoryName string) (string, string) {
-	nameArr := strings.SplitN(repositoryName, "/", 2)
-	targetRepositoryName := repositoryName
-	namespace := DefaultNamespace
-	if len(nameArr) >= 2 {
-		namespace = nameArr[0]
-		targetRepositoryName = nameArr[1]
-	}
-	return targetRepositoryName, namespace
-}
-
-func (l Repository) BuildRepositoryName(repositoryName string, namespace string) string {
-	if namespace != DefaultNamespace {
-		repositoryName = namespace + "/" + repositoryName
-	}
-	return repositoryName
 }
 
 func (l Repository) GetByIdWithUser(id int, user *entity.RegistryUser) (*entity.RegistryRepository, error) {
@@ -82,9 +64,9 @@ func (l Repository) GetByNameAndNamespace(repositoryName string, namespace strin
 	return dao.Q.RegistryRepository.Where(dao.RegistryRepository.Name.Eq(repositoryName)).Where(dao.RegistryRepository.Namespace.Eq(namespace)).First()
 }
 
-func (l Repository) OnRepositoryPrepareOperate(payload types.RegistryRepositoryPayLoad) {
+func (l Repository) OnRepositoryPrepareOperate(payload registry.RegistryRepositoryPayLoad) {
 	if slices.Contains(payload.Scope.Actions, string(PermissionActionTypePush)) {
-		repositoryName, namespace := l.ParseRepositoryNameAndNamespace(payload.Scope.Name)
+		repositoryName, namespace := logic.ParseRepositoryNameAndNamespace(payload.Scope.Name)
 
 		userId := int32(0)
 		if payload.User != nil {
@@ -135,8 +117,8 @@ func (l Repository) OnRepositoryPrepareOperate(payload types.RegistryRepositoryP
 	}
 }
 
-func (l Repository) OnRepositoryPushed(payload types.RegistryRepositoryWebHookPayLoad) {
-	repositoryName, namespace := Repository{}.ParseRepositoryNameAndNamespace(payload.Event.Target.Repository)
+func (l Repository) OnRepositoryPushed(payload registry.RegistryRepositoryWebHookPayLoad) {
+	repositoryName, namespace := logic.ParseRepositoryNameAndNamespace(payload.Event.Target.Repository)
 	repositoryModel, _ := Repository{}.GetByNameAndNamespace(repositoryName, namespace)
 	if repositoryModel != nil {
 		tag, _ := dao.Q.RegistryRepositoryTag.Where(dao.Q.RegistryRepositoryTag.RepositoryID.Eq(repositoryModel.ID)).
@@ -160,11 +142,11 @@ func (l Repository) OnRepositoryPushed(payload types.RegistryRepositoryWebHookPa
 		}
 	}
 
-	go facade.GetEvent().Publish(types.RegistryRepositoryAfterPushedEvent, payload)
+	go facade.GetEvent().Publish(registry.RegistryRepositoryAfterPushedEvent, payload)
 }
 
-func (l Repository) OnRepositoryPulled(payload types.RegistryRepositoryWebHookPayLoad) {
-	repositoryName, namespace := Repository{}.ParseRepositoryNameAndNamespace(payload.Event.Target.Repository)
+func (l Repository) OnRepositoryPulled(payload registry.RegistryRepositoryWebHookPayLoad) {
+	repositoryName, namespace := logic.ParseRepositoryNameAndNamespace(payload.Event.Target.Repository)
 	repositoryModel, _ := Repository{}.GetByNameAndNamespace(repositoryName, namespace)
 	if repositoryModel != nil {
 		pullNum := repositoryModel.PullNum + 1

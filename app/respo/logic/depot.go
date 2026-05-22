@@ -22,6 +22,7 @@ import (
 	"github.com/w7panel/w7panel-zpk/common/function"
 	"github.com/w7panel/w7panel-zpk/common/logic"
 	"github.com/w7panel/w7panel-zpk/common/service"
+	"github.com/w7panel/w7panel-zpk/common/types/registry"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/core/err_handler"
 	"oras.land/oras-go/v2"
@@ -443,6 +444,41 @@ func (self *Depot) Copy(src *Formula, dest *Formula) error {
 
 	_, err = oras.Copy(context.Background(), srcRemoteOci, self.GetFormulaOciTag(src), destRemoteOci, self.GetFormulaOciTag(dest), oras.DefaultCopyOptions)
 	return err
+}
+
+func (self *Depot) OnRepositoryPushed(payload registry.RegistryRepositoryWebHookPayLoad) {
+	repositoryName, namespace := logic.ParseRepositoryNameAndNamespace(payload.Event.Target.Repository)
+	if namespace != facade.GetConfig().GetString("setting.depot.oci_namespace") {
+		return
+	}
+
+	tag := payload.Event.Target.Tag
+	formula := GetFormulaByName(repositoryName)
+	if formula == nil {
+		err := self.AddFormula(repositoryName, tag, nil)
+		if err != nil {
+			slog.Error("Failed to add formula to repository", repositoryName, tag, err)
+			return
+		}
+		formula = GetFormulaByName(repositoryName)
+	}
+	if formula == nil {
+		slog.Error("Failed to get formula from repository", repositoryName, tag)
+		return
+	}
+
+	version, _ := dao.Q.Version.Where(dao.Q.Version.FormulaID.Eq(formula.ID)).Where(dao.Q.Version.Name.Eq(tag)).First()
+	if version == nil {
+		err := dao.Q.Version.Create(&entity.Version{
+			FormulaID:     formula.ID,
+			Name:          tag,
+			Description:   "新版本",
+			PublishStatus: -1,
+		})
+		if err != nil {
+			slog.Error("Failed to create version", repositoryName, tag, err)
+		}
+	}
 }
 
 func (self *Depot) Pack(formula *Formula, async bool) error {

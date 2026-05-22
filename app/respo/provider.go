@@ -10,6 +10,7 @@ import (
 	logic2 "github.com/w7panel/w7panel-zpk/app/system/logic"
 	"github.com/w7panel/w7panel-zpk/common/entity"
 	"github.com/w7panel/w7panel-zpk/common/middleware"
+	"github.com/w7panel/w7panel-zpk/common/types/registry"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/console"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	http_server "github.com/we7coreteam/w7-rangine-go/v2/src/http/server"
@@ -69,8 +70,14 @@ func (provider *Provider) normalizeFormulaNames() error {
 	return nil
 }
 
+func (p Provider) registerEvent() {
+	_ = facade.GetEvent().Subscribe(registry.RegistryRepositoryAfterPushedEvent, logic.Depot{}.OnRepositoryPushed)
+}
+
 func (provider *Provider) Register(httpServer *http_server.Server, console console.Console) {
 	provider.initDb()
+
+	provider.registerEvent()
 
 	console.RegisterCommand(new(command.Pack))
 	console.RegisterCommand(new(command.Sqlite))

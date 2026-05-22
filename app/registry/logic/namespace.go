@@ -17,8 +17,6 @@ var (
 	VisibleTypeFollowNamespace = 3
 )
 
-var DefaultNamespace = "default"
-
 type Namespace struct {
 	logic.Logic
 }
@@ -60,8 +58,8 @@ func (l Namespace) ListSubNamespacesByNamespace(namespace string) ([]string, err
 		Order(dao.Q.RegistryRepository.ID.Asc()).
 		FindInBatches(&batchRows, 200, func(tx gen.Dao, batch int) error {
 			for _, repository := range batchRows {
-				_, subNamespace := Repository{}.ParseRepositoryNameAndNamespace(repository.Name)
-				if subNamespace == "" || subNamespace == DefaultNamespace {
+				_, subNamespace := logic.ParseRepositoryNameAndNamespace(repository.Name)
+				if subNamespace == "" || subNamespace == logic.DefaultNamespace {
 					continue
 				}
 				subNamespaceMap[subNamespace] = struct{}{}

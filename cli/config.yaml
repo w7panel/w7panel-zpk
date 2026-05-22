@@ -9,3 +9,6 @@ log:
   console:
     driver: console
     level: debug
+setting:
+  depot:
+    oci_namespace: ${DEPOT_OCI_NAMESPACE-zpk_oci}

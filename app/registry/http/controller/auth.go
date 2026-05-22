@@ -11,9 +11,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/w7panel/w7panel-zpk/app/registry/logic"
-	"github.com/w7panel/w7panel-zpk/app/registry/types"
 	"github.com/w7panel/w7panel-zpk/common/entity"
 	logic2 "github.com/w7panel/w7panel-zpk/common/logic"
+	"github.com/w7panel/w7panel-zpk/common/types/registry"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 )
@@ -62,7 +62,7 @@ func (c Auth) Auth(ctx *gin.Context) {
 
 	for _, scope := range scopes {
 		if scope.Type == string(logic.ScopeRegistryType) {
-			facade.GetEvent().Publish(types.RegistryRepositoryPrepareEvent, types.RegistryRepositoryPayLoad{
+			facade.GetEvent().Publish(registry.RegistryRepositoryPrepareEvent, registry.RegistryRepositoryPayLoad{
 				User:  user,
 				Scope: scope,
 			})
@@ -119,13 +119,13 @@ func (c Auth) validateUser(ctx *gin.Context) (*entity.RegistryUser, error) {
 	return user, nil
 }
 
-func (c Auth) matchScope(ctx *gin.Context) ([]types.PermissionScope, error) {
-	var scopes = make([]types.PermissionScope, 0)
+func (c Auth) matchScope(ctx *gin.Context) ([]registry.PermissionScope, error) {
+	var scopes = make([]registry.PermissionScope, 0)
 	if ctx.Request.FormValue("scope") != "" {
 		for _, scopeValue := range ctx.Request.Form["scope"] {
 			for _, scopeStr := range strings.Split(scopeValue, " ") {
 				parts := strings.Split(scopeStr, ":")
-				var scope types.PermissionScope
+				var scope registry.PermissionScope
 
 				scopeType, scopeClass, err := parseScope(parts[0])
 				if err != nil {
@@ -134,14 +134,14 @@ func (c Auth) matchScope(ctx *gin.Context) ([]types.PermissionScope, error) {
 
 				switch len(parts) {
 				case 3:
-					scope = types.PermissionScope{
+					scope = registry.PermissionScope{
 						Type:    scopeType,
 						Class:   scopeClass,
 						Name:    parts[1],
 						Actions: strings.Split(parts[2], ","),
 					}
 				case 4:
-					scope = types.PermissionScope{
+					scope = registry.PermissionScope{
 						Type:    scopeType,
 						Class:   scopeClass,
 						Name:    parts[1] + ":" + parts[2],

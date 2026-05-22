@@ -1,4 +1,4 @@
-package types
+package registry
 
 import (
 	"github.com/w7panel/w7panel-zpk/common/entity"

@@ -13,12 +13,12 @@ import (
 	"github.com/docker/distribution/registry/auth/token"
 	"github.com/docker/libtrust"
 	"github.com/gin-gonic/gin"
-	"github.com/w7panel/w7panel-zpk/app/registry/types"
 	"github.com/w7panel/w7panel-zpk/common/accessor"
 	"github.com/w7panel/w7panel-zpk/common/dao"
 	"github.com/w7panel/w7panel-zpk/common/entity"
 	"github.com/w7panel/w7panel-zpk/common/function"
 	"github.com/w7panel/w7panel-zpk/common/logic"
+	"github.com/w7panel/w7panel-zpk/common/types/registry"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 )
 
@@ -49,7 +49,7 @@ type Permission struct {
 	logic.Logic
 }
 
-func (l Permission) CheckUserScopes(user *entity.RegistryUser, scopes []types.PermissionScope) error {
+func (l Permission) CheckUserScopes(user *entity.RegistryUser, scopes []registry.PermissionScope) error {
 	slog.Info("auth", "user", user, "scopes", scopes)
 
 	if user != nil && user.Type == logic.UserTypeSuperAdminForRegistry {
@@ -68,7 +68,7 @@ func (l Permission) CheckUserScopes(user *entity.RegistryUser, scopes []types.Pe
 
 	for _, item := range scopes {
 		if item.Type == string(ScopeRegistryType) {
-			repositoryName, namespace := Repository{}.ParseRepositoryNameAndNamespace(item.Name)
+			repositoryName, namespace := logic.ParseRepositoryNameAndNamespace(item.Name)
 			//直接验证仓库是不是公有
 			registryModel, _ := Repository{}.GetByNameAndNamespace(repositoryName, namespace)
 			if registryModel != nil {
@@ -133,7 +133,7 @@ func (l Permission) CheckUserScopes(user *entity.RegistryUser, scopes []types.Pe
 	return nil
 }
 
-func (l Permission) CreateToken(user *entity.RegistryUser, scopes []types.PermissionScope) (string, error) {
+func (l Permission) CreateToken(user *entity.RegistryUser, scopes []registry.PermissionScope) (string, error) {
 	userName := ""
 	expireDays := 999
 	if user != nil {
@@ -215,7 +215,7 @@ func (l Permission) GetNamespacePermissions(namespace string) ([]*entity.Registr
 		Find()
 }
 
-func (l Permission) ReplaceNamespacePermissions(namespace string, permissions []types.NamespacePermissionItem) error {
+func (l Permission) ReplaceNamespacePermissions(namespace string, permissions []registry.NamespacePermissionItem) error {
 	return dao.Q.Transaction(func(tx *dao.Query) error {
 		_, err := tx.RegistryUserPermission.
 			Where(tx.RegistryUserPermission.ResourceType.Eq(string(PermissionResourceTypeNamespace))).

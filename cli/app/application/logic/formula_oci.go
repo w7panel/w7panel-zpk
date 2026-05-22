@@ -69,7 +69,7 @@ func PackFormulaToOci(session Session) error {
 		}
 	}
 
-	formulaManifest, err := loadFormulaManifest(session, nextVersion, fileList)
+	formulaManifests, err := loadFormulaManifests(session, nextVersion, fileList)
 	if err != nil {
 		return err
 	}
@@ -86,6 +86,12 @@ func PackFormulaToOci(session Session) error {
 
 		pathInfo := function.GetPathInfo(item.Path)
 		attachKey := fmt.Sprintf("/Storage/%s/%s%s", time.Now().Format("200601"), fileMd5, pathInfo.Extension)
+
+		formulaManifest, err := formulaManifests.manifest(item.Artifact)
+		if err != nil {
+			return err
+		}
+
 		switch item.Type {
 		case AttachTypeFrontend:
 			packed, err := commonlogic.PackFrontedCodeZipToOci(map[string]string{attachKey: item.Path})
@@ -93,7 +99,13 @@ func PackFormulaToOci(session Session) error {
 				return err
 			}
 			descriptors = append(descriptors, packed...)
-			replacedMediaTypes = append(replacedMediaTypes, commonlogic.MediaTypeWebCodeZip)
+
+			if strings.HasPrefix(formulaManifest.Web.Url, "file://") {
+				realPath := strings.TrimPrefix(formulaManifest.Web.Url, "file://")
+				if realPath != "" {
+					replacedMediaTypes = append(replacedMediaTypes, commonlogic.MediaTypeWebCodeZip+realPath)
+				}
+			}
 		case AttachTypeBackend:
 			packed, err := commonlogic.PackBackendCodeZipToOci(item.Path)
 			if err != nil {
@@ -107,7 +119,13 @@ func PackFormulaToOci(session Session) error {
 				return err
 			}
 			descriptors = append(descriptors, packed...)
-			replacedMediaTypes = append(replacedMediaTypes, commonlogic.MediaTypeHelmZip)
+
+			if strings.HasPrefix(formulaManifest.Platform.Helm.ChartName, "file://") || strings.HasPrefix(formulaManifest.Platform.Helm.ChartName, "/Storage") {
+				realPath := strings.TrimPrefix(formulaManifest.Platform.Helm.ChartName, "file://")
+				if realPath != "" {
+					replacedMediaTypes = append(replacedMediaTypes, commonlogic.MediaTypeHelmZip+realPath)
+				}
+			}
 		default:
 			return fmt.Errorf("unsupported attachment type %q", item.Type)
 		}
@@ -115,7 +133,7 @@ func PackFormulaToOci(session Session) error {
 		updateManifestByAttachment(formulaManifest, item)
 	}
 
-	manifestDescriptors, err := packManifestFileList(formulaManifest, fileList)
+	manifestDescriptors, err := packManifestFileList(formulaManifests, fileList)
 	if err != nil {
 		return err
 	}
@@ -152,36 +170,84 @@ func getFormulaFileList(remoteRepository *remote.Repository, manifest *v1.Manife
 	return fileList, err
 }
 
-func loadFormulaManifest(session Session, version string, fileList map[string]string) (*commonlogic.Manifest, error) {
+type formulaManifestSet struct {
+	manifests map[string]*commonlogic.Manifest
+	paths     map[string]string
+}
+
+func (set *formulaManifestSet) manifest(artifact string) (*commonlogic.Manifest, error) {
+	artifact = strings.Trim(strings.TrimSpace(artifact), "/")
+	manifest, ok := set.manifests[artifact]
+	if !ok {
+		return nil, fmt.Errorf("manifest for artifact %q not found", artifact)
+	}
+	return manifest, nil
+}
+
+func loadFormulaManifests(session Session, version string, fileList map[string]string) (*formulaManifestSet, error) {
 	if fileList == nil {
 		fileList = map[string]string{}
 	}
 
-	manifestContent, ok := fileList["manifest.yaml"]
-	var manifest commonlogic.Manifest
-	var err error
-	if ok && strings.TrimSpace(manifestContent) != "" {
-		err = yaml.Unmarshal([]byte(manifestContent), &manifest)
-		if err != nil {
-			return nil, err
-		}
-	} else {
+	result := &formulaManifestSet{
+		manifests: map[string]*commonlogic.Manifest{},
+		paths:     map[string]string{},
+	}
+
+	if len(fileList) == 0 {
+		manifest := &commonlogic.Manifest{}
 		manifest.Application.Name = session.Artifact
 		manifest.Application.Identifie = strings.ReplaceAll(session.Artifact, "_", "-")
 		manifest.Application.Type = commonlogic.Docker_App
+		manifest.Application.Version = version
+		result.manifests[session.Artifact] = manifest
+		result.paths[session.Artifact] = "manifest.yaml"
+		return result, nil
 	}
 
-	manifest.Application.Version = version
+	for path, manifestContent := range fileList {
+		artifact, ok := artifactFromManifestPath(path)
+		if !ok || strings.TrimSpace(manifestContent) == "" {
+			continue
+		}
+		var manifest commonlogic.Manifest
+		if err := yaml.Unmarshal([]byte(manifestContent), &manifest); err != nil {
+			return nil, fmt.Errorf("unmarshal %s: %w", path, err)
+		}
 
-	return &manifest, nil
+		if artifact == "" {
+			artifact = session.Artifact
+		}
+		artifact = strings.ReplaceAll(artifact, "_", "-")
+
+		manifest.Application.Version = version
+		result.manifests[artifact] = &manifest
+		result.paths[artifact] = path
+	}
+
+	return result, nil
 }
 
-func packManifestFileList(manifest *commonlogic.Manifest, fileList map[string]string) ([]commonlogic.FileOciDescriptor, error) {
-	rawManifestContent, err := yaml.Marshal(manifest)
-	if err != nil {
-		return nil, err
+func artifactFromManifestPath(path string) (string, bool) {
+	path = strings.Trim(strings.TrimSpace(path), "/")
+	if path == "manifest.yaml" {
+		return "", true
 	}
-	fileList["manifest.yaml"] = string(rawManifestContent)
+	if !strings.HasSuffix(path, "/manifest.yaml") {
+		return "", false
+	}
+	return strings.TrimSuffix(path, "/manifest.yaml"), true
+}
+
+func packManifestFileList(set *formulaManifestSet, fileList map[string]string) ([]commonlogic.FileOciDescriptor, error) {
+	for artifact, manifest := range set.manifests {
+		rawManifestContent, err := yaml.Marshal(manifest)
+		if err != nil {
+			return nil, err
+		}
+		path := set.paths[artifact]
+		fileList[path] = string(rawManifestContent)
+	}
 
 	descriptors, err := commonlogic.PackFileListToOci(fileList)
 	if err != nil {

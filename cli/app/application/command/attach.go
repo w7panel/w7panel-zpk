@@ -47,6 +47,7 @@ func (c AttachAdd) GetDescription() string {
 func (c AttachAdd) Configure(cmd *cobra.Command) {
 	cmd.Flags().StringP("path", "p", "", "local package path")
 	cmd.Flags().StringP("type", "t", "", "attachment type: frontend, backend, helm")
+	cmd.Flags().StringP("sub_artifact", "a", "", "sub artifact identifie, empty means main artifact")
 	_ = cmd.MarkFlagRequired("path")
 	_ = cmd.MarkFlagRequired("type")
 }
@@ -54,8 +55,10 @@ func (c AttachAdd) Configure(cmd *cobra.Command) {
 func (c AttachAdd) Handle(cmd *cobra.Command, args []string) {
 	path, _ := cmd.Flags().GetString("path")
 	attachType, _ := cmd.Flags().GetString("type")
+	subArtifact, _ := cmd.Flags().GetString("sub_artifact")
 
 	path = strings.TrimSpace(path)
+	subArtifact = strings.Trim(strings.TrimSpace(subArtifact), "/")
 	if path == "" {
 		panic("local package path is required")
 	}
@@ -82,14 +85,19 @@ func (c AttachAdd) Handle(cmd *cobra.Command, args []string) {
 	if session.Artifact == "" {
 		panic("please run use before attach")
 	}
+	if subArtifact == "" {
+		subArtifact = session.Artifact
+	}
+	subArtifact = strings.ReplaceAll(subArtifact, "_", "-")
 
 	replaced := false
 	for index, item := range session.Attachments {
-		if item.Type == normalizedType {
+		if item.Type == normalizedType && item.Artifact == subArtifact {
 			session.Attachments[index] = logic.Attachment{
-				Path:    absPath,
-				Type:    normalizedType,
-				AddedAt: time.Now(),
+				Path:     absPath,
+				Type:     normalizedType,
+				AddedAt:  time.Now(),
+				Artifact: subArtifact,
 			}
 			replaced = true
 			break
@@ -97,9 +105,10 @@ func (c AttachAdd) Handle(cmd *cobra.Command, args []string) {
 	}
 	if !replaced {
 		session.Attachments = append(session.Attachments, logic.Attachment{
-			Path:    absPath,
-			Type:    normalizedType,
-			AddedAt: time.Now(),
+			Path:     absPath,
+			Type:     normalizedType,
+			AddedAt:  time.Now(),
+			Artifact: subArtifact,
 		})
 	}
 
@@ -107,7 +116,7 @@ func (c AttachAdd) Handle(cmd *cobra.Command, args []string) {
 		panic(err)
 	}
 
-	fmt.Fprintf(cmd.OutOrStdout(), "attached %s as %s\n", absPath, normalizedType)
+	fmt.Fprintf(cmd.OutOrStdout(), "attached %s as %s for %s\n", absPath, normalizedType, subArtifact)
 }
 
 func cobraCommand(command interface {

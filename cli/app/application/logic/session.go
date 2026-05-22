@@ -27,6 +27,7 @@ type Attachment struct {
 	Type      string    `json:"type"`
 	AddedAt   time.Time `json:"added_at"`
 	MediaHint string    `json:"media_hint,omitempty"`
+	Artifact  string    `json:"artifact"`
 }
 
 type Session struct {

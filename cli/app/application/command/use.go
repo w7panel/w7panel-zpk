@@ -41,7 +41,7 @@ func (c Use) Handle(cmd *cobra.Command, args []string) {
 		panic("please login before use")
 	}
 
-	session.Artifact = name
+	session.Artifact = strings.ReplaceAll(name, "_", "-")
 	session.Attachments = nil
 	if err := logic.SaveSession(session); err != nil {
 		panic(err)

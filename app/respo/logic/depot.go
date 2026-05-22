@@ -2,7 +2,6 @@ package logic
 
 import (
 	"archive/zip"
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -11,7 +10,6 @@ import (
 	"log"
 	"log/slog"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -24,10 +22,10 @@ import (
 	"github.com/w7panel/w7panel-zpk/common/function"
 	"github.com/w7panel/w7panel-zpk/common/logic"
 	"github.com/w7panel/w7panel-zpk/common/service"
-	"github.com/w7panel/w7panel-zpk/common/service/oci"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/core/err_handler"
 	"oras.land/oras-go/v2"
+	"oras.land/oras-go/v2/registry/remote"
 	"sigs.k8s.io/yaml"
 )
 
@@ -42,18 +40,6 @@ const (
 	SETTING_TYPE_SETTING = 2
 	SETTING_TYPE_ICON    = 3
 )
-
-const (
-	MediaTypeIcon       = "application/vnd.w7.formula.icon+png"
-	MediaTypeManifest   = "application/vnd.w7.formula.manifest+yml"
-	MediaTypeFilesJson  = "application/vnd.w7.formula.files.json+json"
-	MediaTypeCodeZip    = "application/vnd.w7.formula.code.zip+zip"
-	MediaTypeWebCodeZip = "application/vnd.w7.formula.code.web.zip+zip"
-	MediaTypeHelmZip    = "application/vnd.w7.formula.helm.zip+zip"
-)
-
-var ZipFileNotFoundErr = errors.New("zip file not found")
-var OciManifestNotFoundErr = errors.New("oci manifest not found")
 
 func RegisterDepot() error {
 	err := facade.GetContainer().NamedSingleton("depot", func() *Depot {
@@ -247,6 +233,7 @@ func (self *Depot) GetFormula(name string, version string, user *entity.Registry
 	if result.RemoteFormulaInfoUrl == "" {
 		err := self.unPackFilesFromOci(result)
 		if err != nil {
+			slog.Error("unPackFilesFromOci err", "formula_name", result.Name, "version", result.Version, "err", err)
 			return nil, err
 		}
 	}
@@ -291,6 +278,7 @@ func (self *Depot) GetFormula(name string, version string, user *entity.Registry
 	if result.RemoteFormulaInfoUrl == "" {
 		err := self.unPackSourceCodeFromOCI(result)
 		if err != nil {
+			slog.Error("unPackSourceCodeFromOCI err", "formula_name", result.Name, "version", result.Version, "err", err)
 			return nil, err
 		}
 	}
@@ -437,18 +425,18 @@ func (self *Depot) GetZipFileContent(formula *Formula, path string) ([]byte, err
 }
 
 func (self *Depot) Copy(src *Formula, dest *Formula) error {
-	srcRemoteOci, err := logic.GetDefaultRemoteOci(self.getFormulaOciName(src))
+	srcRemoteOci, err := logic.GetDefaultRemoteOci(logic.GetFormulaOciName(src.Name))
 	if err != nil {
 		return err
 	}
-	destRemoteOci, err := logic.GetDefaultRemoteOci(self.getFormulaOciName(dest))
+	destRemoteOci, err := logic.GetDefaultRemoteOci(logic.GetFormulaOciName(dest.Name))
 	if err != nil {
 		return err
 	}
 
 	_, _, err = self.getOciManifest(src)
 	if err != nil {
-		if errors.Is(err, OciManifestNotFoundErr) {
+		if errors.Is(err, logic.OciManifestNotFoundErr) {
 			return nil
 		}
 	}
@@ -486,265 +474,60 @@ func (self *Depot) PackLoop() {
 
 func (self *Depot) packToOci(formula *Formula) error {
 	slog.Info("开始打包项目:", "info", formula)
-	remoteOci, err := logic.GetDefaultRemoteOci(self.getFormulaOciName(formula))
+	remoteOci, err := logic.GetDefaultRemoteOci(logic.GetFormulaOciName(formula.Name))
 	if err != nil {
 		return err
 	}
 
-	resourcesDescriptor := make([]FileOciDescriptor, 0)
+	resourcesDescriptor := make([]logic.FileOciDescriptor, 0)
 
 	iconPath := filepath.Join(self.basePath, formula.GetIconRelativePath())
 	slog.Info("打包 icon", "name", formula.Name, "path", iconPath)
-	if function.FileExists(iconPath) {
-		ociIconDescriptor, err := oci.GetOciDescriptorByPath(iconPath, MediaTypeIcon)
-		if err != nil {
-			return err
-		}
-		resourcesDescriptor = append(resourcesDescriptor, FileOciDescriptor{
-			Path:       iconPath,
-			Descriptor: *ociIconDescriptor,
-		})
+	iconDescriptors, err := logic.PackIconToOci(iconPath)
+	if err != nil {
+		return err
 	}
+	resourcesDescriptor = append(resourcesDescriptor, iconDescriptors...)
 
 	fileList, err := self.GetFileList(formula)
 	if err != nil {
 		return err
 	}
-	slog.Info("打包 filelist", "name", formula.Name, "filelist", fileList, "err", err)
-	if len(fileList) > 0 {
-		fileListContent, err := json.Marshal(fileList)
-		if err != nil {
-			return err
-		}
-		ociFileListDescriptor, err := oci.GetOciDescriptorByData(fileListContent, MediaTypeFilesJson)
-		if err != nil {
-			return err
-		}
-		resourcesDescriptor = append(resourcesDescriptor, FileOciDescriptor{
-			Content:    fileListContent,
-			Descriptor: *ociFileListDescriptor,
-		})
-	}
-
-	if strings.HasSuffix(formula.Manifest.Source.Url, ".git") {
-		slog.Info("打包 git 文件", "name", formula.Name)
-		gitFileDescriptors, err := self.packSourceCodeByGitToOci(formula)
-		if err != nil {
-			return err
-		}
-		resourcesDescriptor = append(resourcesDescriptor, gitFileDescriptors...)
-	}
+	backendCodePath := ""
 	if strings.HasSuffix(formula.Manifest.Source.Url, ".zip") || strings.HasSuffix(formula.Manifest.Web.Url, ".zip") {
-		slog.Info("打包 zip 文件", "name", formula.Name)
-		zipFileDescriptors, err := self.packSourceCodeByZipToOci(formula)
-		if err != nil {
-			return err
-		}
-		resourcesDescriptor = append(resourcesDescriptor, zipFileDescriptors...)
+		backendCodePath = filepath.Join(self.basePath, formula.ZipPath)
+		slog.Info("打包 zip 文件", "name", formula.Name, "path", backendCodePath, "filelist", fileList, "err", err)
 	}
-	helmFileDescriptors, err := self.packHelmToOci(formula)
+	backendCodeDescriptors, err := logic.PackBackendCodeZipToOci(backendCodePath, fileList)
+	if err != nil {
+		return err
+	}
+	resourcesDescriptor = append(resourcesDescriptor, backendCodeDescriptors...)
+
+	frontedCodePaths := make([]string, 0)
+	for _, webZipPath := range formula.WebZipPaths {
+		frontedCodePaths = append(frontedCodePaths, filepath.Join(self.basePath, webZipPath))
+	}
+	frontedCodeDescriptors, err := logic.PackFrontedCodeZipToOci(frontedCodePaths)
+	if err != nil {
+		return err
+	}
+	resourcesDescriptor = append(resourcesDescriptor, frontedCodeDescriptors...)
+
+	helmPaths := make([]string, 0)
+	for _, path := range formula.HelmPaths {
+		helmPaths = append(helmPaths, filepath.Join(self.basePath, path))
+	}
+	helmFileDescriptors, err := logic.PackHelmToOci(helmPaths)
 	if err != nil {
 		return err
 	}
 	resourcesDescriptor = append(resourcesDescriptor, helmFileDescriptors...)
 
-	filesDescriptor := make([]v1.Descriptor, 0)
-	ctx := context.Background()
-	for _, item := range resourcesDescriptor {
-		if item.Content != nil {
-			err = remoteOci.Push(ctx, item.Descriptor, bytes.NewReader(item.Content))
-			if err != nil {
-				return err
-			}
-		} else {
-			file, err := os.Open(item.Path)
-			if err != nil {
-				return err
-			}
-			err = remoteOci.Push(ctx, item.Descriptor, file)
-			file.Close()
-			if err != nil {
-				return err
-			}
-		}
-		filesDescriptor = append(filesDescriptor, item.Descriptor)
-	}
-
-	artifactType := "application/vnd.w7.files.v1+tar"
-	v1.DescriptorEmptyJSON.Platform = &v1.Platform{
-		Architecture: "amd64",
-		OS:           "linux",
-	}
-	manifestDescriptor, err := oras.PackManifest(ctx, remoteOci, oras.PackManifestVersion1_1, artifactType, oras.PackManifestOptions{
-		Layers: filesDescriptor,
-	})
-	if err != nil {
-		return err
-	}
-	err = remoteOci.Tag(ctx, manifestDescriptor, self.GetFormulaOciTag(formula))
-	if err != nil {
-		return err
-	}
-
-	slog.Info("打包成功", "name", formula.Name, "tag", self.GetFormulaOciTag(formula))
-
-	//暂时屏蔽
-	//os.RemoveAll(filepath.Join(self.basePath, GetFormulaRelativeDir(formula.Name, formula.VersionId)))
-	//if formula.ZipPath != "" {
-	//	os.RemoveAll(filepath.Join(self.basePath, formula.ZipPath))
-	//}
-	//if formula.WebZipPath != nil {
-	//	for _, path := range formula.WebZipPath {
-	//		os.RemoveAll(filepath.Join(self.basePath, path))
-	//	}
-	//}
-
-	return nil
-}
-
-func (self *Depot) packSourceCodeByGitToOci(formula *Formula) ([]FileOciDescriptor, error) {
-	gitDir := filepath.Join(self.basePath, formula.GetZipRelativeDir())
-	function.CreateDirIfNotExist(gitDir, os.ModePerm)
-	defer os.RemoveAll(gitDir)
-
-	gitLogic := git{
-		depot: self,
-	}
-	_, err := gitLogic.runCmd("clone", formula.Manifest.Source.Url, gitDir)
-	if err != nil {
-		return nil, err
-	}
-
-	fileList, err := self.GetFileList(formula)
-	if err != nil {
-		return nil, err
-	}
-	if len(fileList) > 0 {
-		for key, value := range fileList {
-			file, _ := os.Create(filepath.Join(gitDir, key))
-			_, err = file.Write([]byte(value))
-			if err != nil {
-				return nil, err
-			}
-			file.Close()
-		}
-	}
-
-	cmd := exec.Command("zip", "-r", fmt.Sprintf("../%s.zip", formula.Name), ".")
-	cmd.Dir = gitDir
-	_, err = cmd.CombinedOutput()
-	if err != nil {
-		return nil, err
-	}
-	err = cmd.Run()
-	if err != nil {
-		return nil, err
-	}
-
-	ociDescriptor, err := oci.GetOciDescriptorByPath(filepath.Join(self.basePath, "Storage", formula.Name+".zip"), MediaTypeCodeZip)
-	if err != nil {
-		return nil, err
-	}
-	return []FileOciDescriptor{
-		{
-			Path:       formula.ZipPath,
-			Descriptor: *ociDescriptor,
-		},
-	}, nil
-}
-
-func (self *Depot) packSourceCodeByZipToOci(formula *Formula) ([]FileOciDescriptor, error) {
-	fileDescriptors := make([]FileOciDescriptor, 0)
-
-	zipPath := ""
-	if formula.ZipPath != "" {
-		zipPath = filepath.Join(self.basePath, formula.ZipPath)
-	}
-
-	if zipPath != "" && !function.IsEmptyFile(zipPath) {
-		fileList, err := self.GetFileList(formula)
-		if err != nil {
-			return nil, err
-		}
-
-		if fileList != nil && len(fileList) > 0 {
-			zipDir := filepath.Join(self.basePath, formula.GetZipRelativeDir())
-			for name, value := range fileList {
-				if value != "" {
-					tempPath := filepath.Join(zipDir, name)
-					function.CreateDirIfNotExist(filepath.Dir(tempPath), os.ModePerm)
-
-					file, err := os.Create(tempPath)
-					if err != nil {
-						return nil, err
-					}
-					_, err = file.WriteString(value)
-					if err != nil {
-						return nil, err
-					}
-					file.Close()
-
-					slog.Info("执行命令", "cmd", "zip -u", zipPath, name, "dir", zipDir)
-					cmd := exec.Command("zip", "-u", zipPath, name)
-					cmd.Dir = zipDir
-					message, err := cmd.CombinedOutput()
-					if err != nil {
-						return nil, err
-					}
-					slog.Info("执行命令结果", "cmd", "zip -u", zipPath, name, "message", string(message))
-				}
-			}
-			os.RemoveAll(zipDir)
-		}
-
-		ociCodeDescriptor, err := oci.GetOciDescriptorByPath(zipPath, MediaTypeCodeZip)
-		if err != nil {
-			return nil, err
-		}
-		fileDescriptors = append(fileDescriptors, FileOciDescriptor{
-			Path:       zipPath,
-			Descriptor: *ociCodeDescriptor,
-		})
-	}
-	// 放前端包
-	for _, webZipPath := range formula.WebZipPaths {
-		webAbsolutePath := filepath.Join(self.basePath, webZipPath)
-		if webZipPath != "" && !function.IsEmptyFile(webAbsolutePath) {
-			slog.Info("打包 web zip", "path", webZipPath)
-			ociWebDescriptor, err := oci.GetOciDescriptorByPath(webAbsolutePath, MediaTypeWebCodeZip+webZipPath)
-			if err != nil {
-				return nil, err
-			}
-
-			fileDescriptors = append(fileDescriptors, FileOciDescriptor{
-				Path:       webAbsolutePath,
-				Descriptor: *ociWebDescriptor,
-			})
-		}
-	}
-
-	return fileDescriptors, nil
-}
-
-func (self *Depot) packHelmToOci(formula *Formula) ([]FileOciDescriptor, error) {
-	fileDescriptors := make([]FileOciDescriptor, 0)
-	for _, helmPath := range formula.HelmPaths {
-		helmAbsolutePath := filepath.Join(self.basePath, helmPath)
-		if helmPath != "" && !function.IsEmptyFile(helmAbsolutePath) {
-			slog.Info("打包 helm", "path", helmPath)
-			ociHelmDescriptor, err := oci.GetOciDescriptorByPath(helmAbsolutePath, MediaTypeHelmZip+helmPath)
-			if err != nil {
-				return nil, err
-			}
-
-			fileDescriptors = append(fileDescriptors, FileOciDescriptor{
-				Path:       helmAbsolutePath,
-				Descriptor: *ociHelmDescriptor,
-			})
-		}
-	}
-
-	return fileDescriptors, nil
+	tag := self.GetFormulaOciTag(formula)
+	err = logic.PushOciToRemote(remoteOci, tag, resourcesDescriptor)
+	slog.Info("打包完成", "name", formula.Name, "tag", tag, "err", err)
+	return err
 }
 
 func (self *Depot) unPackFilesFromOci(formula *Formula) error {
@@ -754,45 +537,39 @@ func (self *Depot) unPackFilesFromOci(formula *Formula) error {
 
 		remoteOci, manifest, err := self.getOciManifest(formula)
 		if err != nil {
-			if errors.Is(err, OciManifestNotFoundErr) {
+			if errors.Is(err, logic.OciManifestNotFoundErr) {
 				return nil
 			}
 			return err
 		}
-		for _, layer := range manifest.Layers {
-			if layer.MediaType == MediaTypeFilesJson {
-				reader, err := remoteOci.Fetch(context.Background(), layer)
-				if err != nil {
-					return err
-				}
 
-				readAll, err := io.ReadAll(reader)
-				if err != nil {
-					return err
-				}
-				files := map[string]string{}
-				err = json.Unmarshal(readAll, &files)
-				if err != nil {
-					return err
-				}
-
-				for name, content := range files {
-					tempPath := filepath.Join(filesDir, name)
-					function.CreateDirIfNotExist(filepath.Dir(tempPath), os.ModePerm)
-					file, err := os.Create(tempPath)
-					if err != nil {
-						return err
-					}
-					_, err = file.WriteString(content)
-					if err != nil {
-						return err
-					}
-					file.Close()
-				}
-
-				break
+		return logic.UnPackOciToLocal(remoteOci, manifest, []string{logic.MediaTypeFilesJson}, func(mediaType string, savePath string, reader io.Reader) error {
+			readAll, err := io.ReadAll(reader)
+			if err != nil {
+				return err
 			}
-		}
+			files := map[string]string{}
+			err = json.Unmarshal(readAll, &files)
+			if err != nil {
+				return err
+			}
+
+			for name, content := range files {
+				tempPath := filepath.Join(filesDir, name)
+				function.CreateDirIfNotExist(filepath.Dir(tempPath), os.ModePerm)
+				file, err := os.Create(tempPath)
+				if err != nil {
+					return err
+				}
+				_, err = file.WriteString(content)
+				if err != nil {
+					return err
+				}
+				file.Close()
+			}
+
+			return nil
+		})
 	}
 
 	return nil
@@ -803,16 +580,19 @@ func (self *Depot) unPackSourceCodeFromOCI(formula *Formula) error {
 	unpackZipCode := false
 	unpackWebCode := false
 	unpackHelm := false
+	mediaTypes := make([]string, 0)
 	iconPath := filepath.Join(self.basePath, formula.GetIconRelativePath())
 	if !function.FileExists(iconPath) {
 		function.CreateDirIfNotExist(filepath.Dir(iconPath), os.ModePerm)
 		unpackIcon = true
+		mediaTypes = append(mediaTypes, logic.MediaTypeIcon)
 	}
 	zipPath := filepath.Join(self.basePath, formula.ZipPath)
 	if formula.ZipPath != "" {
 		if !function.FileExists(zipPath) {
 			function.CreateDirIfNotExist(filepath.Dir(zipPath), os.ModePerm)
 			unpackZipCode = true
+			mediaTypes = append(mediaTypes, logic.MediaTypeCodeZip)
 		}
 	}
 	if formula.WebZipPaths != nil {
@@ -823,6 +603,9 @@ func (self *Depot) unPackSourceCodeFromOCI(formula *Formula) error {
 				unpackWebCode = true
 			}
 		}
+		if unpackWebCode {
+			mediaTypes = append(mediaTypes, logic.MediaTypeWebCodeZip)
+		}
 	}
 	if formula.HelmPaths != nil {
 		for _, path := range formula.HelmPaths {
@@ -832,119 +615,70 @@ func (self *Depot) unPackSourceCodeFromOCI(formula *Formula) error {
 				unpackHelm = true
 			}
 		}
+		if unpackHelm {
+			mediaTypes = append(mediaTypes, logic.MediaTypeHelmZip)
+		}
 	}
-	slog.Info("unpackfromoci", "formula", formula.Name, "helms", formula.HelmPaths, "needPack", unpackHelm)
+	slog.Info("unpackfromoci", "formula", formula.Name, "helms", formula.HelmPaths, "needPack", unpackHelm, "mediaTypes", mediaTypes)
 	if !unpackIcon && !unpackZipCode && !unpackWebCode && !unpackHelm {
 		return nil
 	}
 
 	remoteOci, manifest, err := self.getOciManifest(formula)
 	if err != nil {
-		if errors.Is(err, OciManifestNotFoundErr) {
+		if errors.Is(err, logic.OciManifestNotFoundErr) {
 			return nil
 		}
 		return err
 	}
-	for _, layer := range manifest.Layers {
-		if layer.MediaType == MediaTypeIcon && unpackIcon {
-			reader, err := remoteOci.Fetch(context.Background(), layer)
-			if err != nil {
-				return err
-			}
+
+	return logic.UnPackOciToLocal(remoteOci, manifest, mediaTypes, func(mediaType string, savePath string, reader io.Reader) error {
+		data, err := io.ReadAll(reader)
+		if err != nil {
+			return err
+		}
+
+		if mediaType == logic.MediaTypeIcon {
 			file, err := os.Create(iconPath)
 			if err != nil {
 				return err
 			}
 			defer file.Close()
 
-			if _, err := io.Copy(file, reader); err != nil {
+			_, err = file.Write(data)
+			if err != nil {
 				return err
 			}
 		}
-
-		if layer.MediaType == MediaTypeCodeZip && unpackZipCode {
-			reader, err := remoteOci.Fetch(context.Background(), layer)
-			if err != nil {
-				return err
-			}
-
-			data, err := io.ReadAll(reader)
-			if err != nil {
-				return err
-			}
-
+		if mediaType == logic.MediaTypeCodeZip {
 			err = os.WriteFile(zipPath, data, os.ModePerm)
 			if err != nil {
 				return err
 			}
 		}
 
-		if strings.Contains(layer.MediaType, MediaTypeWebCodeZip) && unpackWebCode {
-			reader, err := remoteOci.Fetch(context.Background(), layer)
-			if err != nil {
-				return err
-			}
-
-			data, err := io.ReadAll(reader)
-			if err != nil {
-				return err
-			}
-
-			err = os.WriteFile(filepath.Join(self.basePath, layer.MediaType[len(MediaTypeWebCodeZip)+1:]), data, os.ModePerm)
+		if mediaType == logic.MediaTypeWebCodeZip || mediaType == logic.MediaTypeHelmZip {
+			err = os.WriteFile(filepath.Join(self.basePath, savePath), data, os.ModePerm)
 			if err != nil {
 				return err
 			}
 		}
 
-		if strings.Contains(layer.MediaType, MediaTypeHelmZip) && unpackHelm {
-			reader, err := remoteOci.Fetch(context.Background(), layer)
-			if err != nil {
-				return err
-			}
-
-			data, err := io.ReadAll(reader)
-			if err != nil {
-				return err
-			}
-
-			err = os.WriteFile(filepath.Join(self.basePath, layer.MediaType[len(MediaTypeHelmZip)+1:]), data, os.ModePerm)
-			if err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
+		return nil
+	})
 }
 
-func (self *Depot) getOciManifest(formula *Formula) (oras.GraphTarget, *v1.Manifest, error) {
+func (self *Depot) getOciManifest(formula *Formula) (*remote.Repository, *v1.Manifest, error) {
 	ociTag := self.GetFormulaOciTag(formula)
 	slog.Info("开始解包项目:", formula.Name, "tag", ociTag)
-	remoteOci, err := logic.GetDefaultRemoteOci(self.getFormulaOciName(formula))
+	remoteOci, err := logic.GetDefaultRemoteOci(logic.GetFormulaOciName(formula.Name))
 	if err != nil {
 		return nil, nil, err
 	}
 
-	_, fetchedManifestContent, err := oras.FetchBytes(context.Background(), remoteOci, ociTag, oras.DefaultFetchBytesOptions)
-	if err != nil {
-		if strings.Contains(err.Error(), ociTag+": not found") {
-			return remoteOci, nil, OciManifestNotFoundErr
-		}
-		return nil, nil, err
-	}
+	manifest, err := logic.GetOciManifest(remoteOci, ociTag)
 
-	// 6. Parse the fetched manifest content and get the layers
-	var manifest v1.Manifest
-	if err := json.Unmarshal(fetchedManifestContent, &manifest); err != nil {
-
-		return nil, nil, err
-	}
-
-	return remoteOci, &manifest, nil
-}
-
-func (self *Depot) getFormulaOciName(formula *Formula) string {
-	return facade.GetConfig().GetString("setting.depot.oci_namespace") + "/" + strings.ToLower(strings.ReplaceAll(formula.Name, "-", "_"))
+	return remoteOci, manifest, err
 }
 
 func (self *Depot) GetFormulaOciTag(formula *Formula) string {
@@ -954,10 +688,4 @@ func (self *Depot) GetFormulaOciTag(formula *Formula) string {
 	}
 
 	return versionModel.Name
-}
-
-type FileOciDescriptor struct {
-	Path       string
-	Content    []byte
-	Descriptor v1.Descriptor
 }

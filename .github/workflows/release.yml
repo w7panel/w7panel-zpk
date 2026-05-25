@@ -51,7 +51,7 @@ jobs:
 
       - name: Build zpk CLI
         working-directory: cli
-        run: make build-compress
+        run: go mod tidy && make build-compress
 
       - name: Upload CLI assets to GitHub Release
         uses: softprops/action-gh-release@v2

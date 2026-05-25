@@ -46,10 +46,11 @@ jobs:
           username: ${{ env.DOCKER_USERNAME }}
           password: ${{ env.DOCKER_PASSWORD }}
 
-      - name: Package Helm chart
+      - name: Publish image and Helm package
         run: |
-          rm -f charts/zpk-*.tgz
-          helm package charts/ -d charts
+          RELEASE_TAG="${GITHUB_REF_NAME}"
+          RELEASE_VERSION="${RELEASE_TAG#v}"
+          make publish IMAGE_TAG="${RELEASE_TAG}" HELM_CHART_VERSION="${RELEASE_VERSION}" HELM_APP_VERSION="${RELEASE_TAG}"
 
       - name: Build zpk CLI
         working-directory: cli

@@ -8,6 +8,11 @@ SOURCE_FILES := *.go
 HELM_VALUES_FILE := charts/values.yaml
 HELM_IMAGE_REPOSITORY := $(shell awk '/^image:/{flag=1; next} flag && /^[^[:space:]]/{flag=0} flag && $$1=="repository:" {print $$2; exit}' $(HELM_VALUES_FILE))
 HELM_IMAGE_TAG := $(shell awk '/^image:/{flag=1; next} flag && /^[^[:space:]]/{flag=0} flag && $$1=="tag:" {print $$2; exit}' $(HELM_VALUES_FILE))
+HELM_CHART_VERSION ?= $(shell awk '$$1=="version:" {print $$2; exit}' charts/Chart.yaml)
+HELM_APP_VERSION ?= $(IMAGE_TAG)
+HELM_PACKAGE_IMAGE_TAG ?= $(IMAGE_TAG)
+BETA_TIMESTAMP ?= $(shell date +%Y%m%d%H%M%S)
+BETA_IMAGE_TAG ?= $(IMAGE_TAG)-$(BETA_TIMESTAMP)
 
 IMAGE_REPOSITORY ?= $(HELM_IMAGE_REPOSITORY)
 IMAGE_TAG ?= $(HELM_IMAGE_TAG)
@@ -18,7 +23,7 @@ OFFICIAL_IMAGE_REPOSITORY ?= ccr.ccs.tencentyun.com/w7team/zpk
 OFFICIAL_IMAGE_TAG ?=
 OFFICIAL_IMAGE ?= $(OFFICIAL_IMAGE_REPOSITORY):$(OFFICIAL_IMAGE_TAG)
 
-.PHONY: build-osx build build-windows makebuild dockerbuild publish dev test clean help
+.PHONY: build-osx build build-windows makebuild dockerbuild publish beta dev test clean help
 
 build-osx: clean
 	go build -o ${GO_BIN}/${PROJECT_NAME}_osx ${SOURCE_FILES}
@@ -46,7 +51,21 @@ publish: makebuild dockerbuild
 		docker push $(OFFICIAL_IMAGE); \
 	fi
 	rm -f charts/zpk-*.tgz
-	helm package charts/ -d charts
+	tmp_chart_dir=$$(mktemp -d); \
+	trap 'rm -rf "$$tmp_chart_dir"' EXIT; \
+	cp -R charts "$$tmp_chart_dir/zpk"; \
+	rm -f "$$tmp_chart_dir"/zpk/zpk-*.tgz; \
+	awk -v tag="$(HELM_PACKAGE_IMAGE_TAG)" ' \
+		/^image:[[:space:]]*$$/ { in_image=1; print; next } \
+		in_image && /^[^[:space:]]/ { in_image=0 } \
+		in_image && /^[[:space:]]*tag:/ { sub(/tag:.*/, "tag: " tag) } \
+		{ print } \
+	' "$$tmp_chart_dir/zpk/values.yaml" > "$$tmp_chart_dir/zpk/values.yaml.tmp"; \
+	mv "$$tmp_chart_dir/zpk/values.yaml.tmp" "$$tmp_chart_dir/zpk/values.yaml"; \
+	helm package "$$tmp_chart_dir/zpk" -d charts --version $(HELM_CHART_VERSION) --app-version $(HELM_APP_VERSION)
+
+beta:
+	$(MAKE) publish IMAGE_TAG=$(BETA_IMAGE_TAG) HELM_APP_VERSION=$(BETA_IMAGE_TAG)
 
 dev: clean
 	go run ${SOURCE_FILES} server:start
@@ -65,5 +84,6 @@ help:
 	@echo "make makebuild - 执行现有构建流程"
 	@echo "make dockerbuild - 构建本地镜像 LOCAL_IMAGE=$(LOCAL_IMAGE)"
 	@echo "make publish - 构建二进制、镜像、打 tag、push，并重新打 helm/zpk tgz"
+	@echo "make beta - 使用当前镜像 tag 加时间戳发布 beta，例如 $(IMAGE_TAG)-$(BETA_TIMESTAMP)"
 	@echo "官方发布: OFFICIAL_RELEASE=true OFFICIAL_IMAGE_TAG=xxx"
-	@echo "可覆盖变量: IMAGE_REPOSITORY=xxx IMAGE_TAG=xxx LOCAL_IMAGE=xxx PUBLISH_IMAGE=xxx OFFICIAL_IMAGE_REPOSITORY=xxx"
+	@echo "可覆盖变量: IMAGE_REPOSITORY=xxx IMAGE_TAG=xxx HELM_CHART_VERSION=xxx HELM_APP_VERSION=xxx HELM_PACKAGE_IMAGE_TAG=xxx LOCAL_IMAGE=xxx PUBLISH_IMAGE=xxx OFFICIAL_IMAGE_REPOSITORY=xxx"

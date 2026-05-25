@@ -46,8 +46,10 @@ jobs:
           username: ${{ env.DOCKER_USERNAME }}
           password: ${{ env.DOCKER_PASSWORD }}
 
-      - name: Publish image and Helm package
-        run: make publish
+      - name: Package Helm chart
+        run: |
+          rm -f charts/zpk-*.tgz
+          helm package charts/ -d charts
 
       - name: Build zpk CLI
         working-directory: cli

@@ -173,7 +173,7 @@ func (self *Depot) AddFormula(name string, version string, user *entity.Registry
 			}, "manifest.yaml", string(content))
 		}
 
-		facade.GetEvent().Publish(registry.AddUserPermissionEvent, registry.AddUserPermissionPayload{
+		go facade.GetEvent().Publish(registry.AddUserPermissionEvent, registry.AddUserPermissionPayload{
 			UserID:        user.ID,
 			ResourceType:  "repository",
 			ResourceValue: facade.GetConfig().GetString("setting.depot.oci_namespace") + "/" + strings.ReplaceAll(name, "-", "_"),

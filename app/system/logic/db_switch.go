@@ -216,7 +216,7 @@ func (m *DBSwitchManager) runSwitchToMySQL(source DBMigrationSource, mysqlConfig
 }
 
 func ResolveDBSwitchStateFile(config *viper.Viper) string {
-	return strings.TrimSpace(config.GetString("database_switch.state_file"))
+	return strings.TrimSpace(config.GetString("setting.state_file"))
 }
 
 func defaultDBSwitchState() DBSwitchState {

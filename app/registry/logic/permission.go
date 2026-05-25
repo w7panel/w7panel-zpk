@@ -114,6 +114,20 @@ func (l Permission) CheckUserScopes(user *entity.RegistryUser, scopes []registry
 				}
 				continue
 			}
+			//- namespace 权限：默认授权，适合 namespace 下未单独配置权限的镜像。
+			//- repository 权限：显式覆盖，适合某个镜像需要指定用户管理。
+			//- 一旦某个镜像配置了任何 repository 权限，就说明它进入“精确授权”模式；对 push/管理类操作，不应该再用 namespace 权限兜底。
+			//- pull 可以按你的前面要求不限制，继续允许 public / namespace / repository 任一方式通过。
+			if slices.Contains(item.Actions, string(PermissionActionTypePush)) {
+				registryPermissionConfigured, _ := dao.Q.RegistryUserPermission.
+					Where(dao.Q.RegistryUserPermission.ResourceType.Eq(string(PermissionResourceTypeRepository))).
+					Where(dao.Q.RegistryUserPermission.ResourceValue.Eq(item.Name)).
+					First()
+				if registryPermissionConfigured != nil {
+					return errors.New("invalid action")
+				}
+			}
+
 			namespacePermission, _ := dao.Q.RegistryUserPermission.
 				Where(dao.Q.RegistryUserPermission.UserID.Eq(user.ID)).
 				Where(dao.Q.RegistryUserPermission.ResourceType.Eq(string(PermissionResourceTypeNamespace))).

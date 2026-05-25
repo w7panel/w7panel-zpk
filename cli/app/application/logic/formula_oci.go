@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"strconv"
 	"strings"
@@ -53,6 +54,7 @@ func PackFormulaToOci(session Session) error {
 			return err
 		}
 	}
+	slog.Info("push formula", "name", session.Artifact, "version", nextVersion)
 
 	remoteRepository, err := oci.NewRepositoryOci(session.Host, commonlogic.GetFormulaOciName(session.Artifact), auth.Credential{
 		Username: session.Username,
@@ -106,6 +108,7 @@ func PackFormulaToOci(session Session) error {
 		switch item.Type {
 		case AttachTypeFrontend:
 			packed, err := commonlogic.PackFrontedCodeZipToOci(map[string]string{attachKey: item.Path})
+			slog.Info("pack frontend zip", "path", item.Path, "key", attachKey, "err", err)
 			if err != nil {
 				return err
 			}
@@ -119,6 +122,7 @@ func PackFormulaToOci(session Session) error {
 			}
 		case AttachTypeBackend:
 			packed, err := commonlogic.PackBackendCodeZipToOci(item.Path)
+			slog.Info("pack backend zip", "path", item.Path, "key", attachKey, "err", err)
 			if err != nil {
 				return err
 			}
@@ -126,6 +130,7 @@ func PackFormulaToOci(session Session) error {
 			replacedMediaTypes = append(replacedMediaTypes, commonlogic.MediaTypeBackendCodeZip)
 		case AttachTypeHelm:
 			packed, err := commonlogic.PackHelmToOci(map[string]string{attachKey: item.Path})
+			slog.Info("pack helm package", "path", item.Path, "key", attachKey, "err", err)
 			if err != nil {
 				return err
 			}

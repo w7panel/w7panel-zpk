@@ -446,13 +446,17 @@ func (self *Depot) Copy(src *Formula, dest *Formula) error {
 	return err
 }
 
-func (self *Depot) OnRepositoryPushed(payload registry.RegistryRepositoryWebHookPayLoad) {
+func (self Depot) OnRepositoryPushed(payload registry.RegistryRepositoryWebHookPayLoad) {
 	repositoryName, namespace := logic.ParseRepositoryNameAndNamespace(payload.Event.Target.Repository)
 	if namespace != facade.GetConfig().GetString("setting.depot.oci_namespace") {
 		return
 	}
 
 	tag := payload.Event.Target.Tag
+	if tag == "" {
+		return
+	}
+
 	formula := GetFormulaByName(repositoryName)
 	if formula == nil {
 		err := self.AddFormula(repositoryName, tag, nil)
@@ -536,9 +540,9 @@ func (self *Depot) packToOci(formula *Formula) error {
 	}
 	resourcesDescriptor = append(resourcesDescriptor, fileListDescriptors...)
 
-	if strings.HasSuffix(formula.Manifest.Source.Url, ".zip") || strings.HasSuffix(formula.Manifest.Web.Url, ".zip") {
+	if strings.HasSuffix(formula.Manifest.Source.Url, ".zip") {
 		backendCodePath := filepath.Join(self.basePath, formula.ZipPath)
-		slog.Info("打包 zip 文件", "name", formula.Name, "path", backendCodePath, "err", err)
+		slog.Info("打包 backend zip 文件", "name", formula.Name, "path", backendCodePath, "err", err)
 		backendCodeDescriptors, err := logic.PackBackendCodeZipToOci(backendCodePath)
 		if err != nil {
 			return err
@@ -550,6 +554,7 @@ func (self *Depot) packToOci(formula *Formula) error {
 	for _, webZipPath := range formula.WebZipPaths {
 		frontedCodePaths[webZipPath] = filepath.Join(self.basePath, webZipPath)
 	}
+	slog.Info("打包 frontend zip 文件", "name", formula.Name, "paths", frontedCodePaths, "err", err)
 	frontedCodeDescriptors, err := logic.PackFrontedCodeZipToOci(frontedCodePaths)
 	if err != nil {
 		return err
@@ -560,6 +565,7 @@ func (self *Depot) packToOci(formula *Formula) error {
 	for _, path := range formula.HelmPaths {
 		helmPaths[path] = filepath.Join(self.basePath, path)
 	}
+	slog.Info("打包 helm 文件", "name", formula.Name, "paths", helmPaths, "err", err)
 	helmFileDescriptors, err := logic.PackHelmToOci(helmPaths)
 	if err != nil {
 		return err
@@ -646,7 +652,7 @@ func (self *Depot) unPackSourceCodeFromOCI(formula *Formula) error {
 			}
 		}
 		if unpackWebCode {
-			mediaTypes = append(mediaTypes, logic.MediaTypeBackendCodeZip)
+			mediaTypes = append(mediaTypes, logic.MediaTypeFrontedCodeZip)
 		}
 	}
 	if formula.HelmPaths != nil {

@@ -5,7 +5,7 @@ GO_BIN := $(GO_BASE)/bin
 FILE_NAME := $(shell date +%Y%m%d%H%M)
 SOURCE_FILES := *.go
 
-HELM_VALUES_FILE := helm/zpk/values.yaml
+HELM_VALUES_FILE := charts/values.yaml
 HELM_IMAGE_REPOSITORY := $(shell awk '/^image:/{flag=1; next} flag && /^[^[:space:]]/{flag=0} flag && $$1=="repository:" {print $$2; exit}' $(HELM_VALUES_FILE))
 HELM_IMAGE_TAG := $(shell awk '/^image:/{flag=1; next} flag && /^[^[:space:]]/{flag=0} flag && $$1=="tag:" {print $$2; exit}' $(HELM_VALUES_FILE))
 
@@ -45,8 +45,8 @@ publish: makebuild dockerbuild
 		docker tag $(LOCAL_IMAGE) $(OFFICIAL_IMAGE); \
 		docker push $(OFFICIAL_IMAGE); \
 	fi
-	rm -f helm/zpk-*.tgz
-	helm package helm/zpk -d helm
+	rm -f charts/zpk-*.tgz
+	helm package charts/ -d charts
 
 dev: clean
 	go run ${SOURCE_FILES} server:start

@@ -207,7 +207,7 @@ func UnPackOciToLocal(remoteRepository *remote.Repository, manifest *v1.Manifest
 					if err != nil {
 						return err
 					}
-					err = writeHandler(layer.MediaType, layer.MediaType[len(item)+1:], reader)
+					err = writeHandler(item, layer.MediaType[len(item)+1:], reader)
 					if err != nil {
 						return err
 					}

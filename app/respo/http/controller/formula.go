@@ -60,7 +60,10 @@ func (c Formula) BaseInfo(ctx *gin.Context) {
 		c.JsonResponseWithError(ctx, err, 500)
 		return
 	}
-
+	latestVersion, _ := dao.Q.Version.Where(dao.Q.Version.FormulaID.Eq(formula.ID)).Order(dao.Q.Version.ID.Desc()).First()
+	if latestVersion != nil {
+		formula.Version = latestVersion.Name
+	}
 	c.JsonResponseWithoutError(ctx, map[string]interface{}{"latest_version": formula.Version})
 }
 

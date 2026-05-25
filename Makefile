@@ -11,8 +11,8 @@ HELM_IMAGE_TAG := $(shell awk '/^image:/{flag=1; next} flag && /^[^[:space:]]/{f
 HELM_CHART_VERSION ?= $(shell awk '$$1=="version:" {print $$2; exit}' charts/Chart.yaml)
 HELM_APP_VERSION ?= $(IMAGE_TAG)
 HELM_PACKAGE_IMAGE_TAG ?= $(IMAGE_TAG)
-BETA_TIMESTAMP ?= $(shell date +%Y%m%d%H%M%S)
-BETA_IMAGE_TAG ?= $(IMAGE_TAG)-$(BETA_TIMESTAMP)
+BETA_SUFFIX ?=
+BETA_IMAGE_TAG ?= $(IMAGE_TAG)-$(BETA_SUFFIX)
 
 IMAGE_REPOSITORY ?= $(HELM_IMAGE_REPOSITORY)
 IMAGE_TAG ?= $(HELM_IMAGE_TAG)
@@ -65,6 +65,10 @@ publish: makebuild dockerbuild
 	helm package "$$tmp_chart_dir/zpk" -d charts --version $(HELM_CHART_VERSION) --app-version $(HELM_APP_VERSION)
 
 beta:
+	@if [ -z "$(BETA_SUFFIX)" ]; then \
+		echo "BETA_SUFFIX is required, for example: make beta BETA_SUFFIX=beta1"; \
+		exit 1; \
+	fi
 	$(MAKE) publish IMAGE_TAG=$(BETA_IMAGE_TAG) HELM_APP_VERSION=$(BETA_IMAGE_TAG)
 
 dev: clean
@@ -84,6 +88,6 @@ help:
 	@echo "make makebuild - 执行现有构建流程"
 	@echo "make dockerbuild - 构建本地镜像 LOCAL_IMAGE=$(LOCAL_IMAGE)"
 	@echo "make publish - 构建二进制、镜像、打 tag、push，并重新打 helm/zpk tgz"
-	@echo "make beta - 使用当前镜像 tag 加时间戳发布 beta，例如 $(IMAGE_TAG)-$(BETA_TIMESTAMP)"
+	@echo "make beta BETA_SUFFIX=beta1 - 使用当前镜像 tag 加手动后缀发布 beta，例如 $(IMAGE_TAG)-beta1"
 	@echo "官方发布: OFFICIAL_RELEASE=true OFFICIAL_IMAGE_TAG=xxx"
 	@echo "可覆盖变量: IMAGE_REPOSITORY=xxx IMAGE_TAG=xxx HELM_CHART_VERSION=xxx HELM_APP_VERSION=xxx HELM_PACKAGE_IMAGE_TAG=xxx LOCAL_IMAGE=xxx PUBLISH_IMAGE=xxx OFFICIAL_IMAGE_REPOSITORY=xxx"

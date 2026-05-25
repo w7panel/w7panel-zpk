@@ -42,21 +42,33 @@ func PackFormulaToOci(session Session) error {
 		return err
 	}
 
-	nextVersion := "1.0.0"
+	nextVersion := session.OciTag
+	baseVersion := ""
+	if session.OciRepository != "" && nextVersion == "" {
+		return fmt.Errorf("OCI image reference must include a tag when pushing, for example %s/%s:1.0.0", session.OciRegistry, session.OciRepository)
+	}
+
 	formulaInfo, err := zpk.ZpkService{
 		Base: base.Base{
 			BaseUrl: "https://" + session.Host,
 		},
 	}.GetRemoteFormulaBaseInfo(session.Artifact)
 	if err == nil && formulaInfo != nil && formulaInfo.LatestVersion != "" {
-		nextVersion, err = nextPatchVersion(formulaInfo.LatestVersion)
-		if err != nil {
-			return err
+		baseVersion = formulaInfo.LatestVersion
+		if nextVersion == "" {
+			nextVersion, err = nextPatchVersion(formulaInfo.LatestVersion)
+			if err != nil {
+				return err
+			}
 		}
 	}
-	slog.Info("push formula", "name", session.Artifact, "version", nextVersion)
+	if nextVersion == "" {
+		nextVersion = "1.0.0"
+	}
 
-	remoteRepository, err := oci.NewRepositoryOci(session.Host, commonlogic.GetFormulaOciName(session.Artifact), auth.Credential{
+	slog.Info("push formula", "name", session.Artifact, "baseVersion", baseVersion, "nextVersion", nextVersion)
+
+	remoteRepository, err := NewRemoteRepository(session, auth.Credential{
 		Username: session.Username,
 		Password: password,
 	})
@@ -68,8 +80,8 @@ func PackFormulaToOci(session Session) error {
 	layerDescriptors := make([]v1.Descriptor, 0)
 	fileList := map[string]string{}
 	replacedMediaTypes := make([]string, 0)
-	if formulaInfo != nil && formulaInfo.LatestVersion != "" {
-		manifest, err := commonlogic.GetOciManifest(remoteRepository, formulaInfo.LatestVersion)
+	if baseVersion != "" {
+		manifest, err := commonlogic.GetOciManifest(remoteRepository, baseVersion)
 		if err != nil && !errors.Is(err, commonlogic.OciManifestNotFoundErr) {
 			return err
 		}
@@ -156,21 +168,15 @@ func PackFormulaToOci(session Session) error {
 	descriptors = append(descriptors, manifestDescriptors...)
 
 	layerDescriptors = dropFormulaLayers(layerDescriptors, replacedMediaTypes)
-	return commonlogic.PushOciToRemote(remoteRepository, nextVersion, descriptors, layerDescriptors)
-}
-
-func nextPatchVersion(latestVersion string) (string, error) {
-	parts := strings.Split(strings.TrimSpace(latestVersion), ".")
-	if len(parts) != 3 {
-		return "", fmt.Errorf("invalid latest version %q", latestVersion)
-	}
-
-	patch, err := strconv.Atoi(parts[2])
+	authDescriptor, err := oci.GetOciDescriptorByData([]byte(session.Username), commonlogic.MediaTypeAuth)
 	if err != nil {
-		return "", fmt.Errorf("invalid latest version %q: %w", latestVersion, err)
+		return err
 	}
-	parts[2] = strconv.Itoa(patch + 1)
-	return strings.Join(parts, "."), nil
+	descriptors = append(descriptors, commonlogic.FileOciDescriptor{
+		Content:    []byte(session.Username),
+		Descriptor: *authDescriptor,
+	})
+	return commonlogic.PushOciToRemote(remoteRepository, nextVersion, descriptors, layerDescriptors)
 }
 
 func getFormulaFileList(remoteRepository *remote.Repository, manifest *v1.Manifest) (map[string]string, error) {
@@ -295,4 +301,18 @@ func dropFormulaLayers(layers []v1.Descriptor, mediaTypes []string) []v1.Descrip
 	}
 
 	return result
+}
+
+func nextPatchVersion(latestVersion string) (string, error) {
+	parts := strings.Split(strings.TrimSpace(latestVersion), ".")
+	if len(parts) != 3 {
+		return "", fmt.Errorf("invalid latest version %q", latestVersion)
+	}
+
+	patch, err := strconv.Atoi(parts[2])
+	if err != nil {
+		return "", fmt.Errorf("invalid latest version %q: %w", latestVersion, err)
+	}
+	parts[2] = strconv.Itoa(patch + 1)
+	return strings.Join(parts, "."), nil
 }

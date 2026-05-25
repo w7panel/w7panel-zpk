@@ -172,6 +172,13 @@ func (self *Depot) AddFormula(name string, version string, user *entity.Registry
 				VersionId: versionId,
 			}, "manifest.yaml", string(content))
 		}
+
+		facade.GetEvent().Publish(registry.AddUserPermissionEvent, registry.AddUserPermissionPayload{
+			UserID:        user.ID,
+			ResourceType:  "repository",
+			ResourceValue: facade.GetConfig().GetString("setting.depot.oci_namespace") + "/" + strings.ReplaceAll(name, "-", "_"),
+			Actions:       []string{"push", "pull"},
+		})
 	}
 
 	return nil
@@ -335,6 +342,12 @@ func (self *Depot) DeleteFormula(formula *Formula) error {
 
 	os.RemoveAll(filepath.Join(self.basePath, GetFormulaRelativeDir(formula.Name, 0)))
 
+	facade.GetEvent().Publish(registry.DeleteUserPermissionEvent, registry.DelUserPermissionPayload{
+		UserID:        formula.UserId,
+		ResourceType:  "repository",
+		ResourceValue: facade.GetConfig().GetString("setting.depot.oci_namespace") + "/" + strings.ReplaceAll(formula.Name, "-", "_"),
+	})
+
 	return nil
 }
 
@@ -447,11 +460,11 @@ func (self *Depot) Copy(src *Formula, dest *Formula) error {
 }
 
 func (self Depot) OnRepositoryPushed(payload registry.RegistryRepositoryWebHookPayLoad) {
+	slog.Info("depot OnRepositoryPushed", "payload", payload)
 	repositoryName, namespace := logic.ParseRepositoryNameAndNamespace(payload.Event.Target.Repository)
 	if namespace != facade.GetConfig().GetString("setting.depot.oci_namespace") {
 		return
 	}
-
 	tag := payload.Event.Target.Tag
 	if tag == "" {
 		return
@@ -459,15 +472,25 @@ func (self Depot) OnRepositoryPushed(payload registry.RegistryRepositoryWebHookP
 
 	formula := GetFormulaByName(repositoryName)
 	if formula == nil {
-		err := self.AddFormula(repositoryName, tag, nil)
+		username := payload.Event.Actor.Name
+		if username == "" {
+			slog.Error("OnRepositoryPushed UnPackOciToLocal err", "payload", payload, "err", "empty username")
+			return
+		}
+		user, err := logic.User{}.GetByUsername(username)
 		if err != nil {
-			slog.Error("Failed to add formula to repository", repositoryName, tag, err)
+			slog.Error("OnRepositoryPushed UnPackOciToLocal GetByUsername err", "payload", payload, "err", err)
+			return
+		}
+		err = self.AddFormula(repositoryName, tag, user)
+		if err != nil {
+			slog.Error("OnRepositoryPushed Failed to add formula to repository", "payload", payload, "err", err)
 			return
 		}
 		formula = GetFormulaByName(repositoryName)
 	}
 	if formula == nil {
-		slog.Error("Failed to get formula from repository", repositoryName, tag)
+		slog.Error("OnRepositoryPushed Failed to get formula from repository", "payload", payload)
 		return
 	}
 
@@ -480,8 +503,13 @@ func (self Depot) OnRepositoryPushed(payload registry.RegistryRepositoryWebHookP
 			PublishStatus: -1,
 		})
 		if err != nil {
-			slog.Error("Failed to create version", repositoryName, tag, err)
+			slog.Error("OnRepositoryPushed Failed to create version", "payload", payload, "err", err)
 		}
+	} else {
+		depot, _ := NewDepot()
+		filesDir := filepath.Join(depot.GetBasePath(), filepath.Join(GetFormulaRelativeDir(formula.Name, version.ID), "files"))
+		slog.Info("OnRepositoryPushed formula oci after push clear cache", "payload:", payload, "filesDir", filesDir)
+		os.RemoveAll(filesDir)
 	}
 }
 

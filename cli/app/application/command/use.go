@@ -29,8 +29,9 @@ func (c Use) Configure(cmd *cobra.Command) {
 func (c Use) Handle(cmd *cobra.Command, args []string) {
 	name, _ := cmd.Flags().GetString("name")
 	name = strings.TrimSpace(name)
-	if name == "" {
-		panic("artifact name is required")
+	registryInfo, err := logic.ParseFormulaRegistry(name)
+	if err != nil {
+		panic(err)
 	}
 
 	session, err := logic.LoadSession()
@@ -41,11 +42,14 @@ func (c Use) Handle(cmd *cobra.Command, args []string) {
 		panic("please login before use")
 	}
 
-	session.Artifact = strings.ReplaceAll(name, "_", "-")
+	session.Artifact = registryInfo.Artifact
+	session.OciRegistry = registryInfo.OciRegistry
+	session.OciRepository = registryInfo.OciRepository
+	session.OciTag = registryInfo.OciTag
 	session.Attachments = nil
 	if err := logic.SaveSession(session); err != nil {
 		panic(err)
 	}
 
-	fmt.Fprintf(cmd.OutOrStdout(), "using artifact: %s\n", name)
+	fmt.Fprintf(cmd.OutOrStdout(), "using artifact: %s\n", registryInfo.Reference())
 }

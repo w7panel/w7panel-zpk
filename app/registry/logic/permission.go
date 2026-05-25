@@ -195,9 +195,26 @@ func (l Permission) UserHasPermissionByResource(userId int, resourceValue string
 	return exists != nil
 }
 
-func (l Permission) DelUserPermission(tx *dao.Query, userId int) error {
-	_, err := tx.RegistryUserPermission.
-		Where(tx.RegistryUserPermission.UserID.Eq(int32(userId))).Delete()
+func (l Permission) AddUserPermission(userId int32, resourceValue string, resourceType PermissionResourceType, actions accessor.PermissionActionOption) error {
+	return dao.Q.RegistryUserPermission.Create(&entity.RegistryUserPermission{
+		UserID:        userId,
+		ResourceType:  string(resourceType),
+		ResourceValue: resourceValue,
+		Action:        &actions,
+	})
+}
+
+func (l Permission) DelUserPermission(userId int32, resourceValue string, resourceType PermissionResourceType) error {
+	_, err := dao.Q.RegistryUserPermission.
+		Where(dao.Q.RegistryUserPermission.UserID.Eq(userId)).
+		Where(dao.Q.RegistryUserPermission.ResourceType.Eq(string(resourceType))).
+		Where(dao.Q.RegistryUserPermission.ResourceValue.Eq(resourceValue)).Delete()
+	return err
+}
+
+func (l Permission) ClearUserPermission(userId int32) error {
+	_, err := dao.Q.RegistryUserPermission.
+		Where(dao.Q.RegistryUserPermission.UserID.Eq(userId)).Delete()
 	return err
 }
 
@@ -241,6 +258,31 @@ func (l Permission) ReplaceNamespacePermissions(namespace string, permissions []
 
 		return tx.RegistryUserPermission.CreateInBatches(userPermissions, 10)
 	})
+}
+
+func (l Permission) OnAddUserPermissionEvent(payload registry.AddUserPermissionPayload) {
+	err := l.AddUserPermission(payload.UserID, payload.ResourceValue, PermissionResourceType(payload.ResourceType), payload.Actions)
+	slog.Error("OnAddUserPermissionEvent", "payload", payload, "err", err)
+	if err != nil {
+		return
+	}
+}
+
+func (l Permission) OnDelUserPermissionEvent(payload registry.DelUserPermissionPayload) {
+	err := l.DelUserPermission(payload.UserID, payload.ResourceValue, PermissionResourceType(payload.ResourceType))
+	slog.Error("OnDelUserPermissionEvent", "payload", payload, "err", err)
+	if err != nil {
+		return
+	}
+
+}
+
+func (l Permission) OnClearUserPermissionEvent(payload registry.ClearUserPermissionPayload) {
+	err := l.ClearUserPermission(payload.UserID)
+	slog.Error("onClearUserPermissionEvent", "payload", payload, "err", err)
+	if err != nil {
+		return
+	}
 }
 
 func (l Permission) IsCanOperate(ctx *gin.Context, curUid int32) bool {

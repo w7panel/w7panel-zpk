@@ -4,10 +4,11 @@ import (
 	"errors"
 
 	"github.com/gin-gonic/gin"
-	"github.com/w7panel/w7panel-zpk/app/registry/logic"
 	"github.com/w7panel/w7panel-zpk/common/dao"
 	"github.com/w7panel/w7panel-zpk/common/entity"
 	logic2 "github.com/w7panel/w7panel-zpk/common/logic"
+	"github.com/w7panel/w7panel-zpk/common/types/registry"
+	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 )
 
@@ -152,17 +153,15 @@ func (c UserManager) Delete(ctx *gin.Context) {
 		return
 	}
 
-	err := dao.Q.Transaction(func(tx *dao.Query) error {
-		_, err := tx.RegistryUser.Delete(curUser)
-		if err != nil {
-			return err
-		}
-		return logic.Permission{}.DelUserPermission(tx, int(curUser.ID))
-	})
+	_, err := dao.Q.RegistryUser.Delete(curUser)
 	if err != nil {
 		c.JsonResponseWithServerError(ctx, errors.New("删除用户失败, err:"+err.Error()))
 		return
 	}
+
+	facade.GetEvent().Publish(registry.ClearUserPermissionEvent, registry.ClearUserPermissionPayload{
+		UserID: curUser.ID,
+	})
 
 	c.JsonSuccessResponse(ctx)
 }

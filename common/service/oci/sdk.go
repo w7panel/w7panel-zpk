@@ -19,7 +19,10 @@ func NewRepositoryOci(url string, registryReference string, credential auth.Cred
 	url = strings.ReplaceAll(url, "http://", "")
 	url = strings.TrimRight(url, "/")
 	registryReference = url + "/" + registryReference
+	return NewRepositoryOciReference(registryReference, credential)
+}
 
+func NewRepositoryOciReference(registryReference string, credential auth.Credential) (*remote.Repository, error) {
 	repo, err := remote.NewRepository(registryReference)
 	if err != nil {
 		if errors.Is(errors.Unwrap(err), errdef.ErrInvalidReference) {

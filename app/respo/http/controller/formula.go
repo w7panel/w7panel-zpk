@@ -57,7 +57,7 @@ func (c Formula) BaseInfo(ctx *gin.Context) {
 	depotLogin := c.getDepot()
 	formula, err := depotLogin.GetFormula(params.Identifie, "", nil)
 	if err != nil {
-		c.JsonResponseWithError(ctx, err, 500)
+		c.JsonResponseWithServerError(ctx, err)
 		return
 	}
 	latestVersion, _ := dao.Q.Version.Where(dao.Q.Version.FormulaID.Eq(formula.ID)).Order(dao.Q.Version.ID.Desc()).First()

@@ -13,4 +13,5 @@ func (*Provider) Register(console console.Console) {
 	console.RegisterCommand(new(command.Use))
 	console.RegisterCommand(new(command.Attach))
 	console.RegisterCommand(new(command.Push))
+	console.RegisterCommand(new(command.List))
 }

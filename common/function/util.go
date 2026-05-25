@@ -151,3 +151,11 @@ func SortTagsDesc(tags []string) {
 		return len(parts1) > len(parts2)
 	})
 }
+
+func LooksLikeRegistryReference(name string) bool {
+	first, _, ok := strings.Cut(name, "/")
+	if !ok {
+		return false
+	}
+	return first == "localhost" || strings.ContainsAny(first, ".:")
+}

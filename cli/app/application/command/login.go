@@ -55,6 +55,7 @@ func (c Login) Handle(cmd *cobra.Command, args []string) {
 	session.Host = host
 	session.Username = username
 	session.Password = encryptPwd
+	session.Artifact = ""
 	if err := logic.SaveSession(session); err != nil {
 		panic(err)
 	}

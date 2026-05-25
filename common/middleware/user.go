@@ -1,11 +1,14 @@
 package middleware
 
 import (
+	"sync"
+
 	"github.com/w7panel/w7panel-zpk/common/dao"
 	"github.com/w7panel/w7panel-zpk/common/entity"
 	"github.com/w7panel/w7panel-zpk/common/function"
 	"github.com/w7panel/w7panel-zpk/common/logic"
-	"sync"
+	"github.com/w7panel/w7panel-zpk/common/types/registry"
+	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 )
 
 const superRole = "super"
@@ -58,6 +61,13 @@ func getOrCreateUser(userId string, username string, userRole string, autoCreate
 		if err != nil {
 			return nil, err
 		}
+
+		facade.GetEvent().Publish(registry.AddUserPermissionEvent, registry.AddUserPermissionPayload{
+			UserID:        user.ID,
+			ResourceType:  "namespace",
+			ResourceValue: facade.GetConfig().GetString("setting.depot.oci_namespace"),
+			Actions:       []string{"push", "pull"},
+		})
 	}
 
 	return user, nil

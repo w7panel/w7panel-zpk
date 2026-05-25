@@ -31,12 +31,15 @@ type Attachment struct {
 }
 
 type Session struct {
-	Host        string       `json:"host"`
-	Username    string       `json:"username"`
-	Password    string       `json:"encrypted_password"`
-	Artifact    string       `json:"artifact"`
-	Attachments []Attachment `json:"attachments"`
-	UpdatedAt   time.Time    `json:"updated_at"`
+	Host          string       `json:"host"`
+	Username      string       `json:"username"`
+	Password      string       `json:"encrypted_password"`
+	Artifact      string       `json:"artifact"`
+	OciRegistry   string       `json:"oci_registry,omitempty"`
+	OciRepository string       `json:"oci_repository,omitempty"`
+	OciTag        string       `json:"oci_tag,omitempty"`
+	Attachments   []Attachment `json:"attachments"`
+	UpdatedAt     time.Time    `json:"updated_at"`
 }
 
 func LoadSession() (*Session, error) {

@@ -21,7 +21,7 @@
             </el-button>
           </div>
           <el-alert type="warning" class="registry-primary-el-warning mt-20 fs-14" :closable="false">
-            <div>docker login命令登录信息可在 <span class="cursor txt-line" @click="$router.push('/zpk-access')">访问凭证</span>中获取
+            <div>docker login命令登录信息可在 <span class="cursor" style="border-bottom: 1px solid var(--el-color-primary);display: inline-block;line-height: 1;" @click="accessDialogShow = true"><ArcoIcon name="icon-244" :size="16" color="#3370ff" style="vertical-align: text-top;line-height: 1;"/>访问凭证</span>中获取
             </div>
             <div class="mt-6">外网地址：<span class="cursor txt-line"
                 @click="serverdomain.external_domain ? onekeyCopy(serverdomain.external_domain) : null">{{ serverdomain.external_domain || '' }}</span>
@@ -147,6 +147,11 @@
       </div>
       <div class="shortcut-desc">其中［ImageId］请替换力您所要推送的实际镜像ID，或使用本地镜像的完整路径，［tag］请替换为您期待的镜像版本。</div>
     </el-dialog>
+    <el-dialog v-model="accessDialogShow" title="访问凭证" :width="800">
+      <div>
+        <Access :userInfo="userInfo" />
+      </div>
+    </el-dialog>
   </div>
 </template>
 
@@ -154,12 +159,19 @@
 import myAxios from "@/utils";
 import { ElMessageBox, ElMessage } from 'element-plus';
 import userMixin from "@/utils/user-mixin";
+import Access from '@/views/access.vue';
+import ArcoIcon from "@/components/arco-icon.vue";
 
 export default {
   name: "zpk_registry",
+  components: {
+    Access,
+    ArcoIcon
+  },
   mixins: [userMixin],
   data() {
     return {
+      accessDialogShow: false,
       formVisibleType3: false,
       visibleTypeMap: {
         1: '私有读写',

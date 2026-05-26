@@ -107,6 +107,11 @@ const routes = [
         component: () => import("../views/s3.vue")
     },
     {
+        path: '/zpk-publish',
+        name: 'zpk-publish',
+        component: () => import("../views/publish-settings.vue")
+    },
+    {
         path: "/:pathMatch(.*)*",
         redirect: "/zpk"
     },

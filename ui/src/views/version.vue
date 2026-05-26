@@ -16,6 +16,7 @@
                     新建版本</el-button>
                 <el-button @click="openInstFee()">付费设置</el-button>
                 <el-button @click="editDescription()">应用介绍</el-button>
+                <el-button @click="editPublish()">发布设置</el-button>
             </div>
             <div v-if="list.length" class="mt-20 df">
                 <div class="white-box" style="flex:18;">
@@ -598,6 +599,9 @@ export default {
         },
         editDescription() {
             this.$router.push('/zpk-description?id=' + this.identifie);
+        },
+        editPublish() {
+            this.$router.push('/zpk-publish?id=' + this.identifie);
         },
         getInfo() {
             myAxios.get('/respo/info/' + this.identifie).then(res => {

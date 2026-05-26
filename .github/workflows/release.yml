@@ -115,7 +115,7 @@ jobs:
 
           ZPK="./cli/bin/zpk_linux_amd64"
           "${ZPK}" login --username="${ZPK_DOCKER_USERNAME}" --password="${ZPK_DOCKER_PASSWORD}" --host="${ZPK_HOST}"
-          "${ZPK}" use --name="${ZPK_ARTIFACT}"
+          "${ZPK}" use "${ZPK_ARTIFACT}"
           "${ZPK}" attach add --path="${HELM_PACKAGE}" --type=helm
           "${ZPK}" attach add --path="${FRONTEND_PACKAGE}" --type=frontend
           "${ZPK}" push

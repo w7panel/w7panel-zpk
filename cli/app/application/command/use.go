@@ -18,17 +18,19 @@ func (c Use) GetName() string {
 }
 
 func (c Use) GetDescription() string {
-	return "use zpk artifact"
+	return "use zpk identifier"
 }
 
 func (c Use) Configure(cmd *cobra.Command) {
-	cmd.Flags().StringP("name", "n", "", "artifact name or identifier")
-	_ = cmd.MarkFlagRequired("name")
+	cmd.Use = "use <identifier>"
+	cmd.Args = cobra.ExactArgs(1)
 }
 
 func (c Use) Handle(cmd *cobra.Command, args []string) {
-	name, _ := cmd.Flags().GetString("name")
-	name = strings.TrimSpace(name)
+	name := strings.TrimSpace(args[0])
+	if name == "" {
+		panic("artifact name or identifier is required")
+	}
 	registryInfo, err := logic.ParseFormulaRegistry(name)
 	if err != nil {
 		panic(err)

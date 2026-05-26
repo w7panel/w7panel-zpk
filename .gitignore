@@ -14,3 +14,6 @@ runtime/main
 runtime/
 w7_cd_artifact/config.yaml
 .run/
+node_modules/
+zpk/
+package-lock.json

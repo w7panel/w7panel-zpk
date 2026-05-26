@@ -15,11 +15,11 @@
           </div>
 
           <div class="shortcut-header">2. 登录镜像仓库</div>
-          <div class="shortcut-desc">在镜像仓库菜单页面中查看登录提示信息，获取 <code>username</code>、<code>password</code> 和 <code>host</code>。</div>
+          <div class="shortcut-desc">在镜像仓库页面中查看访问凭证，获取<code>password</code>。</div>
           <div class="shortcut-desc">执行登录命令：</div>
           <div class="shortcut-content">
-            <pre>./zpk_linux_amd64 login --username=xxx --password=xxx --host=xxx</pre>
-            <el-icon :size="12" style="cursor:pointer" @click="onekeyCopy(`./zpk_linux_amd64 login --username=xxx --password=xxx --host=xxx`)"><DocumentCopy /></el-icon>
+            <pre>./zpk_linux_amd64 login --username={{ userInfo.username }} --password=xxx --host={{ host }}</pre>
+            <el-icon :size="12" style="cursor:pointer" @click="onekeyCopy(`./zpk_linux_amd64 login --username=${userInfo.username} --password=xxx --host=${host}`)"><DocumentCopy /></el-icon>
           </div>
           <div class="shortcut-desc">参数说明：</div>
           <ul class="shortcut-list">
@@ -28,16 +28,12 @@
             <li><code>--host</code>：镜像仓库地址</li>
           </ul>
 
-          <div class="shortcut-header">3. 选择 ZPK 包</div>
-          <div class="shortcut-desc">登录成功后，选择需要操作的 ZPK 包：</div>
+          <div class="shortcut-header">3. 选择制品</div>
+          <div class="shortcut-desc">登录成功后，选择需要操作的制品：</div>
           <div class="shortcut-content">
-            <pre>./zpk_linux_amd64 use --name=zpk_name</pre>
-            <el-icon :size="12" style="cursor:pointer" @click="onekeyCopy(`./zpk_linux_amd64 use --name=zpk_name`)"><DocumentCopy /></el-icon>
+            <pre>./zpk_linux_amd64 use {{ $route.query.id }}</pre>
+            <el-icon :size="12" style="cursor:pointer" @click="onekeyCopy(`./zpk_linux_amd64 use ${$route.query.id}`)"><DocumentCopy /></el-icon>
           </div>
-          <div class="shortcut-desc">参数说明：</div>
-          <ul class="shortcut-list">
-            <li><code>--name</code>：ZPK 包名称，请替换为实际的 ZPK 名称</li>
-          </ul>
 
           <div class="shortcut-header">4. 添加附件</div>
           <div class="shortcut-desc">使用 <code>attach add</code> 命令添加附件：</div>
@@ -66,10 +62,10 @@
           </div>
           <div class="shortcut-desc">参数说明：</div>
           <ul class="shortcut-list">
-            <li><code>--sub_artifact</code>：子应用名称</li>
+            <li><code>--sub_artifact</code>：子应用标识</li>
           </ul>
 
-          <div class="shortcut-header">5. 推送 ZPK 包</div>
+          <div class="shortcut-header">5. 推送制品</div>
           <div class="shortcut-desc">所有附件添加完成后，执行推送命令：</div>
           <div class="shortcut-content">
             <pre>./zpk_linux_amd64 push</pre>
@@ -79,8 +75,22 @@
 </template>
 
 <script>
+import userMixin from "@/utils/user-mixin";
+import myAxios from '@/utils/index';
 export default {
     name: "publish-settings",
+    mixins: [userMixin],
+    data() {
+      return {
+        host: ''
+      }
+    },
+    created() {
+      myAxios.get(`/v2/api/registry/info`).then(res => {
+        let data = res?.data?.data?.server || {};
+        this.host = data.external_domain || '';
+      })
+    },
     methods: {
       onekeyCopy(text){
         var textarea = document.createElement('textarea');

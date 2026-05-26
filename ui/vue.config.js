@@ -5,7 +5,7 @@ const proxyTarget = process.env.VUE_PROXY_TARGET || ''
 module.exports = defineConfig({
   transpileDependencies: true,
   productionSourceMap: false,
-  outputDir: 'zpk',
+  outputDir: 'dist',
   lintOnSave: false,
   publicPath: process.env.NODE_ENV === 'production' ? '' : '/',
   devServer: {

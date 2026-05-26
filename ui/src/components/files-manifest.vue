@@ -1945,53 +1945,7 @@ platform:
     appearance: textfield;
 }
 
-.table {
-    width: 100%;
-}
 
-.table .thead .td {
-    background-color: #f2f3f5;
-}
-
-.table td {
-    padding: 10px;
-    line-height: 1.4;
-    border: 1px solid #f2f3f5;
-    border-left: 0;
-    border-right: 0;
-    background: #f7f8fa;
-}
-
-.table tr:last-child td {
-    background: transparent;
-}
-
-.table.nolast tr:last-child td {
-    background: #f0f3fa;
-}
-
-.table thead tr:first-child td {
-    background: #f3f3f3;
-    border-top: 0;
-}
-
-
-.handle+.handle {
-    padding-left: 10px;
-}
-
-.addmenu {
-    padding: 20px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 6px;
-    line-height: 1;
-}
-
-.addmenu:hover {
-    color: #2d5fff;
-}
 
 .branch {
     margin-left: 30px;

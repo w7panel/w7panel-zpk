@@ -466,6 +466,9 @@ func (c Formula) List(ctx *gin.Context) {
 	var user *entity.RegistryUser
 	if params.Owner {
 		user = logic2.User{}.GetUser(ctx)
+		if user == nil {
+			params.Owner = false
+		}
 	}
 
 	var result []ResultNode

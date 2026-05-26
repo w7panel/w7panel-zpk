@@ -15,5 +15,5 @@ runtime/
 w7_cd_artifact/config.yaml
 .run/
 node_modules/
-zpk/
+dist/
 package-lock.json

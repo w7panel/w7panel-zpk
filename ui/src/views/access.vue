@@ -41,7 +41,12 @@ import myAxios from "@/utils";
 
 export default {
     name: "zpk_namespace",
-    props: ['userInfo'],
+    props: {
+        userInfo: {
+            type: Object,
+            default: () => ({})
+        }
+    },
     data() {
         return {
             form: {

@@ -148,14 +148,18 @@
                                         </el-form-item>
 
                                     </div>
-
                                     <div v-if="form.type == 'helm'" class="greybox">
                                         <div class="greybox-title">YAML配置</div>
                                         <div>
                                             <div v-for="(item, index) in form.helm.depend_yamls" :key="index"
                                                 style="margin-bottom:30px;" class="show-on-hover-container">
                                                 <div class="df yaml-header">
+                                                      <el-upload
+                                                        :before-upload="(e) => {helmyamlsUpload(e, index);return false}"
+                                                        :show-file-list="false"
+                                                    >
                                                     <el-button type="primary">上传文件</el-button>
+                                                    </el-upload>
                                                     <div class="show-on-hover yaml-delete">
                                                         <el-icon :size="20" class="cursor"
                                                             @click="form.helm.depend_yamls.splice(index, 1); changeForm();">
@@ -993,9 +997,9 @@ export default {
             })
         },
         helmyamlsUpload(e, index) {
-            let file = e.target.files[0];
+            let file = e
             if (!file) { return }
-            if (!/\.yaml$/.test(file.name)) {
+            if (!(/\.yaml$/.test(file.name) || /\.yml$/.test(file.name))) {
                 this.$message.error('请上传yaml文件');
                 return;
             }

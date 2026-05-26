@@ -1,4 +1,4 @@
-CLI_NAME := w7-zpk
+CLI_NAME := zpk
 CLI_DIR := $(shell pwd)
 BIN_DIR := $(CLI_DIR)/bin
 GO_BUILD := CGO_ENABLED=0 go build -trimpath -ldflags "-s -w"

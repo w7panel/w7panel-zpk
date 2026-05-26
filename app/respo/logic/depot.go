@@ -470,6 +470,7 @@ func (self Depot) OnRepositoryPushed(payload registry.RegistryRepositoryWebHookP
 		return
 	}
 
+	depot, _ := NewDepot()
 	formula := GetFormulaByName(repositoryName)
 	if formula == nil {
 		username := payload.Event.Actor.Name
@@ -482,7 +483,7 @@ func (self Depot) OnRepositoryPushed(payload registry.RegistryRepositoryWebHookP
 			slog.Error("OnRepositoryPushed UnPackOciToLocal GetByUsername err", "payload", payload, "err", err)
 			return
 		}
-		err = self.AddFormula(repositoryName, tag, user)
+		err = depot.AddFormula(repositoryName, tag, user)
 		if err != nil {
 			slog.Error("OnRepositoryPushed Failed to add formula to repository", "payload", payload, "err", err)
 			return
@@ -506,7 +507,6 @@ func (self Depot) OnRepositoryPushed(payload registry.RegistryRepositoryWebHookP
 			slog.Error("OnRepositoryPushed Failed to create version", "payload", payload, "err", err)
 		}
 	} else {
-		depot, _ := NewDepot()
 		filesDir := filepath.Join(depot.GetBasePath(), filepath.Join(GetFormulaRelativeDir(formula.Name, version.ID), "files"))
 		slog.Info("OnRepositoryPushed formula oci after push clear cache", "payload:", payload, "filesDir", filesDir)
 		os.RemoveAll(filesDir)

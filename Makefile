@@ -23,18 +23,15 @@ OFFICIAL_IMAGE_REPOSITORY ?= ccr.ccs.tencentyun.com/w7team/zpk
 OFFICIAL_IMAGE_TAG ?=
 OFFICIAL_IMAGE ?= $(OFFICIAL_IMAGE_REPOSITORY):$(OFFICIAL_IMAGE_TAG)
 
-.PHONY: build-osx build build-windows makebuild dockerbuild publish beta dev test clean help
+.PHONY: tidy build  makebuild dockerbuild publish beta dev test clean help
 
-build-osx: clean
-	go build -o ${GO_BIN}/${PROJECT_NAME}_osx ${SOURCE_FILES}
+tidy:
+	go mod tidy
 
-build: clean
+build: clean tidy
 	CGO_ENABLED=1 GOARCH=amd64 GOOS=linux CC=x86_64-linux-musl-gcc CXX=x86_64-linux-musl-g++ go build -gcflags=-trimpath=$$GOPATH -asmflags=-trimpath=$$GOPATH -ldflags "-w -s" -o builder/server ${SOURCE_FILES}
 
 makebuild: build
-
-build-windows: clean
-	CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o ${GO_BIN}/${PROJECT_NAME}.exe ${SOURCE_FILES}
 
 dockerbuild:
 	docker build -t $(LOCAL_IMAGE) .
@@ -85,6 +82,7 @@ clean:
 
 help:
 	@echo "make build - 编译 Linux 二进制到 builder/server"
+	@echo "make tidy - 整理 Go module 依赖"
 	@echo "make makebuild - 执行现有构建流程"
 	@echo "make dockerbuild - 构建本地镜像 LOCAL_IMAGE=$(LOCAL_IMAGE)"
 	@echo "make publish - 构建二进制、镜像、打 tag、push，并重新打 helm/zpk tgz"

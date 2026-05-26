@@ -6,11 +6,14 @@ UPX := upx
 UPX_FLAGS := --best --lzma
 UPX_DARWIN_FLAGS := $(UPX_FLAGS) --force-macos
 
-.PHONY: build build-all build-compress build-darwin build-linux build-windows compress clean help
+.PHONY: tidy build build-all build-compress build-darwin build-linux build-windows compress clean help
 
 build: build-all
 
-build-all: build-darwin build-linux build-windows
+tidy:
+	go mod tidy
+
+build-all: tidy build-darwin build-linux build-windows
 
 build-compress: build-all compress
 
@@ -40,6 +43,7 @@ clean:
 
 help:
 	@echo "make build - 构建全部 CLI 可执行文件"
+	@echo "make tidy - 整理 Go module 依赖"
 	@echo "make build-compress - 构建全部 CLI 可执行文件并使用 UPX 压缩"
 	@echo "make build-darwin - 构建 macOS CLI"
 	@echo "make build-linux - 构建 Linux CLI"

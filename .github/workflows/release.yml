@@ -24,13 +24,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Go
+      - name: Setup Go
         uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-          cache-dependency-path: |
-            go.sum
-            cli/go.sum
+          cache: true
 
       - name: Set up Helm
         uses: azure/setup-helm@v4
@@ -54,7 +52,7 @@ jobs:
 
       - name: Build zpk CLI
         working-directory: cli
-        run: go mod tidy && make build-compress
+        run: make build-compress
 
       - name: Upload CLI assets to GitHub Release
         uses: softprops/action-gh-release@v2

@@ -150,6 +150,8 @@ func (c FormulaAttach) Files(ctx *gin.Context) {
 			}
 			tmpContent, _ = yaml.Marshal(responseManifestMap)
 			returnFileList[strings.ReplaceAll(index, "_", "-")] = string(tmpContent)
+		} else {
+			returnFileList[index] = val
 		}
 	}
 

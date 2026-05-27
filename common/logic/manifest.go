@@ -209,6 +209,7 @@ type RequestProxy struct {
 type BackendConfig struct {
 	Type             string            `yaml:"type" json:"type"`
 	BackendIdentifie string            `yaml:"backend_identifie" json:"backend_identifie"`
+	BackendPort      int               `yaml:"backend_port" json:"backend_port"`
 	RequestProxy     RequestProxy      `yaml:"proxy_request" json:"proxy_request"`
 	FrontendProps    map[string]string `yaml:"frontend_props" json:"frontend_props"`
 }
@@ -305,6 +306,19 @@ func ProcessManifestIdentify(manifestRow Manifest) Manifest {
 		manifestRow.Platform.Ingress[index] = item
 	}
 	for index, item := range manifestRow.Bindings {
+		existsDefaultMenu := false
+		for mi, mitem := range item.Menu {
+			if mitem.IsDefault > 0 {
+				mitem.IsDefault -= 1
+			}
+			if mitem.IsDefault == 1 {
+				existsDefaultMenu = true
+			}
+			item.Menu[mi] = mitem
+		}
+		if !existsDefaultMenu && len(item.Menu) > 0 {
+			item.Menu[0].IsDefault = 1
+		}
 		item.BackendConfig.BackendIdentifie = strings.ReplaceAll(item.BackendConfig.BackendIdentifie, "_", "-")
 		manifestRow.Bindings[index] = item
 	}

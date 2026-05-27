@@ -2073,27 +2073,6 @@ div>>>pre .hljs {
     opacity: 0;
 }
 
-.greybox {
-    padding: 16px;
-    background-color: #f7f8fa;
-}
-
-.greybox .greybox-title {
-    font-weight: bold;
-    line-height: 20px;
-    margin-bottom: 20px;
-}
-
-.greybox .yaml-header {
-    justify-content: space-between;
-    margin-bottom: 20px;
-}
-
-.greybox .yaml-delete {
-    padding: 5px;
-    line-height: 1;
-}
-
 .show-on-hover-container .show-on-hover {
     display: none;
 }

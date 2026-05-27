@@ -372,40 +372,40 @@
                                                             </div>
                                                         </td>
                                                         <td>
-                                                            <div><el-input v-model="item.do" @change="getMenu"
+                                                            <div><el-input v-model="item.do" @change="onMenuChanged(r.menu)"
                                                                     style="width:150px; height:36px;"
                                                                     placeholder="路由"></el-input>
                                                             </div>
                                                             <div v-for="(sub, subid) in item.children" :key="subid"
                                                                 class="mt-10">
-                                                                <el-input v-model="sub.do" @change="getMenu"
+                                                                <el-input v-model="sub.do" @change="onMenuChanged(r.menu)"
                                                                     style="width:150px; height:36px;"
                                                                     placeholder="路由"></el-input>
                                                             </div>
                                                         </td>
                                                         <td>
-                                                            <div><el-input v-model="item.title" @change="getMenu"
+                                                            <div><el-input v-model="item.title" @change="onMenuChanged(r.menu)"
                                                                     style="width:150px; height:36px;"
                                                                     placeholder="名称"></el-input>
                                                             </div>
                                                             <div v-for="(sub, subid) in item.children" :key="subid"
                                                                 class="mt-10">
-                                                                <el-input v-model="sub.title" @change="getMenu"
+                                                                <el-input v-model="sub.title" @change="onMenuChanged(r.menu)"
                                                                     style="width:150px; height:36px;"
                                                                     placeholder="名称"></el-input>
                                                             </div>
                                                         </td>
                                                         <td>
-                                                            <div style="height:36px; text-align:center;">
-                                                                <el-checkbox v-model="item.is_default" size="large"
-                                                                    :true-label="2" :false-label="1" :name="r.name"
-                                                                    @change="setMenuDefault(r.menu, item, item.is_default)"></el-checkbox>
+                                                            <div style="height:36px; text-align:center;" :style="{visibility: item.children?.length > 0 ? 'hidden' : 'visible'}">
+                                                                <el-checkbox :model-value="Number(item.is_default) === 1" size="large"
+                                                                    :name="r.name"
+                                                                    @click.stop="setMenuDefault(r.menu, item)"></el-checkbox>
                                                             </div>
                                                             <div v-for="(sub, subid) in item.children" :key="subid"
                                                                 class="mt-10 df ai-c jc-c" style="height:36px;">
-                                                                <el-checkbox v-model="sub.is_default" size="large"
-                                                                    :true-label="2" :false-label="1" :name="r.name"
-                                                                    @change="setMenuDefault(r.menu, sub, sub.is_default)"></el-checkbox>
+                                                                <el-checkbox :model-value="Number(sub.is_default) === 1" size="large"
+                                                                    :name="r.name"
+                                                                    @click.stop="setMenuDefault(r.menu, sub)"></el-checkbox>
                                                             </div>
                                                         </td>
                                                         <td>
@@ -432,7 +432,7 @@
                                                         <td>
                                                             <div class="df ai-c" style="height:36px;">
                                                                 <span class="handle c-blue cursor"
-                                                                    @click="addSub(item)">添加子菜单</span>
+                                                                    @click="addSub(r.menu, item)">添加子菜单</span>
                                                                 <el-popover placement="top" :width="240"
                                                                     trigger="hover">
                                                                     <template #reference><span
@@ -475,18 +475,18 @@
                                                                     </div>
                                                                 </el-popover>
                                                                 <span class="handle c-blue cursor"
-                                                                    @click="r.menu.splice(index, 1); getMenu();">删除</span>
+                                                                    @click="removeMenu(r.menu, index)">删除</span>
                                                             </div>
                                                             <div v-for="(sub, subid) in item.children" :key="subid"
                                                                 class="mt-10 df ai-c" style="height:36px;">
                                                                 <span class="handle c-blue cursor"
-                                                                    @click="item.children.splice(subid, 1); getMenu();">删除</span>
+                                                                    @click="removeSubMenu(r.menu, item, subid)">删除</span>
                                                             </div>
                                                         </td>
                                                     </tr>
                                                     <tr>
                                                         <td colspan="9" class="cursor txt-c"
-                                                            @click="r.menu.push({ title: '', icon: '', displayorder: 0, is_default: 1, location: 'normal' })">
+                                                            @click="addMenu(r.menu)">
                                                             <span class="addmenu"><el-icon :size="14">
                                                                     <Plus />
                                                                 </el-icon>添加一级菜单</span>
@@ -774,6 +774,7 @@ export default {
             isCreate: false,
 
             startParams: [],
+            menuDefaultTarget: null,
         }
     },
     created() {
@@ -951,15 +952,96 @@ export default {
             }
             this.roleEdit.index = -1;
         },
-        setMenuDefault(menu, item, is_default) {
-            menu.forEach(i => {
-                i.is_default = 1;
-                if (!i.children?.length) { return }
-                i.children.forEach(j => {
-                    j.is_default = 1;
-                })
+        isCompleteMenuRoute(item) {
+            return !!(item?.title && item?.do);
+        },
+        getMenuDefaultCandidates(menu, { completeOnly = false } = {}) {
+            let candidates = [];
+            (menu || []).forEach(item => {
+                let children = Array.isArray(item.children) ? item.children : [];
+                if (children.length) {
+                    children.forEach(sub => {
+                        if (!completeOnly || this.isCompleteMenuRoute(sub)) {
+                            candidates.push(sub);
+                        }
+                    });
+                    return;
+                }
+                if (!completeOnly || this.isCompleteMenuRoute(item)) {
+                    candidates.push(item);
+                }
             });
-            item.is_default = is_default;
+            return candidates;
+        },
+        hasIncompleteDefaultMenu(menu) {
+            return (menu || []).some(item => {
+                let children = Array.isArray(item.children) ? item.children : [];
+                if (children.length) {
+                    return children.some(sub => Number(sub.is_default) === 1 && !this.isCompleteMenuRoute(sub));
+                }
+                return Number(item.is_default) === 1 && !this.isCompleteMenuRoute(item);
+            });
+        },
+        normalizeBuiltMenuDefault(menu, skipFallback = false) {
+            let selected = menu.find(item => Number(item.is_default) === 1);
+            menu.forEach(item => {
+                item.is_default = item === selected ? 1 : 0;
+            });
+            if (!selected && menu.length && !skipFallback) {
+                menu[0].is_default = 1;
+            }
+        },
+        normalizeMenuDefault(menu, preferredItem) {
+            let candidates = this.getMenuDefaultCandidates(menu);
+            (menu || []).forEach(item => {
+                let children = Array.isArray(item.children) ? item.children : [];
+                if (!candidates.includes(item)) {
+                    item.is_default = 0;
+                }
+                children.forEach(sub => {
+                    if (!candidates.includes(sub)) {
+                        sub.is_default = 0;
+                    }
+                });
+            });
+
+            let selected = preferredItem && candidates.includes(preferredItem) ? preferredItem : null;
+            selected = selected || candidates.find(item => Number(item.is_default) === 1);
+
+            candidates.forEach(item => {
+                item.is_default = item === selected ? 1 : 0;
+            });
+            if (!selected && candidates.length) {
+                candidates[0].is_default = 1;
+            }
+        },
+        getMenuPreferredDefault(menu) {
+            let candidates = this.getMenuDefaultCandidates(menu);
+            return candidates.includes(this.menuDefaultTarget) ? this.menuDefaultTarget : null;
+        },
+        onMenuChanged(menu) {
+            this.normalizeMenuDefault(menu);
+            this.getMenu();
+        },
+        addMenu(menu) {
+            menu.push({ title: '', icon: '', displayorder: 0, is_default: 0, location: 'normal' });
+            this.normalizeMenuDefault(menu);
+            this.getMenu();
+        },
+        removeMenu(menu, index) {
+            menu.splice(index, 1);
+            this.normalizeMenuDefault(menu);
+            this.getMenu();
+        },
+        removeSubMenu(menu, item, subid) {
+            item.children.splice(subid, 1);
+            this.normalizeMenuDefault(menu);
+            this.getMenu();
+        },
+        setMenuDefault(menu, item) {
+            this.menuDefaultTarget = item;
+            item.is_default = 1;
+            this.normalizeMenuDefault(menu, item);
             this.getMenu();
         },
         getIcon() {
@@ -973,9 +1055,13 @@ export default {
                 }
             }
         },
-        addSub(item) {
+        addSub(menu, item) {
             item.children = item.children || [];
-            item.children.push({ title: '', displayorder: 0, is_default: 1 });
+            let sub = { title: '', displayorder: 0, is_default: 0 };
+            item.children.push(sub);
+            this.menuDefaultTarget = sub;
+            this.normalizeMenuDefault(menu, sub);
+            this.getMenu();
         },
         selectIcon(item) {
             this.activeItem.icon_svg = item.json;
@@ -1033,6 +1119,7 @@ export default {
                         r.frontend_props?.map(i => i.isSelect = false)
                     } catch { }
                 }
+                this.normalizeMenuDefault(r.menu, this.getMenuPreferredDefault(r.menu));
 
                 let itemObj = {
                     name: r.name,
@@ -1097,7 +1184,7 @@ export default {
                         icon: o.icon,
                         icon_svg: o.icon_svg,
                         location: o.location,
-                        is_default: o.is_default || 1,
+                        is_default: o.is_default || 0,
                     };
                     delete item.children;
                     menu.push(item);
@@ -1111,13 +1198,14 @@ export default {
                                 title: c.title,
                                 icon: c.icon,
                                 icon_svg: o.icon_svg,
-                                is_default: c.is_default,
+                                is_default: c.is_default || 0,
                                 parent: o.do,
                             });
                         }
                     }
                 }
                 itemObj.menu = menu;
+                this.normalizeBuiltMenuDefault(itemObj.menu, this.hasIncompleteDefaultMenu(r.menu));
 
                 if (itemObj.menu.length > 0) {
                     if (r.support) {

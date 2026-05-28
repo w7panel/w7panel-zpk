@@ -82,11 +82,6 @@
                                                 <el-tab-pane label="微擎面板控制台" name="thirdparty_cd"></el-tab-pane>
                                             </el-tabs>
                                         </div>
-                                        <div v-show="form.hasIframe" class="df ai-c mt-10">
-                                            <span>域名：</span>
-                                            <el-input v-model="form.front_domain" @change="getMenu" :spellcheck="false"
-                                                style="width:360px;" placeholder="请输入" />
-                                        </div>
 
                                         <div v-show="form.menu_type == 'console'" class="df ai-c mt-10">
                                             <div style="">
@@ -115,15 +110,27 @@
                                                             :disabled="r.name == 'founder' || r.name == 'super'"
                                                             placeholder="请输入标识"></el-input>
                                                     </div>
-                                                    <div v-else
-                                                        @click="roleEdit = { index: rindex, title: r.title, name: r.name }"
-                                                        class="df ai-c cursor">
-                                                        <span class="lh-1">{{ r.title }}</span>
-                                                        <el-icon v-if="r.support != 'thirdparty_cd'" color="#333333"
-                                                            :size="14" style="margin-left:4px;">
-                                                            <Edit />
-                                                        </el-icon>
+                                                    <div v-else-if="r.support === 'thirdparty_cd'"
+                                                        class="df ai-c">
+                                                        <span class="lh-1 mr-20">{{ r.title }}</span>
+                                                        <el-checkbox v-model="r.load_mode" true-label="iframe"
+                                                        false-label="static_hosting" @change="changeLoadMode(r)">
+                                                        <span class="c-66">支持iframe</span></el-checkbox>
                                                     </div>
+                                                    <div v-else
+                                                        class="df ai-c cursor">
+                                                        <div @click="roleEdit = { index: rindex, title: r.title, name: r.name }" class="mr-20">
+                                                            <span class="lh-1">{{ r.title }}</span>
+                                                            <el-icon v-if="r.support != 'thirdparty_cd'" color="#333333"
+                                                                :size="14" style="margin-left:4px;">
+                                                                <Edit />
+                                                            </el-icon>
+                                                        </div>
+                                                        <el-checkbox v-model="r.load_mode" true-label="iframe"
+                                                        false-label="static_hosting" @change="changeLoadMode(r)"><span
+                                                            class="c-66">支持iframe</span></el-checkbox>
+                                                    </div>
+
                                                     <div v-if="roleEdit.index == rindex"
                                                         class="ml-40 c-blue cursor lh-1" style="text-wrap: nowrap;"
                                                         @click="submitRoleEdit">确定</div>
@@ -158,13 +165,44 @@
                                                     <el-checkbox v-if="r.name != 'founder' && r.name != 'super'"
                                                         v-model="r.is_default_register" :true-label="2" :false-label="1"
                                                         @change="chengeRegister(r, r.is_default_register)">默认邀请端</el-checkbox>
-                                                    <el-checkbox v-model="r.framework" true-label="iframe"
-                                                        false-label="vue2" @change="getMenu"><span
-                                                            class="c-66">支持iframe</span></el-checkbox>
                                                 </div>
                                             </div>
 
                                             <div class="mt-10 greybox">
+                                                <template v-if="r.load_mode === 'iframe'">
+                                                    <div class="greybox-title">iframe配置<el-tooltip><template #content>iframe使用场景受到了严格的限制，如果需要对接授权登录，可将 {access_token} 传递给iframe，然后由后端服务请求授权接口地址（http://xxxx）获取用户信息。由于iframe受到了浏览器安全限制，生成cookies时必须设置 SameSite: None, Secure: true，并且header设置允许 * 跨域，才能正常传递。</template><ArcoIcon name="icon-41" :size="16"/></el-tooltip></div>
+                                                    <el-form-item label="地址类型" style="margin-bottom:20px;">
+                                                        <el-radio-group v-model="r.type" @change="changeBackendType(r)">
+                                                            <el-radio label="internal" value="internal">应用地址</el-radio>
+                                                            <el-radio label="external" value="external">远程地址</el-radio>
+                                                        </el-radio-group>
+                                                    </el-form-item>
+                                                    <el-form-item label="页面地址" style="margin-bottom:20px;">
+                                                        <div v-if="r.type == 'internal'" class="backend-url-config df ai-c">
+                                                            <span class="backend-url-fixed">https://</span>
+                                                            <span class="backend-url-fixed backend-url-placeholder">{{ getIframeDomainPlaceholder() }}</span>
+                                                            <span class="backend-url-fixed">/</span>
+                                                            <el-input v-model="r.backend_path" @input="getMenu" @change="getMenu" placeholder="请输入目录"
+                                                                class="backend-url-control backend-url-input" />
+                                                        </div>
+                                                        <div v-else class="backend-url-config backend-url-config-external df ai-c">
+                                                            <el-select v-model="r.root_protocol"
+                                                                class="backend-url-control backend-url-protocol"
+                                                                @change="getMenu">
+                                                                <el-option label="http://" value="http://"></el-option>
+                                                                <el-option label="https://" value="https://"></el-option>
+                                                            </el-select>
+                                                            <el-input v-model="r.root_url" @change="getMenu"
+                                                                placeholder="请输入地址"
+                                                                class="backend-url-control backend-url-input" />
+                                                        </div>
+                                                    </el-form-item>
+                                                    <el-form-item label="变量传递" style="margin-bottom:20px;">
+                                                        只支持query方式，get方式拼接到页面地址后面
+                                                    </el-form-item>
+                                                </template>
+                                                <template v-else>
+
                                                 <div class="greybox-title">变量传递配置<el-tooltip><template #content>将开发者设置的变量值传递给后端接口和前端JS变量中</template><ArcoIcon name="icon-41" :size="16"/></el-tooltip></div>
                                                 <el-form-item label="接口类型" style="margin-bottom:20px;">
                                                     <el-radio-group v-model="r.type" @change="changeBackendType(r)">
@@ -172,7 +210,6 @@
                                                         <el-radio label="external" value="external">应用外网地址（external）</el-radio>
                                                     </el-radio-group>
                                                 </el-form-item>
-
                                                 <el-form-item label="接口地址" style="margin-bottom:20px;">
                                                     <div v-if="r.type == 'internal'" class="backend-url-config df ai-c">
                                                         <span class="backend-url-fixed">http://</span>
@@ -204,7 +241,8 @@
                                                             class="backend-url-control backend-url-input" />
                                                     </div>
                                                 </el-form-item>
-                                                <div class="greybox-title">代理配置<el-tooltip><template #content>面板提供转发服务到接口地址，接口后端可通过HTTP变量获取传递值</template><ArcoIcon name="icon-41" :size="16"/></el-tooltip></div>
+
+                                                <div>代理配置<el-tooltip><template #content>面板提供转发服务到接口地址，接口后端可通过HTTP变量获取传递值</template><ArcoIcon name="icon-41" :size="16"/></el-tooltip></div>
                                                 <div class="mb-20">
                                                     <div style="margin-bottom:20px;" class="df">
                                                         <div style="width:100px;">代理地址</div>
@@ -287,7 +325,7 @@
                                                         </table>
                                                     </div>
                                                 </div>
-                                                <div class="greybox-title">前端配置<el-tooltip><template #content>面板提供microapp机制渲染前端包，可通过window.$wujie.props.frontend_props
+                                                <div>前端配置<el-tooltip><template #content>面板提供microapp机制渲染前端包，可通过window.$wujie.props.frontend_props
 从JS变量获取传递值</template><ArcoIcon name="icon-41" :size="16"/></el-tooltip></div>
                                                 <div
                                                     v-if="!(form.menu_type == 'thirdparty_cd' && r.name == 'normal')">
@@ -328,9 +366,11 @@
                                                         </tbody>
                                                     </table>
                                                 </div>
+                                                </template>
+
                                             </div>
 
-                                            <table class="menutable table mt-10">
+                                            <table v-if="r.load_mode !== 'iframe'" class="menutable table mt-10">
                                                 <thead>
                                                     <tr>
                                                         <td>排序</td>
@@ -625,7 +665,6 @@ export default {
                 redis: false,
 
 
-                front_domain: '',
                 hasIframe: false,
                 role_founder: false,
                 role_super: false,
@@ -889,6 +928,11 @@ export default {
             this.getMenu();
         },
         changeBackendType(role) {
+            if (role.load_mode == 'iframe') {
+                this.syncIframeBackendDefaults(role);
+                this.getMenu();
+                return;
+            }
             if (role.type == 'internal') {
                 if (!role.backend_identifie) {
                     role.backend_identifie = this.getDefaultBackendIdentifie();
@@ -901,9 +945,25 @@ export default {
             }
             this.getMenu();
         },
+        changeLoadMode(role) {
+            if (role.load_mode == 'iframe') {
+                role.type = role.type || 'internal';
+                this.syncIframeBackendDefaults(role);
+            } else {
+                if (role.type == 'internal' && role.backend_identifie == this.getIframeDomainPlaceholder()) {
+                    role.backend_identifie = this.getDefaultBackendIdentifie();
+                    role.backend_port = this.getDefaultBackendPort(role.backend_identifie);
+                }
+            }
+            this.getMenu();
+        },
         syncRoleBackendDefaults() {
             let changed = false;
             this.form.role.forEach(role => {
+                if (role.load_mode == 'iframe') {
+                    changed = this.syncIframeBackendDefaults(role) || changed;
+                    return;
+                }
                 if (role.type != 'internal') { return }
                 if (!role.backend_identifie) {
                     role.backend_identifie = this.getDefaultBackendIdentifie();
@@ -915,6 +975,61 @@ export default {
                 }
             });
             return changed;
+        },
+        getIframeDomainPlaceholder() {
+            return '{{.Values.${DOMAIN_URL}}}';
+        },
+        syncIframeBackendDefaults(role) {
+            let changed = false;
+            let placeholder = this.getIframeDomainPlaceholder();
+            if (role.type == 'internal') {
+                if (role.backend_identifie != placeholder) {
+                    role.backend_identifie = placeholder;
+                    changed = true;
+                }
+                if (role.backend_path === undefined || role.backend_path === null) {
+                    role.backend_path = '';
+                    changed = true;
+                }
+            } else {
+                if (!role.root_protocol) {
+                    role.root_protocol = 'http://';
+                    changed = true;
+                }
+                if (role.root_url === undefined || role.root_url === null) {
+                    role.root_url = '';
+                    changed = true;
+                }
+            }
+            return changed;
+        },
+        parseIframeBackendUrl(url) {
+            let value = String(url || '');
+            let placeholder = this.getIframeDomainPlaceholder();
+            if (value.includes(placeholder)) {
+                let path = value.slice(value.indexOf(placeholder) + placeholder.length).replace(/^\/+/, '');
+                return {
+                    type: 'internal',
+                    backend_identifie: placeholder,
+                    backend_path: path,
+                    root_protocol: 'http://',
+                };
+            }
+            let externalBackend = this.parseExternalBackendUrl(value);
+            return {
+                type: 'external',
+                backend_identifie: placeholder,
+                backend_path: '',
+                root_protocol: externalBackend.protocol,
+                root_url: externalBackend.url,
+            };
+        },
+        getIframeBackendUrl(role) {
+            if (role.type == 'internal') {
+                let path = String(role.backend_path || '').trim().replace(/^\/+/, '');
+                return `https://${this.getIframeDomainPlaceholder()}${path ? '/' + path : ''}`;
+            }
+            return this.getExternalBackendUrl(role);
         },
         parseExternalBackendUrl(url) {
             let match = (url || '').match(/^([a-z][a-z\d+.-]*:\/\/)(.*)$/i);
@@ -1077,7 +1192,6 @@ export default {
                     name: this.newRole.name,
                     support: this.form.menu_type,
                     status: 1,
-                    framework: 'vue2',
                     load_mode: 'static_hosting',
                     is_default_register: 1,
                     location: 'left',
@@ -1086,6 +1200,7 @@ export default {
                     type: 'internal',
                     backend_identifie: backend_identifie,
                     backend_port: this.getDefaultBackendPort(backend_identifie),
+                    backend_path: '',
                     root_protocol: 'http://',
                     root_url: '',
 
@@ -1127,11 +1242,10 @@ export default {
                     status: r.status,
                     support: r.support,
                     is_default_register: r.is_default_register,
-                    framework: r.framework,
                     location: r.location,
                     menu_type: r.menu_type,
+                    load_mode: r.load_mode,
                 };
-                itemObj.load_mode = itemObj.framework == 'iframe' ? 'iframe' : 'static_hosting';
 
                 if (['super', 'founder', 'tech', 'normal'].includes(r.name)) {
                     if (r.support == 'console' && ['super', 'founder'].includes(r.name)) {
@@ -1155,23 +1269,34 @@ export default {
                     return [key, value]
                 }))
 
-                itemObj.backend_config = {
-                    type: r.type,
-                    ...(r.type == 'internal' ? {
-                        backend_identifie: r.backend_identifie,
-                        backend_port: this.formatBackendPort(r.backend_port),
-                        proxy_request: {
-                            headers: proxy_request_header,
-                            query: proxy_request_query,
-                        },
-                    } : {
+                if (r.load_mode == 'iframe') {
+                    this.syncIframeBackendDefaults(r);
+                    itemObj.backend_config = {
+                        type: r.type,
+                        backend_identifie: this.getIframeBackendUrl(r),
+                        ...((r.support != 'thirdparty_cd' || r.name != 'normal') ? {
+                            frontend_props: frontend_props
+                        } : {}),
+                    };
+                } else {
+                    itemObj.backend_config = {
+                        type: r.type,
+                        ...(r.type == 'internal' ? {
+                            backend_identifie: r.backend_identifie,
+                            backend_port: this.formatBackendPort(r.backend_port),
+                            proxy_request: {
+                                headers: proxy_request_header,
+                                query: proxy_request_query,
+                            },
+                        } : {
 
-                        backend_identifie: this.getExternalBackendUrl(r),
-                    }),
-                    ...((r.support != 'thirdparty_cd' || r.name != 'normal') ? {
-                        frontend_props: frontend_props
-                    } : {}),
-                };
+                            backend_identifie: this.getExternalBackendUrl(r),
+                        }),
+                        ...((r.support != 'thirdparty_cd' || r.name != 'normal') ? {
+                            frontend_props: frontend_props
+                        } : {}),
+                    };
+                }
 
                 let menu = [];
                 for (let i in r.menu) {
@@ -1207,7 +1332,7 @@ export default {
                 itemObj.menu = menu;
                 this.normalizeBuiltMenuDefault(itemObj.menu, this.hasIncompleteDefaultMenu(r.menu));
 
-                if (itemObj.menu.length > 0) {
+                if (itemObj.menu.length > 0 || r.load_mode == 'iframe') {
                     if (r.support) {
                         front_type.add(r.support);
                     }
@@ -1224,13 +1349,8 @@ export default {
 
             this.json.application.front_type = [...front_type];
             this.json.bindings = role;
-            this.form.hasIframe = Boolean(this.form.role.find(i => i.framework == 'iframe'));
+            this.form.hasIframe = Boolean(this.form.role.find(i => i.load_mode == 'iframe'));
 
-            if (this.form.hasIframe) {
-                this.json.domain = this.form.front_domain;
-            } else {
-                delete this.json.domain;
-            }
             this.setYaml();
         },
 
@@ -1266,7 +1386,7 @@ export default {
                     name: name,
                     status: 1,
                     support: type,
-                    framework: 'vue2',
+                    load_mode: 'static_hosting',
                     is_default_register: 1,
                     location: 'left',
                     menu: [],
@@ -1274,6 +1394,7 @@ export default {
                     type: 'internal',
                     backend_identifie: backend_identifie,
                     backend_port: this.getDefaultBackendPort(backend_identifie),
+                    backend_path: '',
                     root_protocol: 'http://',
                     root_url: '',
 
@@ -1344,7 +1465,6 @@ export default {
             }
             for (let i in j.bindings) {
                 let o = j.bindings[i];
-                o.framework = o.framework || 'vue2';
                 o.load_mode = o.load_mode || 'static_hosting';
             }
 
@@ -1374,19 +1494,30 @@ export default {
                     this.form.role.push(thirdparty_cd);
                 }
 
-                item.type = item?.backend_config?.type || 'internal';
-                if (item.type != 'internal') {
-                    let externalBackend = this.parseExternalBackendUrl(item?.backend_config?.backend_identifie || '');
-                    item.root_protocol = externalBackend.protocol;
-                    item.root_url = externalBackend.url;
-                    item.backend_identifie = this.getDefaultBackendIdentifie();
-                    item.backend_port = this.getDefaultBackendPort(item.backend_identifie);
+                if (item.load_mode == 'iframe') {
+                    let iframeBackend = this.parseIframeBackendUrl(item?.backend_config?.backend_identifie || '');
+                    item.type = iframeBackend.type;
+                    item.backend_identifie = iframeBackend.backend_identifie;
+                    item.backend_path = iframeBackend.backend_path;
+                    item.root_protocol = iframeBackend.root_protocol;
+                    item.root_url = iframeBackend.root_url;
+                    item.backend_port = '';
                 } else {
-                    item.root_protocol = 'http://';
-                    item.root_url = '';
-                    item.backend_identifie = item?.backend_config?.backend_identifie;
-                    item.backend_identifie = item.backend_identifie || this.getDefaultBackendIdentifie();
-                    item.backend_port = item?.backend_config?.backend_port ?? '';
+                    item.type = item?.backend_config?.type || 'internal';
+                    item.backend_path = '';
+                    if (item.type != 'internal') {
+                        let externalBackend = this.parseExternalBackendUrl(item?.backend_config?.backend_identifie || '');
+                        item.root_protocol = externalBackend.protocol;
+                        item.root_url = externalBackend.url;
+                        item.backend_identifie = this.getDefaultBackendIdentifie();
+                        item.backend_port = this.getDefaultBackendPort(item.backend_identifie);
+                    } else {
+                        item.root_protocol = 'http://';
+                        item.root_url = '';
+                        item.backend_identifie = item?.backend_config?.backend_identifie;
+                        item.backend_identifie = item.backend_identifie || this.getDefaultBackendIdentifie();
+                        item.backend_port = item?.backend_config?.backend_port ?? '';
+                    }
                 }
 
 
@@ -1514,6 +1645,7 @@ export default {
         },
         submit(otherData, callback) {
             this.$nextTick(() => {
+                this.getMenu();
                 this.$refs.formref.validate((valid) => {
                     if (!valid) { this.$message.warning('必填项不能为空'); return }
                     this.$emit('complete', this.json, this.yaml, otherData, callback);
@@ -2077,7 +2209,14 @@ export default {
     border-right: 1px solid #dcdfe6;
 }
 
+.backend-url-placeholder {
+    min-width: 130px;
+    color: #606266;
+    background: #fff;
+}
+
 .backend-url-fixed+.backend-url-control,
+.backend-url-fixed+.backend-url-fixed,
 .backend-url-control+.backend-url-fixed,
 .backend-url-control+.backend-url-control {
     border-left: 1px solid #dcdfe6;

@@ -1356,7 +1356,6 @@ platform:
                 if (!o?.menu?.length) {
                     o.menu = [{ displayorder: 0, do: 'home', title: '首页', icon: 'a-shouye', is_default: 1 }];
                 }
-                o.framework = o.framework || 'vue2';
             }
 
             this.form.name = j?.application?.name;

@@ -1755,6 +1755,7 @@ func (hc *HelmPack) generateMicroAppTemplate(rootDir string, manifest logic2.Man
 			"load_mode":          item.LoadMode,
 			"type":               item.BackendConfig.Type,
 			"backend_identifier": item.BackendConfig.BackendIdentifie,
+			"backend_port":       item.BackendConfig.BackendPort,
 			"proxy_request":      item.BackendConfig.RequestProxy,
 			"frontend_props":     item.BackendConfig.FrontendProps,
 		}
@@ -1834,7 +1835,7 @@ spec:
         {{- range .Values.backend_config }}
         {{ .role }}:
           {{- if eq .type "internal" }}
-          serverUrl: "http://{{ $fullName }}.{{ $releaseNamespace }}.svc.cluster.local:{{ $defaultPort }}"
+          serverUrl: "http://{{ $fullName }}.{{ $releaseNamespace }}.svc.cluster.local:{{ default $defaultPort .backend_port }}"
           {{- else if eq .type "external" }}
           serverUrl: {{ .backend_identifier }}
           {{- end }}

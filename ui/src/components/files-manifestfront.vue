@@ -242,7 +242,7 @@
                                                     </div>
                                                 </el-form-item>
 
-                                                <div>代理配置<el-tooltip><template #content>面板提供转发服务到接口地址，接口后端可通过HTTP变量获取传递值</template><ArcoIcon name="icon-41" :size="16"/></el-tooltip></div>
+                                                <div class="df ai-c">代理配置<el-tooltip><template #content>面板提供转发服务到接口地址，接口后端可通过HTTP变量获取传递值</template><ArcoIcon name="icon-41" :size="16"/></el-tooltip></div>
                                                 <div class="mb-20">
                                                     <div style="margin-bottom:20px;" class="df">
                                                         <div style="width:100px;">代理地址</div>
@@ -325,7 +325,7 @@
                                                         </table>
                                                     </div>
                                                 </div>
-                                                <div>前端配置<el-tooltip><template #content>面板提供microapp机制渲染前端包，可通过window.$wujie.props.frontend_props
+                                                <div class="df ai-c">前端配置<el-tooltip><template #content>面板提供microapp机制渲染前端包，可通过window.$wujie.props.frontend_props
 从JS变量获取传递值</template><ArcoIcon name="icon-41" :size="16"/></el-tooltip></div>
                                                 <div
                                                     v-if="!(form.menu_type == 'thirdparty_cd' && r.name == 'normal')">
@@ -339,6 +339,17 @@
                                                             </tr>
                                                         </thead>
                                                         <tbody>
+                                                            <!-- ["${system.group}", "${system.userid}", "${system.openid}", "${system.nickname}", "${system.role}", "${system.access_token}", "${system.group}", "${system.url}"] -->
+                                                            <tr v-for='item in ["${system.userid}", "${system.openid}", "${system.nickname}", "${system.role}", "${system.access_token}", "${system.group}", "${system.url}"]' :key="item">
+                                                                <td>
+                                                                    {{ item.match(/\${system.(.*)}/)[1] }}
+                                                                </td>
+                                                                <td>
+                                                                    {{ item }}
+                                                                </td>
+                                                                <td></td>
+                                                            </tr>
+                                                            
                                                             <tr v-for="(item, index) in r.frontend_props" :key="index">
                                                                 <td>
                                                                     <el-input v-model="item.key" placeholder="key"
@@ -866,9 +877,7 @@ export default {
     },
     computed: {
         systemVar() {
-            const startParams = (this.startParams || []).map(item => `{{.Values.${item.name}}}`)
-            const systemParams = ["${system.group}", "${system.userid}", "${system.openid}", "${system.nickname}", "${system.role}", "${system.access_token}", "${system.group}", "${system.url}"]
-            return startParams.concat(systemParams)
+            return (this.startParams || []).map(item => `{{.Values.${item.name}}}`)
         },
         currentBackendIdentifie() {
             if (this.form.author && this.form.identifie) {

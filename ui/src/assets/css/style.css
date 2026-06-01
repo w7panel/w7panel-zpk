@@ -695,3 +695,27 @@ span.el-pagination__jump.is-last::before {
 .addmenu:hover {
     color: #2d5fff;
 }
+
+
+.greybox {
+    padding: 16px;
+    background-color: #f7f8fa;
+}
+
+.greybox .greybox-title {
+    font-weight: bold;
+    line-height: 20px;
+    margin-bottom: 20px;
+	display: flex;
+	align-items: center;
+}
+
+.greybox .yaml-header {
+    justify-content: space-between;
+    margin-bottom: 20px;
+}
+
+.greybox .yaml-delete {
+    padding: 5px;
+    line-height: 1;
+}

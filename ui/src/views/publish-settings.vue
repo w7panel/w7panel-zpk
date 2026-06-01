@@ -1,5 +1,5 @@
 <template>
-    <div style="min-height:100%;" class="bg-padding">
+    <div style="min-height:100%;">
           <div class="shortcut-header">1. 下载命令行工具</div>
           <div class="shortcut-desc">前往以下地址下载对应平台的命令行工具：</div>
           <a class="shortcut-link" target="_blank" href="https://github.com/w7panel/w7panel-zpk/releases/tag/latest">https://github.com/w7panel/w7panel-zpk/releases/tag/latest</a>
@@ -75,11 +75,19 @@
 </template>
 
 <script>
-import userMixin from "@/utils/user-mixin";
 import myAxios from '@/utils/index';
 export default {
     name: "publish-settings",
-    mixins: [userMixin],
+    props:{
+      userInfo:{
+        type:Object,
+        default:()=>{
+          return {
+            username:''
+          }
+        }
+      }
+    },
     data() {
       return {
         host: ''

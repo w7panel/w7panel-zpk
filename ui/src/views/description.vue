@@ -1,25 +1,6 @@
 <template>
     <div id="zpk-description" class="description-page">
-        <div class="page-header">
-            <el-breadcrumb separator="/">
-                <el-breadcrumb-item :to="{ path: '/zpk' }"><template #default><span
-                            class="c-99 fw-400">我的制品库</span></template></el-breadcrumb-item>
-                <el-breadcrumb-item
-                    :to="{ path: '/zpk-version', query: { id: this.identifie, title: vtitle } }"><template
-                        #default><span class="c-99 fw-400">版本管理</span></template></el-breadcrumb-item>
-                <el-breadcrumb-item><template #default><span
-                            class="c-33 fw-400">应用介绍</span></template></el-breadcrumb-item>
-            </el-breadcrumb>
-        </div>
-
-        <div class="page-body" v-loading="loading || saving">
-            <div class="toolbar df ai-c jc-b">
-                <div>
-                    <div class="toolbar-title">应用介绍</div>
-                    <div class="toolbar-desc">{{ toolbarDescription }}</div>
-                </div>
-            </div>
-
+        <div v-loading="loading || saving">
             <div class="content-box">
                 <div class="sidebar df-s0">
                     <div class="sidebar-title df ai-c jc-b">

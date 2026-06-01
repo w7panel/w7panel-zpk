@@ -1356,7 +1356,6 @@ platform:
                 if (!o?.menu?.length) {
                     o.menu = [{ displayorder: 0, do: 'home', title: '首页', icon: 'a-shouye', is_default: 1 }];
                 }
-                o.framework = o.framework || 'vue2';
             }
 
             this.form.name = j?.application?.name;
@@ -2071,27 +2070,6 @@ div>>>pre .hljs {
     bottom: 0;
     z-index: 1;
     opacity: 0;
-}
-
-.greybox {
-    padding: 16px;
-    background-color: #f7f8fa;
-}
-
-.greybox .greybox-title {
-    font-weight: bold;
-    line-height: 20px;
-    margin-bottom: 20px;
-}
-
-.greybox .yaml-header {
-    justify-content: space-between;
-    margin-bottom: 20px;
-}
-
-.greybox .yaml-delete {
-    padding: 5px;
-    line-height: 1;
 }
 
 .show-on-hover-container .show-on-hover {

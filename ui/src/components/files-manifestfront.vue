@@ -82,11 +82,6 @@
                                                 <el-tab-pane label="微擎面板控制台" name="thirdparty_cd"></el-tab-pane>
                                             </el-tabs>
                                         </div>
-                                        <div v-show="form.hasIframe" class="df ai-c mt-10">
-                                            <span>域名：</span>
-                                            <el-input v-model="form.front_domain" @change="getMenu" :spellcheck="false"
-                                                style="width:360px;" placeholder="请输入" />
-                                        </div>
 
                                         <div v-show="form.menu_type == 'console'" class="df ai-c mt-10">
                                             <div style="">
@@ -115,15 +110,27 @@
                                                             :disabled="r.name == 'founder' || r.name == 'super'"
                                                             placeholder="请输入标识"></el-input>
                                                     </div>
-                                                    <div v-else
-                                                        @click="roleEdit = { index: rindex, title: r.title, name: r.name }"
-                                                        class="df ai-c cursor">
-                                                        <span class="lh-1">{{ r.title }}</span>
-                                                        <el-icon v-if="r.support != 'thirdparty_cd'" color="#333333"
-                                                            :size="14" style="margin-left:4px;">
-                                                            <Edit />
-                                                        </el-icon>
+                                                    <div v-else-if="r.support === 'thirdparty_cd'"
+                                                        class="df ai-c">
+                                                        <span class="lh-1 mr-20">{{ r.title }}</span>
+                                                        <el-checkbox v-model="r.load_mode" true-label="iframe"
+                                                        false-label="static_hosting" @change="changeLoadMode(r)">
+                                                        <span class="c-66">支持iframe</span></el-checkbox>
                                                     </div>
+                                                    <div v-else
+                                                        class="df ai-c cursor">
+                                                        <div @click="roleEdit = { index: rindex, title: r.title, name: r.name }" class="mr-20">
+                                                            <span class="lh-1">{{ r.title }}</span>
+                                                            <el-icon v-if="r.support != 'thirdparty_cd'" color="#333333"
+                                                                :size="14" style="margin-left:4px;">
+                                                                <Edit />
+                                                            </el-icon>
+                                                        </div>
+                                                        <el-checkbox v-model="r.load_mode" true-label="iframe"
+                                                        false-label="static_hosting" @change="changeLoadMode(r)"><span
+                                                            class="c-66">支持iframe</span></el-checkbox>
+                                                    </div>
+
                                                     <div v-if="roleEdit.index == rindex"
                                                         class="ml-40 c-blue cursor lh-1" style="text-wrap: nowrap;"
                                                         @click="submitRoleEdit">确定</div>
@@ -158,146 +165,212 @@
                                                     <el-checkbox v-if="r.name != 'founder' && r.name != 'super'"
                                                         v-model="r.is_default_register" :true-label="2" :false-label="1"
                                                         @change="chengeRegister(r, r.is_default_register)">默认邀请端</el-checkbox>
-                                                    <el-checkbox v-model="r.framework" true-label="iframe"
-                                                        false-label="vue2" @change="getMenu"><span
-                                                            class="c-66">支持iframe</span></el-checkbox>
                                                 </div>
                                             </div>
 
-                                            <div class="mt-10" style="margin-left:20px;">
+                                            <div class="mt-10 greybox">
+                                                <template v-if="r.load_mode === 'iframe'">
+                                                    <div class="greybox-title">iframe配置<el-tooltip><template #content>iframe使用场景受到了严格的限制，如果需要对接授权登录，可将 {access_token} 传递给iframe，然后由后端服务请求授权接口地址（http://xxxx）获取用户信息。由于iframe受到了浏览器安全限制，生成cookies时必须设置 SameSite: None, Secure: true，并且header设置允许 * 跨域，才能正常传递。</template><ArcoIcon name="icon-41" :size="16"/></el-tooltip></div>
+                                                    <el-form-item label="地址类型" style="margin-bottom:20px;">
+                                                        <el-radio-group v-model="r.type" @change="changeBackendType(r)">
+                                                            <el-radio label="internal" value="internal">应用地址</el-radio>
+                                                            <el-radio label="external" value="external">远程地址</el-radio>
+                                                        </el-radio-group>
+                                                    </el-form-item>
+                                                    <el-form-item label="页面地址" style="margin-bottom:20px;">
+                                                        <div v-if="r.type == 'internal'" class="backend-url-config df ai-c">
+                                                            <span class="backend-url-fixed">https://</span>
+                                                            <span class="backend-url-fixed backend-url-placeholder">{{ getIframeDomainPlaceholder() }}</span>
+                                                            <span class="backend-url-fixed">/</span>
+                                                            <el-input v-model="r.backend_path" @input="getMenu" @change="getMenu" placeholder="请输入目录"
+                                                                class="backend-url-control backend-url-input" />
+                                                        </div>
+                                                        <div v-else class="backend-url-config backend-url-config-external df ai-c">
+                                                            <el-select v-model="r.root_protocol"
+                                                                class="backend-url-control backend-url-protocol"
+                                                                @change="getMenu">
+                                                                <el-option label="http://" value="http://"></el-option>
+                                                                <el-option label="https://" value="https://"></el-option>
+                                                            </el-select>
+                                                            <el-input v-model="r.root_url" @change="getMenu"
+                                                                placeholder="请输入地址"
+                                                                class="backend-url-control backend-url-input" />
+                                                        </div>
+                                                    </el-form-item>
+                                                    <el-form-item label="变量传递" style="margin-bottom:20px;">
+                                                        只支持query方式，get方式拼接到页面地址后面
+                                                    </el-form-item>
+                                                </template>
+                                                <template v-else>
+
+                                                <div class="greybox-title">变量传递配置<el-tooltip><template #content>将开发者设置的变量值传递给后端接口和前端JS变量中</template><ArcoIcon name="icon-41" :size="16"/></el-tooltip></div>
                                                 <el-form-item label="接口类型" style="margin-bottom:20px;">
-                                                    <el-radio-group v-model="r.type" @change="getMenu">
-                                                        <el-radio label="internal" value="internal">internal</el-radio>
-                                                        <el-radio label="external" value="external">external</el-radio>
+                                                    <el-radio-group v-model="r.type" @change="changeBackendType(r)">
+                                                        <el-radio label="internal" value="internal">应用内网地址（internal）</el-radio>
+                                                        <el-radio label="external" value="external">应用外网地址（external）</el-radio>
                                                     </el-radio-group>
                                                 </el-form-item>
-
-                                                <el-form-item v-if="r.type == 'internal'" label="应用标识"
-                                                    style="margin-bottom:20px;">
-                                                    <el-input v-model="r.backend_identifie" @change="getMenu"
-                                                        placeholder="请输入" style="width:500px;" />
+                                                <el-form-item label="接口地址" style="margin-bottom:20px;">
+                                                    <div v-if="r.type == 'internal'" class="backend-url-config df ai-c">
+                                                        <span class="backend-url-fixed">http://</span>
+                                                        <el-select v-model="r.backend_identifie" filterable
+                                                            default-first-option placeholder="选择应用标识"
+                                                            class="backend-url-control backend-url-identifie"
+                                                            @change="changeBackendIdentifie(r)">
+                                                            <el-option v-for="app in backendAppOptions" :key="app.id"
+                                                                :label="app.title && app.title != app.id ? `${app.id}（${app.title}）` : app.id"
+                                                                :value="app.id"></el-option>
+                                                        </el-select>
+                                                        <span
+                                                            class="backend-url-fixed">.default.svc.cluster.local:</span>
+                                                        <el-autocomplete v-model="r.backend_port"
+                                                            :fetch-suggestions="(query, cb) => queryBackendPortSuggestions(r.backend_identifie, query, cb)"
+                                                            placeholder="端口"
+                                                            class="backend-url-control backend-url-port" @input="getMenu"
+                                                            @change="getMenu" @select="getMenu"></el-autocomplete>
+                                                    </div>
+                                                    <div v-else class="backend-url-config backend-url-config-external df ai-c">
+                                                        <el-select v-model="r.root_protocol"
+                                                            class="backend-url-control backend-url-protocol"
+                                                            @change="getMenu">
+                                                            <el-option label="http://" value="http://"></el-option>
+                                                            <el-option label="https://" value="https://"></el-option>
+                                                        </el-select>
+                                                        <el-input v-model="r.root_url" @change="getMenu"
+                                                            placeholder="请输入地址"
+                                                            class="backend-url-control backend-url-input" />
+                                                    </div>
                                                 </el-form-item>
 
-                                                <el-form-item v-if="r.type == 'external'" label="接口地址"
-                                                    style="margin-bottom:20px;">
-                                                    <el-input v-model="r.root_url" @change="getMenu" placeholder="请输入"
-                                                        style="width:500px;" />
-                                                </el-form-item>
-
-                                                <el-form-item v-if="r.type == 'internal'" label="代理配置"
-                                                    style="margin-bottom:20px;">
-                                                    <div>
-                                                        <div class="df ai-s">
-                                                            <div style="width:80px;">header:</div>
-                                                            <div class="ml-10">
-                                                                <div v-for="(item, index) in r.proxy_request_header"
-                                                                    :key="index" class="df ai-c"
-                                                                    style="margin-bottom:10px;">
+                                                <div>代理配置<el-tooltip><template #content>面板提供转发服务到接口地址，接口后端可通过HTTP变量获取传递值</template><ArcoIcon name="icon-41" :size="16"/></el-tooltip></div>
+                                                <div class="mb-20">
+                                                    <div style="margin-bottom:20px;" class="df">
+                                                        <div style="width:100px;">代理地址</div>
+                                                        <div>/panel-api/v1/microapp/{{identifie}}/proxy</div>
+                                                    </div>
+                                                    <div class="mb-20">
+                                                        <div>请求头(Header)</div>
+                                                        <table class="table">
+                                                            <thead>
+                                                                <tr>
+                                                                    <td>key</td>
+                                                                    <td>value</td>
+                                                                    <td>操作</td>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                <tr v-for="(item, index) in r.proxy_request_header" :key="index">
+                                                                    <td>
+                                                                        <el-input v-model="item.key" placeholder="key"
+                                                                            @change="getMenu"
+                                                                            style="width:200px;margin-right:10px;"></el-input>
+                                                                    </td>
+                                                                    <td>
+                                                                        <el-autocomplete v-model="item.value"
+                                                                            :fetch-suggestions="(query) => systemVar.filter(i=>i.includes(query)).map(i=>({value:i}))"
+                                                                            placeholder="value"
+                                                                            class="backend-url-control backend-url-port" @input="getMenu"
+                                                                            @change="getMenu" @select="getMenu"></el-autocomplete>
+                                                                    </td>
+                                                                    <td><span class="c-blue cursor handle"
+                                                                            @click="r.proxy_request_header.length <= 1 ? r.proxy_request_header = [{ key: '', value: '', isSelect: false }] : r.proxy_request_header.splice(index, 1)">删除</span></td>
+                                                                </tr>
+                                                                <tr>
+                                                                    <td colspan="5" class="cursor txt-c"
+                                                                        @click="r.proxy_request_header.push({ key: '', value: '' })">
+                                                                        <span class="addmenu"><el-icon :size="14">
+                                                                                <Plus />
+                                                                            </el-icon>添加请求头</span>
+                                                                    </td>
+                                                                </tr>
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                    <div v-if="!(form.menu_type == 'thirdparty_cd' && r.name == 'normal')">
+                                                        <div >请求参数(Query)</div>
+                                                        <table class="table">
+                                                            <thead>
+                                                                <tr>
+                                                                    <td>key</td>
+                                                                    <td>value</td>
+                                                                    <td>操作</td>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                <tr v-for="(item, index) in r.proxy_request_query" :key="index">
+                                                                    <td>
+                                                                        <el-input v-model="item.key" placeholder="key"
+                                                                            @change="getMenu"
+                                                                            style="width:200px;margin-right:10px;"></el-input>
+                                                                    </td>
+                                                                    <td>
+                                                                        <el-autocomplete v-model="item.value"
+                                                                            :fetch-suggestions="(query) => systemVar.filter(i=>i.includes(query)).map(i=>({value:i}))"
+                                                                            placeholder="value"
+                                                                            class="backend-url-control backend-url-port" @input="getMenu"
+                                                                            @change="getMenu" @select="getMenu"></el-autocomplete>
+                                                                    </td>
+                                                                    <td><span class="c-blue cursor handle"
+                                                                            @click="r.proxy_request_query.length <= 1 ? r.proxy_request_query = [{ key: '', value: '', isSelect: false }] : r.proxy_request_query.splice(index, 1)">删除</span></td>
+                                                                </tr>
+                                                                <tr>
+                                                                    <td colspan="5" class="cursor txt-c"
+                                                                        @click="r.proxy_request_query.push({ key: '', value: '' })">
+                                                                        <span class="addmenu"><el-icon :size="14">
+                                                                                <Plus />
+                                                                            </el-icon>添加请求参数</span>
+                                                                    </td>
+                                                                </tr>
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                </div>
+                                                <div>前端配置<el-tooltip><template #content>面板提供microapp机制渲染前端包，可通过window.$wujie.props.frontend_props
+从JS变量获取传递值</template><ArcoIcon name="icon-41" :size="16"/></el-tooltip></div>
+                                                <div
+                                                    v-if="!(form.menu_type == 'thirdparty_cd' && r.name == 'normal')">
+                                                    <div >前端配置</div>
+                                                    <table class="table">
+                                                        <thead>
+                                                            <tr>
+                                                                <td>key</td>
+                                                                <td>value</td>
+                                                                <td>操作</td>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            <tr v-for="(item, index) in r.frontend_props" :key="index">
+                                                                <td>
                                                                     <el-input v-model="item.key" placeholder="key"
                                                                         @change="getMenu"
                                                                         style="width:200px;margin-right:10px;"></el-input>
-                                                                    <el-input v-if="!item.isSelect" v-model="item.value"
-                                                                        placeholder="value" @change="getMenu"
-                                                                        style="width:200px;margin-right:10px;"></el-input>
-                                                                    <el-select v-if="item.isSelect" v-model="item.value"
-                                                                        placeholder="请选择"
-                                                                        style="width:200px;margin-right:10px;"
-                                                                        @change="getMenu">
-                                                                        <el-option v-for="sp in startParams"
-                                                                            :key="sp.name" :label="sp.title"
-                                                                            :value="sp.name"></el-option>
-                                                                    </el-select>
-                                                                    <el-checkbox v-if="r.type == 'internal'"
-                                                                        v-model="item.isSelect"
-                                                                        @change="item.value = ''; getMenu()"
-                                                                        style="margin-right:10px;">选择占位符</el-checkbox>
-                                                                    <div>
-                                                                        <span
-                                                                            @click="r.proxy_request_header.length <= 1 ? r.proxy_request_header = [{ key: '', value: '', isSelect: false }] : r.proxy_request_header.splice(index, 1)"
-                                                                            class="ml-10 cursor c-blue">删除</span>
-                                                                        <span
-                                                                            v-if="index + 1 == r.proxy_request_header.length"
-                                                                            @click="r.proxy_request_header.push({ key: '', value: '' })"
-                                                                            class="ml-10 cursor c-blue">添加</span>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                        <div v-if="!(form.menu_type == 'thirdparty_cd' && r.name == 'normal')"
-                                                            class="df ai-s">
-                                                            <div style="width:80px;">query:</div>
-                                                            <div class="ml-10">
-                                                                <div v-for="(item, index) in r.proxy_request_query"
-                                                                    :key="index" class="df ai-c"
-                                                                    style="margin-bottom:10px;">
-                                                                    <el-input v-model="item.key" placeholder="key"
-                                                                        @change="getMenu"
-                                                                        style="width:200px;margin-right:10px;"></el-input>
-                                                                    <el-input v-if="!item.isSelect" v-model="item.value"
-                                                                        placeholder="value" @change="getMenu"
-                                                                        style="width:200px;margin-right:10px;"></el-input>
-                                                                    <el-select v-if="item.isSelect" v-model="item.value"
-                                                                        placeholder="请选择"
-                                                                        style="width:200px;margin-right:10px;"
-                                                                        @change="getMenu">
-                                                                        <el-option v-for="sp in startParams"
-                                                                            :key="sp.name" :label="sp.title"
-                                                                            :value="sp.name"></el-option>
-                                                                    </el-select>
-                                                                    <el-checkbox v-if="r.type == 'internal'"
-                                                                        v-model="item.isSelect"
-                                                                        @change="item.value = ''; getMenu()"
-                                                                        style="margin-right:10px;">选择占位符</el-checkbox>
-                                                                    <div>
-                                                                        <span
-                                                                            @click="r.proxy_request_query.length <= 1 ? r.proxy_request_query = [{ key: '', value: '', isSelect: false }] : r.proxy_request_query.splice(index, 1)"
-                                                                            class="ml-10 cursor c-blue">删除</span>
-                                                                        <span
-                                                                            v-if="index + 1 == r.proxy_request_query.length"
-                                                                            @click="r.proxy_request_query.push({ key: '', value: '' })"
-                                                                            class="ml-10 cursor c-blue">添加</span>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </el-form-item>
-                                                <el-form-item
-                                                    v-if="!(form.menu_type == 'thirdparty_cd' && r.name == 'normal')"
-                                                    label="前端配置" style="margin-bottom:20px;">
-                                                    <div>
-                                                        <div v-for="(item, index) in r.frontend_props" :key="index"
-                                                            class="df ai-c" style="margin-bottom:10px;">
-                                                            <el-input v-model="item.key" placeholder="key"
-                                                                @change="getMenu"
-                                                                style="width:200px;margin-right:10px;"></el-input>
-                                                            <el-input v-if="!item.isSelect" v-model="item.value"
-                                                                placeholder="value" @change="getMenu"
-                                                                style="width:200px;margin-right:10px;"></el-input>
-                                                            <el-select v-if="item.isSelect" v-model="item.value"
-                                                                placeholder="请选择" @change="getMenu"
-                                                                style="width:200px;margin-right:10px;">
-                                                                <el-option v-for="sp in startParams" :key="sp.name"
-                                                                    :label="sp.title" :value="sp.name"></el-option>
-                                                            </el-select>
-                                                            <el-checkbox v-if="r.type == 'internal'"
-                                                                v-model="item.isSelect"
-                                                                @change="item.value = ''; getMenu()"
-                                                                style="margin-right:10px;">选择占位符</el-checkbox>
-                                                            <div>
-                                                                <span
-                                                                    @click="r.frontend_props.length <= 1 ? r.frontend_props = [{ key: '', value: '', isSelect: false }] : r.frontend_props.splice(index, 1)"
-                                                                    class="ml-10 cursor c-blue">删除</span>
-                                                                <span v-if="index + 1 == r.frontend_props.length"
-                                                                    @click="r.frontend_props.push({ key: '', value: '' })"
-                                                                    class="ml-10 cursor c-blue">添加</span>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </el-form-item>
+                                                                </td>
+                                                                <td>
+                                                                    <el-autocomplete v-model="item.value"
+                                                                        :fetch-suggestions="(query) => systemVar.filter(i=>i.includes(query)).map(i=>({value:i}))"
+                                                                        placeholder="value"
+                                                                        class="backend-url-control backend-url-port" @input="getMenu"
+                                                                        @change="getMenu" @select="getMenu"></el-autocomplete>
+                                                                </td>
+                                                                <td><span class="c-blue cursor handle"
+                                                                        @click="r.frontend_props.length <= 1 ? r.frontend_props = [{ key: '', value: '', isSelect: false }] : r.frontend_props.splice(index, 1)">删除</span></td>
+                                                            </tr>
+                                                            <tr>
+                                                                <td colspan="5" class="cursor txt-c"
+                                                                    @click="r.frontend_props.push({ key: '', value: '' })">
+                                                                    <span class="addmenu"><el-icon :size="14">
+                                                                            <Plus />
+                                                                        </el-icon>添加前端配置</span>
+                                                                </td>
+                                                            </tr>
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                                </template>
+
                                             </div>
 
-                                            <table class="menutable table mt-10">
+                                            <table v-if="r.load_mode !== 'iframe'" class="menutable table mt-10">
                                                 <thead>
                                                     <tr>
                                                         <td>排序</td>
@@ -339,40 +412,40 @@
                                                             </div>
                                                         </td>
                                                         <td>
-                                                            <div><el-input v-model="item.do" @change="getMenu"
+                                                            <div><el-input v-model="item.do" @change="onMenuChanged(r.menu)"
                                                                     style="width:150px; height:36px;"
                                                                     placeholder="路由"></el-input>
                                                             </div>
                                                             <div v-for="(sub, subid) in item.children" :key="subid"
                                                                 class="mt-10">
-                                                                <el-input v-model="sub.do" @change="getMenu"
+                                                                <el-input v-model="sub.do" @change="onMenuChanged(r.menu)"
                                                                     style="width:150px; height:36px;"
                                                                     placeholder="路由"></el-input>
                                                             </div>
                                                         </td>
                                                         <td>
-                                                            <div><el-input v-model="item.title" @change="getMenu"
+                                                            <div><el-input v-model="item.title" @change="onMenuChanged(r.menu)"
                                                                     style="width:150px; height:36px;"
                                                                     placeholder="名称"></el-input>
                                                             </div>
                                                             <div v-for="(sub, subid) in item.children" :key="subid"
                                                                 class="mt-10">
-                                                                <el-input v-model="sub.title" @change="getMenu"
+                                                                <el-input v-model="sub.title" @change="onMenuChanged(r.menu)"
                                                                     style="width:150px; height:36px;"
                                                                     placeholder="名称"></el-input>
                                                             </div>
                                                         </td>
                                                         <td>
-                                                            <div style="height:36px; text-align:center;">
-                                                                <el-checkbox v-model="item.is_default" size="large"
-                                                                    :true-label="2" :false-label="1" :name="r.name"
-                                                                    @change="setMenuDefault(r.menu, item, item.is_default)"></el-checkbox>
+                                                            <div style="height:36px; text-align:center;" :style="{visibility: item.children?.length > 0 ? 'hidden' : 'visible'}">
+                                                                <el-checkbox :model-value="Number(item.is_default) === 1" size="large"
+                                                                    :name="r.name"
+                                                                    @click.stop="setMenuDefault(r.menu, item)"></el-checkbox>
                                                             </div>
                                                             <div v-for="(sub, subid) in item.children" :key="subid"
                                                                 class="mt-10 df ai-c jc-c" style="height:36px;">
-                                                                <el-checkbox v-model="sub.is_default" size="large"
-                                                                    :true-label="2" :false-label="1" :name="r.name"
-                                                                    @change="setMenuDefault(r.menu, sub, sub.is_default)"></el-checkbox>
+                                                                <el-checkbox :model-value="Number(sub.is_default) === 1" size="large"
+                                                                    :name="r.name"
+                                                                    @click.stop="setMenuDefault(r.menu, sub)"></el-checkbox>
                                                             </div>
                                                         </td>
                                                         <td>
@@ -399,7 +472,7 @@
                                                         <td>
                                                             <div class="df ai-c" style="height:36px;">
                                                                 <span class="handle c-blue cursor"
-                                                                    @click="addSub(item)">添加子菜单</span>
+                                                                    @click="addSub(r.menu, item)">添加子菜单</span>
                                                                 <el-popover placement="top" :width="240"
                                                                     trigger="hover">
                                                                     <template #reference><span
@@ -442,18 +515,18 @@
                                                                     </div>
                                                                 </el-popover>
                                                                 <span class="handle c-blue cursor"
-                                                                    @click="r.menu.splice(index, 1); getMenu();">删除</span>
+                                                                    @click="removeMenu(r.menu, index)">删除</span>
                                                             </div>
                                                             <div v-for="(sub, subid) in item.children" :key="subid"
                                                                 class="mt-10 df ai-c" style="height:36px;">
                                                                 <span class="handle c-blue cursor"
-                                                                    @click="item.children.splice(subid, 1); getMenu();">删除</span>
+                                                                    @click="removeSubMenu(r.menu, item, subid)">删除</span>
                                                             </div>
                                                         </td>
                                                     </tr>
                                                     <tr>
                                                         <td colspan="9" class="cursor txt-c"
-                                                            @click="r.menu.push({ title: '', icon: '', displayorder: 0, is_default: 1, location: 'normal' })">
+                                                            @click="addMenu(r.menu)">
                                                             <span class="addmenu"><el-icon :size="14">
                                                                     <Plus />
                                                                 </el-icon>添加一级菜单</span>
@@ -527,6 +600,7 @@ import hljs from 'highlight.js';
 import filesUpload from './files-upload.vue';
 import selSvg from '@/components/sel-svg.vue';
 import W7Identifie from '@/components/w7-identifie.vue';
+import ArcoIcon from '@/components/arco-icon.vue';
 
 
 export default {
@@ -537,11 +611,13 @@ export default {
         'option',
         'identifie',
         'version_id',
+        'app_ports'
     ],
     components: {
         filesUpload,
         selSvg,
-        W7Identifie
+        W7Identifie,
+        ArcoIcon
     },
     data() {
         return {
@@ -589,7 +665,6 @@ export default {
                 redis: false,
 
 
-                front_domain: '',
                 hasIframe: false,
                 role_founder: false,
                 role_super: false,
@@ -644,9 +719,6 @@ export default {
             },
             showAddRole: false,
             newRole: { title: "", name: "" },
-
-
-            app_ports: [],
             app_names: [],
 
             rules: {
@@ -741,6 +813,7 @@ export default {
             isCreate: false,
 
             startParams: [],
+            menuDefaultTarget: null,
         }
     },
     created() {
@@ -784,8 +857,203 @@ export default {
         },
 
         data() { this.init(this.data) },
+        app_ports() {
+            if (this.syncRoleBackendDefaults()) { this.getMenu(); }
+        },
+        'option.app_ports'() {
+            if (this.syncRoleBackendDefaults()) { this.getMenu(); }
+        },
+    },
+    computed: {
+        systemVar() {
+            const startParams = (this.startParams || []).map(item => `{{.Values.${item.name}}}`)
+            const systemParams = ["${system.group}", "${system.userid}", "${system.openid}", "${system.nickname}", "${system.role}", "${system.access_token}", "${system.group}", "${system.url}"]
+            return startParams.concat(systemParams)
+        },
+        currentBackendIdentifie() {
+            if (this.form.author && this.form.identifie) {
+                return this.form.author + '-' + this.form.identifie;
+            }
+            return this.identifie || '';
+        },
+        backendAppOptions() {
+            let apps = new Map();
+            let addApp = (item) => {
+                if (!item) { return }
+                let id = item.id || item.identifie || item.name;
+                if (!id) { return }
+                let ports = this.normalizeBackendPorts(item.ports || item.port || []);
+                let old = apps.get(id) || {};
+                apps.set(id, {
+                    id,
+                    title: item.title || old.title || id,
+                    ports: ports.length ? ports : (old.ports || []),
+                });
+            };
+
+            addApp({
+                id: this.currentBackendIdentifie,
+                title: this.form.name || this.currentBackendIdentifie,
+                ports: this.form.port?.map?.(i => i.port) || [],
+            });
+            (this.app_ports || []).forEach(addApp);
+            (this.option?.app_ports || []).forEach(addApp);
+
+            return [...apps.values()];
+        },
     },
     methods: {
+        normalizeBackendPorts(ports) {
+            if (!Array.isArray(ports)) { ports = ports ? [ports] : [] }
+            return [...new Set(ports.map(i => {
+                if (i && typeof i == 'object') {
+                    return i.port ?? i.containerPort ?? '';
+                }
+                return i;
+            }).filter(i => i !== '' && i !== undefined && i !== null).map(i => String(i)))];
+        },
+        getBackendPorts(identifie) {
+            return this.backendAppOptions.find(i => i.id == identifie)?.ports || [];
+        },
+        queryBackendPortSuggestions(identifie, query, cb) {
+            let q = String(query || '');
+            let ports = this.getBackendPorts(identifie)
+                .filter(i => !q || String(i).includes(q))
+                .map(i => ({ value: String(i) }));
+            cb(ports);
+        },
+        getDefaultBackendIdentifie() {
+            return this.currentBackendIdentifie || this.backendAppOptions[0]?.id || '';
+        },
+        getDefaultBackendPort(identifie) {
+            return this.getBackendPorts(identifie)[0] || '';
+        },
+        changeBackendIdentifie(role) {
+            role.backend_port = this.getDefaultBackendPort(role.backend_identifie);
+            this.getMenu();
+        },
+        changeBackendType(role) {
+            if (role.load_mode == 'iframe') {
+                this.syncIframeBackendDefaults(role);
+                this.getMenu();
+                return;
+            }
+            if (role.type == 'internal') {
+                if (!role.backend_identifie) {
+                    role.backend_identifie = this.getDefaultBackendIdentifie();
+                }
+                if (!role.backend_port) {
+                    role.backend_port = this.getDefaultBackendPort(role.backend_identifie);
+                }
+            } else {
+                role.root_protocol = role.root_protocol || 'http://';
+            }
+            this.getMenu();
+        },
+        changeLoadMode(role) {
+            if (role.load_mode == 'iframe') {
+                role.type = role.type || 'internal';
+                this.syncIframeBackendDefaults(role);
+            } else {
+                if (role.type == 'internal' && role.backend_identifie == this.getIframeDomainPlaceholder()) {
+                    role.backend_identifie = this.getDefaultBackendIdentifie();
+                    role.backend_port = this.getDefaultBackendPort(role.backend_identifie);
+                }
+            }
+            this.getMenu();
+        },
+        syncRoleBackendDefaults() {
+            let changed = false;
+            this.form.role.forEach(role => {
+                if (role.load_mode == 'iframe') {
+                    changed = this.syncIframeBackendDefaults(role) || changed;
+                    return;
+                }
+                if (role.type != 'internal') { return }
+                if (!role.backend_identifie) {
+                    role.backend_identifie = this.getDefaultBackendIdentifie();
+                    changed = true;
+                }
+                if (!role.backend_port) {
+                    role.backend_port = this.getDefaultBackendPort(role.backend_identifie);
+                    changed = true;
+                }
+            });
+            return changed;
+        },
+        getIframeDomainPlaceholder() {
+            return '{{.Values.DOMAIN_URL}}';
+        },
+        syncIframeBackendDefaults(role) {
+            let changed = false;
+            let placeholder = this.getIframeDomainPlaceholder();
+            if (role.type == 'internal') {
+                if (role.backend_identifie != placeholder) {
+                    role.backend_identifie = placeholder;
+                    changed = true;
+                }
+                if (role.backend_path === undefined || role.backend_path === null) {
+                    role.backend_path = '';
+                    changed = true;
+                }
+            } else {
+                if (!role.root_protocol) {
+                    role.root_protocol = 'http://';
+                    changed = true;
+                }
+                if (role.root_url === undefined || role.root_url === null) {
+                    role.root_url = '';
+                    changed = true;
+                }
+            }
+            return changed;
+        },
+        parseIframeBackendUrl(url) {
+            let value = String(url || '');
+            let placeholder = this.getIframeDomainPlaceholder();
+            if (value.includes(placeholder)) {
+                let path = value.slice(value.indexOf(placeholder) + placeholder.length).replace(/^\/+/, '');
+                return {
+                    type: 'internal',
+                    backend_identifie: placeholder,
+                    backend_path: path,
+                    root_protocol: 'http://',
+                };
+            }
+            let externalBackend = this.parseExternalBackendUrl(value);
+            return {
+                type: 'external',
+                backend_identifie: placeholder,
+                backend_path: '',
+                root_protocol: externalBackend.protocol,
+                root_url: externalBackend.url,
+            };
+        },
+        getIframeBackendUrl(role) {
+            if (role.type == 'internal') {
+                let path = String(role.backend_path || '').trim().replace(/^\/+/, '');
+                return `https://${this.getIframeDomainPlaceholder()}${path ? '/' + path : ''}`;
+            }
+            return this.getExternalBackendUrl(role);
+        },
+        parseExternalBackendUrl(url) {
+            let match = (url || '').match(/^([a-z][a-z\d+.-]*:\/\/)(.*)$/i);
+            return {
+                protocol: match?.[1] || 'http://',
+                url: match ? match[2] : (url || ''),
+            };
+        },
+        getExternalBackendUrl(role) {
+            if (!role.root_url) { return '' }
+            if (/^[a-z][a-z\d+.-]*:\/\//i.test(role.root_url)) {
+                return role.root_url;
+            }
+            return (role.root_protocol || 'http://') + role.root_url;
+        },
+        formatBackendPort(port) {
+            if (port === '' || port === undefined || port === null) { return '' }
+            return /^\d+$/.test(String(port)) ? Number(port) : port;
+        },
         deleteRoleEdit() {
             let r = this.form.role.filter(i => i.support == this.form.menu_type)[this.roleEdit.index]
             let findIndex = this.form.role.findIndex(i => i.support == r.support && i.name == r.name);
@@ -804,15 +1072,96 @@ export default {
             }
             this.roleEdit.index = -1;
         },
-        setMenuDefault(menu, item, is_default) {
-            menu.forEach(i => {
-                i.is_default = 1;
-                if (!i.children?.length) { return }
-                i.children.forEach(j => {
-                    j.is_default = 1;
-                })
+        isCompleteMenuRoute(item) {
+            return !!(item?.title && item?.do);
+        },
+        getMenuDefaultCandidates(menu, { completeOnly = false } = {}) {
+            let candidates = [];
+            (menu || []).forEach(item => {
+                let children = Array.isArray(item.children) ? item.children : [];
+                if (children.length) {
+                    children.forEach(sub => {
+                        if (!completeOnly || this.isCompleteMenuRoute(sub)) {
+                            candidates.push(sub);
+                        }
+                    });
+                    return;
+                }
+                if (!completeOnly || this.isCompleteMenuRoute(item)) {
+                    candidates.push(item);
+                }
             });
-            item.is_default = is_default;
+            return candidates;
+        },
+        hasIncompleteDefaultMenu(menu) {
+            return (menu || []).some(item => {
+                let children = Array.isArray(item.children) ? item.children : [];
+                if (children.length) {
+                    return children.some(sub => Number(sub.is_default) === 1 && !this.isCompleteMenuRoute(sub));
+                }
+                return Number(item.is_default) === 1 && !this.isCompleteMenuRoute(item);
+            });
+        },
+        normalizeBuiltMenuDefault(menu, skipFallback = false) {
+            let selected = menu.find(item => Number(item.is_default) === 1);
+            menu.forEach(item => {
+                item.is_default = item === selected ? 1 : 0;
+            });
+            if (!selected && menu.length && !skipFallback) {
+                menu[0].is_default = 1;
+            }
+        },
+        normalizeMenuDefault(menu, preferredItem) {
+            let candidates = this.getMenuDefaultCandidates(menu);
+            (menu || []).forEach(item => {
+                let children = Array.isArray(item.children) ? item.children : [];
+                if (!candidates.includes(item)) {
+                    item.is_default = 0;
+                }
+                children.forEach(sub => {
+                    if (!candidates.includes(sub)) {
+                        sub.is_default = 0;
+                    }
+                });
+            });
+
+            let selected = preferredItem && candidates.includes(preferredItem) ? preferredItem : null;
+            selected = selected || candidates.find(item => Number(item.is_default) === 1);
+
+            candidates.forEach(item => {
+                item.is_default = item === selected ? 1 : 0;
+            });
+            if (!selected && candidates.length) {
+                candidates[0].is_default = 1;
+            }
+        },
+        getMenuPreferredDefault(menu) {
+            let candidates = this.getMenuDefaultCandidates(menu);
+            return candidates.includes(this.menuDefaultTarget) ? this.menuDefaultTarget : null;
+        },
+        onMenuChanged(menu) {
+            this.normalizeMenuDefault(menu);
+            this.getMenu();
+        },
+        addMenu(menu) {
+            menu.push({ title: '', icon: '', displayorder: 0, is_default: 0, location: 'normal' });
+            this.normalizeMenuDefault(menu);
+            this.getMenu();
+        },
+        removeMenu(menu, index) {
+            menu.splice(index, 1);
+            this.normalizeMenuDefault(menu);
+            this.getMenu();
+        },
+        removeSubMenu(menu, item, subid) {
+            item.children.splice(subid, 1);
+            this.normalizeMenuDefault(menu);
+            this.getMenu();
+        },
+        setMenuDefault(menu, item) {
+            this.menuDefaultTarget = item;
+            item.is_default = 1;
+            this.normalizeMenuDefault(menu, item);
             this.getMenu();
         },
         getIcon() {
@@ -826,9 +1175,13 @@ export default {
                 }
             }
         },
-        addSub(item) {
+        addSub(menu, item) {
             item.children = item.children || [];
-            item.children.push({ title: '', displayorder: 0, is_default: 1 });
+            let sub = { title: '', displayorder: 0, is_default: 0 };
+            item.children.push(sub);
+            this.menuDefaultTarget = sub;
+            this.normalizeMenuDefault(menu, sub);
+            this.getMenu();
         },
         selectIcon(item) {
             this.activeItem.icon_svg = item.json;
@@ -838,13 +1191,12 @@ export default {
         addRole() {
             this.$refs.role.validate((valid) => {
                 if (!valid) { return }
-                let backend_identifie = this.form.author + '-' + this.form.identifie;
+                let backend_identifie = this.getDefaultBackendIdentifie();
                 this.form.role.push({
                     title: this.newRole.title,
                     name: this.newRole.name,
                     support: this.form.menu_type,
                     status: 1,
-                    framework: 'vue2',
                     load_mode: 'static_hosting',
                     is_default_register: 1,
                     location: 'left',
@@ -852,6 +1204,9 @@ export default {
 
                     type: 'internal',
                     backend_identifie: backend_identifie,
+                    backend_port: this.getDefaultBackendPort(backend_identifie),
+                    backend_path: '',
+                    root_protocol: 'http://',
                     root_url: '',
 
                     proxy_request_header: [{ key: '', value: '' }],
@@ -884,6 +1239,7 @@ export default {
                         r.frontend_props?.map(i => i.isSelect = false)
                     } catch { }
                 }
+                this.normalizeMenuDefault(r.menu, this.getMenuPreferredDefault(r.menu));
 
                 let itemObj = {
                     name: r.name,
@@ -891,11 +1247,10 @@ export default {
                     status: r.status,
                     support: r.support,
                     is_default_register: r.is_default_register,
-                    framework: r.framework,
                     location: r.location,
                     menu_type: r.menu_type,
+                    load_mode: r.load_mode,
                 };
-                itemObj.load_mode = itemObj.framework == 'iframe' ? 'iframe' : 'static_hosting';
 
                 if (['super', 'founder', 'tech', 'normal'].includes(r.name)) {
                     if (r.support == 'console' && ['super', 'founder'].includes(r.name)) {
@@ -919,22 +1274,34 @@ export default {
                     return [key, value]
                 }))
 
-                itemObj.backend_config = {
-                    type: r.type,
-                    ...(r.type == 'internal' ? {
-                        backend_identifie: r.backend_identifie,
-                        proxy_request: {
-                            headers: proxy_request_header,
-                            query: proxy_request_query,
-                        },
-                    } : {
+                if (r.load_mode == 'iframe') {
+                    this.syncIframeBackendDefaults(r);
+                    itemObj.backend_config = {
+                        type: r.type,
+                        backend_identifie: this.getIframeBackendUrl(r),
+                        ...((r.support != 'thirdparty_cd' || r.name != 'normal') ? {
+                            frontend_props: frontend_props
+                        } : {}),
+                    };
+                } else {
+                    itemObj.backend_config = {
+                        type: r.type,
+                        ...(r.type == 'internal' ? {
+                            backend_identifie: r.backend_identifie,
+                            backend_port: this.formatBackendPort(r.backend_port),
+                            proxy_request: {
+                                headers: proxy_request_header,
+                                query: proxy_request_query,
+                            },
+                        } : {
 
-                        backend_identifie: r.root_url,
-                    }),
-                    ...((r.support != 'thirdparty_cd' || r.name != 'normal') ? {
-                        frontend_props: frontend_props
-                    } : {}),
-                };
+                            backend_identifie: this.getExternalBackendUrl(r),
+                        }),
+                        ...((r.support != 'thirdparty_cd' || r.name != 'normal') ? {
+                            frontend_props: frontend_props
+                        } : {}),
+                    };
+                }
 
                 let menu = [];
                 for (let i in r.menu) {
@@ -947,7 +1314,7 @@ export default {
                         icon: o.icon,
                         icon_svg: o.icon_svg,
                         location: o.location,
-                        is_default: o.is_default || 1,
+                        is_default: o.is_default || 0,
                     };
                     delete item.children;
                     menu.push(item);
@@ -961,15 +1328,16 @@ export default {
                                 title: c.title,
                                 icon: c.icon,
                                 icon_svg: o.icon_svg,
-                                is_default: c.is_default,
+                                is_default: c.is_default || 0,
                                 parent: o.do,
                             });
                         }
                     }
                 }
                 itemObj.menu = menu;
+                this.normalizeBuiltMenuDefault(itemObj.menu, this.hasIncompleteDefaultMenu(r.menu));
 
-                if (itemObj.menu.length > 0) {
+                if (itemObj.menu.length > 0 || r.load_mode == 'iframe') {
                     if (r.support) {
                         front_type.add(r.support);
                     }
@@ -986,13 +1354,8 @@ export default {
 
             this.json.application.front_type = [...front_type];
             this.json.bindings = role;
-            this.form.hasIframe = Boolean(this.form.role.find(i => i.framework == 'iframe'));
+            this.form.hasIframe = Boolean(this.form.role.find(i => i.load_mode == 'iframe'));
 
-            if (this.form.hasIframe) {
-                this.json.domain = this.form.front_domain;
-            } else {
-                delete this.json.domain;
-            }
             this.setYaml();
         },
 
@@ -1022,19 +1385,23 @@ export default {
             }
             if (v) {
                 if (hasrole) { return }
-                let backend_identifie = this.form.author + '-' + this.form.identifie;
+                let backend_identifie = this.getDefaultBackendIdentifie();
                 this.form.role.push({
                     title: title,
                     name: name,
                     status: 1,
                     support: type,
-                    framework: 'vue2',
+                    load_mode: 'static_hosting',
                     is_default_register: 1,
                     location: 'left',
                     menu: [],
 
                     type: 'internal',
                     backend_identifie: backend_identifie,
+                    backend_port: this.getDefaultBackendPort(backend_identifie),
+                    backend_path: '',
+                    root_protocol: 'http://',
+                    root_url: '',
 
                     proxy_request_header: [{ key: '', value: '' }],
                     proxy_request_query: [{ key: '', value: '' }],
@@ -1103,11 +1470,10 @@ export default {
             }
             for (let i in j.bindings) {
                 let o = j.bindings[i];
-                o.framework = o.framework || 'vue2';
                 o.load_mode = o.load_mode || 'static_hosting';
             }
 
-            this.startParams = j?.platform?.container?.startParams || [];
+            this.startParams = j?.platform?.startParams || [];
 
             this.form.name = j?.application?.name;
             if (/^[^-]+-.+$/.test(j.application.identifie)) {
@@ -1133,14 +1499,30 @@ export default {
                     this.form.role.push(thirdparty_cd);
                 }
 
-                item.type = item?.backend_config?.type || 'internal';
-                if (item.type != 'internal') {
-                    item.root_url = item?.backend_config?.backend_identifie || '';
-                    item.backend_identifie = this.form.author + '-' + this.form.identifie;
+                if (item.load_mode == 'iframe') {
+                    let iframeBackend = this.parseIframeBackendUrl(item?.backend_config?.backend_identifie || '');
+                    item.type = iframeBackend.type;
+                    item.backend_identifie = iframeBackend.backend_identifie;
+                    item.backend_path = iframeBackend.backend_path;
+                    item.root_protocol = iframeBackend.root_protocol;
+                    item.root_url = iframeBackend.root_url;
+                    item.backend_port = '';
                 } else {
-                    item.root_url = '';
-                    item.backend_identifie = item?.backend_config?.backend_identifie;
-                    item.backend_identifie = item.backend_identifie || (this.form.author + '-' + this.form.identifie);
+                    item.type = item?.backend_config?.type || 'internal';
+                    item.backend_path = '';
+                    if (item.type != 'internal') {
+                        let externalBackend = this.parseExternalBackendUrl(item?.backend_config?.backend_identifie || '');
+                        item.root_protocol = externalBackend.protocol;
+                        item.root_url = externalBackend.url;
+                        item.backend_identifie = this.getDefaultBackendIdentifie();
+                        item.backend_port = this.getDefaultBackendPort(item.backend_identifie);
+                    } else {
+                        item.root_protocol = 'http://';
+                        item.root_url = '';
+                        item.backend_identifie = item?.backend_config?.backend_identifie;
+                        item.backend_identifie = item.backend_identifie || this.getDefaultBackendIdentifie();
+                        item.backend_port = item?.backend_config?.backend_port ?? '';
+                    }
                 }
 
 
@@ -1233,7 +1615,7 @@ export default {
                             this.form.startParams = [];
                         }
                     } else {
-                        let startParams = j?.platform?.container?.startParams;
+                        let startParams = j?.platform?.startParams;
                         this.form.startParams = startParams?.length ? startParams : [];
                         this.form.mysql8 = false;
                         if (this.form.startParams?.length) {
@@ -1264,9 +1646,11 @@ export default {
                     chartName: 'default',
                 };
             }
+            this.syncRoleBackendDefaults();
         },
         submit(otherData, callback) {
             this.$nextTick(() => {
+                this.getMenu();
                 this.$refs.formref.validate((valid) => {
                     if (!valid) { this.$message.warning('必填项不能为空'); return }
                     this.$emit('complete', this.json, this.yaml, otherData, callback);
@@ -1798,6 +2182,82 @@ export default {
     line-height: 20x;
     cursor: pointer;
     margin-left: 10px;
+}
+
+.backend-url-config {
+    width: 620px;
+    height: 32px;
+    box-sizing: border-box;
+    overflow: hidden;
+    border: 1px solid #dcdfe6;
+    border-radius: 4px;
+    background: #fff;
+    transition: border-color .2s;
+}
+
+.backend-url-config:focus-within {
+    border-color: #409eff;
+}
+
+.backend-url-config-external {
+    width: 500px;
+}
+
+.backend-url-fixed {
+    color: #c0c4cc;
+    line-height: 30px;
+    white-space: nowrap;
+    align-self: stretch;
+    padding: 0 8px;
+    margin: 0;
+    background: #f5f7fa;
+    border-right: 1px solid #dcdfe6;
+}
+
+.backend-url-placeholder {
+    min-width: 130px;
+    color: #606266;
+    background: #fff;
+}
+
+.backend-url-fixed+.backend-url-control,
+.backend-url-fixed+.backend-url-fixed,
+.backend-url-control+.backend-url-fixed,
+.backend-url-control+.backend-url-control {
+    border-left: 1px solid #dcdfe6;
+}
+
+.backend-url-identifie {
+    width: 190px;
+}
+
+.backend-url-port {
+    width: 120px;
+}
+
+.backend-url-protocol {
+    width: 110px;
+}
+
+.backend-url-input {
+    flex: 1;
+}
+
+.backend-url-config :deep(.el-input__wrapper) {
+    height: 30px;
+    box-shadow: none !important;
+    border-radius: 0;
+    background: transparent;
+    padding: 0 10px;
+}
+
+.backend-url-config :deep(.el-input__inner) {
+    height: 30px;
+    line-height: 30px;
+}
+
+.backend-url-config :deep(.el-select .el-input.is-focus .el-input__wrapper) {
+    box-shadow: none !important;
 }
 
 .elseoption {

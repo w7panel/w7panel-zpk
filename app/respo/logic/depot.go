@@ -450,17 +450,8 @@ func (self *Depot) GetFrontendZipFileContent(formula *Formula, path string) ([]b
 	}
 
 	zipPath := filepath.Join(self.basePath, formula.WebZipPaths[formula.Name])
-	zipReader, err := zip.OpenReader(zipPath)
-	if err != nil {
-		return nil, err
-	}
-
-	file, err := zipReader.Open(path)
-	if err != nil {
-		return nil, err
-	}
-
-	return io.ReadAll(file)
+	cacheRoot := filepath.Join(os.TempDir(), "w7panel-zpk", "zip_file_cache")
+	return Attach{}.GetZipFileContent(cacheRoot, zipPath, path)
 }
 
 func (self *Depot) Copy(src *Formula, dest *Formula) error {

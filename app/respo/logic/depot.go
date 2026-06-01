@@ -289,6 +289,12 @@ func (self *Depot) GetFormula(name string, version string, user *entity.Registry
 			slog.Error("unPackSourceCodeFromOCI err", "formula_name", result.Name, "version", result.Version, "err", err)
 			return nil, err
 		}
+		go func() {
+			err = self.unPackIconFromOCI(result)
+			if err != nil {
+				slog.Error("unPackIconFromOCI faile", "formula_name", result.Name, "version", result.Version, "err", err)
+			}
+		}()
 	}
 
 	return result, nil
@@ -396,7 +402,7 @@ func (self *Depot) GetFileList(formula *Formula) (map[string]string, error) {
 	return files, nil
 }
 
-func (self *Depot) GetZipFileList(formula *Formula) ([]string, error) {
+func (self *Depot) GetBackendZipFileList(formula *Formula) ([]string, error) {
 	result := make([]string, 0)
 
 	if formula.ZipPath == "" {
@@ -423,8 +429,27 @@ func (self *Depot) GetZipFileList(formula *Formula) ([]string, error) {
 	return result, nil
 }
 
-func (self *Depot) GetZipFileContent(formula *Formula, path string) ([]byte, error) {
+func (self *Depot) GetBackendZipFileContent(formula *Formula, path string) ([]byte, error) {
 	zipPath := filepath.Join(self.basePath, formula.ZipPath)
+	zipReader, err := zip.OpenReader(zipPath)
+	if err != nil {
+		return nil, err
+	}
+
+	file, err := zipReader.Open(path)
+	if err != nil {
+		return nil, err
+	}
+
+	return io.ReadAll(file)
+}
+
+func (self *Depot) GetFrontendZipFileContent(formula *Formula, path string) ([]byte, error) {
+	if _, exists := formula.WebZipPaths[formula.Name]; !exists {
+		return nil, nil
+	}
+
+	zipPath := filepath.Join(self.basePath, formula.WebZipPaths[formula.Name])
 	zipReader, err := zip.OpenReader(zipPath)
 	if err != nil {
 		return nil, err
@@ -652,17 +677,10 @@ func (self *Depot) unPackFilesFromOci(formula *Formula) error {
 }
 
 func (self *Depot) unPackSourceCodeFromOCI(formula *Formula) error {
-	unpackIcon := false
 	unpackZipCode := false
 	unpackWebCode := false
 	unpackHelm := false
 	mediaTypes := make([]string, 0)
-	iconPath := filepath.Join(self.basePath, formula.GetIconRelativePath())
-	if !function.FileExists(iconPath) {
-		function.CreateDirIfNotExist(filepath.Dir(iconPath), os.ModePerm)
-		unpackIcon = true
-		mediaTypes = append(mediaTypes, logic.MediaTypeIcon)
-	}
 	zipPath := filepath.Join(self.basePath, formula.ZipPath)
 	if formula.ZipPath != "" {
 		if !function.FileExists(zipPath) {
@@ -696,7 +714,53 @@ func (self *Depot) unPackSourceCodeFromOCI(formula *Formula) error {
 		}
 	}
 	slog.Info("unpackfromoci", "formula", formula.Name, "helms", formula.HelmPaths, "needPack", unpackHelm, "mediaTypes", mediaTypes)
-	if !unpackIcon && !unpackZipCode && !unpackWebCode && !unpackHelm {
+	if !unpackZipCode && !unpackWebCode && !unpackHelm {
+		return nil
+	}
+
+	remoteOci, manifest, err := self.getOciManifest(formula)
+	if err != nil {
+		if errors.Is(err, logic.OciManifestNotFoundErr) {
+			return nil
+		}
+		return err
+	}
+
+	return logic.UnPackOciToLocal(remoteOci, manifest, mediaTypes, func(mediaType string, savePath string, reader io.Reader) error {
+		data, err := io.ReadAll(reader)
+		if err != nil {
+			return err
+		}
+
+		if mediaType == logic.MediaTypeBackendCodeZip {
+			err = os.WriteFile(zipPath, data, os.ModePerm)
+			if err != nil {
+				return err
+			}
+		}
+
+		if mediaType == logic.MediaTypeFrontedCodeZip || mediaType == logic.MediaTypeHelmZip {
+			err = os.WriteFile(filepath.Join(self.basePath, savePath), data, os.ModePerm)
+			if err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
+}
+
+func (self *Depot) unPackIconFromOCI(formula *Formula) error {
+	unpackIcon := false
+	mediaTypes := make([]string, 0)
+	iconPath := filepath.Join(self.basePath, formula.GetIconRelativePath())
+	if !function.FileExists(iconPath) {
+		function.CreateDirIfNotExist(filepath.Dir(iconPath), os.ModePerm)
+		unpackIcon = true
+		mediaTypes = append(mediaTypes, logic.MediaTypeIcon)
+	}
+
+	if !unpackIcon {
 		return nil
 	}
 
@@ -722,19 +786,6 @@ func (self *Depot) unPackSourceCodeFromOCI(formula *Formula) error {
 			defer file.Close()
 
 			_, err = file.Write(data)
-			if err != nil {
-				return err
-			}
-		}
-		if mediaType == logic.MediaTypeBackendCodeZip {
-			err = os.WriteFile(zipPath, data, os.ModePerm)
-			if err != nil {
-				return err
-			}
-		}
-
-		if mediaType == logic.MediaTypeFrontedCodeZip || mediaType == logic.MediaTypeHelmZip {
-			err = os.WriteFile(filepath.Join(self.basePath, savePath), data, os.ModePerm)
 			if err != nil {
 				return err
 			}

@@ -10,110 +10,217 @@
                 </el-breadcrumb-item>
             </el-breadcrumb>
         </div>
-        <div class="mt-20">
-            <div>
-                <el-button type="primary" @click="form = { show: true, edit: false, version: '', description: '' }">+
-                    新建版本</el-button>
-                <el-button @click="openInstFee()">付费设置</el-button>
-                <el-button @click="editDescription()">应用介绍</el-button>
-                <el-button @click="editPublish()">发布设置</el-button>
-            </div>
-            <div v-if="list.length" class="mt-20 df">
-                <div class="white-box" style="flex:18;">
-                    <div class="c-16 b">当前线上版本</div>
-                    <div class="df mt-20">
-                        <div style="width:400px;">
-                            <div class="c-66">版本号</div>
-                            <div class="mt-20">
-                                <span class="lh-1 fs-20 b">{{ version.name }}</span>
+        <el-tabs v-model="activeTab" class="mt-10" @tab-click="handleTabClick">
+            <el-tab-pane label="版本管理" name="version">
+                <div>
+                    <div>
+                        <el-button type="primary"
+                            @click="form = { show: true, edit: false, version: '', description: '' }">+
+                            新建版本</el-button>
+                    </div>
+                    <div v-if="list.length" class="mt-20 df">
+                        <div class="white-box" style="flex:18;">
+                            <div class="c-16 b">当前线上版本</div>
+                            <div class="df mt-20">
+                                <div style="width:400px;">
+                                    <div class="c-66">版本号</div>
+                                    <div class="mt-20">
+                                        <span class="lh-1 fs-20 b">{{ version.name }}</span>
+                                    </div>
+                                </div>
+                                <div>
+                                    <div>
+                                        <span class="c-66">发布状态</span>
+                                        <span class="ml-20">已发布</span>
+
+                                        <el-tooltip v-if="goods_id" effect="dark" content="应用已发布至微擎云市场"
+                                            placement="top-start">
+                                            <a class="ml-10 cursor c-blue" target="_blank"
+                                                :href="'https://dev.w7.cc/publishgoods/' + goods_id">
+                                                <el-icon class="va-middle">
+                                                    <MostlyCloudy />
+                                                </el-icon>
+                                                <span class="ml-4">微擎云市场</span>
+                                            </a>
+                                        </el-tooltip>
+                                    </div>
+                                    <div class="mt-20">
+                                        <span class="c-66">交付方式</span>
+                                        <span v-if="noPlatform" class="ml-20">在线使用（无服务器）</span>
+                                        <span v-else class="ml-20">安装部署（有服务器）</span>
+                                    </div>
+                                    <div class="mt-20">
+                                        <span class="c-66">创建时间</span>
+                                        <span class="ml-20">{{ version.created_at }}</span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                        <div>
+                        <div class="white-box ml-20" style="flex:12;">
+                            <div class="c-16 b">基础信息</div>
+                            <div class="mt-20">
+                                <version-info :identifie="identifie" :info="info"
+                                    @refresh="() => { getInfo() }"></version-info>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-20 gray-box">
+                        <div class="c-16 b">开发版本</div>
+                        <div class="mt-10">
+                            <div v-for="(item, index) in list" :key="index" class="item df">
+                                <div style="width:400px;">
+                                    <div class="c-66">版本号</div>
+                                    <div class="mt-20" style="display: flex; align-items: center;height: 24px;">
+                                        <span class="lh-1 fs-20 b">{{ item.name }}</span>
+
+                                        <el-tooltip
+                                            v-if="item.id == version.id && goods_id && audit_status && audit_status < 4"
+                                            effect="dark" content="应用已发布至微擎云市场，等待管理员审核" placement="top-start">
+                                            <span class="ml-10 cursor" style="color:#E6A23C;">待审核</span>
+                                        </el-tooltip>
+
+                                        <span v-if="item.id == version.id" class="c-blue"
+                                            style="border: 1px solid #0052d9;margin-left: 12px;padding: 1px;">线上版本</span>
+                                        <span class="publish-status" @click="toPublish(item)"
+                                            :class="{ '-1': 'c-99', 1: 'c-blue', 2: 'c-green', 3: 'c-red' }[item.publish_status]">{{
+                                                { '-1': '未发布', 1: '发布中', 2: '已发布', 3: '发布失败' }[item.publish_status]
+                                            }}</span>
+                                        <span class="publish-status-button c-blue" @click="toPublish(item)"
+                                            style="border:1px solid;padding:1px 3px;">点击发布</span>
+
+                                        <template v-if="item.publish_status == 3">
+                                            <el-tooltip effect="dark" :content="item.publish_fail_reason"
+                                                placement="top">
+                                                <el-icon class="va-middle" color="#D00805" :size="16"
+                                                    style="margin-left:4px;">
+                                                    <Warning />
+                                                </el-icon>
+                                            </el-tooltip>
+                                        </template>
+                                    </div>
+                                </div>
+                                <div class="fc">
+                                    <div class="mt-20">
+                                        <span class="c-66">创建时间</span>
+                                        <span class="ml-20">{{ item.created_at }}</span>
+                                    </div>
+                                </div>
+
+
+                                <el-button @click="edit(item)">后端包管理</el-button>
+                                <el-button @click="editfront(item)">前端包管理</el-button>
+                                <el-button @click="editVersion(item)">版本说明</el-button>
+
+
+                            </div>
+                        </div>
+                        <div class="mt-20 df jc-c">
+                            <el-pagination v-model:current-page="currentPage" :page-size="10" :total="total"
+                                layout="prev, pager, next" background @current-change="getList" />
+                        </div>
+                    </div>
+                </div>
+            </el-tab-pane>
+            <el-tab-pane label="付费设置" name="paidset">
+                <div>
+                    <el-form :model="instFee" ref="instFee" label-width="80px" :rules="rules">
+                        <el-form-item label="">
+                            <div class="df df-c" style="flex:1;">
+                                <el-radio-group v-model="instFee.product_type">
+                                    <el-radio label="1">按授权付费</el-radio>
+                                    <el-radio label="2">按安装付费</el-radio>
+                                </el-radio-group>
+                                <span v-if="instFee.product_type == '1'" class="c-99">仅针对项目拥有所有权的商家，可按项目授权出售</span>
+                                <span v-if="instFee.product_type == '2'"
+                                    class="c-99">对该项目熟悉并打包成可用安装包的技术人员，可按安装付费出售</span>
+                            </div>
+                        </el-form-item>
+
+                        <el-form-item label="售价" prop="service_fee">
+                            <el-input v-model="instFee.service_fee" type="number" placeholder="请输入服务费">
+                                <template #append>元</template>
+                            </el-input>
+                        </el-form-item>
+
+                        <el-form-item v-if="instFee.product_type == '1'" label="升级服务">
+
+                            <table class="table mt-10">
+                                <thead>
+                                    <tr>
+                                        <td>版本号</td>
+                                        <td>价格</td>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="(item, index) in instFee.version_prices" :key="index">
+                                        <td>{{ item.version === 9999 ? '其他版本' : item.version ? (item.version +
+                                            '.*.*')
+                                            : '' }}</td>
+                                        <td>￥{{ item.price }}</td>
+                                    </tr>
+                                    <tr v-if="!instFee.version_prices.length">
+                                        <td colspan="3" class="c-99 txt-c">暂无数据</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                            <el-button style="width:100%;margin-top:8px;" type="primary"
+                                @click="openVersionPrices(instFee.version_prices)">设置升级服务</el-button>
+                        </el-form-item>
+                        <el-form-item v-if="instFee.product_type == '2'" label="付费升级">
                             <div>
-                                <span class="c-66">发布状态</span>
-                                <span class="ml-20">已发布</span>
+                                <el-switch v-model="instFee.is_free_upgrade"></el-switch>
+                                <span class="c-99" style="margin-left:10px;">用户想升级到指定版本，需要付费。</span>
+                            </div>
+                        </el-form-item>
 
-                                <el-tooltip v-if="goods_id" effect="dark" content="应用已发布至微擎云市场" placement="top-start">
-                                    <a class="ml-10 cursor c-blue" target="_blank"
-                                        :href="'https://dev.w7.cc/publishgoods/' + goods_id">
-                                        <el-icon class="va-middle">
-                                            <MostlyCloudy />
-                                        </el-icon>
-                                        <span class="ml-4">微擎云市场</span>
-                                    </a>
-                                </el-tooltip>
+                        <el-form-item v-if="instFee.product_type == '1'" label="服务周期">
+                            <div class="mt-6" style="line-height:18px;">
+                                <el-icon class="c-red" style="display:inline-block; vertical-align:middle;">
+                                    <Warning />
+                                </el-icon>
+                                <span class="c-99"
+                                    style="margin-left:4px; vertical-align:middle;">到期后无法维护更新,需要再次购买服务周期套餐才可以维护更新</span>
                             </div>
-                            <div class="mt-20">
-                                <span class="c-66">交付方式</span>
-                                <span v-if="noPlatform" class="ml-20">在线使用（无服务器）</span>
-                                <span v-else class="ml-20">安装部署（有服务器）</span>
+                            <table class="table mt-10">
+                                <thead>
+                                    <tr>
+                                        <td>价格</td>
+                                        <td>时间</td>
+                                        <td>生效</td>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="(item, index) in instFee.service_packages" :key="index">
+                                        <td>￥{{ item.price }}</td>
+                                        <td>{{ item.month / 12 }}年</td>
+                                        <td>{{ item.enabled == 2 ? '是' : '否' }}</td>
+                                    </tr>
+                                    <tr v-if="!instFee.service_packages.length">
+                                        <td colspan="3" class="c-99 txt-c">暂无数据</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                            <el-button style="width:100%;margin-top:8px;" type="primary"
+                                @click="openServicePackages(instFee.service_packages)">设置服务周期</el-button>
+                        </el-form-item>
+
+                        <el-form-item label="">
+                            <div>
+                                <el-button @click="instFee.show = false;">取消</el-button>
+                                <el-button type="primary" @click="submitInstFee">确定</el-button>
                             </div>
-                            <div class="mt-20">
-                                <span class="c-66">创建时间</span>
-                                <span class="ml-20">{{ version.created_at }}</span>
-                            </div>
-                        </div>
-                    </div>
+                        </el-form-item>
+                    </el-form>
                 </div>
-                <div class="white-box ml-20" style="flex:12;">
-                    <div class="c-16 b">基础信息</div>
-                    <div class="mt-20">
-                        <version-info :identifie="identifie" :info="info" @refresh="() => { getInfo() }"></version-info>
-                    </div>
-                </div>
-            </div>
-            <div class="mt-20 gray-box">
-                <div class="c-16 b">开发版本</div>
-                <div class="mt-10">
-                    <div v-for="(item, index) in list" :key="index" class="item df">
-                        <div style="width:400px;">
-                            <div class="c-66">版本号</div>
-                            <div class="mt-20" style="display: flex; align-items: center;height: 24px;">
-                                <span class="lh-1 fs-20 b">{{ item.name }}</span>
 
-                                <el-tooltip v-if="item.id == version.id && goods_id && audit_status && audit_status < 4"
-                                    effect="dark" content="应用已发布至微擎云市场，等待管理员审核" placement="top-start">
-                                    <span class="ml-10 cursor" style="color:#E6A23C;">待审核</span>
-                                </el-tooltip>
-
-                                <span v-if="item.id == version.id" class="c-blue"
-                                    style="border: 1px solid #0052d9;margin-left: 12px;padding: 1px;">线上版本</span>
-                                <span class="publish-status" @click="toPublish(item)"
-                                    :class="{ '-1': 'c-99', 1: 'c-blue', 2: 'c-green', 3: 'c-red' }[item.publish_status]">{{
-                                        { '-1': '未发布', 1: '发布中', 2: '已发布', 3: '发布失败' }[item.publish_status] }}</span>
-                                <span class="publish-status-button c-blue" @click="toPublish(item)"
-                                    style="border:1px solid;padding:1px 3px;">点击发布</span>
-
-                                <template v-if="item.publish_status == 3">
-                                    <el-tooltip effect="dark" :content="item.publish_fail_reason" placement="top">
-                                        <el-icon class="va-middle" color="#D00805" :size="16" style="margin-left:4px;">
-                                            <Warning />
-                                        </el-icon>
-                                    </el-tooltip>
-                                </template>
-                            </div>
-                        </div>
-                        <div class="fc">
-                            <div class="mt-20">
-                                <span class="c-66">创建时间</span>
-                                <span class="ml-20">{{ item.created_at }}</span>
-                            </div>
-                        </div>
-
-
-                        <el-button @click="edit(item)">后端包管理</el-button>
-                        <el-button @click="editfront(item)">前端包管理</el-button>
-                        <el-button @click="editVersion(item)">版本说明</el-button>
-
-
-                    </div>
-                </div>
-                <div class="mt-20 df jc-c">
-                    <el-pagination v-model:current-page="currentPage" :page-size="10" :total="total"
-                        layout="prev, pager, next" background @current-change="getList" />
-                </div>
-            </div>
-        </div>
+            </el-tab-pane>
+            <el-tab-pane label="应用介绍" name="appinfo">
+                <description v-if="activeTab == 'appinfo'" :identifie="identifie"></description>
+            </el-tab-pane>
+            <el-tab-pane label="发布设置" name="publish">
+                <publish-settings v-if="activeTab == 'publish'" :identifie="identifie" :userInfo="userInfo"></publish-settings>
+            </el-tab-pane>
+        </el-tabs>
     </div>
     <el-dialog v-model="form.show" modal-class="createversiondialog" width="640px" title="新建版本">
         <template #header>
@@ -143,97 +250,6 @@
         <template #footer>
             <el-button @click="form.show = false;">取消</el-button>
             <el-button type="primary" @click="addVersion">确定</el-button>
-        </template>
-    </el-dialog>
-
-    <el-dialog v-model="instFee.show" width="840px" title="付费设置">
-        <div>
-            <el-form :model="instFee" ref="instFee" label-width="80px" :rules="rules">
-                <el-form-item label="">
-                    <div class="df df-c" style="flex:1;">
-                        <el-radio-group v-model="instFee.product_type">
-                            <el-radio label="1">按授权付费</el-radio>
-                            <el-radio label="2">按安装付费</el-radio>
-                        </el-radio-group>
-                        <span v-if="instFee.product_type == '1'" class="c-99">仅针对项目拥有所有权的商家，可按项目授权出售</span>
-                        <span v-if="instFee.product_type == '2'" class="c-99">对该项目熟悉并打包成可用安装包的技术人员，可按安装付费出售</span>
-                    </div>
-                </el-form-item>
-
-                <el-form-item label="售价" prop="service_fee">
-                    <el-input v-model="instFee.service_fee" type="number" placeholder="请输入服务费">
-                        <template #append>元</template>
-                    </el-input>
-                </el-form-item>
-
-                <el-form-item v-if="instFee.product_type == '1'" label="升级服务">
-
-                    <table class="table mt-10">
-                        <thead>
-                            <tr>
-                                <td>版本号</td>
-                                <td>价格</td>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr v-for="(item, index) in instFee.version_prices" :key="index">
-                                <td>{{ item.version === 9999 ? '其他版本' : item.version ? (item.version +
-                                    '.*.*')
-                                    : '' }}</td>
-                                <td>￥{{ item.price }}</td>
-                            </tr>
-                            <tr v-if="!instFee.version_prices.length">
-                                <td colspan="3" class="c-99 txt-c">暂无数据</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                    <el-button style="width:100%;margin-top:8px;" type="primary"
-                        @click="openVersionPrices(instFee.version_prices)">设置升级服务</el-button>
-                </el-form-item>
-                <el-form-item v-if="instFee.product_type == '2'" label="付费升级">
-                    <div>
-                        <el-switch v-model="instFee.is_free_upgrade"></el-switch>
-                        <span class="c-99" style="margin-left:10px;">用户想升级到指定版本，需要付费。</span>
-                    </div>
-                </el-form-item>
-
-                <el-form-item v-if="instFee.product_type == '1'" label="服务周期">
-                    <div class="mt-6" style="line-height:18px;">
-                        <el-icon class="c-red" style="display:inline-block; vertical-align:middle;">
-                            <Warning />
-                        </el-icon>
-                        <span class="c-99"
-                            style="margin-left:4px; vertical-align:middle;">到期后无法维护更新,需要再次购买服务周期套餐才可以维护更新</span>
-                    </div>
-                    <table class="table mt-10">
-                        <thead>
-                            <tr>
-                                <td>价格</td>
-                                <td>时间</td>
-                                <td>生效</td>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr v-for="(item, index) in instFee.service_packages" :key="index">
-                                <td>￥{{ item.price }}</td>
-                                <td>{{ item.month / 12 }}年</td>
-                                <td>{{ item.enabled == 2 ? '是' : '否' }}</td>
-                            </tr>
-                            <tr v-if="!instFee.service_packages.length">
-                                <td colspan="3" class="c-99 txt-c">暂无数据</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                    <el-button style="width:100%;margin-top:8px;" type="primary"
-                        @click="openServicePackages(instFee.service_packages)">设置服务周期</el-button>
-                </el-form-item>
-
-                <el-form-item label=""></el-form-item>
-            </el-form>
-        </div>
-        <template #footer>
-            <el-button @click="instFee.show = false;">取消</el-button>
-            <el-button type="primary" @click="submitInstFee">确定</el-button>
         </template>
     </el-dialog>
 
@@ -284,7 +300,7 @@
         <div class="df service_packages mt-20">
             <el-form v-for="(item, index) in service_packages.list" label-width="60px" class="fc" :key="index">
                 <el-form-item label="" style="margin-bottom:10px;"><span class="fs-16">套餐{{ index + 1
-                }}</span></el-form-item>
+                        }}</span></el-form-item>
                 <el-form-item label="价格" style="margin-bottom:10px;">
                     <el-input v-model="item.price" type="number" placeholder="请输入" />
                 </el-form-item>
@@ -321,10 +337,20 @@
 import myAxios from '@/utils'
 import versionInfo from '@/components/version-info.vue';
 import jsyaml from "js-yaml";
+import description from './description.vue';
+import publishSettings from './publish-settings.vue';
+import userMixin from "@/utils/user-mixin";
 
 export default {
+    components: {
+        versionInfo,
+        description,
+        publishSettings,
+    },
+    mixins: [userMixin],
     data() {
         return {
+            activeTab: 'version',
             identifie: '',
             list: [],
             versionsKV: {},
@@ -418,10 +444,16 @@ export default {
         this.getInfo();
         this.getList();
     },
-    components: {
-        versionInfo,
-    },
     methods: {
+        handleTabClick(tab) {
+            if (tab.props.name == 'paidset') {
+                this.getInstFee();
+            } else if (tab.props.name == 'appinfo') {
+                this.getInfo();
+            } else if (tab.props.name == 'publish') {
+                this.getPublishInfo();
+            }
+        },
         getCuv() {
             myAxios.post('/respo/goods/can-upgrade-versions', {
                 identifie: this.identifie,
@@ -538,11 +570,7 @@ export default {
 
 
 
-        openInstFee() {
-
-
-
-
+        getInstFee() {
             let version_prices = this.info?.version_prices || [];
             version_prices.map(i => {
                 i.versionName = this.versionsKV[i.version];
@@ -553,7 +581,6 @@ export default {
             }
             this.instFee = {
                 ...this.instFee,
-                show: true,
                 product_type: String(product_type),
                 old_fee: this.info?.install_service_fee,
                 service_fee: this.info?.install_service_fee || '',

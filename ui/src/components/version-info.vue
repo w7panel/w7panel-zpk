@@ -54,7 +54,7 @@
             </el-form-item>
 
             <el-form-item label="注解" style="margin-bottom:10px;">
-                <span class="c-blue cursor ml-20" @click="openAnnotationEdit">编辑</span>
+                {{ annotationKeys }}<span class="c-blue cursor ml-20" @click="openAnnotationEdit">编辑</span>
             </el-form-item>
             <el-form-item label="属性">
                 <div class="df df-c">
@@ -90,7 +90,10 @@
                         </td>
                     </tr>
                     <tr>
-                        <td colspan="3" class="cursor txt-c" @click="annotationEdit.list.push({ key: '', value: '' })">添加
+                        <td colspan="3" class="cursor txt-c" @click="annotationEdit.list.push({ key: '', value: '' })">
+                            <span class="addmenu"><el-icon :size="14">
+                                    <Plus />
+                                </el-icon>添加注解</span>
                         </td>
                     </tr>
                 </tbody>
@@ -287,6 +290,12 @@ export default {
                 this.$emit('refresh');
             })
         },
+    },
+    computed: {
+        annotationKeys() {
+            const keys = Object.keys(this.json?.application?.annotation || []);
+            return keys.length === 0 ? '-' : keys.join(',');
+        }
     }
 }
 </script>

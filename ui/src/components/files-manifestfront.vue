@@ -267,7 +267,7 @@
                                                                     </td>
                                                                     <td>
                                                                         <el-autocomplete v-model="item.value"
-                                                                            :fetch-suggestions="(query) => startParams.filter(i=>i.name.includes(query)).map(i=>({value:i.name}))"
+                                                                            :fetch-suggestions="(query) => systemVar.filter(i=>i.includes(query)).map(i=>({value:i}))"
                                                                             placeholder="value"
                                                                             class="backend-url-control backend-url-port" @input="getMenu"
                                                                             @change="getMenu" @select="getMenu"></el-autocomplete>
@@ -305,7 +305,7 @@
                                                                     </td>
                                                                     <td>
                                                                         <el-autocomplete v-model="item.value"
-                                                                            :fetch-suggestions="(query) => startParams.filter(i=>i.name.includes(query)).map(i=>({value:i.name}))"
+                                                                            :fetch-suggestions="(query) => systemVar.filter(i=>i.includes(query)).map(i=>({value:i}))"
                                                                             placeholder="value"
                                                                             class="backend-url-control backend-url-port" @input="getMenu"
                                                                             @change="getMenu" @select="getMenu"></el-autocomplete>
@@ -347,7 +347,7 @@
                                                                 </td>
                                                                 <td>
                                                                     <el-autocomplete v-model="item.value"
-                                                                        :fetch-suggestions="(query) => startParams.filter(i=>i.name.includes(query)).map(i=>({value:i.name}))"
+                                                                        :fetch-suggestions="(query) => systemVar.filter(i=>i.includes(query)).map(i=>({value:i}))"
                                                                         placeholder="value"
                                                                         class="backend-url-control backend-url-port" @input="getMenu"
                                                                         @change="getMenu" @select="getMenu"></el-autocomplete>
@@ -865,6 +865,11 @@ export default {
         },
     },
     computed: {
+        systemVar() {
+            const startParams = (this.startParams || []).map(item => `{{.Values.${item.name}}}`)
+            const systemParams = ["${system.group}", "${system.userid}", "${system.openid}", "${system.nickname}", "${system.role}", "${system.access_token}", "${system.group}", "${system.url}"]
+            return startParams.concat(systemParams)
+        },
         currentBackendIdentifie() {
             if (this.form.author && this.form.identifie) {
                 return this.form.author + '-' + this.form.identifie;
@@ -977,7 +982,7 @@ export default {
             return changed;
         },
         getIframeDomainPlaceholder() {
-            return '{{.Values.${DOMAIN_URL}}}';
+            return '{{.Values.DOMAIN_URL}}';
         },
         syncIframeBackendDefaults(role) {
             let changed = false;

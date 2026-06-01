@@ -261,7 +261,7 @@ func (c Formula) Info(ctx *gin.Context) {
 	if formula.VersionPrices != nil && formula.VersionPrices.List != nil {
 		versionPrices = formula.VersionPrices.List
 	}
-	ticket, _ := logic.Order{}.GetTicket(logic.OrderTicketInfo{
+	ticket, _ := logic.Ticket{}.GetTicket(logic.TicketInfo{
 		FormulaId:      formula.ID,
 		ConsoleUid:     consoleUid,
 		FormulaVersion: version.Name,
@@ -668,7 +668,7 @@ func (c Formula) InstallComplete(ctx *gin.Context) {
 		return
 	}
 
-	ticketInfo, err := logic.Order{}.ParseTicket(params.Ticket)
+	ticketInfo, err := logic.Ticket{}.ParseTicket(params.Ticket)
 	slog.Info("核销订单", "ticket", params.Ticket, "info", ticketInfo, "err", err)
 	if err != nil {
 		c.JsonResponseWithError(ctx, err, 500)
@@ -692,7 +692,7 @@ func (c Formula) UnInstallComplete(ctx *gin.Context) {
 		return
 	}
 
-	ticketInfo, err := logic.Order{}.ParseTicket(params.Ticket)
+	ticketInfo, err := logic.Ticket{}.ParseTicket(params.Ticket)
 	slog.Info("废弃订单", "ticket", params.Ticket, "info", ticketInfo, "err", err)
 	if err != nil {
 		c.JsonResponseWithError(ctx, err, 500)

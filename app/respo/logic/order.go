@@ -1,7 +1,6 @@
 package logic
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -14,7 +13,6 @@ import (
 	"github.com/w7panel/w7panel-zpk/common/service/w7"
 	"github.com/w7panel/w7panel-zpk/common/service/w7/devcenter"
 	"github.com/w7panel/w7panel-zpk/common/service/w7/ip"
-	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 )
 
 const (
@@ -28,14 +26,6 @@ const (
 	OrderPayStatusSuccess    = int32(1)
 	OrderRefundStatusSuccess = int32(2)
 )
-
-type OrderTicketInfo struct {
-	FormulaId      int32  `json:"formula_id"`
-	ConsoleUid     int32  `json:"console_uid"`
-	FormulaVersion string `json:"formula_version"`
-	OrderSn        string `json:"order_sn"`
-	IsUpgrade      bool   `json:"is_upgrade"`
-}
 
 type OrderPayNotify struct {
 	ConsoleUid   int    `form:"uid" binding:"required"`
@@ -400,7 +390,7 @@ func (l Order) OrderRefundNotify(req OrderRefundNotify) error {
 	})
 }
 
-func (l Order) DiscardUsedOrder(ticketInfo OrderTicketInfo) error {
+func (l Order) DiscardUsedOrder(ticketInfo TicketInfo) error {
 	_, err := dao.Q.Order.
 		Where(dao.Q.Order.OrderSn.Eq(ticketInfo.OrderSn)).
 		Where(dao.Q.Order.OrderType.Eq(OrderTypeBase)).
@@ -410,7 +400,7 @@ func (l Order) DiscardUsedOrder(ticketInfo OrderTicketInfo) error {
 	return err
 }
 
-func (l Order) UseOrder(ticketInfo OrderTicketInfo) error {
+func (l Order) UseOrder(ticketInfo TicketInfo) error {
 	formula, _ := dao.Q.Formula.Where(dao.Q.Formula.ID.Eq(ticketInfo.FormulaId)).First()
 	if formula == nil {
 		return errors.New("制品不存在")
@@ -621,33 +611,4 @@ func (l Order) GetFormulaCanUpgradeVersion(formula Formula, consoleUid int32, or
 	}
 
 	return "", false, nil
-}
-
-func (l Order) GetTicket(ticketInfo OrderTicketInfo) (string, error) {
-	key := function.GetMd5(facade.GetConfig().GetString("setting.secret"))
-	content, err := json.Marshal(ticketInfo)
-	if err != nil {
-		return "", err
-	}
-	ticket, err := function.AesEncrypt(string(content), key)
-	if err != nil {
-		return "", err
-	}
-	return ticket, nil
-}
-
-func (l Order) ParseTicket(ticket string) (*OrderTicketInfo, error) {
-	key := function.GetMd5(facade.GetConfig().GetString("setting.secret"))
-	info, err := function.AesDecrypt(ticket, key)
-	if err != nil {
-		return nil, err
-	}
-
-	ticketInfo := &OrderTicketInfo{}
-	err = json.Unmarshal([]byte(info), ticketInfo)
-	if err != nil {
-		return nil, err
-	}
-
-	return ticketInfo, nil
 }

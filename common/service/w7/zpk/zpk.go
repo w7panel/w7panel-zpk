@@ -232,6 +232,23 @@ func (s ZpkService) DownloadRemoteFormulaIcon(remoteUrl string, savePath string)
 	return nil
 }
 
+func (s ZpkService) DownloadFrontendFile(remoteUrl string, formulaName string, version string, path string, ticket string) (*http.Response, error) {
+	attachUrl := strings.ReplaceAll(remoteUrl, "zpk/respo/info", "zpk/respo/attach/frontend/"+formulaName+"/"+version+"/"+path+"?ticket="+ticket)
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+	}
+	req, err := http.NewRequest("GET", attachUrl, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	return resp, nil
+}
+
 type OrderListRequest struct {
 	Limit      int    `json:"limit"`
 	Page       int    `json:"page"`

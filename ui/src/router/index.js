@@ -17,11 +17,6 @@ const routes = [
         component: () => import("../views/version.vue"),
     },
     {
-        path: '/zpk-description',
-        name: 'zpk-description',
-        component: () => import("../views/description.vue"),
-    },
-    {
         path: '/zpk-detail/:id',
         name: 'zpk-detail',
         component: () => import("../views/respo-detail.vue"),
@@ -97,19 +92,9 @@ const routes = [
         component: () => import("../views/store-app-detail.vue")
     },
     {
-        path: '/zpk-database',
-        name: 'zpk-database',
-        component: () => import("../views/database.vue")
-    },
-    {
-        path: '/zpk-s3',
-        name: 'zpk-s3',
-        component: () => import("../views/s3.vue")
-    },
-    {
-        path: '/zpk-publish',
-        name: 'zpk-publish',
-        component: () => import("../views/publish-settings.vue")
+        path: '/zpk-settings',
+        name: 'zpk-settings',
+        component: () => import("../views/settings.vue")
     },
     {
         path: "/:pathMatch(.*)*",

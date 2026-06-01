@@ -1,12 +1,16 @@
 <template>
     <div class="storage-page" v-loading="pageLoading">
-        <div class="page-card">
-            <div class="title">存储设置（<a style="text-decoration: none;color: #2d5fff;"
-                    href="https://wiki.w7.com/document/2575/8496" target="_blank">迁移文档</a>）</div>
-            <div class="subtitle">S3存储设置</div>
-
+        <div>
             <el-alert v-if="storageType !== 's3'" type="info" style="color: #2d5fff" :closable="false" show-icon
-                title="提示" description="修改存储配置前，请先完成历史数据迁移，否则切换后旧镜像可能无法继续拉取。" class="mb-20" />
+                title="提示" class="mb-20">
+                <template #default>
+                    <div class="df jc-b">
+                        <span style="color: var(--gray-800);">修改存储配置前，请先完成历史数据迁移，否则切换后旧镜像可能无法继续拉取。</span>
+                        <a style="text-decoration: none;color: #2d5fff;"
+                    href="https://wiki.w7.com/document/2575/8496" target="_blank">迁移文档</a>
+                    </div>
+                </template>
+            </el-alert>
 
             <el-form ref="ruleFormRef" :model="form" :rules="rules" label-width="120px" label-position="left"
                 class="setting-form">
@@ -287,10 +291,6 @@ export default {
 </script>
 
 <style scoped lang="scss">
-.storage-page {
-    padding: 20px;
-}
-
 .page-card {
     max-width: 760px;
     background: #ffffff;

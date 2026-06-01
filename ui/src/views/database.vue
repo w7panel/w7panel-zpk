@@ -1,9 +1,6 @@
 <template>
     <div class="database-page" v-loading="pageLoading">
         <div class="page-card">
-            <div class="title">数据库设置</div>
-            <div class="subtitle">MySQL数据库设置</div>
-
             <el-alert v-if="statusError" type="error" :closable="false" show-icon title="设置失败"
                 :description="statusError" class="mb-20" />
 
@@ -297,9 +294,6 @@ export default {
 </script>
 
 <style scoped lang="scss">
-.database-page {
-    padding: 20px;
-}
 
 .page-card {
     max-width: 760px;

@@ -10,21 +10,21 @@ HELM_IMAGE_REPOSITORY := $(shell awk '/^image:/{flag=1; next} flag && /^[^[:spac
 HELM_IMAGE_TAG := $(shell awk '/^image:/{flag=1; next} flag && /^[^[:space:]]/{flag=0} flag && $$1=="tag:" {print $$2; exit}' $(HELM_VALUES_FILE))
 HELM_CHART_VERSION ?= $(shell awk '$$1=="version:" {print $$2; exit}' charts/Chart.yaml)
 HELM_APP_VERSION ?= $(IMAGE_TAG)
-HELM_PACKAGE_IMAGE_REPOSITORY ?= $(IMAGE_REPOSITORY)
-HELM_PACKAGE_IMAGE_TAG ?= $(IMAGE_TAG)
 BETA_SUFFIX ?=
 BETA_IMAGE_TAG ?= $(IMAGE_TAG)-$(BETA_SUFFIX)
 
-IMAGE_REPOSITORY ?= $(HELM_IMAGE_REPOSITORY)
-IMAGE_TAG ?= $(HELM_IMAGE_TAG)
-LOCAL_IMAGE ?= $(PROJECT_NAME):$(IMAGE_TAG)
-PUBLISH_IMAGE ?= $(IMAGE_REPOSITORY):$(IMAGE_TAG)
 OFFICIAL_RELEASE ?= false
 OFFICIAL_IMAGE_REPOSITORY ?= ccr.ccs.tencentyun.com/w7team/zpk
 OFFICIAL_IMAGE_TAG ?=
 OFFICIAL_IMAGE ?= $(OFFICIAL_IMAGE_REPOSITORY):$(OFFICIAL_IMAGE_TAG)
+IMAGE_REPOSITORY ?= $(HELM_IMAGE_REPOSITORY)
+IMAGE_TAG ?= $(if $(filter true,$(OFFICIAL_RELEASE)),$(OFFICIAL_IMAGE_TAG),$(HELM_IMAGE_TAG))
+LOCAL_IMAGE ?= $(PROJECT_NAME):$(IMAGE_TAG)
+PUBLISH_IMAGE ?= $(if $(filter true,$(OFFICIAL_RELEASE)),$(OFFICIAL_IMAGE),$(IMAGE_REPOSITORY):$(IMAGE_TAG))
+HELM_PACKAGE_IMAGE_REPOSITORY ?= $(if $(filter true,$(OFFICIAL_RELEASE)),$(OFFICIAL_IMAGE_REPOSITORY),$(IMAGE_REPOSITORY))
+HELM_PACKAGE_IMAGE_TAG ?= $(if $(filter true,$(OFFICIAL_RELEASE)),$(OFFICIAL_IMAGE_TAG),$(IMAGE_TAG))
 
-.PHONY: tidy build  makebuild dockerbuild publish beta dev test clean help
+.PHONY: tidy build makebuild dockerbuild validate-publish publish beta dev test clean help
 
 tidy:
 	go mod tidy
@@ -37,17 +37,15 @@ makebuild: build
 dockerbuild:
 	docker build -t $(LOCAL_IMAGE) .
 
-publish: makebuild dockerbuild
+validate-publish:
+	@if [ "$(OFFICIAL_RELEASE)" = "true" ] && [ -z "$(OFFICIAL_IMAGE_TAG)" ]; then \
+		echo "OFFICIAL_IMAGE_TAG is required when OFFICIAL_RELEASE=true"; \
+		exit 1; \
+	fi
+
+publish: validate-publish makebuild dockerbuild
 	docker tag $(LOCAL_IMAGE) $(PUBLISH_IMAGE)
 	docker push $(PUBLISH_IMAGE)
-	@if [ "$(OFFICIAL_RELEASE)" = "true" ]; then \
-		if [ -z "$(OFFICIAL_IMAGE_TAG)" ]; then \
-			echo "OFFICIAL_IMAGE_TAG is required when OFFICIAL_RELEASE=true"; \
-			exit 1; \
-		fi; \
-		docker tag $(LOCAL_IMAGE) $(OFFICIAL_IMAGE); \
-		docker push $(OFFICIAL_IMAGE); \
-	fi
 	rm -f charts/zpk-*.tgz
 	tmp_chart_dir=$$(mktemp -d); \
 	trap 'rm -rf "$$tmp_chart_dir"' EXIT; \

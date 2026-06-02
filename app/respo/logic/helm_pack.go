@@ -1834,7 +1834,9 @@ spec:
       roleConfig:
         {{- range .Values.backend_config }}
         {{ .role }}:
-          {{- if eq .type "internal" }}
+          {{- if eq .load_mode "iframe" }}
+          serverUrl: "https://{{ $.Values.DOMAIN_URL }}"
+          {{- else if eq .type "internal" }}
           serverUrl: "http://{{ $fullName }}.{{ $releaseNamespace }}.svc.cluster.local:{{ default $defaultPort .backend_port }}"
           {{- else if eq .type "external" }}
           serverUrl: {{ .backend_identifier }}

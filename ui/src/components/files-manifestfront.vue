@@ -266,11 +266,18 @@
                                                                             style="width:200px;margin-right:10px;"></el-input>
                                                                     </td>
                                                                     <td>
-                                                                        <el-autocomplete v-model="item.value"
-                                                                            :fetch-suggestions="(query) => systemVar.filter(i=>i.includes(query)).map(i=>({value:i}))"
+                                                                        <el-select v-model="item.value" filterable allow-create
+                                                                            default-first-option
                                                                             placeholder="value"
-                                                                            class="backend-url-control backend-url-port" @input="getMenu"
-                                                                            @change="getMenu" @select="getMenu"></el-autocomplete>
+                                                                            class="backend-url-control start-param-select"
+                                                                            @change="(value) => changeStartParamValue(item, value)">
+                                                                            <el-option v-for="param in systemVarOptions"
+                                                                                :key="param.value" :label="param.label"
+                                                                                :value="param.value">
+                                                                                <span>{{ param.label }}</span>
+                                                                                <span class="c-99 fs-12 ml-10">{{ param.value }}</span>
+                                                                            </el-option>
+                                                                        </el-select>
                                                                     </td>
                                                                     <td><span class="c-blue cursor handle"
                                                                             @click="r.proxy_request_header.length <= 1 ? r.proxy_request_header = [{ key: '', value: '', isSelect: false }] : r.proxy_request_header.splice(index, 1)">删除</span></td>
@@ -304,11 +311,18 @@
                                                                             style="width:200px;margin-right:10px;"></el-input>
                                                                     </td>
                                                                     <td>
-                                                                        <el-autocomplete v-model="item.value"
-                                                                            :fetch-suggestions="(query) => systemVar.filter(i=>i.includes(query)).map(i=>({value:i}))"
+                                                                        <el-select v-model="item.value" filterable allow-create
+                                                                            default-first-option
                                                                             placeholder="value"
-                                                                            class="backend-url-control backend-url-port" @input="getMenu"
-                                                                            @change="getMenu" @select="getMenu"></el-autocomplete>
+                                                                            class="backend-url-control start-param-select"
+                                                                            @change="(value) => changeStartParamValue(item, value)">
+                                                                            <el-option v-for="param in systemVarOptions"
+                                                                                :key="param.value" :label="param.label"
+                                                                                :value="param.value">
+                                                                                <span>{{ param.label }}</span>
+                                                                                <span class="c-99 fs-12 ml-10">{{ param.value }}</span>
+                                                                            </el-option>
+                                                                        </el-select>
                                                                     </td>
                                                                     <td><span class="c-blue cursor handle"
                                                                             @click="r.proxy_request_query.length <= 1 ? r.proxy_request_query = [{ key: '', value: '', isSelect: false }] : r.proxy_request_query.splice(index, 1)">删除</span></td>
@@ -357,11 +371,18 @@
                                                                         style="width:200px;margin-right:10px;"></el-input>
                                                                 </td>
                                                                 <td>
-                                                                    <el-autocomplete v-model="item.value"
-                                                                        :fetch-suggestions="(query) => systemVar.filter(i=>i.includes(query)).map(i=>({value:i}))"
+                                                                    <el-select v-model="item.value" filterable allow-create
+                                                                        default-first-option
                                                                         placeholder="value"
-                                                                        class="backend-url-control backend-url-port" @input="getMenu"
-                                                                        @change="getMenu" @select="getMenu"></el-autocomplete>
+                                                                        class="backend-url-control start-param-select"
+                                                                        @change="(value) => changeStartParamValue(item, value)">
+                                                                        <el-option v-for="param in systemVarOptions"
+                                                                            :key="param.value" :label="param.label"
+                                                                            :value="param.value">
+                                                                            <span>{{ param.label }}</span>
+                                                                            <span class="c-99 fs-12 ml-10">{{ param.value }}</span>
+                                                                        </el-option>
+                                                                    </el-select>
                                                                 </td>
                                                                 <td><span class="c-blue cursor handle"
                                                                         @click="r.frontend_props.length <= 1 ? r.frontend_props = [{ key: '', value: '', isSelect: false }] : r.frontend_props.splice(index, 1)">删除</span></td>
@@ -876,8 +897,11 @@ export default {
         },
     },
     computed: {
-        systemVar() {
-            return (this.startParams || []).map(item => `{{.Values.${item.name}}}`)
+        systemVarOptions() {
+            return (this.startParams || []).filter(item => item?.name).map(item => ({
+                label: item.title || item.name,
+                value: item.name,
+            }))
         },
         currentBackendIdentifie() {
             if (this.form.author && this.form.identifie) {
@@ -907,11 +931,14 @@ export default {
             });
             (this.app_ports || []).forEach(addApp);
             (this.option?.app_ports || []).forEach(addApp);
-
             return [...apps.values()];
         },
     },
     methods: {
+        changeStartParamValue(item, value) {
+            item.isSelect = this.systemVarOptions.some(i => i.value == value);
+            this.getMenu();
+        },
         normalizeBackendPorts(ports) {
             if (!Array.isArray(ports)) { ports = ports ? [ports] : [] }
             return [...new Set(ports.map(i => {
@@ -1566,47 +1593,47 @@ export default {
             }
 
             if (j.platform) {
-                if (j.platform.container) {
+                if (j.platform['container-v2']) {
 
-                    delete j.platform.container.hook;
+                    delete j.platform['container-v2'].hook;
 
-                    if (!j.platform.container.ports?.length) {
-                        if (j.platform.container.containerPort) {
-                            this.form.port = [{ name: "默认", port: j.platform.container.containerPort, protocol: 'TCP', lbPort: '' }];
-                            j.platform.container.ports = this.form.port;
+                    if (!j.platform['container-v2'].ports?.length) {
+                        if (j.platform['container-v2'].containerPort) {
+                            this.form.port = [{ name: "默认", port: j.platform['container-v2'].containerPort, protocol: 'TCP', lbPort: '' }];
+                            j.platform['container-v2'].ports = this.form.port;
                         } else {
                             this.form.port = [];
-                            j.platform.container.ports = [];
+                            j.platform['container-v2'].ports = [];
                         }
-                    } else if (j.platform.container.ports?.length) {
-                        this.form.port = JSON.parse(JSON.stringify(j.platform.container.ports));
+                    } else if (j.platform['container-v2'].ports?.length) {
+                        this.form.port = JSON.parse(JSON.stringify(j.platform['container-v2'].ports));
                         this.form.port.forEach(i => {
                             if (!i.protocol) { i.protocol = 'TCP' }
                         })
                     }
-                    j.platform.container.privileged = j.platform.container?.privileged == 'false' ? false : (!!j.platform.container.privileged);
+                    j.platform['container-v2'].privileged = j.platform['container-v2']?.privileged == 'false' ? false : (!!j.platform['container-v2'].privileged);
 
-                    this.form.cpu = j.platform.container.cpu || 1;
-                    this.form.mem = j.platform.container.mem || 2;
-                    this.form.image = j.platform.container.image || '';
-                    this.form.privileged = j.platform.container.privileged || false;
-                    this.form.build_context = j.platform.container.build?.context || '';
+                    this.form.cpu = j.platform['container-v2'].cpu || 1;
+                    this.form.mem = j.platform['container-v2'].mem || 2;
+                    this.form.image = j.platform['container-v2'].image || '';
+                    this.form.privileged = j.platform['container-v2'].privileged || false;
+                    this.form.build_context = j.platform['container-v2'].build?.context || '';
 
-                    if (j.platform.container.language) {
-                        delete j.platform.container.language;
+                    if (j.platform['container-v2'].language) {
+                        delete j.platform['container-v2'].language;
                     }
-                    let shell = j.platform.container?.shells;
+                    let shell = j.platform['container-v2']?.shells;
                     if (typeof shell == 'object') {
                         this.form.shell = shell;
                     } else {
                         this.form.shell = [];
                     }
 
-                    this.form.cmd = j.platform.container.cmd || [''];
+                    this.form.cmd = j.platform['container-v2'].cmd || [''];
                     if (!this.form.cmd.length) { this.form.cmd = ['']; }
 
-                    if (j.platform.container.securityContext) {
-                        let sc = j.platform.container.securityContext;
+                    if (j.platform['container-v2'].securityContext) {
+                        let sc = j.platform['container-v2'].securityContext;
                         this.form.securityContext.runAsNonRoot = sc.runAsNonRoot || false;
 
                         this.form.securityContext.runAsUser = sc.runAsUser === undefined ? '' : sc.runAsUser;
@@ -1615,14 +1642,8 @@ export default {
                         this.form.securityContext.fsGroup = sc.fsGroup === undefined ? '' : sc.fsGroup;
                     }
 
-                    let env = j?.platform?.container?.env;
-                    this.form.env = env?.length ? env : [];
-
                     if (this?.option?.lightApp) {
-                        if (j?.platform?.container?.startParams) {
-                            j.platform.container.startParams = [];
-                            this.form.startParams = [];
-                        }
+
                     } else {
                         let startParams = j?.platform?.startParams;
                         this.form.startParams = startParams?.length ? startParams : [];
@@ -1643,9 +1664,6 @@ export default {
                             })
                         }
                     }
-
-                    let volumes = j?.platform?.container?.volumes;
-                    this.form.volumes = volumes?.length ? volumes : [];
                 }
 
                 this.form.ingress = j.platform.ingress || [];
@@ -1671,7 +1689,7 @@ export default {
             json.application = this.json.application;
             json.source = this.json.source || {};
             json.platform = json.platform || {};
-            json.platform.container = json.platform.container || {};
+            json.platform['container-v2'] = json.platform['container-v2'] || {};
             this.json = json;
             this.initJSON();
             this.changeForm();
@@ -1690,19 +1708,19 @@ export default {
                 }
             }
             if (j.platform) {
-                j.platform.container = j.platform.container || {};
+                j.platform['container-v2'] = j.platform['container-v2'] || {};
 
-                j.platform.container.cpu = Number(this.form.cpu);
-                j.platform.container.mem = Number(this.form.mem);
-                j.platform.container.image = this.form.image;
-                j.platform.container.privileged = this.form.privileged;
-                if (j.platform.container.build) {
-                    j.platform.container.build.build_context = this.form.build_context;
+                j.platform['container-v2'].cpu = Number(this.form.cpu);
+                j.platform['container-v2'].mem = Number(this.form.mem);
+                j.platform['container-v2'].image = this.form.image;
+                j.platform['container-v2'].privileged = this.form.privileged;
+                if (j.platform['container-v2'].build) {
+                    j.platform['container-v2'].build.build_context = this.form.build_context;
                 } else {
-                    j.platform.container.build = { build_context: this.form.build_context }
+                    j.platform['container-v2'].build = { build_context: this.form.build_context }
                 }
 
-                j.platform.container.cmd = this.form.cmd.filter(i => i);
+                j.platform['container-v2'].cmd = this.form.cmd.filter(i => i);
 
                 let sc = this.form.securityContext;
                 let securityContext = {};
@@ -1718,7 +1736,7 @@ export default {
                 if (sc.fsGroup !== '') {
                     securityContext.fsGroup = Number(sc.fsGroup) || 0;
                 }
-                j.platform.container.securityContext = securityContext;
+                j.platform['container-v2'].securityContext = securityContext;
 
                 j.platform.depends = this.form.depend;
 
@@ -2242,6 +2260,10 @@ export default {
 
 .backend-url-port {
     width: 120px;
+}
+
+.start-param-select {
+    width: 240px;
 }
 
 .backend-url-protocol {

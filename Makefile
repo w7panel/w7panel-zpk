@@ -10,6 +10,7 @@ HELM_IMAGE_REPOSITORY := $(shell awk '/^image:/{flag=1; next} flag && /^[^[:spac
 HELM_IMAGE_TAG := $(shell awk '/^image:/{flag=1; next} flag && /^[^[:space:]]/{flag=0} flag && $$1=="tag:" {print $$2; exit}' $(HELM_VALUES_FILE))
 HELM_CHART_VERSION ?= $(shell awk '$$1=="version:" {print $$2; exit}' charts/Chart.yaml)
 HELM_APP_VERSION ?= $(IMAGE_TAG)
+HELM_PACKAGE_IMAGE_REPOSITORY ?= $(IMAGE_REPOSITORY)
 HELM_PACKAGE_IMAGE_TAG ?= $(IMAGE_TAG)
 BETA_SUFFIX ?=
 BETA_IMAGE_TAG ?= $(IMAGE_TAG)-$(BETA_SUFFIX)
@@ -52,9 +53,10 @@ publish: makebuild dockerbuild
 	trap 'rm -rf "$$tmp_chart_dir"' EXIT; \
 	cp -R charts "$$tmp_chart_dir/zpk"; \
 	rm -f "$$tmp_chart_dir"/zpk/zpk-*.tgz; \
-	awk -v tag="$(HELM_PACKAGE_IMAGE_TAG)" ' \
+	awk -v repository="$(HELM_PACKAGE_IMAGE_REPOSITORY)" -v tag="$(HELM_PACKAGE_IMAGE_TAG)" ' \
 		/^image:[[:space:]]*$$/ { in_image=1; print; next } \
 		in_image && /^[^[:space:]]/ { in_image=0 } \
+		in_image && /^[[:space:]]*repository:/ { sub(/repository:.*/, "repository: " repository) } \
 		in_image && /^[[:space:]]*tag:/ { sub(/tag:.*/, "tag: " tag) } \
 		{ print } \
 	' "$$tmp_chart_dir/zpk/values.yaml" > "$$tmp_chart_dir/zpk/values.yaml.tmp"; \
@@ -88,4 +90,4 @@ help:
 	@echo "make publish - 构建二进制、镜像、打 tag、push，并重新打 helm/zpk tgz"
 	@echo "make beta BETA_SUFFIX=beta1 - 使用当前镜像 tag 加手动后缀发布 beta，例如 $(IMAGE_TAG)-beta1"
 	@echo "官方发布: OFFICIAL_RELEASE=true OFFICIAL_IMAGE_TAG=xxx"
-	@echo "可覆盖变量: IMAGE_REPOSITORY=xxx IMAGE_TAG=xxx HELM_CHART_VERSION=xxx HELM_APP_VERSION=xxx HELM_PACKAGE_IMAGE_TAG=xxx LOCAL_IMAGE=xxx PUBLISH_IMAGE=xxx OFFICIAL_IMAGE_REPOSITORY=xxx"
+	@echo "可覆盖变量: IMAGE_REPOSITORY=xxx IMAGE_TAG=xxx HELM_CHART_VERSION=xxx HELM_APP_VERSION=xxx HELM_PACKAGE_IMAGE_REPOSITORY=xxx HELM_PACKAGE_IMAGE_TAG=xxx LOCAL_IMAGE=xxx PUBLISH_IMAGE=xxx OFFICIAL_IMAGE_REPOSITORY=xxx"

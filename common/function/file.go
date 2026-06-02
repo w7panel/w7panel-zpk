@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 type PathInfoOut struct {
@@ -117,4 +118,10 @@ func AppendBytesToFile(filename string, data []byte) error {
 
 	_, err = file.Write(data)
 	return err
+}
+
+func IsPathInDir(filePath string, dir string) bool {
+	cleanFilePath := filepath.Clean(filePath)
+	cleanDir := filepath.Clean(dir)
+	return strings.HasPrefix(cleanFilePath, cleanDir+string(os.PathSeparator))
 }

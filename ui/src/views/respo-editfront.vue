@@ -104,23 +104,69 @@ export default {
         window.removeEventListener('message', this.winMessage);
     },
     watch: {
-        depends() {
+        manifest() {
+            this.refreshAppPorts();
+        },
+        depends: {
+            handler() {
+                this.refreshAppPorts();
+            },
+            deep: true,
+        },
+    },
+    methods: {
+        getManifestAppPorts(manifest) {
+            let json = typeof manifest == 'string' ? (jsyaml.load(manifest) || {}) : (manifest || {});
+            let ports = [];
+            let addContainerPorts = (container) => {
+                if (!container) { return }
+                if (Array.isArray(container)) {
+                    container.forEach(addContainerPorts);
+                    return;
+                }
+                ports = ports.concat(container?.ports?.map?.(i => i?.port ?? i?.containerPort) || []);
+                if (container.containerPort) {
+                    ports.push(container.containerPort);
+                }
+            }
+            addContainerPorts(json?.platform?.container);
+            addContainerPorts(json?.platform?.['container-v2']);
+            return {
+                json,
+                ports: [...new Set(ports.filter(i => i !== '' && i !== undefined && i !== null))],
+            };
+        },
+        getManifestIdentifie(json, fallback) {
+            let identifie = json?.application?.identifie || fallback || '';
+            let author = json?.application?.author || '';
+            if (identifie && author && !/^[^-]+-.+$/.test(identifie)) {
+                return author + '-' + identifie;
+            }
+            return identifie;
+        },
+        refreshAppPorts() {
             let arr = [];
+            let main = this.getManifestAppPorts(this.manifest);
+            if (main.ports.length) {
+                arr.push({
+                    name: this.getManifestIdentifie(main.json, this.identifie),
+                    title: main.json?.application?.name,
+                    port: main.ports,
+                });
+            }
             for (let i = 0; i < this.depends.length; i++) {
                 let manifest = this.depends[i]?.manifest || '';
-                let json = jsyaml.load(manifest) || {};
-                if (json?.platform?.container?.ports?.length) {
+                let { json, ports } = this.getManifestAppPorts(manifest);
+                if (ports.length) {
                     arr.push({
-                        name: this.depends[i].identifie,
+                        name: this.getManifestIdentifie(json, this.depends[i].identifie),
                         title: json?.application?.name,
-                        port: json.platform.container.ports.map(i => i.port)
+                        port: ports
                     })
                 }
             }
             this.app_ports = arr;
-        }
-    },
-    methods: {
+        },
         structure() {
             let app_name = '';
             if (window.__MICRO_APP_ENVIRONMENT__) {

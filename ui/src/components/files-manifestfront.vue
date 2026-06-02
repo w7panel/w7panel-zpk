@@ -1593,79 +1593,6 @@ export default {
             }
 
             if (j.platform) {
-                if (j.platform['container-v2']) {
-
-                    delete j.platform['container-v2'].hook;
-
-                    if (!j.platform['container-v2'].ports?.length) {
-                        if (j.platform['container-v2'].containerPort) {
-                            this.form.port = [{ name: "默认", port: j.platform['container-v2'].containerPort, protocol: 'TCP', lbPort: '' }];
-                            j.platform['container-v2'].ports = this.form.port;
-                        } else {
-                            this.form.port = [];
-                            j.platform['container-v2'].ports = [];
-                        }
-                    } else if (j.platform['container-v2'].ports?.length) {
-                        this.form.port = JSON.parse(JSON.stringify(j.platform['container-v2'].ports));
-                        this.form.port.forEach(i => {
-                            if (!i.protocol) { i.protocol = 'TCP' }
-                        })
-                    }
-                    j.platform['container-v2'].privileged = j.platform['container-v2']?.privileged == 'false' ? false : (!!j.platform['container-v2'].privileged);
-
-                    this.form.cpu = j.platform['container-v2'].cpu || 1;
-                    this.form.mem = j.platform['container-v2'].mem || 2;
-                    this.form.image = j.platform['container-v2'].image || '';
-                    this.form.privileged = j.platform['container-v2'].privileged || false;
-                    this.form.build_context = j.platform['container-v2'].build?.context || '';
-
-                    if (j.platform['container-v2'].language) {
-                        delete j.platform['container-v2'].language;
-                    }
-                    let shell = j.platform['container-v2']?.shells;
-                    if (typeof shell == 'object') {
-                        this.form.shell = shell;
-                    } else {
-                        this.form.shell = [];
-                    }
-
-                    this.form.cmd = j.platform['container-v2'].cmd || [''];
-                    if (!this.form.cmd.length) { this.form.cmd = ['']; }
-
-                    if (j.platform['container-v2'].securityContext) {
-                        let sc = j.platform['container-v2'].securityContext;
-                        this.form.securityContext.runAsNonRoot = sc.runAsNonRoot || false;
-
-                        this.form.securityContext.runAsUser = sc.runAsUser === undefined ? '' : sc.runAsUser;
-                        this.form.securityContext.runAsGroup = sc.runAsGroup === undefined ? '' : sc.runAsGroup;
-
-                        this.form.securityContext.fsGroup = sc.fsGroup === undefined ? '' : sc.fsGroup;
-                    }
-
-                    if (this?.option?.lightApp) {
-
-                    } else {
-                        let startParams = j?.platform?.startParams;
-                        this.form.startParams = startParams?.length ? startParams : [];
-                        this.form.mysql8 = false;
-                        if (this.form.startParams?.length) {
-                            this.form.startParams.forEach((i, index) => {
-                                if (i.module_name == 'w7_mysql' || i.module_name == 'w7_mysql5') {
-                                    i.mark = i.module_name == 'w7_mysql' ? 'mysql8' : 'mysql5';
-                                    this.form[i.module_name == 'w7_mysql' ? 'mysql8' : 'mysql5'] = true;
-
-                                    let next = this.form.startParams[index + 1];
-                                    if (next && next.name == 'MYSQL_DATABASE' && !next.module_name) {
-                                        next.mark = i.mark;
-                                    }
-                                }
-                                if (i.module_name == 'w7_redis') { i.mark = 'redis'; this.form.redis = true; }
-                                if (i.module_name == 'w7_mongodb') { i.mark = 'mongodb6'; this.form.mongodb6 = true; }
-                            })
-                        }
-                    }
-                }
-
                 this.form.ingress = j.platform.ingress || [];
                 this.form.depend = j.platform.depends || [];
                 this.form.helm = j.platform.helm || {
@@ -1684,70 +1611,12 @@ export default {
                 });
             })
         },
-
-        replaceZpk(json) {
-            json.application = this.json.application;
-            json.source = this.json.source || {};
-            json.platform = json.platform || {};
-            json.platform['container-v2'] = json.platform['container-v2'] || {};
-            this.json = json;
-            this.initJSON();
-            this.changeForm();
-        },
         changeForm() {
             let j = this.json;
             if (j.application) {
                 j.application.name = this.form.name;
-                j.application.identifie = this.form.author + '-' + this.form.identifie;
-                j.application.author = this.form.author;
-                j.application.theme = this.form.theme;
                 j.application.description = this.form.description;
                 j.application.type = this.form.type;
-                if (this.form.type != 'tradition') {
-                    this.form.language = '';
-                }
-            }
-            if (j.platform) {
-                j.platform['container-v2'] = j.platform['container-v2'] || {};
-
-                j.platform['container-v2'].cpu = Number(this.form.cpu);
-                j.platform['container-v2'].mem = Number(this.form.mem);
-                j.platform['container-v2'].image = this.form.image;
-                j.platform['container-v2'].privileged = this.form.privileged;
-                if (j.platform['container-v2'].build) {
-                    j.platform['container-v2'].build.build_context = this.form.build_context;
-                } else {
-                    j.platform['container-v2'].build = { build_context: this.form.build_context }
-                }
-
-                j.platform['container-v2'].cmd = this.form.cmd.filter(i => i);
-
-                let sc = this.form.securityContext;
-                let securityContext = {};
-                if (sc.runAsNonRoot) {
-                    securityContext = { runAsNonRoot: sc.runAsNonRoot };
-                }
-                if (sc.runAsUser !== '') {
-                    securityContext.runAsUser = Number(sc.runAsUser) || 0;
-                }
-                if (sc.runAsGroup !== '') {
-                    securityContext.runAsGroup = Number(sc.runAsGroup) || 0;
-                }
-                if (sc.fsGroup !== '') {
-                    securityContext.fsGroup = Number(sc.fsGroup) || 0;
-                }
-                j.platform['container-v2'].securityContext = securityContext;
-
-                j.platform.depends = this.form.depend;
-
-                if (this.form.type == 'helm') {
-                    j.platform.helm = {
-                        repository: this.form.helm.repository,
-                        chartName: this.form.helm.chartName,
-                    }
-                } else {
-                    delete j.platform.helm;
-                }
             }
             this.setYaml();
         },

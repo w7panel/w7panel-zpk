@@ -2,52 +2,49 @@
     <div>
         <div class="top">
             <div class="df ai-c cursor" @click="$router.go(-1);">
-                <el-icon :size="14" color="#666666">
-                    <ArrowLeft />
-                </el-icon>
+                <span class="back-icon"></span>
                 <span class="c-66 fs-16" style="margin-left:4px;">返回</span>
             </div>
         </div>
-        <div v-loading="loading">
+        <a-spin :loading="loading" class="create-spin">
             <div class="df jc-e">
-                <el-button type="primary" @click="impt.show = true; impt.data = null;"
-                    style="margin-right:20px;">导入制品库</el-button>
+                <a-button type="primary" @click="impt.show = true; impt.data = null;"
+                    style="margin-right:20px;">导入制品库</a-button>
             </div>
             <div v-if="noPlatform">
-                <el-empty :image-size="200" description="">
-                    <template #description>
-                        <span class="c-99">暂无数据，点击</span>
-                        <span class="cursor c-blue" @click="setPlatform">创建后端包配置</span>
-                    </template>
-                </el-empty>
+                <a-empty :image-size="200" description="" class="manifest-empty">
+                    <span class="c-99">暂无数据，点击</span>
+                    <span class="cursor c-blue" @click="setPlatform">创建后端包配置</span>
+                </a-empty>
             </div>
             <files-manifest v-if="manifest && !noPlatform" :data="manifest" ref="form" :version_id="version_id"
                 :identifie="identifie" :option="{ create: true }" @addfile="addfileInside" @complete="complete">
             </files-manifest>
             <files-upload v-if="uploadzipfile" :file="uploadzipfile" @error="loading = false;"
                 @success="uploadSuccess"></files-upload>
-        </div>
+        </a-spin>
     </div>
 
-    <el-dialog v-model="addfile.show" title="添加文件" width="600px" modal-class="zpk-version-dialog">
+    <a-modal v-model:visible="addfile.show" title="添加文件" :width="600" modal-class="zpk-version-dialog">
         <div class="mt-20 df ai-c ml-20">
             <div style="width:70px;">文件名</div>
-            <el-input v-model="addfile.filename" placeholder="请输入文件名" style="width:400px;"></el-input>
+            <a-input v-model="addfile.filename" placeholder="请输入文件名" style="width:400px;"></a-input>
         </div>
         <template #footer>
-            <el-button @click="addfile.show = false;">取消</el-button>
-            <el-button type="primary"
-                @click="$router.push('/zpk-fileadd?identifie=' + identifie + '&filename=' + addfile.filename)">确认添加</el-button>
+            <a-button @click="addfile.show = false;">取消</a-button>
+            <a-button type="primary"
+                @click="$router.push('/zpk-fileadd?identifie=' + identifie + '&filename=' + addfile.filename)">确认添加</a-button>
         </template>
-    </el-dialog>
+    </a-modal>
 
-    <el-dialog v-model="impt.show" title="导入制品库" width="560px">
+    <a-modal v-model:visible="impt.show" title="导入制品库" :width="560" :footer="false">
         <div class="df" style="padding:10px;">
-            <el-autocomplete v-model="impt.title" ref="imptzpk" :fetch-suggestions="addQuerySearch" placeholder="请选择制品库"
-                style="width:400px;" value-key="name" size="large" @select="addSelect" :spellcheck="false" />
-            <el-button type="primary" @click="imptSubmit()" class="ml-10" size="large">确定</el-button>
+            <a-auto-complete v-model="impt.title" ref="imptzpk" :data="impt.options" placeholder="请选择制品库"
+                style="width:400px;" size="large" allow-clear :filter-option="false" @search="addQuerySearch"
+                @change="handleImportTitleChange" @select="addSelect" :spellcheck="false" />
+            <a-button type="primary" @click="imptSubmit()" class="ml-10" size="large">确定</a-button>
         </div>
-    </el-dialog>
+    </a-modal>
 </template>
 
 <script>
@@ -78,6 +75,7 @@ import axios from 'axios';
 import JSZip from 'jszip';
 import JSZipUtils from "jszip-utils";
 import filesUpload from '@/components/files-upload.vue';
+import { messageError, messageSuccess, messageWarning } from '@/utils/ui-feedback';
 
 export default {
     components: { filesManifest, filesUpload },
@@ -99,6 +97,7 @@ export default {
                 show: false,
                 title: '',
                 data: null,
+                options: [],
             },
             noPlatform: false,
             noManifest: false,
@@ -141,7 +140,7 @@ export default {
             }
         },
         imptSubmit() {
-            if (!this.impt.data) { this.$message.warning('请选择制品库'); return; }
+            if (!this.impt.data) { messageWarning('请选择制品库'); return; }
             this.jsonp('https://console.w7.cc/zpk?path=/respo/v2/info/' + this.impt.data.identifie + '/' + this.version_id, 'getimportmanifest', data => {
                 let manifest = data?.data?.manifest || defaultManifest;
                 let json = jsyaml.load(manifest);
@@ -151,18 +150,28 @@ export default {
             })
         },
 
-        addQuerySearch(query, cb) {
-            this.jsonp('https://console.w7.cc/zpk?status=2&page=1&limit=999&keyword=' + query + '&path=/respo/list', 'getimport', (data) => {
+        addQuerySearch(query = '') {
+            this.jsonp('https://console.w7.cc/zpk?status=2&page=1&limit=999&keyword=' + encodeURIComponent(query) + '&path=/respo/list', 'getimport', (data) => {
                 let list = data?.data?.list || [];
                 list = list.splice(0, 20);
-                cb(list)
+                this.impt.options = list.map(item => ({
+                    label: item.name,
+                    value: item.name,
+                    raw: item,
+                }));
             });
         },
 
-        addSelect(data) {
-            this.$refs.imptzpk.close();
-            this.$refs.imptzpk.inputRef.blur();
-            this.impt.data = data;
+        handleImportTitleChange(value) {
+            if (this.impt.data?.name == value) { return; }
+            let option = this.impt.options.find(item => item.value == value);
+            this.impt.data = option?.raw || null;
+        },
+
+        addSelect(value) {
+            let option = this.impt.options.find(item => item.value == value);
+            this.impt.data = option?.raw || null;
+            this.$refs.imptzpk?.blur?.();
         },
 
         addfileInside(json, yaml, data) {
@@ -184,7 +193,7 @@ export default {
                 });
             }).catch((error) => {
                 if (error?.response?.data?.error) {
-                    this.$message.error(error.response.data.error);
+                    messageError(error.response.data.error);
                 }
             });
         },
@@ -242,7 +251,7 @@ export default {
                 });
             }).catch(() => {
                 this.loading = false;
-                this.$message.error('制品库链接请求失败');
+                messageError('制品库链接请求失败');
             })
         },
         complete(json, yaml, otherData) {
@@ -260,7 +269,7 @@ export default {
                     this.$router.push('/zpk-fileadd?identifie=' + this.identifie + '&filename=' + otherData.editfile);
                     return;
                 }
-                this.$message.success('添加manifest成功');
+                messageSuccess('添加manifest成功');
                 this.getInfo(this.identifie, () => {
                     this.publish();
                 });
@@ -268,19 +277,19 @@ export default {
 
             }).catch((error) => {
                 if (error?.response?.data?.error) {
-                    this.$message.error(error.response.data.error);
+                    messageError(error.response.data.error);
                 }
             });
         },
         publish() {
             myAxios.post('/respo/publish', { identifie: this.identifie, version: this.version_id }).then(res => {
                 if (res.data?.message || res.data?.data?.message) {
-                    this.$message.success(res.data?.message || res.data?.data?.message);
+                    messageSuccess(res.data?.message || res.data?.data?.message);
                     this.$router.go(-1);
                 }
             }).catch((error) => {
                 if (error?.response?.data?.error) {
-                    this.$message.error(error.response.data.error);
+                    messageError(error.response.data.error);
                 }
             });
         },
@@ -342,16 +351,25 @@ export default {
     padding: 20px;
 }
 
+.back-icon {
+    width: 8px;
+    height: 8px;
+    border-left: 1px solid #666666;
+    border-bottom: 1px solid #666666;
+    transform: rotate(45deg);
+    display: inline-block;
+}
+
+.create-spin {
+    display: block;
+    min-height: 240px;
+}
+
 .treebox {
     width: 100px;
     height: 500px;
     border: 1px solid;
     overflow: auto;
-}
-
-.respo-tree.el-tree {
-    min-width: 100px;
-    display: inline-block;
 }
 
 .table {

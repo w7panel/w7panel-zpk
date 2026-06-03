@@ -1,7 +1,7 @@
 <template>
     <div ref="files_editor_cont" class="content">
         <div id="editor_textarea" style="width:100%;"></div>
-        <el-button type="primary" style="margin-top:20px; width:100px;" @click="save">确定</el-button>
+        <a-button type="primary" style="margin-top:20px; width:100px;" @click="save">确定</a-button>
     </div>
 </template>
 

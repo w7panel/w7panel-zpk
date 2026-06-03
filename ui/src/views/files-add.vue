@@ -1,12 +1,18 @@
 <template>
     <div class="bg-white" style="min-height:100vh;">
         <div style="padding:20px; border:1px solid #E7E7E7;">
-            <el-breadcrumb separator="/">
-                <el-breadcrumb-item :to="{path:'/zpk'}"><template #default><span class="c-99 fw-400">我的制品库</span></template></el-breadcrumb-item>
-                <el-breadcrumb-item :to="{path:'/zpk-version',query:{id:this.identifie,title:vtitle}}"><template #default><span class="c-99 fw-400">版本管理</span></template></el-breadcrumb-item>
-                <el-breadcrumb-item :to="{path:'/zpk-edit',query:{id:identifie,versionid:version_id}}"><template #default><span class="c-99 fw-400">应用基础信息修改</span></template></el-breadcrumb-item>
-                <el-breadcrumb-item><template #default><span class="c-33 fw-400">文件编辑</span></template></el-breadcrumb-item>
-            </el-breadcrumb>
+            <a-breadcrumb>
+                <a-breadcrumb-item><router-link to="/zpk" class="c-99 fw-400">我的制品库</router-link></a-breadcrumb-item>
+                <a-breadcrumb-item>
+                    <router-link :to="{ path: '/zpk-version', query: { id: identifie, title: vtitle } }"
+                        class="c-99 fw-400">版本管理</router-link>
+                </a-breadcrumb-item>
+                <a-breadcrumb-item>
+                    <router-link :to="{ path: '/zpk-edit', query: { id: identifie, versionid: version_id } }"
+                        class="c-99 fw-400">应用基础信息修改</router-link>
+                </a-breadcrumb-item>
+                <a-breadcrumb-item><span class="c-33 fw-400">文件编辑</span></a-breadcrumb-item>
+            </a-breadcrumb>
         </div>
         <div class="bg-padding pb-24">
             <files-editor :filename="filename" :version_id="version_id" :filecont="filecont" @complete="complete"></files-editor>
@@ -17,6 +23,7 @@
 <script>
 import myAxios from '@/utils';
 import filesEditor from '@/components/files-editor.vue';
+import { messageSuccess } from '@/utils/ui-feedback';
 export default {
     data(){
         return {
@@ -55,7 +62,7 @@ export default {
                 version: this.version_id,
             }).then(()=>{
                 this.getInfo(this.identifie, ()=>{
-                    this.$message.success('操作成功');
+                    messageSuccess('操作成功');
                     setTimeout(()=>{
                         this.$router.go(-1);
                     },500);

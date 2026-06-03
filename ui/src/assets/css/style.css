@@ -501,31 +501,6 @@ a,
 	background: #f2f2f2;
 }
 
-.bg-f2.el-select:hover .el-input__wrapper {
-	box-shadow: none;
-}
-
-.bg-f2.el-input .el-input__wrapper {
-	box-shadow: none;
-}
-
-.bg-f2.el-input .el-input__wrapper.is-focus {
-	box-shadow: 0 0 0 1px var(--el-color-primary) inset;
-}
-
-.el-form-item.is-error .bg-f2 .el-input__wrapper {
-	box-shadow: 0 0 0 1px var(--el-color-danger) inset;
-}
-
-.bg-f2>.el-input__wrapper {
-	background: #f2f2f2;
-}
-
-.bg-f2.el-select .el-input__wrapper {
-	background: #f2f2f2;
-	box-shadow: none;
-}
-
 .bg-white {
 	background: #ffffff;
 }
@@ -538,103 +513,7 @@ a,
 	padding-bottom: 24px;
 }
 
-:root {
-	--el-color-primary: #0052D9;
-	--el-font-weight-primary: normal
-}
-
-.el-button.el-button--primary:hover,
-.el-button.el-button--primary:focus {
-	background-color: var(--el-color-primary);
-	border-color: var(--el-color-primary);
-}
-
-.el-input-number__decrease,
-.el-input-number__increase {
-	border-radius: 4px !important;
-	background: #ffffff !important;
-	border: 1px solid #dcdfe6 !important;
-}
-
-.el-input-number .el-input__wrapper {
-	box-shadow: none !important;
-	background: transparent;
-}
-
-.el-input-number .el-input.is-disabled .el-input__wrapper {
-	background: #fff;
-}
-
-.el-input-number .el-input__inner {
-	border: 1px solid #dcdfe6;
-	background: #ffffff;
-	border-radius: 4px;
-}
-
-.el-table.table-header table thead th {
-	background: #F3F3F3;
-	color: #666666;
-	font-weight: 500;
-	padding: 11px 0;
-}
-
-.el-table.table-border {
-	box-sizing: border-box;
-	border: var(--el-table-border);
-	border-bottom: 0;
-}
-
-span.el-pagination__jump.is-last {
-	font-size: 0;
-}
-
-span.el-pagination__jump.is-last::before {
-	content: "跳转";
-	font-size: 14px;
-}
-
-.el-input__prefix {
-	position: static !important;
-}
-
-.el-radio--w7 .el-checkbox__input,
-.el-radio--w7 .el-radio__input {
-	display: none;
-}
-
-.el-radio--w7 .el-radio__label {
-	padding-left: 0;
-}
-
-.el-radio--w7.is-checked::before {
-	content: '';
-	position: absolute;
-	bottom: 0;
-	right: 0;
-	width: 22px;
-	height: 16px;
-	background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABYAAAAQCAMAAAAlM38UAAAAAXNSR0IB2cksfwAAAAlwSFlzAAALEwAACxMBAJqcGAAAAFFQTFRFAAAAQ3PtQXPyQXX3QXPyQnTzQnTyQXPyQHPyQnTzQXPyQnTzL2n8QnTyP3P1QnTzQXPyQnTzY4z1zNn7TXzz1+H8bJP11uH8V4P0l7L4Q3XzsDHLHAAAABt0Uk5TABCdMd3/dvkZuUbmBokizWLv//////////9j1thQKAAAAGFJREFUeJxtzkkOgCAQBVFAv/MEDqD3P6gChnTSXcu3KqWEtJG0qiFo04Jz1wOchxGcpxngvKwQeLOJ3E5ZGxxJT0f4m718+LVwnMXtQ1bQ2ehZQWeju3JSZkl0lvJjBcUL3NIFzmiP9QMAAAAASUVORK5CYII=)
-}
-
-.reputation .el-tooltip__popper.is-light[x-placement^=left] .popper__arrow {
-	border-left-color: #e8e9eb;
-	top: 11px !important;
-}
-
-.reputation .el-tooltip__popper.is-light {
-	border: none;
-	padding: 0px;
-}
-
-.reputation .el-tooltip__popper {
-	padding: 0px;
-}
-
-.reputation.el-popper {
-	padding: 0px;
-}
-
-.dark-search.el-input .el-input__wrapper {
+.dark-search.arco-input-wrapper {
 	display: inline-flex;
 	box-sizing: border-box;
 	width: 100%;

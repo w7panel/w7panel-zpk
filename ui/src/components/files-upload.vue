@@ -1,8 +1,14 @@
 <template>
-    <el-upload v-loading="loading" class="upload-components" :accept="accept" :show-file-list="false"
-        :before-upload="beforeUpload" :http-request="httpRequest">
-        <slot></slot>
-    </el-upload>
+    <a-spin :loading="loading" class="upload-spin">
+        <a-upload class="upload-components" :accept="accept" :show-file-list="false" :custom-request="httpRequest"
+            :on-before-upload="beforeUpload">
+            <template #upload-button>
+                <slot>
+                    <a-button type="primary">点击上传</a-button>
+                </slot>
+            </template>
+        </a-upload>
+    </a-spin>
 </template>
 <script>
 import myAxios from '../utils';
@@ -15,7 +21,7 @@ export default {
         testDockerfile: { default: false },
         accept: { default: '.zip' },
     },
-    emits: ['success', 'error', 'progress'],
+    emits: ['success', 'error', 'progress', 'testDockerfile'],
     data() {
         return {
             loading: false,
@@ -56,7 +62,9 @@ export default {
                 reader.readAsArrayBuffer(file);
             });
         },
-        beforeUpload() { },
+        beforeUpload() {
+            return true;
+        },
         beforeDockerfile(file) {
             let zip = new JSZip();
             zip.loadAsync(file).then(async () => {
@@ -86,12 +94,15 @@ export default {
             });
         },
         httpRequest(data) {
-            let file = data.file;
+            let file = data.fileItem?.file || data.file?.file || data.file;
             if (this.testDockerfile) {
                 this.beforeDockerfile(file);
             } else {
                 this.upfile(file)
             }
+            return {
+                abort() { }
+            };
         },
         async upfile(file) {
             this.loading = true;

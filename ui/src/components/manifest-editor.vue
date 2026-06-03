@@ -2,16 +2,18 @@
     <div ref="content" style="height:100vh;overflow:auto;">
         <div>
             <div style="padding:20px; border:1px solid #E7E7E7;">
-                <el-breadcrumb separator="/">
-                    <el-breadcrumb-item :to="{ path: '/zpk' }"><template #default><span
-                                class="c-99 fw-400">我的制品库</span></template></el-breadcrumb-item>
-                    <el-breadcrumb-item :to="{ path: '/zpk-version', query: { id: this.identifie, title: vtitle } }"><template
-                            #default><span class="c-99 fw-400">版本管理</span></template></el-breadcrumb-item>
-                    <el-breadcrumb-item :to="{ path: '/zpk-edit', query: { id: identifie, versionid: version_id } }"><template
-                            #default><span class="c-99 fw-400">应用基础信息修改</span></template></el-breadcrumb-item>
-                    <el-breadcrumb-item><template #default><span
-                                class="c-33 fw-400">{{ title }}</span></template></el-breadcrumb-item>
-                </el-breadcrumb>
+                <a-breadcrumb>
+                    <a-breadcrumb-item><router-link to="/zpk" class="c-99 fw-400">我的制品库</router-link></a-breadcrumb-item>
+                    <a-breadcrumb-item>
+                        <router-link :to="{ path: '/zpk-version', query: { id: identifie, title: vtitle } }"
+                            class="c-99 fw-400">版本管理</router-link>
+                    </a-breadcrumb-item>
+                    <a-breadcrumb-item>
+                        <router-link :to="{ path: '/zpk-edit', query: { id: identifie, versionid: version_id } }"
+                            class="c-99 fw-400">应用基础信息修改</router-link>
+                    </a-breadcrumb-item>
+                    <a-breadcrumb-item><span class="c-33 fw-400">{{ title }}</span></a-breadcrumb-item>
+                </a-breadcrumb>
             </div>
             <files-manifest :data="manifest" :option="{ pureManifest: true }" @complete="complete"></files-manifest>
         </div>
@@ -20,6 +22,7 @@
 
 <script>
 import myAxios from '@/utils';
+import { messageSuccess } from '@/utils/ui-feedback';
 const defaultManifest = `application:
     name: ''
     identifie: ''
@@ -83,7 +86,7 @@ export default {
                 version: this.version_id,
             }).then(() => {
                 this.getInfo(this.identifie, () => {
-                    this.$message.success('操作成功');
+                    messageSuccess('操作成功');
                     setTimeout(() => {
                         this.$router.go(-1);
                     }, 500);

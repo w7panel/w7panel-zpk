@@ -6,22 +6,22 @@
           <div class="df jc-b">
             <div>
               <span>命名空间：</span>
-              <el-select v-model="activeNamespace" @change="changeActiveNamespace">
-                <el-option :value="-1" label="所有命名空间" />
-                <el-option v-for="item in namespace" :key="item.id" :value="item.name" />
-              </el-select>
+              <a-select v-model="activeNamespace" class="registry-filter-select" @change="changeActiveNamespace">
+                <a-option :value="-1" label="所有命名空间" />
+                <a-option v-for="item in namespace" :key="item.id" :value="item.name" />
+              </a-select>
               <span style="margin-left:10px;">二级命名空间：</span>
-              <el-select v-model="subNamespace" @change="getData(1)">
-                <el-option :value="-1" label="所有命名空间" />
-                <el-option v-for="item in subNamespaceData" :key="item" :value="item" />
-              </el-select>
+              <a-select v-model="subNamespace" class="registry-filter-select" @change="getData(1)">
+                <a-option :value="-1" label="所有命名空间" />
+                <a-option v-for="item in subNamespaceData" :key="item" :value="item" />
+              </a-select>
             </div>
-            <el-button type="primary" @click="add">
+            <a-button type="primary" @click="add">
               新建镜像
-            </el-button>
+            </a-button>
           </div>
-          <el-alert type="warning" class="registry-primary-el-warning mt-20 fs-14" :closable="false">
-            <div>docker login命令登录信息可在 <span class="cursor" style="border-bottom: 1px solid var(--el-color-primary);display: inline-block;line-height: 1;" @click="accessDialogShow = true"><ArcoIcon name="icon-244" :size="16" color="#3370ff" style="vertical-align: text-top;line-height: 1;"/>访问凭证</span>中获取
+          <a-alert type="warning" class="registry-primary-warning mt-20 fs-14" :closable="false">
+            <div>docker login命令登录信息可在 <span class="credential-link" @click="accessDialogShow = true"><ArcoIcon name="icon-244" :size="16" color="#3370ff" style="vertical-align: text-top;line-height: 1;"/>访问凭证</span>中获取
             </div>
             <div class="mt-6">外网地址：<span class="cursor txt-line"
                 @click="serverdomain.external_domain ? onekeyCopy(serverdomain.external_domain) : null">{{ serverdomain.external_domain || '' }}</span>
@@ -29,135 +29,123 @@
             <div class="mt-6">内网地址：<span class="cursor txt-line"
                 @click="serverdomain.intranet_domain ? onekeyCopy(serverdomain.intranet_domain) : null">{{ serverdomain.intranet_domain || '' }}</span>
             </div>
-          </el-alert>
-          <el-table :data="tableData" class="mt-20 table-header">
-            <el-table-column label="名称" prop="name" width="150">
-              <template #default="scope">
-                <router-link :to="'/zpk-registry/' + scope.row.id" class="el-button el-button--primary is-text"
-                  style="padding: 0">
-                  {{ scope.row.name }}
-                </router-link>
-              </template>
-            </el-table-column>
-            <el-table-column label="镜像地址">
-              <template #default="scope">
-                {{ scope.row.registry }}/{{ scope.row.namespace }}/{{ scope.row.name }}
-                <el-icon :size="12" style="cursor:pointer"
-                  @click="onekeyCopy(`${scope.row.registry}/${scope.row.namespace}/${scope.row.name}`)">
-                  <DocumentCopy />
-                </el-icon>
-              </template>
-            </el-table-column>
-            <el-table-column label="类型" width="100">
-              <template #default="scope">
-                {{ scope.row.visible_type === 3 ? namespaceTypeMap[scope.row.namespace] :
-                  visibleTypeMap[scope.row.visible_type]}}
-              </template>
-            </el-table-column>
-
-            <el-table-column label="命名空间" prop="namespace" width="150" />
-            <el-table-column label="创建时间" prop="created_at" width="200">
-              <template #default="scope">
-                {{ new Date(scope.row.created_at).toLocaleString() }}
-              </template>
-            </el-table-column>
-            <el-table-column align="left" label="操作" width="300">
-              <template #default="scope">
-                <template v-if="hasAccess(scope.row.user_id)">
-                  <el-button type="text" @click="edit(scope.row)" style="padding-left: 0">修改</el-button>
-                  <el-button type="text" @click="del(scope.row)">删除</el-button>
+          </a-alert>
+          <a-table :data="tableData" :pagination="false" class="mt-20 table-header" row-key="id">
+            <template #columns>
+              <a-table-column title="名称" data-index="name" :width="150">
+                <template #cell="{ record }">
+                  <router-link :to="'/zpk-registry/' + record.id" class="registry-link"
+                    style="padding: 0">
+                    {{ record.name }}
+                  </router-link>
                 </template>
-                <el-button type="text" @click="shortcut(scope.row)">快捷指令</el-button>
-              </template>
-            </el-table-column>
-          </el-table>
+              </a-table-column>
+              <a-table-column title="镜像地址">
+                <template #cell="{ record }">
+                  {{ record.registry }}/{{ record.namespace }}/{{ record.name }}
+                  <span class="registry-copy-action" @click="onekeyCopy(`${record.registry}/${record.namespace}/${record.name}`)">复制</span>
+                </template>
+              </a-table-column>
+              <a-table-column title="类型" :width="100">
+                <template #cell="{ record }">
+                  {{ record.visible_type === 3 ? namespaceTypeMap[record.namespace] :
+                    visibleTypeMap[record.visible_type]}}
+                </template>
+              </a-table-column>
+
+              <a-table-column title="命名空间" data-index="namespace" :width="150" />
+              <a-table-column title="创建时间" data-index="created_at" :width="200">
+                <template #cell="{ record }">
+                  {{ new Date(record.created_at).toLocaleString() }}
+                </template>
+              </a-table-column>
+              <a-table-column align="left" title="操作" :width="300">
+                <template #cell="{ record }">
+                  <template v-if="hasAccess(record.user_id)">
+                    <a-button type="text" @click="edit(record)" style="padding-left: 0">修改</a-button>
+                    <a-button type="text" status="danger" @click="del(record)">删除</a-button>
+                  </template>
+                  <a-button type="text" @click="shortcut(record)">快捷指令</a-button>
+                </template>
+              </a-table-column>
+            </template>
+          </a-table>
           <div class="mt-20 df jc-e">
-            <el-pagination v-model:page-size="paginate" :current-page="page" :page-count="last_page"
-              :page-sizes="[10, 20, 30, 40]" background layout="sizes, prev, pager, next" @size-change="getData(1)"
-              @current-change='getData'></el-pagination>
+            <a-pagination v-model:current="page" v-model:page-size="paginate" :total="list.length"
+              :page-size-options="[10, 20, 30, 40]" show-page-size
+              @page-size-change="handlePageSizeChange" @change="getData" />
           </div>
         </div>
       </div>
     </div>
-    <el-dialog v-model="visible" :title="editId ? '编辑镜像' : '添加镜像'" :width="500">
-      <el-form ref="form" :model="form" label-position="left" label-width="80px">
-        <el-form-item :rules="[{ required: true, message: '名称不能为空', trigger: 'manual' }]" label="名称" prop="name">
-          <el-input v-model="form.name" />
-        </el-form-item>
-        <el-form-item :rules="[{ required: true, message: '命名空间不能为空', trigger: 'manual' }]" label="命名空间" prop="namespace">
-          <el-select v-model="form.namespace">
-            <el-option v-for="item in namespace" :key="item.id" :value="item.name">
+    <a-modal v-model:visible="visible" :title="editId ? '编辑镜像' : '添加镜像'" :width="500" :footer="false">
+      <a-form ref="form" :model="form" label-align="left" :label-col-props="{ span: 4, flex: '0 0 80px' }"
+        :wrapper-col-props="{ span: 20, flex: '1' }" class="registry-form">
+        <a-form-item :rules="[{ required: true, message: '名称不能为空', trigger: 'manual' }]" label="名称" field="name">
+          <a-input v-model="form.name" />
+        </a-form-item>
+        <a-form-item :rules="[{ required: true, message: '命名空间不能为空', trigger: 'manual' }]" label="命名空间" field="namespace">
+          <a-select v-model="form.namespace">
+            <a-option v-for="item in namespace" :key="item.id" :value="item.name">
               {{ item.name }}
-            </el-option>
-          </el-select>
-        </el-form-item>
-        <el-form-item label="描述" prop="namespace">
-          <el-input v-model="form.desc" :rows="5" type="textarea" />
-        </el-form-item>
-        <el-form-item label="公共权限" prop="namespace">
+            </a-option>
+          </a-select>
+        </a-form-item>
+        <a-form-item label="描述" field="desc">
+          <a-textarea v-model="form.desc" :auto-size="{ minRows: 5, maxRows: 5 }" />
+        </a-form-item>
+        <a-form-item label="公共权限" field="visible_type">
           <div class="df df-c" style="flex:1;">
-            <el-checkbox v-model="formVisibleType3" @change="v => form.visible_type = v ? 3 : 1">跟随命名空间</el-checkbox>
-            <el-radio-group v-model="form.visible_type" :disabled="formVisibleType3">
+            <a-checkbox v-model="formVisibleType3" @change="v => form.visible_type = v ? 3 : 1">跟随命名空间</a-checkbox>
+            <a-radio-group v-model="form.visible_type" :disabled="formVisibleType3">
 
-              <el-radio :label="1">私有读写</el-radio>
-              <el-radio :label="4">公有读私有写</el-radio>
-              <el-radio :label="2">公有读写</el-radio>
-            </el-radio-group>
+              <a-radio :value="1">私有读写</a-radio>
+              <a-radio :value="4">公有读私有写</a-radio>
+              <a-radio :value="2">公有读写</a-radio>
+            </a-radio-group>
           </div>
-        </el-form-item>
-        <el-form-item>
-          <el-button size="large" type="primary" @click="onSubmit">确定</el-button>
-          <el-button size="large" @click="visible = false">取消</el-button>
-        </el-form-item>
-      </el-form>
-    </el-dialog>
-    <el-dialog v-model="shortcutVisible" :width="800" title="快捷指令">
+        </a-form-item>
+        <a-form-item>
+          <a-button size="large" type="primary" @click="onSubmit">确定</a-button>
+          <a-button size="large" @click="visible = false">取消</a-button>
+        </a-form-item>
+      </a-form>
+    </a-modal>
+    <a-modal v-model:visible="shortcutVisible" :width="800" title="快捷指令" :footer="false">
       <div class="shortcut-header">登录容器镜像服务 Docker Registry</div>
       <div class="shortcut-content">
         <div>{{ `docker login ${shortcutData.registry} --username=${userInfo.username}` }}</div>
-        <el-icon :size="12" style="cursor:pointer"
-          @click="onekeyCopy(`docker login ${shortcutData.registry} --username=${userInfo.username}`)">
-          <DocumentCopy />
-        </el-icon>
+        <span class="registry-copy-action" @click="onekeyCopy(`docker login ${shortcutData.registry} --username=${userInfo.username}`)">复制</span>
       </div>
       <div class="shortcut-header">从 Registry 拉取镜像</div>
       <div class="shortcut-content">
         <div>{{ `docker pull ${shortcutData.registry}/${shortcutData.namespace}/${shortcutData.name}:[tag]` }}</div>
-        <el-icon :size="12" style="cursor:pointer"
-          @click="onekeyCopy(`docker pull ${shortcutData.registry}/${shortcutData.namespace}/${shortcutData.name}:[tag]`)">
-          <DocumentCopy />
-        </el-icon>
+        <span class="registry-copy-action" @click="onekeyCopy(`docker pull ${shortcutData.registry}/${shortcutData.namespace}/${shortcutData.name}:[tag]`)">复制</span>
       </div>
       <div class="shortcut-desc">其中［tag］请根据您需要拉取镜像的具体版本镜像替换，如latest。</div>
       <div class="shortcut-header">向 Registry 中推送镜像</div>
       <div class="shortcut-content">
         <div>{{ `docker tag [imageId] ${shortcutData.registry}/${shortcutData.namespace}/${shortcutData.name}:[tag]` }}
         </div>
-        <el-icon :size="12" style="cursor:pointer"
-          @click="onekeyCopy(`docker tag [imageId] ${shortcutData.registry}/${shortcutData.namespace}/${shortcutData.name}:[tag]`)">
-          <DocumentCopy />
-        </el-icon>
+        <span class="registry-copy-action" @click="onekeyCopy(`docker tag [imageId] ${shortcutData.registry}/${shortcutData.namespace}/${shortcutData.name}:[tag]`)">复制</span>
       </div>
       <div class="shortcut-content">
         <div>{{ `docker push ${shortcutData.registry}/${shortcutData.namespace}/${shortcutData.name}:[tag]` }}</div>
-        <el-icon :size="12" style="cursor:pointer"
-          @click="onekeyCopy(`docker push ${shortcutData.registry}/${shortcutData.namespace}/${shortcutData.name}:[tag]`)">
-          <DocumentCopy />
-        </el-icon>
+        <span class="registry-copy-action" @click="onekeyCopy(`docker push ${shortcutData.registry}/${shortcutData.namespace}/${shortcutData.name}:[tag]`)">复制</span>
       </div>
       <div class="shortcut-desc">其中［ImageId］请替换力您所要推送的实际镜像ID，或使用本地镜像的完整路径，［tag］请替换为您期待的镜像版本。</div>
-    </el-dialog>
-    <el-dialog v-model="accessDialogShow" title="访问凭证" :width="800">
+    </a-modal>
+    <a-modal v-model:visible="accessDialogShow" title="访问凭证" :width="800" :footer="false">
       <div>
         <Access :userInfo="userInfo" />
       </div>
-    </el-dialog>
+    </a-modal>
   </div>
 </template>
 
 <script>
 import myAxios from "@/utils";
-import { ElMessageBox, ElMessage } from 'element-plus';
+import { confirm, messageSuccess } from "@/utils/ui-feedback";
 import userMixin from "@/utils/user-mixin";
 import Access from '@/views/access.vue';
 import ArcoIcon from "@/components/arco-icon.vue";
@@ -254,7 +242,7 @@ export default {
       textarea.select();
       document.execCommand('copy', true);
       document.body.removeChild(textarea);
-      this.$message.success("复制成功");
+      messageSuccess("复制成功");
     },
     getNamespace() {
       myAxios.post("/v2/api/namespace/list").then(res => {
@@ -282,6 +270,9 @@ export default {
         });
       }
     },
+    handlePageSizeChange() {
+      this.getData(1);
+    },
     add() {
       this.editId = ''
       this.form.name = ''
@@ -292,21 +283,21 @@ export default {
       this.visible = true
     },
     onSubmit() {
-      this.$refs.form.validate((valid) => {
-        if (!valid) {
+      this.$refs.form.validate((errors) => {
+        if (errors) {
           return
         }
 
         if (this.editId) {
           myAxios.post('/v2/api/repository/edit', { id: this.editId, ...this.form }).then(() => {
-            this.$message.success('操作成功');
+            messageSuccess('操作成功');
             this.getData(1, true);
             this.visible = false
           })
           return
         }
         myAxios.post('/v2/api/repository/add', this.form).then(() => {
-          this.$message.success('操作成功');
+          messageSuccess('操作成功');
           this.getData(1, false);
           this.visible = false
         })
@@ -322,19 +313,19 @@ export default {
       this.visible = true
     },
     del(row) {
-      ElMessageBox.confirm('请确认删除', "提示", {
+      confirm({
+        title: "提示",
+        content: '请确认删除',
         confirmButtonText: "确定",
         cancelButtonText: "取消",
-      }).then(() => {
-        myAxios.post("/v2/api/repository/del", { id: row.id }).then(res => {
-          if (!res) { return }
-          ElMessage({
-            message: '删除成功',
-            type: 'success',
-          })
-          this.getData(1, true);
-        });
-      }).catch(() => { });
+        onOk: () => {
+          return myAxios.post("/v2/api/repository/del", { id: row.id }).then(res => {
+            if (!res) { return }
+            messageSuccess('删除成功')
+            this.getData(1, true);
+          });
+        }
+      });
     },
     see(row) {
       this.$router.push({ path: "/registry-detail/" + row.id });
@@ -368,14 +359,54 @@ export default {
   margin-top: 30px;
 }
 
-.registry-primary-el-warning {
-  background-color: var(--el-color-primary-light-9) !important;
-  color: var(--el-color-primary) !important;
+.registry-primary-warning {
+  background-color: #e8f3ff !important;
+  color: #3370ff !important;
 }
 
-.registry-primary-el-warning .el-alert__description {
+.registry-primary-warning .arco-alert-content {
   margin: 0;
   padding: 5px 0;
-  color: var(--el-color-primary) !important;
+  color: #3370ff !important;
+}
+
+.credential-link {
+  display: inline-block;
+  line-height: 1;
+  color: #3370ff;
+  border-bottom: 1px solid #3370ff;
+  cursor: pointer;
+}
+
+.registry-filter-select {
+  width: 180px;
+}
+
+.table-header .arco-table-th {
+  background: #F3F3F3;
+  color: #666666;
+  font-weight: 500;
+}
+
+.registry-copy-action {
+  margin-left: 6px;
+  color: #3370ff;
+  cursor: pointer;
+}
+
+.registry-link {
+  color: #3370ff;
+}
+
+.registry-form .arco-form-item-label-col {
+  width: 80px;
+}
+
+.registry-form .arco-form-item-label {
+  white-space: nowrap;
+}
+
+.registry-form .arco-form-item-wrapper-col {
+  min-width: 0;
 }
 </style>

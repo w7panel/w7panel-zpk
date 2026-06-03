@@ -1,12 +1,10 @@
 import { createApp } from 'vue'
 import App from './App.vue'
-import ElementPlus from 'element-plus'
-import 'element-plus/dist/index.css'
-import locale from 'element-plus/dist/locale/zh-cn.mjs'
+import ArcoVue from '@arco-design/web-vue'
+import '@arco-design/web-vue/dist/arco.css'
 
 import './assets/css/style.css'
 import routes from './router'
-import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 
 import 'highlight.js/styles/atom-one-dark.css'
 import hljs from 'highlight.js/lib/common'
@@ -21,31 +19,33 @@ if (window.__POWERED_BY_WUJIE__) {
 
 window.hljs = hljs;
 
+if (process.env.NODE_ENV === 'development') {
+	const devPanelToken = process.env.VUE_APP_PANEL_TOKEN || process.env.VUE_APP_TOKEN;
+	if (devPanelToken) {
+		localStorage.setItem('X-W7Panel-Token', devPanelToken);
+	}
+}
+
 const app = createApp(App);
+
+const installPlugins = () => {
+	app.use(ArcoVue);
+	app.use(routes);
+	app.use(mavonEditor);
+};
 
 if (window.__POWERED_BY_WUJIE__) {
 	document.body.style.minHeight = 'calc(-146px + 100vh)';
 	window.__WUJIE_MOUNT = () => {
-		app.use(ElementPlus, { locale });
-		app.use(routes);
-		app.use(mavonEditor);
+		installPlugins();
 		app.mount('#zpk');
 	};
 	window.__WUJIE_UNMOUNT = () => {
 		app.unmount();
 	};
 } else {
-	app.use(ElementPlus, { locale });
-	app.use(routes);
-	app.use(mavonEditor);
+	installPlugins();
 	app.mount('#zpk');
-}
-
-
-
-
-for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
-	app.component(key, component)
 }
 
 const debounce = (fn, delay) => {

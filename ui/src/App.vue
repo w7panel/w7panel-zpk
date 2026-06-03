@@ -36,53 +36,76 @@ export default {
 	cursor: pointer;
 }
 
-.el-form-item.is-success .el-input__inner,
-.el-dialog .el-form-item.is-success .el-input__inner,
-.content .el-form-item.is-success .el-input__inner {
-	border: 0;
-}
-
-.el-dialog .el-dialog__header {
-	border: 0;
-}
-
 .content {
 	padding: 20px;
 }
 
-.content .el-table {
-	--el-table-border-color: #eeeeee;
+.arco-btn+.arco-btn {
+	margin-left: 8px;
 }
 
-.distance-checkbox .el-checkbox {
-	margin-right: 20px;
+.arco-btn-group .arco-btn+.arco-btn {
+	margin-left: 0;
 }
 
-.distance-checkbox .el-checkbox__label {
-	padding-left: 5px;
+.arco-pagination-options {
+	order: -1;
+	margin-right: 8px;
+	margin-left: 0 !important;
 }
 
-.el-input-group__append {
-	width: auto !important;
+.arco-table {
+	color: #1d2129;
 }
 
-.menu-popover.el-popover.el-popper {
-	min-width: 100px;
-	box-sizing: border-box;
+.arco-table .arco-table-container,
+.arco-table-border .arco-table-container,
+.arco-table-border:not(.arco-table-border-cell) .arco-table-container {
+	border: 0 !important;
 }
 
-.list-popover.el-popover.el-popper {
-	min-width: 100px;
-	padding: 12px 0;
-	box-sizing: border-box;
+.arco-table .arco-table-th,
+.table-header .arco-table-th {
+	color: #1d2129 !important;
+	font-weight: 400 !important;
+	background: #f2f3f5 !important;
+	border-bottom: 1px solid #f2f3f5 !important;
 }
 
-.bg-f2 .el-input.is-disabled .el-input__inner {
+.arco-table .arco-table-td {
+	color: #1d2129;
 	background: transparent;
+	border-bottom: 1px solid #f2f3f5 !important;
 }
 
-.el-input .el-input-group__prepend {
-	width: auto !important;
+.arco-table .arco-table-cell {
+	min-height: 22px;
+	padding: 10px 16px !important;
+	line-height: 22px;
+}
+
+.arco-table-hover:not(.arco-table-dragging) .arco-table-tr:not(.arco-table-tr-empty):not(.arco-table-tr-summary):hover .arco-table-td:not(.arco-table-col-fixed-left):not(.arco-table-col-fixed-right),
+.arco-table-hover .arco-table-tr-drag .arco-table-td:not(.arco-table-col-fixed-left):not(.arco-table-col-fixed-right) {
+	background: #f7f8fa;
+}
+
+.arco-table .arco-table-td .arco-btn-text {
+	height: auto;
+	padding: 0 !important;
+	color: #165dff !important;
+	line-height: 22px;
+	background: transparent !important;
+	border: 0 !important;
+}
+
+.arco-table .arco-table-td .arco-btn-text:hover,
+.arco-table .arco-table-td .arco-btn-text:focus {
+	color: #165dff !important;
+	background: transparent !important;
+}
+
+.arco-table .arco-table-td .arco-btn-text+.arco-btn-text {
+	margin-left: 16px;
 }
 
 .cluster-box {
@@ -93,14 +116,6 @@ export default {
 .refresh {
 	margin: 0 16px;
 	cursor: pointer;
-}
-
-.form .el-input-group__append {
-	width: auto;
-}
-
-.sbclass .el-message-box__content {
-	padding: 40px;
 }
 
 .com-table-header {
@@ -138,36 +153,4 @@ export default {
 	-o-animation: rotation 2s linear infinite;
 }
 
-.slotbtn .el-input-group__append button.el-button {
-	display: inline-flex;
-	justify-content: center;
-	align-items: center;
-	line-height: 1;
-	height: 32px;
-	white-space: nowrap;
-	cursor: pointer;
-	color: var(--el-button-text-color);
-	text-align: center;
-	box-sizing: border-box;
-	outline: 0;
-	transition: .1s;
-	font-weight: var(--el-button-font-weight);
-	-webkit-user-select: none;
-	user-select: none;
-	vertical-align: middle;
-	appearance: none;
-	background-color: var(--el-button-bg-color);
-	border: var(--el-border);
-	border-color: var(--el-button-border-color);
-	padding: 8px 15px;
-	font-size: var(--el-font-size-base);
-	border-radius: 0 var(--el-border-radius-base) var(--el-border-radius-base) 0;
-}
-
-.slotbtn .el-input-group__append button.el-button:hover {
-	color: var(--el-button-hover-text-color);
-	border-color: var(--el-button-hover-border-color);
-	background-color: var(--el-button-hover-bg-color);
-	outline: 0;
-}
 </style>

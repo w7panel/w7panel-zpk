@@ -2,35 +2,36 @@
     <div class="df content">
         <div class="fc" style="padding-left:0; overflow:auto;">
             <div>
-                <el-form ref="formref" :model="form" label-width="120px" :rules="rules" label-position="left"
-                    class="form manifest-form">
+                <a-form ref="formref" :model="form" :rules="rules" label-align="left"
+                    :label-col-props="{ span: 5, flex: '0 0 120px' }"
+                    :wrapper-col-props="{ span: 19, flex: '1' }" class="form manifest-form">
                     <div class="df jc-e">
-                        <el-button v-if="!showYaml" type="primary" @click="showYaml = true;">预览yaml</el-button>
+                        <a-button v-if="!showYaml" type="primary" @click="showYaml = true;">预览yaml</a-button>
                     </div>
                     <div class="bg-white com-line df">
                         <div class="fc">
                             <div class="c-00-6 df ai-c">基础配置</div>
-                            <el-form-item class="mt-16" label="名称" :prop="option?.pureManifest ? 'name' : ''">
-                                <el-input v-model="form.name" size="large" style="width:500px;" @change="changeForm"
-                                    placeholder="请输入"></el-input>
-                            </el-form-item>
-                            <el-form-item label="标识" :prop="option?.pureManifest ? 'identifie' : ''">
+                            <a-form-item class="mt-16" label="名称" :field="option?.pureManifest ? 'name' : ''">
+                                <a-input v-model="form.name" size="large" style="width:500px;" @change="changeForm"
+                                    placeholder="请输入"></a-input>
+                            </a-form-item>
+                            <a-form-item label="标识" :field="option?.pureManifest ? 'identifie' : ''">
                                 <div class="df jc-b" style="width:500px;">
                                     <w7-identifie v-model:author="form.author" v-model:identifie="form.identifie"
                                         @change="changeForm" disabled />
                                 </div>
-                            </el-form-item>
-                            <el-form-item label="描述" prop="description">
+                            </a-form-item>
+                            <a-form-item label="描述" field="description">
                                 <div class="df df-c">
-                                    <el-input v-model="form.description" size="large" style="width:500px;"
-                                        placeholder="请输入应用描述" @change="changeForm"></el-input>
+                                    <a-input v-model="form.description" size="large" style="width:500px;"
+                                        placeholder="请输入应用描述" @change="changeForm"></a-input>
                                 </div>
-                            </el-form-item>
+                            </a-form-item>
 
-                            <el-form-item v-if="option.pureManifest" label="可选安装">
-                                <el-switch v-model="otherData.required" :active-value="false"
-                                    :inactive-value="true"></el-switch>
-                            </el-form-item>
+                            <a-form-item v-if="option.pureManifest" label="可选安装">
+                                <a-switch v-model="otherData.required" :checked-value="false"
+                                    :unchecked-value="true"></a-switch>
+                            </a-form-item>
                         </div>
                     </div>
                     <div class="bg-white mt-20 pb-24">
@@ -38,75 +39,67 @@
                             <span class="">代码配置</span>
                         </div>
                         <div class="mt-16">
-                            <el-form-item label="类型">
+                            <a-form-item label="类型">
                                 <div class="df df-c fc">
 
-                                    <el-radio-group v-model="form.type" @change="changeFormtype">
-                                        <el-radio label="docker">原生应用</el-radio>
-                                        <el-radio label="tradition">传统应用</el-radio>
-                                        <el-radio label="helm">K8sYaml</el-radio>
-                                    </el-radio-group>
+                                    <a-radio-group v-model="form.type" @change="changeFormtype">
+                                        <a-radio value="docker">原生应用</a-radio>
+                                        <a-radio value="tradition">传统应用</a-radio>
+                                        <a-radio value="helm">K8sYaml</a-radio>
+                                    </a-radio-group>
 
-                                    <el-form-item v-if="form.type == 'helm'" class="mt-20" style="margin-bottom:10px;"
+                                    <a-form-item v-if="form.type == 'helm'" class="mt-20" style="margin-bottom:10px;"
                                         label="启用helm配置">
-                                        <el-switch v-model="form.helm.useHelm" @change="changeForm"></el-switch>
-                                    </el-form-item>
+                                        <a-switch v-model="form.helm.useHelm" @change="changeForm"></a-switch>
+                                    </a-form-item>
 
                                     <div v-if="form.type == 'helm' && form.helm.useHelm" class="greybox"
                                         style="margin-bottom:20px;">
                                         <div class="greybox-title">Helm配置</div>
 
-                                        <el-form-item label="Chart包来源" style="margin-bottom:18px;">
-                                            <el-radio-group v-model="form.helm.helmtype" @change="changeForm">
-                                                <el-radio label="1">helm仓库</el-radio>
-                                                <el-radio label="2">helm下载包</el-radio>
-                                            </el-radio-group>
-                                        </el-form-item>
+                                        <a-form-item label="Chart包来源" style="margin-bottom:18px;">
+                                            <a-radio-group v-model="form.helm.helmtype" @change="changeForm">
+                                                <a-radio value="1">helm仓库</a-radio>
+                                                <a-radio value="2">helm下载包</a-radio>
+                                            </a-radio-group>
+                                        </a-form-item>
 
-                                        <el-form-item v-if="form.type == 'helm' && form.helm.helmtype == '1'"
-                                            label="helm仓库地址" prop="repository" style="margin-bottom:18px;">
-                                            <el-input v-model="form.helm.repository" size="large"
+                                        <a-form-item v-if="form.type == 'helm' && form.helm.helmtype == '1'"
+                                            label="helm仓库地址" field="repository" style="margin-bottom:18px;">
+                                            <a-input v-model="form.helm.repository" size="large"
                                                 @change="getChartInfo(); changeForm();" style="width:500px;"
                                                 placeholder="请输入" />
-                                            <el-icon v-if="getChartInfoLoading" class="is-loading fs-24 ml-10">
-                                                <Loading />
-                                            </el-icon>
-                                        </el-form-item>
+                                            <icon-loading v-if="getChartInfoLoading" class="is-loading fs-24 ml-10" />
+                                        </a-form-item>
 
-                                        <el-form-item v-if="form.type == 'helm' && form.helm.helmtype == '1'"
-                                            label="chart名称" prop="chartName" style="margin-bottom:18px;">
-                                            <el-autocomplete ref="formhelmchartname" v-model="form.helm.chartName"
-                                                :fetch-suggestions="async (queryString, callback) => {
-                                                    const results = queryString
-                                                        ? helmCharts.filter(item => item.toLowerCase().includes(queryString.toLowerCase()))
-                                                        : helmCharts;
-                                                    callback(results.map(item => ({ value: item, label: item })));
-                                                }" placeholder="请输入内容" @change="getChartVersion(); changeForm();"
-                                                @select="getChartVersion(); changeForm(); $refs.formhelmchartname.close()"
-                                                style="width:240px;"></el-autocomplete>
+                                        <a-form-item v-if="form.type == 'helm' && form.helm.helmtype == '1'"
+                                            label="chart名称" field="chartName" style="margin-bottom:18px;">
+                                            <a-auto-complete ref="formhelmchartname" v-model="form.helm.chartName"
+                                                :data="helmChartOptions" placeholder="请输入内容" :filter-option="false"
+                                                @search="helmChartKeyword = $event"
+                                                @change="getChartVersion(); changeForm();"
+                                                @select="getChartVersion(); changeForm(); $refs.formhelmchartname?.blur?.()"
+                                                style="width:240px;"></a-auto-complete>
 
-                                            <el-autocomplete ref="formhelmversion" v-model="form.helm.version"
-                                                :fetch-suggestions="async (queryString, callback) => {
-                                                    const results = queryString
-                                                        ? helmChartVersions.filter(item => item.toLowerCase().includes(queryString.toLowerCase()))
-                                                        : helmChartVersions;
-                                                    callback(results.map(item => ({ value: item, label: item })));
-                                                }" placeholder="请输入内容" @change="changeForm"
-                                                @select="changeForm(); $refs.formhelmversion.close()"
-                                                style="width:240px;margin-left:20px;"></el-autocomplete>
-                                        </el-form-item>
+                                            <a-auto-complete ref="formhelmversion" v-model="form.helm.version"
+                                                :data="helmChartVersionOptions" placeholder="请输入内容"
+                                                :filter-option="false" @search="helmChartVersionKeyword = $event"
+                                                @change="changeForm"
+                                                @select="changeForm(); $refs.formhelmversion?.blur?.()"
+                                                style="width:240px;margin-left:20px;"></a-auto-complete>
+                                        </a-form-item>
 
-                                        <el-form-item v-if="form.type == 'helm' && form.helm.helmtype == '2'"
-                                            label="Chart包地址" prop="chartName2" style="margin-bottom:18px;">
-                                            <el-input v-model="form.helm.chartName2" size="large" style="width:500px;"
+                                        <a-form-item v-if="form.type == 'helm' && form.helm.helmtype == '2'"
+                                            label="Chart包地址" field="chartName2" style="margin-bottom:18px;">
+                                            <a-input v-model="form.helm.chartName2" size="large" style="width:500px;"
                                                 @change="changeForm" placeholder="请输入" />
                                             <files-upload accept=".tgz" @success="helmUploadSuccess">
-                                                <el-button type="primary" size="large"
-                                                    style="margin-left:10px;">上传</el-button>
+                                                <a-button type="primary" size="large"
+                                                    style="margin-left:10px;">上传</a-button>
                                             </files-upload>
-                                        </el-form-item>
+                                        </a-form-item>
 
-                                        <el-form-item v-if="form.type == 'helm'" label="安装配置">
+                                        <a-form-item v-if="form.type == 'helm'" label="安装配置">
                                             <table class="table">
                                                 <thead>
                                                     <tr class="thead">
@@ -119,12 +112,12 @@
                                                 <tbody>
                                                     <tr v-for="(item, index) in form.helm.kv" :key="index">
                                                         <td>
-                                                            <el-input v-model="item.name" size="large"
+                                                            <a-input v-model="item.name" size="large"
                                                                 style="width:200px;" @change="changeForm"
                                                                 placeholder="请输入" />
                                                         </td>
                                                         <td>
-                                                            <el-input v-model="item.value" size="large"
+                                                            <a-input v-model="item.value" size="large"
                                                                 style="width:200px;" @change="changeForm"
                                                                 placeholder="请输入" />
                                                         </td>
@@ -137,15 +130,13 @@
                                                         <td colspan="3" style="box-sizing:border-box; cursor:pointer;"
                                                             @click="form.helm.kv.push({ name: '', value: '' }); changeForm();">
                                                             <div class="df ai-c jc-c">
-                                                                <span class="addmenu"><el-icon :size="14">
-                                                                        <Plus />
-                                                                    </el-icon>添加配置</span>
+                                                                <span class="addmenu"><icon-plus />添加配置</span>
                                                             </div>
                                                         </td>
                                                     </tr>
                                                 </tbody>
                                             </table>
-                                        </el-form-item>
+                                        </a-form-item>
 
                                     </div>
                                     <div v-if="form.type == 'helm'" class="greybox">
@@ -154,45 +145,41 @@
                                             <div v-for="(item, index) in form.helm.depend_yamls" :key="index"
                                                 style="margin-bottom:30px;" class="show-on-hover-container">
                                                 <div class="df yaml-header">
-                                                      <el-upload
-                                                        :before-upload="(e) => {helmyamlsUpload(e, index);return false}"
-                                                        :show-file-list="false"
-                                                    >
-                                                    <el-button type="primary">上传文件</el-button>
-                                                    </el-upload>
+                                                    <a-upload
+                                                        :on-before-upload="fileItem => { helmyamlsUpload(fileItem.file, index); return false }"
+                                                        :show-file-list="false">
+                                                        <a-button type="primary">上传文件</a-button>
+                                                    </a-upload>
                                                     <div class="show-on-hover yaml-delete">
-                                                        <el-icon :size="20" class="cursor"
+                                                        <icon-close :size="20" class="cursor"
                                                             @click="form.helm.depend_yamls.splice(index, 1); changeForm();">
-                                                            <close />
-                                                        </el-icon>
+                                                        </icon-close>
                                                     </div>
 
                                                 </div>
-                                                <el-form-item label="标题" style="margin-bottom: 20px">
-                                                    <el-input v-model="item.nameInput" placeholder="标题"
+                                                <a-form-item label="标题" style="margin-bottom: 20px">
+                                                    <a-input v-model="item.nameInput" placeholder="标题"
                                                         @change="changeForm" style="width:500px;"><template
-                                                            #append>.yaml</template></el-input>
-                                                </el-form-item>
-                                                <el-form-item label="YAML">
-                                                    <el-input v-model="item.yaml" rows="5" type="textarea"
+                                                            #append>.yaml</template></a-input>
+                                                </a-form-item>
+                                                <a-form-item label="YAML">
+                                                    <a-textarea v-model="item.yaml" :rows="5"
                                                         placeholder="请输入YAML" class="fc" @change="changeForm" />
                                                     <div class="command-upfile ml-20">
                                                         <input type="file" @change="e => helmyamlsUpload(e, index)" />
                                                     </div>
-                                                </el-form-item>
+                                                </a-form-item>
                                             </div>
                                             <div class="df ai-c jc-c cursor"
                                                 @click="form.helm.depend_yamls.push({ nameInput: '', name: '', yaml: '' })">
-                                                <span class="addmenu"><el-icon :size="14">
-                                                        <Plus />
-                                                    </el-icon>添加YAML</span>
+                                                <span class="addmenu"><icon-plus />添加YAML</span>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
-                            </el-form-item>
+                            </a-form-item>
 
-                            <el-form-item v-if="form.type == 'tradition'" label="环境类型">
+                            <a-form-item v-if="form.type == 'tradition'" label="环境类型">
                                 <div class="df df-ww env-sel">
                                     <div v-for="(item, index) in environmentList" :key="index"
                                         :class="{ 'active': form.environmentName == item.identifie }"
@@ -203,17 +190,17 @@
                                             style="display:none;" />
                                     </div>
                                 </div>
-                            </el-form-item>
-                            <el-form-item v-if="form.type == 'tradition'" label="环境版本">
-                                <el-select v-model="form.environmentVersion" placeholder="请选择" @change="changeForm"
+                            </a-form-item>
+                            <a-form-item v-if="form.type == 'tradition'" label="环境版本">
+                                <a-select v-model="form.environmentVersion" placeholder="请选择" @change="changeForm"
                                     size="large" style="width:500px;">
-                                    <el-option
+                                    <a-option
                                         v-for="(item, index) in environmentList?.find?.(i => i.identifie == form.environmentName)?.versions || []"
-                                        :key="index" :label="item" :value="item"></el-option>
-                                </el-select>
-                            </el-form-item>
+                                        :key="index" :label="item" :value="item"></a-option>
+                                </a-select>
+                            </a-form-item>
 
-                            <el-form-item
+                            <a-form-item
                                 v-if="!option || !option.pureManifest && form.type != 'docker' && form.type != 'light' && form.type != 'helm'"
                                 label="代码包">
                                 <div class="df ai-e">
@@ -222,28 +209,21 @@
                                             <img src="@/assets/img/zip.png" alt=""
                                                 style="width:60px;height:60px;display:block;" />
                                             <div class="df ai-c mt-20">
-                                                <el-icon :size="18" class="c-green"
-                                                    style="margin-right:6px;vertical-align:middle;">
-                                                    <CircleCheckFilled />
-                                                </el-icon>
+                                                <icon-check-circle-fill class="c-green file-status-icon" />
                                                 <div class="fs-14 c-33"
                                                     style="vertical-align:middle;max-width:200px;overflow:hidden;text-overflow:ellipsis;">
                                                     {{
                                                         zip.name }}</div>
                                             </div>
                                             <div class="mask df df-c ai-c jc-c">
-                                                <el-button type="primary">重新上传</el-button>
+                                                <a-button type="primary">重新上传</a-button>
                                             </div>
                                         </div>
                                         <div v-else class="upfilebox df df-c ai-c jc-c">
                                             <div class="df df-c ai-c">
-                                                <el-icon class="uploadicon c-99">
-                                                    <UploadFilled />
-                                                </el-icon>
+                                                <icon-upload class="uploadicon c-99" />
                                                 <span class="uploadbtn df ai-c">
-                                                    <el-icon class="uploadicon c-33">
-                                                        <Upload />
-                                                    </el-icon>
+                                                    <icon-upload class="uploadicon c-33" />
                                                     <span class="lh-1 c-33">上传代码包</span>
                                                 </span>
                                             </div>
@@ -256,38 +236,34 @@
                                 </div>
                                 <div v-if="zip.hasDockerfile === false" class="c-red mt-10">没有检测到Dockerfile文件，请重新上传
                                 </div>
-                            </el-form-item>
+                            </a-form-item>
 
                             <slot></slot>
 
-                            <el-form-item v-if="form.type == 'tradition'" label="CMD">
+                            <a-form-item v-if="form.type == 'tradition'" label="CMD">
                                 <div class="df df-c">
                                     <div v-for="(item, index) in form.cmd" :key="index" class="df ai-e"
                                         :style="{ marginTop: index == 0 ? 0 : '10px' }">
-                                        <el-input v-model="form.cmd[index]" @change="changeForm" type="textarea"
+                                        <a-textarea v-model="form.cmd[index]" @change="changeForm"
                                             :spellcheck="false" :rows="2" style="width:500px;"
-                                            placeholder="请输入"></el-input>
+                                            placeholder="请输入"></a-textarea>
                                         <div class="df ai-c">
                                             <span class="ml-10 cursor c-blue"
                                                 @click="form.cmd.length > 1 ? form.cmd.splice(index, 1) : form.cmd = ['']; changeForm();">删除</span>
                                             <span class="ml-10 cursor c-blue" v-if="index + 1 == form.cmd.length"
                                                 @click="form.cmd.push('')">添加</span>
-                                            <el-popover placement="top-start" v-if="index + 1 == form.cmd.length"
-                                                :width="300" trigger="hover"
-                                                content="容器的启动参数。该参数为可选参数，如果不填写，则默认使用 Dockerfile 中的 CMD。输入规范，以“空格”作为参数的分割标识，例如 -u app.py">
-                                                <template #reference>
-                                                    <el-icon class="fs-16 c-99 ml-4">
-                                                        <WarningFilled />
-                                                    </el-icon>
-                                                </template>
-                                            </el-popover>
+                                            <a-tooltip v-if="index + 1 == form.cmd.length"
+                                                content="容器的启动参数。该参数为可选参数，如果不填写，则默认使用 Dockerfile 中的 CMD。输入规范，以“空格”作为参数的分割标识，例如 -u app.py"
+                                                position="top">
+                                                <icon-exclamation-circle-fill class="fs-16 c-99 ml-4" />
+                                            </a-tooltip>
                                         </div>
                                     </div>
                                 </div>
-                            </el-form-item>
+                            </a-form-item>
 
-                            <el-form-item v-if="form.type != 'tradition' && form.type != 'helm' && form.type != 'light'"
-                                label="脚本配置" prop="shell" class="mt-16">
+                            <a-form-item v-if="form.type != 'tradition' && form.type != 'helm' && form.type != 'light'"
+                                label="脚本配置" field="shell" class="mt-16">
                                 <div style="flex:1;">
                                     <table class="table">
                                         <thead>
@@ -302,26 +278,26 @@
                                         <tbody>
                                             <tr v-for="(item, index) in form.shell" :key="index">
                                                 <td>
-                                                    <el-select v-model="item.type" placeholder="请选择类型"
+                                                    <a-select v-model="item.type" placeholder="请选择类型"
                                                         style="width:160px;">
-                                                        <el-option label="应用被安装时触发" value="requireinstall"></el-option>
-                                                        <el-option label="应用安装时触发" value="install"></el-option>
-                                                        <el-option label="应用安装前触发" value="pre-install"></el-option>
-                                                        <el-option label="应用更新时触发" value="upgrade"></el-option>
-                                                        <el-option label="应用卸载时触发" value="uninstall"></el-option>
-                                                        <el-option label="手动触发" value="custom"></el-option>
-                                                    </el-select>
+                                                        <a-option label="应用被安装时触发" value="requireinstall"></a-option>
+                                                        <a-option label="应用安装时触发" value="install"></a-option>
+                                                        <a-option label="应用安装前触发" value="pre-install"></a-option>
+                                                        <a-option label="应用更新时触发" value="upgrade"></a-option>
+                                                        <a-option label="应用卸载时触发" value="uninstall"></a-option>
+                                                        <a-option label="手动触发" value="custom"></a-option>
+                                                    </a-select>
                                                 </td>
                                                 <td>
-                                                    <el-input v-model="item.shell" :rows="2" type="textarea"
-                                                        :spellcheck="false" placeholder="请输入"></el-input>
+                                                    <a-textarea v-model="item.shell" :rows="2"
+                                                        :spellcheck="false" placeholder="请输入"></a-textarea>
                                                 </td>
                                                 <td>
-                                                    <el-input v-model="item.image" :spellcheck="false"
-                                                        placeholder="不填默认当前应用镜像"></el-input>
+                                                    <a-input v-model="item.image" :spellcheck="false"
+                                                        placeholder="不填默认当前应用镜像"></a-input>
                                                 </td>
                                                 <td>
-                                                    <el-input v-model="item.title" placeholder="请输入"></el-input>
+                                                    <a-input v-model="item.title" placeholder="请输入"></a-input>
                                                 </td>
                                                 <td><span class="c-blue cursor handle"
                                                         @click="form.shell.splice(index, 1);">删除</span></td>
@@ -329,15 +305,13 @@
                                             <tr>
                                                 <td colspan="5" class="cursor txt-c"
                                                     @click="form.shell.push({ title: '', type: '', shell: '' })">
-                                                    <span class="addmenu"><el-icon :size="14">
-                                                            <Plus />
-                                                        </el-icon>添加脚本</span>
+                                                    <span class="addmenu"><icon-plus />添加脚本</span>
                                                 </td>
                                             </tr>
                                         </tbody>
                                     </table>
                                 </div>
-                            </el-form-item>
+                            </a-form-item>
 
 
                         </div>
@@ -346,83 +320,83 @@
                     <div v-if="form.type != 'helm' && form.type != 'tradition'" class="bg-white com-line mt-20">
                         <div class="mt-16">
 
-                            <el-form-item label="应用配置">
+                            <a-form-item label="应用配置">
                                 <div v-if="form.containers && form.containers.length">
                                     {{form.containers.map(i => i.name).join(', ')}}</div>
                                 <div v-else>无</div>
                                 <span class="cursor c-blue ml-10" @click="openAppset">编辑</span>
-                            </el-form-item>
+                            </a-form-item>
 
 
-                            <el-form-item v-if="form.type != 'helm'" label="域名设置" class="mt-16">
+                            <a-form-item v-if="form.type != 'helm'" label="域名设置" class="mt-16">
                                 <div style="flex:1;">
 
                                     <form-ingress v-model="form.ingress" :app-names="app_names" :app-ports="app_ports"
                                         :mainapp="option && option.mainapp" :identifie="identifie"
                                         @checkDomainStartParams="checkDomainStartParams" />
                                 </div>
-                            </el-form-item>
+                            </a-form-item>
                         </div>
                     </div>
 
                     <div class="bg-white com-line mt-20">
-                        <el-form-item class="mt-16" label="启动参数" prop="startParams">
-                            <div>
-                                <el-checkbox v-model="form.mysql8" label="mysql8.0" />
-                                <el-checkbox v-model="form.mysql5" label="mysql5.6" />
-                                <el-checkbox v-model="form.redis" label="redis" />
-                                <el-checkbox v-model="form.mongodb6" label="mongodb" />
-                            </div>
-                            <div style="width:100%;">
-                                <el-button type="primary" @click="openSpEdit">批量修改</el-button>
-                            </div>
-                            <table class="table mt-10">
-                                <thead>
-                                    <tr>
-                                        <td>标识</td>
-                                        <td>名称</td>
-                                        <td>必填</td>
-                                        <td>默认值</td>
-                                        <td>依赖系统组件标识</td>
-                                        <td style="width:100px;">操作</td>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr v-for="(item, index) in form.startParams" :key="index">
-                                        <td><el-input v-model="item.name" @change="getStart"
-                                                :disabled="computedSpDisabled(item)" :spellcheck="false"
-                                                placeholder="配置标识"></el-input></td>
-                                        <td><el-input v-model="item.title" @change="getStart"
-                                                :disabled="computedSpDisabled(item)" :spellcheck="false"
-                                                placeholder="配置名称"></el-input></td>
-                                        <td><el-switch v-model="item.required" @change="getStart"
-                                                :disabled="computedSpDisabled(item)" />
-                                        </td>
-                                        <td><el-input v-model="item.values_text" @change="getStart"
-                                                :disabled="computedSpDisabled(item)" :spellcheck="false"
-                                                placeholder="配置默认值"></el-input></td>
-                                        <td><el-input v-model="item.module_name" @change="getStart" :spellcheck="false"
-                                                placeholder="依赖的系统组件标识名"></el-input></td>
-                                        <td>
-                                            <span class="c-blue cursor handle" @click="openSpDesc(item)">编辑描述</span>
-                                            <span class="c-blue cursor handle"
-                                                @click="form.startParams.splice(index, 1); getStart();">删除</span>
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td colspan="6" class="cursor txt-c"
-                                            @click="form.startParams.push({ name: '', title: '', required: true, values_text: '', module_name: '', description: '' })">
-                                            <span class="addmenu"><el-icon :size="14">
-                                                    <Plus />
-                                                </el-icon>添加启动参数</span>
-                                        </td>
-                                    </tr>
-                                </tbody>
+                        <a-form-item class="mt-16" label="启动参数" field="startParams">
+                            <div class="manifest-field-stack">
+                                <div class="start-param-head">
+                                    <div class="start-param-services">
+                                        <a-checkbox v-model="form.mysql8">mysql8.0</a-checkbox>
+                                        <a-checkbox v-model="form.mysql5">mysql5.6</a-checkbox>
+                                        <a-checkbox v-model="form.redis">redis</a-checkbox>
+                                        <a-checkbox v-model="form.mongodb6">mongodb</a-checkbox>
+                                    </div>
+                                    <a-button type="primary" @click="openSpEdit">批量修改</a-button>
+                                </div>
+                                <table class="table mt-10">
+                                    <thead>
+                                        <tr>
+                                            <td>标识</td>
+                                            <td>名称</td>
+                                            <td>必填</td>
+                                            <td>默认值</td>
+                                            <td>依赖系统组件标识</td>
+                                            <td style="width:100px;">操作</td>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr v-for="(item, index) in form.startParams" :key="index">
+                                            <td><a-input v-model="item.name" @change="getStart"
+                                                    :disabled="computedSpDisabled(item)" :spellcheck="false"
+                                                    placeholder="配置标识"></a-input></td>
+                                            <td><a-input v-model="item.title" @change="getStart"
+                                                    :disabled="computedSpDisabled(item)" :spellcheck="false"
+                                                    placeholder="配置名称"></a-input></td>
+                                            <td><a-switch v-model="item.required" @change="getStart"
+                                                    :disabled="computedSpDisabled(item)" />
+                                            </td>
+                                            <td><a-input v-model="item.values_text" @change="getStart"
+                                                    :disabled="computedSpDisabled(item)" :spellcheck="false"
+                                                    placeholder="配置默认值"></a-input></td>
+                                            <td><a-input v-model="item.module_name" @change="getStart"
+                                                    :spellcheck="false" placeholder="依赖的系统组件标识名"></a-input></td>
+                                            <td>
+                                                <span class="c-blue cursor handle" @click="openSpDesc(item)">编辑描述</span>
+                                                <span class="c-blue cursor handle"
+                                                    @click="form.startParams.splice(index, 1); getStart();">删除</span>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td colspan="6" class="cursor txt-c"
+                                                @click="form.startParams.push({ name: '', title: '', required: true, values_text: '', module_name: '', description: '' })">
+                                                <span class="addmenu"><icon-plus />添加启动参数</span>
+                                            </td>
+                                        </tr>
+                                    </tbody>
 
-                            </table>
-                        </el-form-item>
+                                </table>
+                            </div>
+                        </a-form-item>
 
-                        <el-form-item class="mt-20" label="安装依赖">
+                        <a-form-item class="mt-20" label="安装依赖">
                             <table class="table">
                                 <thead>
                                     <tr>
@@ -436,23 +410,23 @@
                                 <tbody>
                                     <tr v-for="(item, index) in form.depends" :key="index">
                                         <td>
-                                            <el-select v-model="item.identifie" size="large"
+                                            <a-select v-model="item.identifie" size="large"
                                                 @change="getSubDepends(index); item.subidentifie = ''; item.subname = ''; item.name = dependsList[item.identifie]; changeForm()"
                                                 placeholder="请选择">
-                                                <el-option v-for="(name, identifie) in dependsList" :key="identifie"
-                                                    :label="name" :value="identifie"></el-option>
-                                            </el-select>
+                                                <a-option v-for="(name, identifie) in dependsList" :key="identifie"
+                                                    :label="name" :value="identifie"></a-option>
+                                            </a-select>
                                         </td>
                                         <td>
-                                            <el-select v-model="item.subidentifie" size="large"
+                                            <a-select v-model="item.subidentifie" size="large"
                                                 @change="item.subname = subDependsList[index][item.subidentifie]; changeForm()"
                                                 placeholder="请选择">
-                                                <el-option v-for="(name, identifie) in subDependsList[index]"
-                                                    :key="identifie" :label="name" :value="identifie"></el-option>
-                                            </el-select>
+                                                <a-option v-for="(name, identifie) in subDependsList[index]"
+                                                    :key="identifie" :label="name" :value="identifie"></a-option>
+                                            </a-select>
                                         </td>
                                         <td>
-                                            <el-switch v-model="item.required" @change="changeForm" />
+                                            <a-switch v-model="item.required" @change="changeForm" />
                                         </td>
                                         <td>{{ dependsList[item.identifie] }}</td>
                                         <td>
@@ -463,23 +437,21 @@
                                     <tr>
                                         <td colspan="5" class="cursor txt-c"
                                             @click="form.depends.push({ identifie: '', name: '', required: false, type: 'out' })">
-                                            <span class="addmenu"><el-icon :size="14">
-                                                    <Plus />
-                                                </el-icon>添加安装依赖</span>
+                                            <span class="addmenu"><icon-plus />添加安装依赖</span>
                                         </td>
                                     </tr>
                                 </tbody>
                             </table>
-                        </el-form-item>
+                        </a-form-item>
                     </div>
 
                     <div class="bg-white pb-24 mt-20 df ai-c">
-                        <el-button v-if="option.pureManifest" :loading="submiting" type="primary"
-                            @click="submit(otherData)" style="width:90px;">确定提交</el-button>
-                        <el-button v-else :loading="submiting" type="primary" @click="submit()"
-                            style="width:90px;">确定提交</el-button>
+                        <a-button v-if="option.pureManifest" :loading="submiting" type="primary"
+                            @click="submit(otherData)" style="width:90px;">确定提交</a-button>
+                        <a-button v-else :loading="submiting" type="primary" @click="submit()"
+                            style="width:90px;">确定提交</a-button>
                     </div>
-                </el-form>
+                </a-form>
             </div>
         </div>
         <div v-show="showYaml" class="box" style="width:600px; position:relative; padding-right:0;">
@@ -491,36 +463,47 @@
             </div>
         </div>
 
-        <el-dialog v-model="dependForm.show" :title="dependForm.editIndex >= 0 ? '修改子应用' : '添加子应用'" width="640px"
+        <a-modal v-model:visible="dependForm.show" :title="dependForm.editIndex >= 0 ? '修改子应用' : '添加子应用'" :width="640"
+            :footer="false"
             @close="dependForm = { show: false, editIndex: -1, identifie_before: '', identifie_last: '', identifie: '', name: '', required: false, from: '' };">
-            <el-form ref="depend" :rules="addRules" :model="dependForm" label-width="80px">
-                <el-form-item label="标识" prop="identifie">
+            <a-form ref="depend" :rules="addRules" :model="dependForm"
+                :label-col-props="{ span: 5, flex: '0 0 80px' }"
+                :wrapper-col-props="{ span: 19, flex: '1' }">
+                <a-form-item label="标识" field="identifie">
                     <w7-identifie v-model:author="dependForm.identifie_before"
                         v-model:identifie="dependForm.identifie_last" @change="onChange" :author-disabled="true" />
-                </el-form-item>
-                <el-form-item label="名称" prop="name">
-                    <el-input placeholder="请输入名称" v-model="dependForm.name" size="large"
-                        style="width:500px;"></el-input>
-                </el-form-item>
-                <el-form-item label="可选安装" prop="from">
-                    <el-switch v-model="dependForm.required" :active-value="false" :inactive-value="true" />
-                </el-form-item>
-                <el-form-item label="" class="mt-20">
-                    <el-button type="primary" size="large" @click="addDepend">确定</el-button>
-                </el-form-item>
-            </el-form>
-        </el-dialog>
+                </a-form-item>
+                <a-form-item label="名称" field="name">
+                    <a-input placeholder="请输入名称" v-model="dependForm.name" size="large"
+                        style="width:500px;"></a-input>
+                </a-form-item>
+                <a-form-item label="可选安装" field="from">
+                    <a-switch v-model="dependForm.required" :checked-value="false" :unchecked-value="true" />
+                </a-form-item>
+                <a-form-item label="" class="mt-20">
+                    <a-button type="primary" size="large" @click="addDepend">确定</a-button>
+                </a-form-item>
+            </a-form>
+        </a-modal>
 
-        <el-dialog v-model="spEdit.show" title="启动参数" width="700px" custom-class="envdialog">
+        <a-modal v-model:visible="spEdit.show" title="启动参数" :width="700" modal-class="envdialog" :footer="false">
             <span class="c-66">格式：键=值 #标题 : 描述 : 必填(1或0) : 依赖组件标识</span>
-            <el-input v-model="spEdit.values" class="mt-10" type="textarea" :spellcheck="false"
+            <a-textarea v-model="spEdit.values" class="mt-10" :spellcheck="false"
                 placeholder="格式：键=值 #标题 : 描述 : 必填(1或0) : 依赖组件标识" :rows="12"
-                :input-style="{ lineHeight: '24px' }"></el-input>
+                :auto-size="false"></a-textarea>
             <div class="df ai-c jc-c mt-20">
-                <el-button @click="spEdit.show = false;">取消</el-button>
-                <el-button @click="submitSpEdit" type="primary">确定</el-button>
+                <a-button @click="spEdit.show = false;">取消</a-button>
+                <a-button @click="submitSpEdit" type="primary">确定</a-button>
             </div>
-        </el-dialog>
+        </a-modal>
+
+        <a-modal v-model:visible="spDesc.show" title="描述" :width="520" modal-class="envdialog">
+            <a-input v-model="spDesc.value" placeholder="请编辑描述" />
+            <template #footer>
+                <a-button @click="spDesc.show = false">取消</a-button>
+                <a-button type="primary" @click="submitSpDesc">确定</a-button>
+            </template>
+        </a-modal>
 
     </div>
 </template>
@@ -532,6 +515,15 @@ import filesUpload from './files-upload.vue';
 import formIngress from '@/components/form-ingress.vue';
 import w7Identifie from "@/components/w7-identifie.vue";
 import myAxios from '../utils/index';
+import {
+    IconCheckCircleFill,
+    IconClose,
+    IconExclamationCircleFill,
+    IconLoading,
+    IconPlus,
+    IconUpload,
+} from '@arco-design/web-vue/es/icon';
+import { confirm, messageError, messageSuccess, messageWarning } from '@/utils/ui-feedback';
 
 import { bus } from "wujie";
 
@@ -544,7 +536,17 @@ export default {
         'identifie',
         'version_id',
     ],
-    components: { filesUpload, formIngress, w7Identifie },
+    components: {
+        filesUpload,
+        formIngress,
+        w7Identifie,
+        IconCheckCircleFill,
+        IconClose,
+        IconExclamationCircleFill,
+        IconLoading,
+        IconPlus,
+        IconUpload,
+    },
     data() {
         return {
             field_arr: [
@@ -634,32 +636,32 @@ export default {
                 identifie: [
                     { required: true, message: '内容不能为空', trigger: 'blur' },
                     {
-                        required: true, trigger: 'blur', validator: (rule, value, callback) => {
+                        required: true, trigger: 'blur', validator: (value, callback) => {
                             if (this.form.author) { callback() }
-                            else { callback(new Error("请输入完整")) }
+                            else { callback("请输入完整") }
                         }
                     },
                     {
-                        required: true, trigger: 'blur', validator: (rule, value, callback) => {
+                        required: true, trigger: 'blur', validator: (value, callback) => {
                             if (/^[a-zA-Z0-9]+$/.test(value)) { callback() }
-                            else { callback(new Error("标识格式有误")) }
+                            else { callback("标识格式有误") }
                         }
                     },
                     {
-                        required: true, trigger: 'blur', validator: (rule, value, callback) => {
+                        required: true, trigger: 'blur', validator: (value, callback) => {
                             if (/^[a-zA-Z0-9]+$/.test(this.form.author)) { callback() }
-                            else { callback(new Error("标识格式有误")) }
+                            else { callback("标识格式有误") }
                         }
                     },
                 ],
                 port: [
                     { required: true, message: '内容不能为空', trigger: 'blur' },
                     {
-                        required: true, trigger: 'blur', validator: (rule, value, callback) => {
+                        required: true, trigger: 'blur', validator: (value, callback) => {
                             if (value?.filter?.(i => i.name && i.protocol && i.port)?.length) {
                                 callback()
                             } else {
-                                callback(new Error("必填项不能为空"))
+                                callback("必填项不能为空")
                             }
                         }
                     },
@@ -670,9 +672,9 @@ export default {
                     { required: true, message: '内容不能为空', trigger: 'blur' },
 
                     {
-                        required: true, trigger: 'blur', validator: (rule, value, callback) => {
+                        required: true, trigger: 'blur', validator: (value, callback) => {
                             if (/^[a-zA-Z0-9]+-[a-zA-Z0-9]+$/.test(value)) { callback() }
-                            else { callback(new Error("标识格式有误")) }
+                            else { callback("标识格式有误") }
                         }
                     },
                 ],
@@ -719,6 +721,11 @@ export default {
                 show: false,
                 values: '',
             },
+            spDesc: {
+                show: false,
+                item: null,
+                value: '',
+            },
 
             dependsList: {},
             subDependsList: {},
@@ -729,6 +736,8 @@ export default {
 
             helmCharts: [],
             helmChartVersions: [],
+            helmChartKeyword: '',
+            helmChartVersionKeyword: '',
 
             getChartInfoLoading: false,
 
@@ -779,6 +788,12 @@ export default {
     },
 
     computed: {
+        helmChartOptions() {
+            return this.filterAutocompleteOptions(this.helmCharts, this.helmChartKeyword);
+        },
+        helmChartVersionOptions() {
+            return this.filterAutocompleteOptions(this.helmChartVersions, this.helmChartVersionKeyword);
+        },
     },
     watch: {
         'dependForm.identifie_before'() {
@@ -852,6 +867,14 @@ export default {
         } catch { }
     },
     methods: {
+        filterAutocompleteOptions(list = [], keyword = '') {
+            let normalizedKeyword = String(keyword || '').toLowerCase();
+            let source = normalizedKeyword
+                ? list.filter(item => String(item || '').toLowerCase().includes(normalizedKeyword))
+                : list;
+            return source.map(item => ({ label: item, value: item }));
+        },
+        onChange() { },
         computedSpDisabled(item) {
             return ((this.disabledDomainStartParams || this.form.type == 'tradition') && item.mark === 'domain')
                 || (this.json?.platform?.['volumeClaimTemplates']?.length && item.mark === 'storage');
@@ -1000,7 +1023,7 @@ export default {
             let file = e
             if (!file) { return }
             if (!(/\.yaml$/.test(file.name) || /\.yml$/.test(file.name))) {
-                this.$message.error('请上传yaml文件');
+                messageError('请上传yaml文件');
                 return;
             }
             this.form.helm.depend_yamls[index].name = file.name;
@@ -1125,12 +1148,16 @@ export default {
         },
 
         openSpDesc(item) {
-            this.$prompt('请编辑描述', '描述', {
-                inputValue: item.description,
-            }).then((value) => {
-                item.description = value.value || '';
+            this.spDesc.show = true;
+            this.spDesc.item = item;
+            this.spDesc.value = item.description || '';
+        },
+        submitSpDesc() {
+            if (this.spDesc.item) {
+                this.spDesc.item.description = this.spDesc.value || '';
                 this.getStart();
-            }).catch(() => { });
+            }
+            this.spDesc.show = false;
         },
         openAddDepend() {
             this.dependForm.show = true;
@@ -1138,10 +1165,10 @@ export default {
             this.dependForm.identifie_before = identifie.match(/^([^-]+)-(.+)$/)?.[1] || '';
         },
         addDepend() {
-            this.$refs.depend.validate((valid) => {
-                if (!valid) { return }
+            this.$refs.depend.validate((errors) => {
+                if (errors) { return }
                 if (!this.dependForm.identifie_before || !this.dependForm.identifie_last) {
-                    this.$message.warning('标识请填写完整');
+                    messageWarning('标识请填写完整');
                     return;
                 }
                 let o = {
@@ -1169,8 +1196,8 @@ platform:
     container:
         containerPort: 80
 `
-                this.$refs.formref.validate(async (valid) => {
-                    if (!valid) { this.$message.warning('必填项不能为空'); return }
+                this.$refs.formref.validate(async (errors) => {
+                    if (errors) { messageWarning('必填项不能为空'); return }
 
                     if (this.form.type == 'helm' || this.form.type == 'tradition') {
                         try {
@@ -1238,7 +1265,7 @@ platform:
             formdata.append('identifie', this.form.author + '-' + this.form.identifie);
             formdata.append('file', this.logofile);
             myAxios.post('/respo/icon', formdata).then(res => {
-                this.$message.success('添加成功');
+                messageSuccess('添加成功');
                 this.logoimg = res.data?.data?.url;
                 if (!/^https?:\/\//.test(this.logoimg)) {
                     this.logoimg = this.baseurl + this.logoimg;
@@ -1251,7 +1278,7 @@ platform:
             myAxios.post('/respo/tag/delete', {
                 tagId: this.form.tags[index].id,
             }).then(res => {
-                this.$message.success('删除成功');
+                messageSuccess('删除成功');
                 this.form.tags.splice(index, 1);
             })
         },
@@ -1263,7 +1290,7 @@ platform:
                 identifie: this.form.author + '-' + this.form.identifie,
                 name: tag,
             }).then(res => {
-                this.$message.success('添加成功');
+                messageSuccess('添加成功');
                 this.form.tags.push({ name: tag, id: res.data.id });
                 this.form.taginput = '';
                 this.getTag();
@@ -1304,15 +1331,18 @@ platform:
             this.changeForm();
         },
         deleteUpload() {
-            this.$confirm('确定要删除吗', "提示", {
-                confirmButtonText: "确定",
-                cancelButtonText: "取消",
-            }).then(() => {
-                this.zip.name = '';
-                this.zip.url = '';
-                delete this.json.source;
-                this.setYaml();
-            }).catch(() => { })
+            confirm({
+                title: '提示',
+                content: '确定要删除吗',
+                confirmButtonText: '确定',
+                cancelButtonText: '取消',
+                onOk: () => {
+                    this.zip.name = '';
+                    this.zip.url = '';
+                    delete this.json.source;
+                    this.setYaml();
+                },
+            });
         },
         uploadHelmChart(data) {
             if (data?.url || data?.data?.url) {
@@ -1489,8 +1519,8 @@ platform:
         },
         submit(otherData, callback) {
 
-            this.$refs.formref.validate(async (valid) => {
-                if (!valid) { this.$message.warning('必填项不能为空'); return }
+            this.$refs.formref.validate(async (errors) => {
+                if (errors) { messageWarning('必填项不能为空'); return }
 
                 if (this.form.type == 'helm' || this.form.type == 'tradition') {
                     try {
@@ -1715,7 +1745,7 @@ platform:
                 document.execCommand('copy', true);
                 document.body.removeChild(textarea);
             }
-            this.$message.success("复制成功")
+            messageSuccess("复制成功")
         },
     },
 }
@@ -1744,6 +1774,31 @@ platform:
 .com-line {
     padding-bottom: 20px;
     border-bottom: 1px solid #E7E7E7;
+}
+
+.manifest-field-stack {
+    width: 100%;
+    min-width: 0;
+}
+
+.start-param-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    width: 100%;
+}
+
+.start-param-services {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 20px;
+    min-width: 0;
+}
+
+.start-param-services :deep(.arco-checkbox) {
+    margin-right: 0;
 }
 
 .upfilebox {
@@ -1930,7 +1985,7 @@ platform:
     padding: 0;
 }
 
-.box>>>.pre {
+.box :deep(.pre) {
     margin: 0;
     height: 100%;
     font-size: 16px;
@@ -1939,12 +1994,12 @@ platform:
     background: #282c34;
 }
 
-.box>>>input::-webkit-outer-spin-button,
-.box>>>input::-webkit-inner-spin-button {
+.box :deep(input::-webkit-outer-spin-button),
+.box :deep(input::-webkit-inner-spin-button) {
     -webkit-appearance: none;
 }
 
-.box>>>input[type="number"] {
+.box :deep(input[type="number"]) {
     appearance: textfield;
 }
 
@@ -2037,7 +2092,7 @@ platform:
     cursor: pointer;
 }
 
-div>>>pre .hljs {
+:deep(pre .hljs) {
     height: 100%;
     box-sizing: border-box;
 }
@@ -2081,42 +2136,44 @@ div>>>pre .hljs {
 }
 </style>
 <style>
-.menulocation .el-radio {
+.menulocation .arco-radio {
     height: 20px;
 }
 
-.menulocation .el-radio__label {
+.menulocation .arco-radio-label {
     padding-left: 4px;
     font-size: 12px;
 }
 
-.support-group .el-checkbox {
+.support-group .arco-checkbox {
     height: 18px;
     width: 120px;
     margin-right: 20px;
     margin-bottom: 10px;
 }
 
-.manifest-form .el-form-item__label {
+.manifest-form .arco-form-item-label {
     color: rgba(0, 0, 0, 0.9);
 }
 
-.envdialog .el-dialog__body {
+.manifest-form .arco-form-item-layout-horizontal>.arco-form-item-label-col {
+    flex: 0 0 120px !important;
+    max-width: 120px !important;
+}
+
+.manifest-form .arco-form-item-layout-horizontal>.arco-form-item-wrapper-col {
+    flex: 1 1 0 !important;
+    max-width: calc(100% - 120px) !important;
+    min-width: 0;
+}
+
+.manifest-form .arco-form-item-content-wrapper,
+.manifest-form .arco-form-item-content {
+    width: 100%;
+    min-width: 0;
+}
+
+.envdialog .arco-modal-body {
     padding-top: 0;
-}
-
-.container-drawer .el-drawer {
-    width: 1000px !important;
-}
-
-.container-drawer .el-drawer__footer {
-    padding: 16px;
-    border-top: 1px solid #E7E7E7;
-}
-
-.container-drawer .el-drawer__header {
-    padding: 16px;
-    margin-bottom: 0;
-    border-bottom: 1px solid #E7E7E7;
 }
 </style>

@@ -2,44 +2,42 @@
     <div class="df content">
         <div class="fc" style="padding-left:0; overflow:auto;">
             <div v-if="noRole && !isCreate">
-                <el-empty :image-size="200" description="">
-                    <template #description>
-                        <span class="c-99">暂无数据，点击</span>
-                        <span class="cursor c-blue" @click="isCreate = true;">创建应用配置</span>
-                    </template>
-                </el-empty>
+                <a-empty :image-size="200" description="">
+                    <span class="c-99">暂无数据，点击</span>
+                    <span class="cursor c-blue" @click="isCreate = true;">创建应用配置</span>
+                </a-empty>
             </div>
             <div v-else>
-                <el-form ref="formref" :model="form" label-width="100px" :rules="rules" label-position="left"
-                    class="form manifest-form">
+                <a-form ref="formref" :model="form" :rules="rules" label-align="left"
+                    :label-col-props="{ span: 3 }" :wrapper-col-props="{ span: 21 }" class="form manifest-form">
                     <div class="df jc-e">
-                        <el-button v-if="!showYaml" type="primary" @click="showYaml = true;">预览yaml</el-button>
+                        <a-button v-if="!showYaml" type="primary" @click="showYaml = true;">预览yaml</a-button>
                     </div>
                     <div class="bg-white com-line df" style="margin-bottom:20px;">
                         <div class="fc">
                             <div class="c-00-6 df ai-c">基础配置</div>
-                            <el-form-item class="mt-16" label="名称">
-                                <el-input v-model="form.name" size="large" :disabled="!noPlatform" style="width:500px;"
-                                    @change="changeForm" placeholder="请输入"></el-input>
-                            </el-form-item>
-                            <el-form-item label="标识">
+                            <a-form-item class="mt-16" label="名称" field="name">
+                                <a-input v-model="form.name" size="large" :disabled="!noPlatform" style="width:500px;"
+                                    @change="changeForm" placeholder="请输入"></a-input>
+                            </a-form-item>
+                            <a-form-item label="标识" field="identifie">
                                 <div class="df jc-b" style="width:500px;">
                                     <w7-identifie v-model:author="form.author" v-model:identifie="form.identifie"
                                         @change="onChange" disabled />
                                 </div>
-                            </el-form-item>
-                            <el-form-item label="描述">
+                            </a-form-item>
+                            <a-form-item label="描述">
                                 <div class="df df-c">
-                                    <el-input v-model="form.description" :disabled="!noPlatform" size="large"
-                                        style="width:500px;" placeholder="请输入应用描述" @change="changeForm"></el-input>
+                                    <a-input v-model="form.description" :disabled="!noPlatform" size="large"
+                                        style="width:500px;" placeholder="请输入应用描述" @change="changeForm"></a-input>
                                 </div>
-                            </el-form-item>
+                            </a-form-item>
                         </div>
                     </div>
 
                     <div class="bg-white">
                         <div>
-                            <el-form-item v-if="form.type != 'tradition'" label="前端配置">
+                            <a-form-item v-if="form.type != 'tradition'" label="前端配置">
                                 <div class="f1">
 
                                     <files-upload @success="webUploadSuccess">
@@ -47,27 +45,24 @@
                                             <img src="@/assets/img/zip.png" alt=""
                                                 style="width:60px;height:60px;display:block;" />
                                             <div class="df ai-c mt-20">
-                                                <el-icon :size="18" class="c-green"
-                                                    style="margin-right:6px;vertical-align:middle;">
-                                                    <CircleCheckFilled />
-                                                </el-icon>
+                                                <icon-check-circle-fill class="c-green file-status-icon" />
                                                 <div class="fs-14 c-33"
                                                     style="vertical-align:middle;max-width:200px;overflow:hidden;text-overflow:ellipsis;">
                                                     {{ web.name }}</div>
                                             </div>
                                             <div class="mask df df-c ai-c jc-c">
-                                                <el-button type="primary">重新上传</el-button>
+                                                <a-button type="primary">重新上传</a-button>
                                             </div>
                                         </div>
                                         <div v-else class="upfilebox df df-c ai-c jc-c">
                                             <div class="df df-c ai-c">
-                                                <el-icon class="uploadicon c-99">
-                                                    <UploadFilled />
-                                                </el-icon>
+                                                <svg class="uploadicon upload-cloud-icon c-99" xmlns="http://www.w3.org/2000/svg"
+                                                    viewBox="0 0 1024 1024" aria-hidden="true">
+                                                    <path fill="currentColor"
+                                                        d="M544 864V672h128L512 480 352 672h128v192H320v-1.6c-5.376.32-10.496 1.6-16 1.6A240 240 0 0 1 64 624c0-123.136 93.12-223.488 212.608-237.248A239.81 239.81 0 0 1 512 192a239.87 239.87 0 0 1 235.456 194.752c119.488 13.76 212.48 114.112 212.48 237.248a240 240 0 0 1-240 240c-5.376 0-10.56-1.28-16-1.6v1.6z"></path>
+                                                </svg>
                                                 <span class="uploadbtn df ai-c">
-                                                    <el-icon class="uploadicon c-33">
-                                                        <Upload />
-                                                    </el-icon>
+                                                    <icon-upload class="uploadicon c-33" />
                                                     <span class="lh-1 c-33">上传代码包</span>
                                                 </span>
                                             </div>
@@ -76,25 +71,25 @@
 
                                     <div>
                                         <div class="df ai-c mt-16">
-                                            <el-tabs v-model="form.menu_type" class="fc"
-                                                @tab-click="() => { roleEdit.index = -1 }">
-                                                <el-tab-pane label="微擎云端控制台" name="console"></el-tab-pane>
-                                                <el-tab-pane label="微擎面板控制台" name="thirdparty_cd"></el-tab-pane>
-                                            </el-tabs>
+                                            <a-tabs v-model:active-key="form.menu_type" class="fc"
+                                                @change="() => { roleEdit.index = -1 }">
+                                                <a-tab-pane key="console" title="微擎云端控制台"></a-tab-pane>
+                                                <a-tab-pane key="thirdparty_cd" title="微擎面板控制台"></a-tab-pane>
+                                            </a-tabs>
                                         </div>
 
                                         <div v-show="form.menu_type == 'console'" class="df ai-c mt-10">
                                             <div style="">
-                                                <el-checkbox v-model="form.role_founder" label="创始人端" />
-                                                <el-checkbox v-model="form.role_super" label="超级管理端" />
+                                                <a-checkbox v-model="form.role_founder">创始人端</a-checkbox>
+                                                <a-checkbox v-model="form.role_super">超级管理端</a-checkbox>
                                             </div>
                                         </div>
                                         <div v-show="form.menu_type == 'thirdparty_cd'" class="df ai-c mt-10">
                                             <div style="">
-                                                <el-checkbox v-model="cdrole.founder" label="创始人" />
-                                                <el-checkbox v-model="cdrole.super" label="管理员" />
-                                                <el-checkbox v-model="cdrole.tech" label="技术人员" />
-                                                <el-checkbox v-model="cdrole.normal" label="普通用户" />
+                                                <a-checkbox v-model="cdrole.founder">创始人</a-checkbox>
+                                                <a-checkbox v-model="cdrole.super">管理员</a-checkbox>
+                                                <a-checkbox v-model="cdrole.tech">技术人员</a-checkbox>
+                                                <a-checkbox v-model="cdrole.normal">普通用户</a-checkbox>
                                             </div>
                                         </div>
                                         <div v-for="(r, rindex) in form.role.filter(i => i.support == form.menu_type)"
@@ -103,32 +98,30 @@
                                                 <div class="df ai-c">
                                                     <div v-if="roleEdit.index == rindex" class="df">
                                                         <span>名称：</span>
-                                                        <el-input v-model="roleEdit.title" style="width:140px;"
-                                                            placeholder="请输入名称"></el-input>
+                                                        <a-input v-model="roleEdit.title" style="width:140px;"
+                                                            placeholder="请输入名称"></a-input>
                                                         <span class="ml-20">标识：</span>
-                                                        <el-input v-model="roleEdit.name" style="width:140px;"
+                                                        <a-input v-model="roleEdit.name" style="width:140px;"
                                                             :disabled="r.name == 'founder' || r.name == 'super'"
-                                                            placeholder="请输入标识"></el-input>
+                                                            placeholder="请输入标识"></a-input>
                                                     </div>
                                                     <div v-else-if="r.support === 'thirdparty_cd'"
                                                         class="df ai-c">
                                                         <span class="lh-1 mr-20">{{ r.title }}</span>
-                                                        <el-checkbox v-model="r.load_mode" true-label="iframe"
-                                                        false-label="static_hosting" @change="changeLoadMode(r)">
-                                                        <span class="c-66">支持iframe</span></el-checkbox>
+                                                        <a-checkbox :model-value="r.load_mode === 'iframe'"
+                                                            @change="v => { r.load_mode = v ? 'iframe' : 'static_hosting'; changeLoadMode(r); }">
+                                                            <span class="c-66">支持iframe</span></a-checkbox>
                                                     </div>
                                                     <div v-else
                                                         class="df ai-c cursor">
                                                         <div @click="roleEdit = { index: rindex, title: r.title, name: r.name }" class="mr-20">
                                                             <span class="lh-1">{{ r.title }}</span>
-                                                            <el-icon v-if="r.support != 'thirdparty_cd'" color="#333333"
-                                                                :size="14" style="margin-left:4px;">
-                                                                <Edit />
-                                                            </el-icon>
+                                                            <icon-edit v-if="r.support != 'thirdparty_cd'"
+                                                                class="role-edit-icon" />
                                                         </div>
-                                                        <el-checkbox v-model="r.load_mode" true-label="iframe"
-                                                        false-label="static_hosting" @change="changeLoadMode(r)"><span
-                                                            class="c-66">支持iframe</span></el-checkbox>
+                                                        <a-checkbox :model-value="r.load_mode === 'iframe'"
+                                                            @change="v => { r.load_mode = v ? 'iframe' : 'static_hosting'; changeLoadMode(r); }"><span
+                                                            class="c-66">支持iframe</span></a-checkbox>
                                                     </div>
 
                                                     <div v-if="roleEdit.index == rindex"
@@ -140,116 +133,116 @@
                                                     </div>
                                                 </div>
                                                 <div class="df ai-c">
-                                                    <el-popover placement="top" :width="240" trigger="hover">
-                                                        <template #reference>
-                                                            <div class="df ai-c cursor" style="margin-right:30px;">
-                                                                <img src="@/assets/img/micon.png" alt=""
-                                                                    style="width:20px;margin-right:5px;" />
-                                                                <span class="c-66 lh-1">菜单布局</span>
-                                                            </div>
+                                                    <a-popover position="top" :content-style="{ width: '240px' }">
+                                                        <div class="df ai-c cursor" style="margin-right:30px;">
+                                                            <img src="@/assets/img/micon.png" alt=""
+                                                                style="width:20px;margin-right:5px;" />
+                                                            <span class="c-66 lh-1">菜单布局</span>
+                                                        </div>
+                                                        <template #content>
+                                                            <a-radio-group v-model="r.location" class="df"
+                                                                @change="getMenu">
+                                                                <div class="fc df df-c ai-c menulocation cursor"
+                                                                    @click="r.location = 'top'; getMenu()">
+                                                                    <img src="@/assets/img/menu-t.png" alt="" />
+                                                                    <a-radio value="top" class="mt-10">顶部菜单布局</a-radio>
+                                                                </div>
+                                                                <div class="fc df df-c ai-c menulocation cursor"
+                                                                    @click="r.location = 'left'; getMenu()">
+                                                                    <img src="@/assets/img/menu-l.png" alt="" />
+                                                                    <a-radio value="left" class="mt-10">左侧菜单布局</a-radio>
+                                                                </div>
+                                                            </a-radio-group>
                                                         </template>
-                                                        <el-radio-group v-model="r.location" class="df"
-                                                            @change="getMenu">
-                                                            <div class="fc df df-c ai-c menulocation cursor"
-                                                                @click="r.location = 'top'; getMenu()">
-                                                                <img src="@/assets/img/menu-t.png" alt="" />
-                                                                <el-radio label="top" class="mt-10">顶部菜单布局</el-radio>
-                                                            </div>
-                                                            <div class="fc df df-c ai-c menulocation cursor"
-                                                                @click="r.location = 'left'; getMenu()">
-                                                                <img src="@/assets/img/menu-l.png" alt="" />
-                                                                <el-radio label="left" class="mt-10">左侧菜单布局</el-radio>
-                                                            </div>
-                                                        </el-radio-group>
-                                                    </el-popover>
-                                                    <el-checkbox v-if="r.name != 'founder' && r.name != 'super'"
-                                                        v-model="r.is_default_register" :true-label="2" :false-label="1"
-                                                        @change="chengeRegister(r, r.is_default_register)">默认邀请端</el-checkbox>
+                                                    </a-popover>
+                                                    <a-checkbox v-if="r.name != 'founder' && r.name != 'super'"
+                                                        :model-value="r.is_default_register == 2"
+                                                        @change="v => { r.is_default_register = v ? 2 : 1; chengeRegister(r, r.is_default_register); }">默认邀请端</a-checkbox>
                                                 </div>
                                             </div>
 
-                                            <div class="mt-10 greybox">
+                                            <div class="mt-16 greybox manifest-front-config">
                                                 <template v-if="r.load_mode === 'iframe'">
-                                                    <div class="greybox-title">iframe配置<el-tooltip><template #content>iframe使用场景受到了严格的限制，如果需要对接授权登录，可将 {access_token} 传递给iframe，然后由后端服务请求授权接口地址（http://xxxx）获取用户信息。由于iframe受到了浏览器安全限制，生成cookies时必须设置 SameSite: None, Secure: true，并且header设置允许 * 跨域，才能正常传递。</template><ArcoIcon name="icon-41" :size="16"/></el-tooltip></div>
-                                                    <el-form-item label="地址类型" style="margin-bottom:20px;">
-                                                        <el-radio-group v-model="r.type" @change="changeBackendType(r)">
-                                                            <el-radio label="internal" value="internal">应用地址</el-radio>
-                                                            <el-radio label="external" value="external">远程地址</el-radio>
-                                                        </el-radio-group>
-                                                    </el-form-item>
-                                                    <el-form-item label="页面地址" style="margin-bottom:20px;">
+                                                    <div class="greybox-title">iframe配置<a-tooltip content="iframe使用场景受到了严格的限制，如果需要对接授权登录，可将 {access_token} 传递给iframe，然后由后端服务请求授权接口地址（http://xxxx）获取用户信息。由于iframe受到了浏览器安全限制，生成cookies时必须设置 SameSite: None, Secure: true，并且header设置允许 * 跨域，才能正常传递。"><ArcoIcon name="icon-41" :size="16"/></a-tooltip></div>
+                                                    <a-form-item label="地址类型" style="margin-bottom:20px;">
+                                                        <a-radio-group v-model="r.type" @change="changeBackendType(r)">
+                                                            <a-radio value="internal">应用地址</a-radio>
+                                                            <a-radio value="external">远程地址</a-radio>
+                                                        </a-radio-group>
+                                                    </a-form-item>
+                                                    <a-form-item label="页面地址" style="margin-bottom:20px;">
                                                         <div v-if="r.type == 'internal'" class="backend-url-config df ai-c">
                                                             <span class="backend-url-fixed">https://</span>
                                                             <span class="backend-url-fixed backend-url-placeholder">{{ getIframeDomainPlaceholder() }}</span>
                                                             <span class="backend-url-fixed">/</span>
-                                                            <el-input v-model="r.backend_path" @input="getMenu" @change="getMenu" placeholder="请输入目录"
+                                                            <a-input v-model="r.backend_path" @input="getMenu" @change="getMenu" placeholder="请输入目录"
                                                                 class="backend-url-control backend-url-input" />
                                                         </div>
                                                         <div v-else class="backend-url-config backend-url-config-external df ai-c">
-                                                            <el-select v-model="r.root_protocol"
+                                                            <a-select v-model="r.root_protocol"
                                                                 class="backend-url-control backend-url-protocol"
                                                                 @change="getMenu">
-                                                                <el-option label="http://" value="http://"></el-option>
-                                                                <el-option label="https://" value="https://"></el-option>
-                                                            </el-select>
-                                                            <el-input v-model="r.root_url" @change="getMenu"
+                                                                <a-option label="http://" value="http://"></a-option>
+                                                                <a-option label="https://" value="https://"></a-option>
+                                                            </a-select>
+                                                            <a-input v-model="r.root_url" @change="getMenu"
                                                                 placeholder="请输入地址"
                                                                 class="backend-url-control backend-url-input" />
                                                         </div>
-                                                    </el-form-item>
-                                                    <el-form-item label="变量传递" style="margin-bottom:20px;">
+                                                    </a-form-item>
+                                                    <a-form-item label="变量传递" style="margin-bottom:20px;">
                                                         只支持query方式，get方式拼接到页面地址后面
-                                                    </el-form-item>
+                                                    </a-form-item>
                                                 </template>
                                                 <template v-else>
 
-                                                <div class="greybox-title">变量传递配置<el-tooltip><template #content>将开发者设置的变量值传递给后端接口和前端JS变量中</template><ArcoIcon name="icon-41" :size="16"/></el-tooltip></div>
-                                                <el-form-item label="接口类型" style="margin-bottom:20px;">
-                                                    <el-radio-group v-model="r.type" @change="changeBackendType(r)">
-                                                        <el-radio label="internal" value="internal">应用内网地址（internal）</el-radio>
-                                                        <el-radio label="external" value="external">应用外网地址（external）</el-radio>
-                                                    </el-radio-group>
-                                                </el-form-item>
-                                                <el-form-item label="接口地址" style="margin-bottom:20px;">
+                                                <div class="greybox-title">变量传递配置<a-tooltip content="将开发者设置的变量值传递给后端接口和前端JS变量中"><ArcoIcon name="icon-41" :size="16"/></a-tooltip></div>
+                                                <a-form-item label="接口类型" style="margin-bottom:20px;">
+                                                    <a-radio-group v-model="r.type" @change="changeBackendType(r)">
+                                                        <a-radio value="internal">应用内网地址（internal）</a-radio>
+                                                        <a-radio value="external">应用外网地址（external）</a-radio>
+                                                    </a-radio-group>
+                                                </a-form-item>
+                                                <a-form-item label="接口地址" style="margin-bottom:20px;">
                                                     <div v-if="r.type == 'internal'" class="backend-url-config df ai-c">
                                                         <span class="backend-url-fixed">http://</span>
-                                                        <el-select v-model="r.backend_identifie" filterable
-                                                            default-first-option placeholder="选择应用标识"
+                                                        <a-select v-model="r.backend_identifie" allow-search
+                                                            placeholder="选择应用标识"
                                                             class="backend-url-control backend-url-identifie"
                                                             @change="changeBackendIdentifie(r)">
-                                                            <el-option v-for="app in backendAppOptions" :key="app.id"
+                                                            <a-option v-for="app in backendAppOptions" :key="app.id"
                                                                 :label="app.title && app.title != app.id ? `${app.id}（${app.title}）` : app.id"
-                                                                :value="app.id"></el-option>
-                                                        </el-select>
+                                                                :value="app.id"></a-option>
+                                                        </a-select>
                                                         <span
                                                             class="backend-url-fixed">.default.svc.cluster.local:</span>
-                                                        <el-autocomplete v-model="r.backend_port"
-                                                            :fetch-suggestions="(query, cb) => queryBackendPortSuggestions(r.backend_identifie, query, cb)"
-                                                            placeholder="端口"
+                                                        <a-auto-complete v-model="r.backend_port"
+                                                            :data="getBackendPortOptions(r.backend_identifie, r.backend_port)"
+                                                            :filter-option="false" placeholder="端口"
                                                             class="backend-url-control backend-url-port" @input="getMenu"
-                                                            @change="getMenu" @select="getMenu"></el-autocomplete>
+                                                            @change="getMenu" @select="getMenu"></a-auto-complete>
                                                     </div>
                                                     <div v-else class="backend-url-config backend-url-config-external df ai-c">
-                                                        <el-select v-model="r.root_protocol"
+                                                        <a-select v-model="r.root_protocol"
                                                             class="backend-url-control backend-url-protocol"
                                                             @change="getMenu">
-                                                            <el-option label="http://" value="http://"></el-option>
-                                                            <el-option label="https://" value="https://"></el-option>
-                                                        </el-select>
-                                                        <el-input v-model="r.root_url" @change="getMenu"
+                                                            <a-option label="http://" value="http://"></a-option>
+                                                            <a-option label="https://" value="https://"></a-option>
+                                                        </a-select>
+                                                        <a-input v-model="r.root_url" @change="getMenu"
                                                             placeholder="请输入地址"
                                                             class="backend-url-control backend-url-input" />
                                                     </div>
-                                                </el-form-item>
+                                                </a-form-item>
 
-                                                <div class="df ai-c">代理配置<el-tooltip><template #content>面板提供转发服务到接口地址，接口后端可通过HTTP变量获取传递值</template><ArcoIcon name="icon-41" :size="16"/></el-tooltip></div>
-                                                <div class="mb-20">
-                                                    <div style="margin-bottom:20px;" class="df">
+                                                <div class="df ai-c manifest-front-section-title">代理配置<a-tooltip content="面板提供转发服务到接口地址，接口后端可通过HTTP变量获取传递值"><ArcoIcon name="icon-41" :size="16"/></a-tooltip></div>
+                                                <div class="mb-20 manifest-front-block">
+                                                    <div class="df proxy-address-row">
                                                         <div style="width:100px;">代理地址</div>
                                                         <div>/panel-api/v1/microapp/{{identifie}}/proxy</div>
                                                     </div>
-                                                    <div class="mb-20">
-                                                        <div>请求头(Header)</div>
+                                                    <div class="mb-20 manifest-front-table-block">
+                                                        <div class="manifest-front-table-title">请求头(Header)</div>
                                                         <table class="table">
                                                             <thead>
                                                                 <tr>
@@ -261,23 +254,22 @@
                                                             <tbody>
                                                                 <tr v-for="(item, index) in r.proxy_request_header" :key="index">
                                                                     <td>
-                                                                        <el-input v-model="item.key" placeholder="key"
+                                                                        <a-input v-model="item.key" placeholder="key"
                                                                             @change="getMenu"
-                                                                            style="width:200px;margin-right:10px;"></el-input>
+                                                                            style="width:200px;margin-right:10px;"></a-input>
                                                                     </td>
                                                                     <td>
-                                                                        <el-select v-model="item.value" filterable allow-create
-                                                                            default-first-option
+                                                                        <a-select v-model="item.value" allow-search allow-create
                                                                             placeholder="value"
                                                                             class="backend-url-control start-param-select"
                                                                             @change="(value) => changeStartParamValue(item, value)">
-                                                                            <el-option v-for="param in systemVarOptions"
+                                                                            <a-option v-for="param in systemVarOptions"
                                                                                 :key="param.value" :label="param.label"
                                                                                 :value="param.value">
                                                                                 <span>{{ param.label }}</span>
                                                                                 <span class="c-99 fs-12 ml-10">{{ param.value }}</span>
-                                                                            </el-option>
-                                                                        </el-select>
+                                                                            </a-option>
+                                                                        </a-select>
                                                                     </td>
                                                                     <td><span class="c-blue cursor handle"
                                                                             @click="r.proxy_request_header.length <= 1 ? r.proxy_request_header = [{ key: '', value: '', isSelect: false }] : r.proxy_request_header.splice(index, 1)">删除</span></td>
@@ -285,16 +277,14 @@
                                                                 <tr>
                                                                     <td colspan="5" class="cursor txt-c"
                                                                         @click="r.proxy_request_header.push({ key: '', value: '' })">
-                                                                        <span class="addmenu"><el-icon :size="14">
-                                                                                <Plus />
-                                                                            </el-icon>添加请求头</span>
+                                                                        <span class="addmenu"><icon-plus :size="14" />添加请求头</span>
                                                                     </td>
                                                                 </tr>
                                                             </tbody>
                                                         </table>
                                                     </div>
-                                                    <div v-if="!(form.menu_type == 'thirdparty_cd' && r.name == 'normal')">
-                                                        <div >请求参数(Query)</div>
+                                                    <div v-if="!(form.menu_type == 'thirdparty_cd' && r.name == 'normal')" class="manifest-front-table-block">
+                                                        <div class="manifest-front-table-title">请求参数(Query)</div>
                                                         <table class="table">
                                                             <thead>
                                                                 <tr>
@@ -306,23 +296,22 @@
                                                             <tbody>
                                                                 <tr v-for="(item, index) in r.proxy_request_query" :key="index">
                                                                     <td>
-                                                                        <el-input v-model="item.key" placeholder="key"
+                                                                        <a-input v-model="item.key" placeholder="key"
                                                                             @change="getMenu"
-                                                                            style="width:200px;margin-right:10px;"></el-input>
+                                                                            style="width:200px;margin-right:10px;"></a-input>
                                                                     </td>
                                                                     <td>
-                                                                        <el-select v-model="item.value" filterable allow-create
-                                                                            default-first-option
+                                                                        <a-select v-model="item.value" allow-search allow-create
                                                                             placeholder="value"
                                                                             class="backend-url-control start-param-select"
                                                                             @change="(value) => changeStartParamValue(item, value)">
-                                                                            <el-option v-for="param in systemVarOptions"
+                                                                            <a-option v-for="param in systemVarOptions"
                                                                                 :key="param.value" :label="param.label"
                                                                                 :value="param.value">
                                                                                 <span>{{ param.label }}</span>
                                                                                 <span class="c-99 fs-12 ml-10">{{ param.value }}</span>
-                                                                            </el-option>
-                                                                        </el-select>
+                                                                            </a-option>
+                                                                        </a-select>
                                                                     </td>
                                                                     <td><span class="c-blue cursor handle"
                                                                             @click="r.proxy_request_query.length <= 1 ? r.proxy_request_query = [{ key: '', value: '', isSelect: false }] : r.proxy_request_query.splice(index, 1)">删除</span></td>
@@ -330,20 +319,17 @@
                                                                 <tr>
                                                                     <td colspan="5" class="cursor txt-c"
                                                                         @click="r.proxy_request_query.push({ key: '', value: '' })">
-                                                                        <span class="addmenu"><el-icon :size="14">
-                                                                                <Plus />
-                                                                            </el-icon>添加请求参数</span>
+                                                                        <span class="addmenu"><icon-plus :size="14" />添加请求参数</span>
                                                                     </td>
                                                                 </tr>
                                                             </tbody>
                                                         </table>
                                                     </div>
                                                 </div>
-                                                <div class="df ai-c">前端配置<el-tooltip><template #content>面板提供microapp机制渲染前端包，可通过window.$wujie.props.frontend_props
-从JS变量获取传递值</template><ArcoIcon name="icon-41" :size="16"/></el-tooltip></div>
+                                                <div class="df ai-c manifest-front-section-title">前端配置<a-tooltip content="面板提供microapp机制渲染前端包，可通过window.$wujie.props.frontend_props 从JS变量获取传递值"><ArcoIcon name="icon-41" :size="16"/></a-tooltip></div>
                                                 <div
-                                                    v-if="!(form.menu_type == 'thirdparty_cd' && r.name == 'normal')">
-                                                    <div >前端配置</div>
+                                                    v-if="!(form.menu_type == 'thirdparty_cd' && r.name == 'normal')" class="manifest-front-block">
+                                                    <div class="manifest-front-table-title">前端配置</div>
                                                     <table class="table">
                                                         <thead>
                                                             <tr>
@@ -366,23 +352,22 @@
                                                             
                                                             <tr v-for="(item, index) in r.frontend_props" :key="index">
                                                                 <td>
-                                                                    <el-input v-model="item.key" placeholder="key"
+                                                                    <a-input v-model="item.key" placeholder="key"
                                                                         @change="getMenu"
-                                                                        style="width:200px;margin-right:10px;"></el-input>
+                                                                        style="width:200px;margin-right:10px;"></a-input>
                                                                 </td>
                                                                 <td>
-                                                                    <el-select v-model="item.value" filterable allow-create
-                                                                        default-first-option
+                                                                    <a-select v-model="item.value" allow-search allow-create
                                                                         placeholder="value"
                                                                         class="backend-url-control start-param-select"
                                                                         @change="(value) => changeStartParamValue(item, value)">
-                                                                        <el-option v-for="param in systemVarOptions"
+                                                                        <a-option v-for="param in systemVarOptions"
                                                                             :key="param.value" :label="param.label"
                                                                             :value="param.value">
                                                                             <span>{{ param.label }}</span>
                                                                             <span class="c-99 fs-12 ml-10">{{ param.value }}</span>
-                                                                        </el-option>
-                                                                    </el-select>
+                                                                        </a-option>
+                                                                    </a-select>
                                                                 </td>
                                                                 <td><span class="c-blue cursor handle"
                                                                         @click="r.frontend_props.length <= 1 ? r.frontend_props = [{ key: '', value: '', isSelect: false }] : r.frontend_props.splice(index, 1)">删除</span></td>
@@ -390,9 +375,7 @@
                                                             <tr>
                                                                 <td colspan="5" class="cursor txt-c"
                                                                     @click="r.frontend_props.push({ key: '', value: '' })">
-                                                                    <span class="addmenu"><el-icon :size="14">
-                                                                            <Plus />
-                                                                        </el-icon>添加前端配置</span>
+                                                                    <span class="addmenu"><icon-plus :size="14" />添加前端配置</span>
                                                                 </td>
                                                             </tr>
                                                         </tbody>
@@ -411,15 +394,9 @@
                                                         <td>
                                                             <div class="df ai-c jc-c">
                                                                 <span>欢迎页</span>
-                                                                <el-popover placement="top" :width="200" trigger="hover"
-                                                                    content="用户进入系统首页访问的页面">
-                                                                    <template #reference>
-                                                                        <el-icon color="#999" :size="16"
-                                                                            class="cursor ml-4">
-                                                                            <QuestionFilled />
-                                                                        </el-icon>
-                                                                    </template>
-                                                                </el-popover>
+                                                                <a-tooltip content="用户进入系统首页访问的页面">
+                                                                    <icon-question-circle-fill class="cursor ml-4 c-99" :size="16" />
+                                                                </a-tooltip>
                                                             </div>
                                                         </td>
                                                         <td>图标</td>
@@ -429,55 +406,59 @@
                                                 <tbody>
                                                     <tr v-for="(item, index) in r.menu" :key="index">
                                                         <td>
-                                                            <div><el-input type="number" v-model="item.displayorder"
+                                                            <div><a-input type="number"
+                                                                    :model-value="String(item.displayorder ?? '')"
+                                                                    @update:model-value="v => item.displayorder = v"
                                                                     @change="getMenu"
-                                                                    style="width:60px; height:36px;"></el-input>
+                                                                    style="width:60px; height:36px;"></a-input>
                                                             </div>
                                                             <div v-for="(sub, subid) in item.children" :key="subid"
                                                                 class="df mt-10">
                                                                 <div class="branch"
                                                                     :class="{ last: subid == item.children.length - 1 }">
                                                                 </div>
-                                                                <el-input type="number" v-model="sub.displayorder"
+                                                                <a-input type="number"
+                                                                    :model-value="String(sub.displayorder ?? '')"
+                                                                    @update:model-value="v => sub.displayorder = v"
                                                                     @change="getMenu"
-                                                                    style="width:60px; height:36px;"></el-input>
+                                                                    style="width:60px; height:36px;"></a-input>
                                                             </div>
                                                         </td>
                                                         <td>
-                                                            <div><el-input v-model="item.do" @change="onMenuChanged(r.menu)"
+                                                            <div><a-input v-model="item.do" @change="onMenuChanged(r.menu)"
                                                                     style="width:150px; height:36px;"
-                                                                    placeholder="路由"></el-input>
+                                                                    placeholder="路由"></a-input>
                                                             </div>
                                                             <div v-for="(sub, subid) in item.children" :key="subid"
                                                                 class="mt-10">
-                                                                <el-input v-model="sub.do" @change="onMenuChanged(r.menu)"
+                                                                <a-input v-model="sub.do" @change="onMenuChanged(r.menu)"
                                                                     style="width:150px; height:36px;"
-                                                                    placeholder="路由"></el-input>
+                                                                    placeholder="路由"></a-input>
                                                             </div>
                                                         </td>
                                                         <td>
-                                                            <div><el-input v-model="item.title" @change="onMenuChanged(r.menu)"
+                                                            <div><a-input v-model="item.title" @change="onMenuChanged(r.menu)"
                                                                     style="width:150px; height:36px;"
-                                                                    placeholder="名称"></el-input>
+                                                                    placeholder="名称"></a-input>
                                                             </div>
                                                             <div v-for="(sub, subid) in item.children" :key="subid"
                                                                 class="mt-10">
-                                                                <el-input v-model="sub.title" @change="onMenuChanged(r.menu)"
+                                                                <a-input v-model="sub.title" @change="onMenuChanged(r.menu)"
                                                                     style="width:150px; height:36px;"
-                                                                    placeholder="名称"></el-input>
+                                                                    placeholder="名称"></a-input>
                                                             </div>
                                                         </td>
-                                                        <td>
-                                                            <div style="height:36px; text-align:center;" :style="{visibility: item.children?.length > 0 ? 'hidden' : 'visible'}">
-                                                                <el-checkbox :model-value="Number(item.is_default) === 1" size="large"
+                                                        <td class="menu-default-cell">
+                                                            <div class="menu-default-check" :style="{visibility: item.children?.length > 0 ? 'hidden' : 'visible'}">
+                                                                <a-checkbox :model-value="Number(item.is_default) === 1"
                                                                     :name="r.name"
-                                                                    @click.stop="setMenuDefault(r.menu, item)"></el-checkbox>
+                                                                    @click.stop="setMenuDefault(r.menu, item)"></a-checkbox>
                                                             </div>
                                                             <div v-for="(sub, subid) in item.children" :key="subid"
-                                                                class="mt-10 df ai-c jc-c" style="height:36px;">
-                                                                <el-checkbox :model-value="Number(sub.is_default) === 1" size="large"
+                                                                class="mt-10 menu-default-check">
+                                                                <a-checkbox :model-value="Number(sub.is_default) === 1"
                                                                     :name="r.name"
-                                                                    @click.stop="setMenuDefault(r.menu, sub)"></el-checkbox>
+                                                                    @click.stop="setMenuDefault(r.menu, sub)"></a-checkbox>
                                                             </div>
                                                         </td>
                                                         <td>
@@ -492,9 +473,11 @@
                                                             </div>
                                                             <div class="selicon cursor df ai-c jc-c" v-else
                                                                 @click="dialogVisible = true; activeItem = item;">
-                                                                <el-icon :size="24">
-                                                                    <Menu />
-                                                                </el-icon>
+                                                                <svg class="default-menu-icon" xmlns="http://www.w3.org/2000/svg"
+                                                                    viewBox="0 0 1024 1024" aria-hidden="true">
+                                                                    <path fill="currentColor"
+                                                                        d="M160 448a32 32 0 0 1-32-32V160.064a32 32 0 0 1 32-32h256a32 32 0 0 1 32 32V416a32 32 0 0 1-32 32zm448 0a32 32 0 0 1-32-32V160.064a32 32 0 0 1 32-32h255.936a32 32 0 0 1 32 32V416a32 32 0 0 1-32 32zM160 896a32 32 0 0 1-32-32V608a32 32 0 0 1 32-32h256a32 32 0 0 1 32 32v256a32 32 0 0 1-32 32zm448 0a32 32 0 0 1-32-32V608a32 32 0 0 1 32-32h255.936a32 32 0 0 1 32 32v256a32 32 0 0 1-32 32z"></path>
+                                                                </svg>
                                                             </div>
                                                             <div v-for="(sub, subid) in item.children" :key="subid"
                                                                 class="df ai-c jc-c mt-10"
@@ -505,47 +488,47 @@
                                                             <div class="df ai-c" style="height:36px;">
                                                                 <span class="handle c-blue cursor"
                                                                     @click="addSub(r.menu, item)">添加子菜单</span>
-                                                                <el-popover placement="top" :width="240"
-                                                                    trigger="hover">
-                                                                    <template #reference><span
-                                                                            class="handle c-blue cursor">设置位置</span></template>
-                                                                    <div>
-                                                                        <div class="df ai-c jc-b">
-                                                                            <div class="menu-single-location">单个菜单位置设置
+                                                                <a-popover position="top" :content-style="{ width: '240px' }">
+                                                                    <span class="handle c-blue cursor">设置位置</span>
+                                                                    <template #content>
+                                                                        <div>
+                                                                            <div class="df ai-c jc-b">
+                                                                                <div class="menu-single-location">单个菜单位置设置
+                                                                                </div>
                                                                             </div>
+                                                                            <a-radio-group v-model="item.location"
+                                                                                class="df mt-10" @change="getMenu">
+                                                                                <div class="fc df df-c ai-c menulocation cursor"
+                                                                                    @click="item.location = 'normal'; getMenu()">
+                                                                                    <img v-if="r.location == 'top'"
+                                                                                        src="@/assets/img/menu-t.png"
+                                                                                        alt="" />
+                                                                                    <img v-else
+                                                                                        src="@/assets/img/menu-l.png"
+                                                                                        alt="" />
+                                                                                    <a-radio value="normal"
+                                                                                        class="mt-10">默认位置</a-radio>
+                                                                                </div>
+                                                                                <div v-if="r.location == 'top'"
+                                                                                    class="fc df df-c ai-c menulocation cursor"
+                                                                                    @click="item.location = 'back'; getMenu()">
+                                                                                    <img src="@/assets/img/menu-r.png"
+                                                                                        alt="" />
+                                                                                    <a-radio value="back"
+                                                                                        class="mt-10">顶部右侧</a-radio>
+                                                                                </div>
+                                                                                <div v-else
+                                                                                    class="fc df df-c ai-c menulocation cursor"
+                                                                                    @click="item.location = 'back'; getMenu()">
+                                                                                    <img src="@/assets/img/menu-b.png"
+                                                                                        alt="" />
+                                                                                    <a-radio value="back"
+                                                                                        class="mt-10">左侧底部</a-radio>
+                                                                                </div>
+                                                                            </a-radio-group>
                                                                         </div>
-                                                                        <el-radio-group v-model="item.location"
-                                                                            class="df mt-10" @change="getMenu">
-                                                                            <div class="fc df df-c ai-c menulocation cursor"
-                                                                                @click="item.location = 'normal'; getMenu()">
-                                                                                <img v-if="r.location == 'top'"
-                                                                                    src="@/assets/img/menu-t.png"
-                                                                                    alt="" />
-                                                                                <img v-else
-                                                                                    src="@/assets/img/menu-l.png"
-                                                                                    alt="" />
-                                                                                <el-radio label="normal"
-                                                                                    class="mt-10">默认位置</el-radio>
-                                                                            </div>
-                                                                            <div v-if="r.location == 'top'"
-                                                                                class="fc df df-c ai-c menulocation cursor"
-                                                                                @click="item.location = 'back'; getMenu()">
-                                                                                <img src="@/assets/img/menu-r.png"
-                                                                                    alt="" />
-                                                                                <el-radio label="back"
-                                                                                    class="mt-10">顶部右侧</el-radio>
-                                                                            </div>
-                                                                            <div v-else
-                                                                                class="fc df df-c ai-c menulocation cursor"
-                                                                                @click="item.location = 'back'; getMenu()">
-                                                                                <img src="@/assets/img/menu-b.png"
-                                                                                    alt="" />
-                                                                                <el-radio label="back"
-                                                                                    class="mt-10">左侧底部</el-radio>
-                                                                            </div>
-                                                                        </el-radio-group>
-                                                                    </div>
-                                                                </el-popover>
+                                                                    </template>
+                                                                </a-popover>
                                                                 <span class="handle c-blue cursor"
                                                                     @click="removeMenu(r.menu, index)">删除</span>
                                                             </div>
@@ -559,9 +542,7 @@
                                                     <tr>
                                                         <td colspan="9" class="cursor txt-c"
                                                             @click="addMenu(r.menu)">
-                                                            <span class="addmenu"><el-icon :size="14">
-                                                                    <Plus />
-                                                                </el-icon>添加一级菜单</span>
+                                                            <span class="addmenu"><icon-plus :size="14" />添加一级菜单</span>
                                                         </td>
                                                     </tr>
                                                 </tbody>
@@ -574,15 +555,17 @@
                                         </div>
                                     </div>
                                 </div>
-                            </el-form-item>
+                            </a-form-item>
                         </div>
                         <span v-if="form.type == 'tradition'">传统应用</span>
                     </div>
-                    <div class="bg-white pb-24 mt-20 df ai-c">
-                        <el-button :loading="submiting" type="primary" @click="submit()"
-                            style="width:90px;margin-left:100px;">确定提交</el-button>
+                    <div class="bg-white pb-24 mt-20 manifest-submit-bar">
+                        <a-form-item label=" " class="manifest-submit-item">
+                            <a-button :loading="submiting" type="primary" @click="submit()"
+                                style="width:90px;">确定提交</a-button>
+                        </a-form-item>
                     </div>
-                </el-form>
+                </a-form>
             </div>
         </div>
         <div v-show="showYaml" class="box" style="width:600px; position:relative; padding-right:0;">
@@ -593,36 +576,36 @@
                 <a :href="downloadUrl" download="manifest.yaml" class="copybtn" style="right:110px;">下载</a>
             </div>
         </div>
-        <el-dialog v-model="dialogVisible" title="选择图标" width="820px" top="50px">
+        <a-modal v-model:visible="dialogVisible" title="选择图标" :width="820" :footer="false">
             <sel-svg @submit="selectIcon"></sel-svg>
-        </el-dialog>
-        <el-dialog v-model="showIngress" title="添加业务端" width="640px">
-            <el-form ref="ingress" :model="newIngressEnd" label-width="80px">
-                <el-form-item label="名称" prop="name" :rules="[{ required: true, message: '内容不能为空', trigger: 'blur' }]">
-                    <el-input placeholder="请输入业务端名称" v-model="newIngressEnd.name" size="large"
-                        style="width:500px;"></el-input>
-                </el-form-item>
-                <el-form-item label="" class="mt-20">
-                    <el-button @click="addIngressEnd" type="primary" size="large">确定</el-button>
-                </el-form-item>
-            </el-form>
-        </el-dialog>
+        </a-modal>
+        <a-modal v-model:visible="showIngress" title="添加业务端" :width="640" :footer="false">
+            <a-form ref="ingress" :model="newIngressEnd" :label-col-props="{ flex: '0 0 80px' }">
+                <a-form-item label="名称" field="name" :rules="[{ required: true, message: '内容不能为空', trigger: 'blur' }]">
+                    <a-input placeholder="请输入业务端名称" v-model="newIngressEnd.name" size="large"
+                        style="width:500px;"></a-input>
+                </a-form-item>
+                <a-form-item label="" class="mt-20">
+                    <a-button @click="addIngressEnd" type="primary" size="large">确定</a-button>
+                </a-form-item>
+            </a-form>
+        </a-modal>
 
-        <el-dialog v-model="showAddRole" title="添加管理端" width="640px">
-            <el-form ref="role" :model="newRole" label-width="80px">
-                <el-form-item label="名称" prop="title" :rules="[{ required: true, message: '内容不能为空', trigger: 'blur' }]">
-                    <el-input placeholder="请输入管理端名称" v-model="newRole.title" size="large"
-                        style="width:500px;"></el-input>
-                </el-form-item>
-                <el-form-item label="标识" prop="name" :rules="[{ required: true, message: '内容不能为空', trigger: 'blur' }]">
-                    <el-input placeholder="请输入管理端标识" v-model="newRole.name" size="large"
-                        style="width:500px;"></el-input>
-                </el-form-item>
-                <el-form-item label="" class="mt-20">
-                    <el-button @click="addRole" type="primary" size="large">确定</el-button>
-                </el-form-item>
-            </el-form>
-        </el-dialog>
+        <a-modal v-model:visible="showAddRole" title="添加管理端" :width="640" :footer="false">
+            <a-form ref="role" :model="newRole" :label-col-props="{ flex: '0 0 80px' }">
+                <a-form-item label="名称" field="title" :rules="[{ required: true, message: '内容不能为空', trigger: 'blur' }]">
+                    <a-input placeholder="请输入管理端名称" v-model="newRole.title" size="large"
+                        style="width:500px;"></a-input>
+                </a-form-item>
+                <a-form-item label="标识" field="name" :rules="[{ required: true, message: '内容不能为空', trigger: 'blur' }]">
+                    <a-input placeholder="请输入管理端标识" v-model="newRole.name" size="large"
+                        style="width:500px;"></a-input>
+                </a-form-item>
+                <a-form-item label="" class="mt-20">
+                    <a-button @click="addRole" type="primary" size="large">确定</a-button>
+                </a-form-item>
+            </a-form>
+        </a-modal>
     </div>
 </template>
 
@@ -633,6 +616,14 @@ import filesUpload from './files-upload.vue';
 import selSvg from '@/components/sel-svg.vue';
 import W7Identifie from '@/components/w7-identifie.vue';
 import ArcoIcon from '@/components/arco-icon.vue';
+import {
+    IconCheckCircleFill,
+    IconEdit,
+    IconPlus,
+    IconQuestionCircleFill,
+    IconUpload,
+} from '@arco-design/web-vue/es/icon';
+import { messageSuccess, messageWarning } from '@/utils/ui-feedback';
 
 
 export default {
@@ -643,13 +634,19 @@ export default {
         'option',
         'identifie',
         'version_id',
-        'app_ports'
+        'app_ports',
+        'manifestInfo'
     ],
     components: {
         filesUpload,
         selSvg,
         W7Identifie,
-        ArcoIcon
+        ArcoIcon,
+        IconCheckCircleFill,
+        IconEdit,
+        IconPlus,
+        IconQuestionCircleFill,
+        IconUpload,
     },
     data() {
         return {
@@ -760,21 +757,21 @@ export default {
                 identifie: [
                     { required: true, message: '内容不能为空', trigger: 'blur' },
                     {
-                        required: true, trigger: 'blur', validator: (rule, value, callback) => {
+                        required: true, trigger: 'blur', validator: (value, callback) => {
                             if (this.form.author) { callback() }
-                            else { callback(new Error("请输入完整")) }
+                            else { callback("请输入完整") }
                         }
                     },
                     {
-                        required: true, trigger: 'blur', validator: (rule, value, callback) => {
+                        required: true, trigger: 'blur', validator: (value, callback) => {
                             if (/^[a-zA-Z0-9]+$/.test(value)) { callback() }
-                            else { callback(new Error("标识格式有误")) }
+                            else { callback("标识格式有误") }
                         }
                     },
                     {
-                        required: true, trigger: 'blur', validator: (rule, value, callback) => {
+                        required: true, trigger: 'blur', validator: (value, callback) => {
                             if (/^[a-zA-Z0-9]+$/.test(this.form.author)) { callback() }
-                            else { callback(new Error("标识格式有误")) }
+                            else { callback("标识格式有误") }
                         }
                     },
                 ],
@@ -787,9 +784,9 @@ export default {
                     { required: true, message: '内容不能为空', trigger: 'blur' },
 
                     {
-                        required: true, trigger: 'blur', validator: (rule, value, callback) => {
+                        required: true, trigger: 'blur', validator: (value, callback) => {
                             if (/^[a-zA-Z0-9]+-[a-zA-Z0-9]+$/.test(value)) { callback() }
-                            else { callback(new Error("标识格式有误")) }
+                            else { callback("标识格式有误") }
                         }
                     },
                 ],
@@ -935,6 +932,7 @@ export default {
         },
     },
     methods: {
+        onChange() { },
         changeStartParamValue(item, value) {
             item.isSelect = this.systemVarOptions.some(i => i.value == value);
             this.getMenu();
@@ -948,8 +946,48 @@ export default {
                 return i;
             }).filter(i => i !== '' && i !== undefined && i !== null).map(i => String(i)))];
         },
+        getFallbackApplicationInfo() {
+            let info = this.manifestInfo || {};
+            let fullIdentifie = info.identifie || this.identifie || '';
+            let author = '';
+            let identifie = fullIdentifie;
+            let match = String(fullIdentifie).match(/^([^-]+)-(.+)$/);
+            if (match?.length) {
+                author = match[1];
+                identifie = match[2];
+            }
+            return {
+                name: info.name || info.title || fullIdentifie,
+                description: info.description || info.desc || '',
+                author,
+                identifie,
+                fullIdentifie,
+            };
+        },
+        applyApplicationFallbacks(j) {
+            if (!j.application) { j.application = {}; }
+            let fallback = this.getFallbackApplicationInfo();
+            if (!j.application.identifie && fallback.fullIdentifie) {
+                j.application.identifie = fallback.fullIdentifie;
+            }
+            if (!j.application.author && fallback.author) {
+                j.application.author = fallback.author;
+            }
+            if (!j.application.name && fallback.name) {
+                j.application.name = fallback.name;
+            }
+            if (!j.application.description && fallback.description) {
+                j.application.description = fallback.description;
+            }
+        },
         getBackendPorts(identifie) {
             return this.backendAppOptions.find(i => i.id == identifie)?.ports || [];
+        },
+        getBackendPortOptions(identifie, query) {
+            let q = String(query || '');
+            return this.getBackendPorts(identifie)
+                .filter(i => !q || String(i).includes(q))
+                .map(i => String(i));
         },
         queryBackendPortSuggestions(identifie, query, cb) {
             let q = String(query || '');
@@ -1138,6 +1176,19 @@ export default {
                 return Number(item.is_default) === 1 && !this.isCompleteMenuRoute(item);
             });
         },
+        getCurrentMenuDefault(menu) {
+            let selected = null;
+            (menu || []).some(item => {
+                if (Number(item.is_default) === 1) {
+                    selected = item;
+                    return true;
+                }
+                let children = Array.isArray(item.children) ? item.children : [];
+                selected = children.find(sub => Number(sub.is_default) === 1) || null;
+                return !!selected;
+            });
+            return selected;
+        },
         normalizeBuiltMenuDefault(menu, skipFallback = false) {
             let selected = menu.find(item => Number(item.is_default) === 1);
             menu.forEach(item => {
@@ -1213,10 +1264,12 @@ export default {
         },
         addSub(menu, item) {
             item.children = item.children || [];
+            let selected = this.getCurrentMenuDefault(menu);
             let sub = { title: '', displayorder: 0, is_default: 0 };
             item.children.push(sub);
-            this.menuDefaultTarget = sub;
-            this.normalizeMenuDefault(menu, sub);
+            if (!selected) {
+                this.normalizeMenuDefault(menu);
+            }
             this.getMenu();
         },
         selectIcon(item) {
@@ -1225,8 +1278,8 @@ export default {
             this.getMenu();
         },
         addRole() {
-            this.$refs.role.validate((valid) => {
-                if (!valid) { return }
+            this.$refs.role.validate((errors) => {
+                if (errors) { return }
                 let backend_identifie = this.getDefaultBackendIdentifie();
                 this.form.role.push({
                     title: this.newRole.title,
@@ -1479,6 +1532,7 @@ export default {
         initJSON() {
             let j = this.json;
             j.v = 2;
+            this.applyApplicationFallbacks(j);
             if (j.application) {
                 if (/^[^-]+-.+$/.test(j.application?.identifie)) {
                     let i = j.application.identifie;
@@ -1557,7 +1611,7 @@ export default {
                         item.root_url = '';
                         item.backend_identifie = item?.backend_config?.backend_identifie;
                         item.backend_identifie = item.backend_identifie || this.getDefaultBackendIdentifie();
-                        item.backend_port = item?.backend_config?.backend_port ?? '';
+                        item.backend_port = String(item?.backend_config?.backend_port ?? '');
                     }
                 }
 
@@ -1605,8 +1659,8 @@ export default {
         submit(otherData, callback) {
             this.$nextTick(() => {
                 this.getMenu();
-                this.$refs.formref.validate((valid) => {
-                    if (!valid) { this.$message.warning('必填项不能为空'); return }
+                this.$refs.formref.validate((errors) => {
+                    if (errors) { messageWarning('必填项不能为空'); return }
                     this.$emit('complete', this.json, this.yaml, otherData, callback);
                 });
             })
@@ -1652,11 +1706,11 @@ export default {
                 document.execCommand('copy', true);
                 document.body.removeChild(textarea);
             }
-            this.$message.success("复制成功")
+            messageSuccess("复制成功")
         },
         addIngressEnd() {
-            this.$refs.ingress.validate((valid) => {
-                if (!valid) { return }
+            this.$refs.ingress.validate((errors) => {
+                if (errors) { return }
                 this.form.ingress.push({
                     name: this.newIngressEnd.name,
                     routes: [
@@ -1811,6 +1865,12 @@ export default {
 
 .upfilebox .uploadicon {
     font-size: 40px;
+}
+
+.upfilebox .upload-cloud-icon {
+    display: block;
+    width: 42px;
+    height: 42px;
 }
 
 .upfilebox .uploadbtn {
@@ -1985,7 +2045,7 @@ export default {
     padding: 0;
 }
 
-.box>>>.pre {
+.box :deep(.pre) {
     margin: 0;
     height: 100%;
     font-size: 16px;
@@ -1994,12 +2054,12 @@ export default {
     background: #282c34;
 }
 
-.box>>>input::-webkit-outer-spin-button,
-.box>>>input::-webkit-inner-spin-button {
+.box :deep(input::-webkit-outer-spin-button),
+.box :deep(input::-webkit-inner-spin-button) {
     -webkit-appearance: none;
 }
 
-.box>>>input[type="number"] {
+.box :deep(input[type="number"]) {
     appearance: textfield;
 }
 
@@ -2048,6 +2108,29 @@ export default {
     height: 36px;
 }
 
+.default-menu-icon {
+    width: 24px;
+    height: 24px;
+    color: #1d2129;
+}
+
+.menu-default-cell {
+    text-align: center;
+}
+
+.menu-default-check {
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+}
+
+.menu-default-check :deep(.arco-checkbox) {
+    align-items: center;
+    line-height: 1;
+}
+
 .iconbox {
     width: 790px;
     height: 500px;
@@ -2078,6 +2161,51 @@ export default {
     line-height: 20x;
     cursor: pointer;
     margin-left: 10px;
+}
+
+.manifest-front-config {
+    padding: 22px 16px 24px;
+}
+
+.manifest-front-config .greybox-title {
+    margin-bottom: 22px;
+}
+
+.manifest-front-config :deep(.arco-form-item) {
+    margin-bottom: 22px;
+}
+
+.manifest-front-config .mb-20 {
+    margin-bottom: 26px;
+}
+
+.manifest-front-section-title {
+    margin-top: 30px;
+    margin-bottom: 14px;
+    line-height: 22px;
+    font-weight: 600;
+}
+
+.manifest-front-block {
+    padding-bottom: 4px;
+}
+
+.manifest-front-table-block {
+    margin-top: 24px;
+}
+
+.manifest-front-table-title {
+    margin-bottom: 10px;
+    line-height: 22px;
+}
+
+.proxy-address-row {
+    margin-bottom: 22px;
+    line-height: 22px;
+}
+
+.manifest-submit-item {
+    margin-bottom: 0;
 }
 
 .backend-url-config {
@@ -2143,21 +2271,23 @@ export default {
     flex: 1;
 }
 
-.backend-url-config :deep(.el-input__wrapper) {
+.backend-url-config :deep(.arco-input-wrapper),
+.backend-url-config :deep(.arco-select-view) {
     height: 30px;
     box-shadow: none !important;
+    border: 0;
     border-radius: 0;
     background: transparent;
     padding: 0 10px;
 }
 
-.backend-url-config :deep(.el-input__inner) {
+.backend-url-config :deep(.arco-input) {
     height: 30px;
     line-height: 30px;
 }
 
-.backend-url-config :deep(.el-select .el-input.is-focus .el-input__wrapper) {
-    box-shadow: none !important;
+.backend-url-config :deep(.arco-select-view-single) {
+    padding: 0 8px;
 }
 
 .elseoption {
@@ -2171,7 +2301,7 @@ export default {
     padding: 10px;
 }
 
-div>>>pre .hljs {
+:deep(pre .hljs) {
     height: 100%;
     box-sizing: border-box;
 }
@@ -2192,27 +2322,27 @@ div>>>pre .hljs {
 }
 </style>
 <style>
-.menulocation .el-radio {
+.menulocation .arco-radio {
     height: 20px;
 }
 
-.menulocation .el-radio__label {
+.menulocation .arco-radio-label {
     padding-left: 4px;
     font-size: 12px;
 }
 
-.support-group .el-checkbox {
+.support-group .arco-checkbox {
     height: 18px;
     width: 120px;
     margin-right: 20px;
     margin-bottom: 10px;
 }
 
-.manifest-form .el-form-item__label {
+.manifest-form .arco-form-item-label {
     color: rgba(0, 0, 0, 0.9);
 }
 
-.envdialog .el-dialog__body {
+.envdialog .arco-modal-body {
     padding-top: 0;
 }
 </style>

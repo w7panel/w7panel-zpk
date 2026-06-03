@@ -2,9 +2,7 @@
     <div class="bg-f2" style="min-height:100%;">
         <div class="top bg-white df ai-c">
             <div class="df ai-c cursor" @click="$router.go(-1);">
-                <el-icon :size="14" color="#666666">
-                    <ArrowLeft />
-                </el-icon>
+                <icon-left class="back-icon" />
                 <span class="c-66 fs-16" style="margin-left:4px;">返回</span>
             </div>
         </div>
@@ -19,17 +17,17 @@
                         <div class="mt-10 fs-14 c-66">{{ info.description }}</div>
                         <div class="mt-20 df ai-c">
                             <span class="fs-14 c-66 lh-1">版本</span>
-                            <el-select v-model="version" class="ml-10">
-                                <el-option v-for="item in versionlist" :key="item.id" :value="item.name"
-                                    :label="item.name"></el-option>
-                            </el-select>
+                            <a-select v-model="version" class="ml-10 version-select">
+                                <a-option v-for="item in versionlist" :key="item.id" :value="item.name"
+                                    :label="item.name"></a-option>
+                            </a-select>
                         </div>
                         <div class="mt-20">
-                            <el-button v-if="iniframe" type="primary" @click="installurl">安装</el-button>
+                            <a-button v-if="iniframe" type="primary" @click="installurl">安装</a-button>
                             <div v-else>
-                                <el-button type="primary" @click="toinstall">复制地址</el-button>
+                                <a-button type="primary" @click="toinstall">复制地址</a-button>
                                 <a :href="url" target="_blank" style="margin-left:10px;">
-                                    <el-button type="primary" @click="toinstall">安装</el-button>
+                                    <a-button type="primary" @click="toinstall">安装</a-button>
                                 </a>
                             </div>
                         </div>
@@ -46,8 +44,11 @@
 
 <script>
 import axios from 'axios';
+import { IconLeft } from '@arco-design/web-vue/es/icon';
+import { messageSuccess } from '@/utils/ui-feedback';
 
 export default {
+    components: { IconLeft },
     data() {
         return {
             identifie: '',
@@ -106,7 +107,7 @@ export default {
                 createInput.className = 'createInput';
                 createInput.style.display = 'none';
             }
-            this.$message.success("复制成功")
+            messageSuccess("复制成功")
         },
     }
 }
@@ -119,6 +120,15 @@ export default {
 
 .top {
     padding: 20px;
+}
+
+.back-icon {
+    color: #666666;
+    font-size: 14px;
+}
+
+.version-select {
+    width: 180px;
 }
 
 .logo-box {

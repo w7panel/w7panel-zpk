@@ -1,73 +1,72 @@
 <template>
-    <div class="df">
+    <div class="version-info-layout">
         <div class="app-icon">
             <img v-if="logoimg" :src="logoimg" class="img df-s0" alt="" />
             <div v-else class="df df-c ai-c jc-c"
                 style="width:100%;height:100%;border:1px solid #e7e7e7;border-radius:4px;">
-                <el-icon>
-                    <Plus />
-                </el-icon>
+                <span class="upload-plus">+</span>
                 <span class="c-99 fs-12 lh-1 mt-8">点击上传</span>
             </div>
             <input type="file" @change="uplogo" accept="image/*" />
         </div>
-        <el-form class="ml-40 fc version-info-form" @keydown.enter.prevent>
-            <el-form-item label="名称" style="margin-bottom:10px;">
+        <a-form class="fc version-info-form" :model="form" label-align="left"
+            :label-col-props="{ span: 5, flex: '0 0 56px' }"
+            :wrapper-col-props="{ span: 19, flex: '1' }" @keydown.enter.prevent>
+            <a-form-item label="名称" style="margin-bottom:10px;">
                 <span v-if="edit.type != 'name'">{{ form.name || '-' }}</span>
                 <span v-if="edit.type != 'name'" class="c-blue cursor editbtn"
                     @click="edit.type = 'name'; edit.name = form.name;">修改</span>
-                <el-input v-if="edit.type == 'name'" v-model="edit.name" placeholder="请输入"
-                    style="width:160px;"></el-input>
+                <a-input v-if="edit.type == 'name'" v-model="edit.name" placeholder="请输入"
+                    style="width:160px;" />
                 <span v-if="edit.type == 'name'" class="c-blue cursor ml-20" @click="changeForm('name')">确定</span>
-            </el-form-item>
-            <el-form-item label="标识" style="margin-bottom:10px;">
+            </a-form-item>
+            <a-form-item label="标识" style="margin-bottom:10px;">
                 <span>{{ identifie }}</span>
-            </el-form-item>
-            <el-form-item label="描述" style="margin-bottom:10px;">
+            </a-form-item>
+            <a-form-item label="描述" style="margin-bottom:10px;">
                 <span v-if="edit.type != 'description'">{{ form.description || '-' }}</span>
                 <span v-if="edit.type != 'description'" class="c-blue cursor editbtn"
                     @click="edit.type = 'description'; edit.description = form.description;">修改</span>
-                <el-input v-if="edit.type == 'description'" v-model="edit.description" placeholder="请输入"
-                    style="width:160px;"></el-input>
+                <a-input v-if="edit.type == 'description'" v-model="edit.description" placeholder="请输入"
+                    style="width:160px;" />
                 <span v-if="edit.type == 'description'" class="c-blue cursor ml-20"
                     @click="changeForm('description')">确定</span>
-            </el-form-item>
-            <el-form-item label="标签" style="margin-bottom:10px;">
+            </a-form-item>
+            <a-form-item label="标签" style="margin-bottom:10px;">
 
                 <div class="df df-ww">
-                    <el-tag type="primary" v-for="(item, index) in form.tags" :key="index" size="large"
-                        :closable="edit.type == 'tags'" @close="deleteTag(index)" class="tag">{{ item.name }}</el-tag>
+                    <a-tag color="blue" v-for="(item, index) in form.tags" :key="index"
+                        :closable="edit.type == 'tags'" @close="deleteTag(index)" class="tag">{{ item.name }}</a-tag>
                     <div v-if="edit.type == 'tags'" class="df">
-                        <el-select v-model="form.taginput" multiple collapse-tags size="default" style="width:140px;"
+                        <a-select v-model="form.taginput" multiple :max-tag-count="1" style="width:140px;"
                             placeholder="添加新标签">
-                            <el-option v-for="item in tags" :disabled="Boolean(form.tags.find(i => i.name == item.name))"
-                                :key="item.id" :label="item.name" :value="item.id"></el-option>
-                        </el-select>
-                        <el-button type="primary" size="default" @click="addTag"
-                            style="margin-left:10px;">确定</el-button>
-                        <el-button @click="edit.type = ''" size="default">取消</el-button>
+                            <a-option v-for="item in tags" :disabled="Boolean(form.tags.find(i => i.name == item.name))"
+                                :key="item.id" :label="item.name" :value="item.id"></a-option>
+                        </a-select>
+                        <a-button type="primary" @click="addTag" style="margin-left:10px;">确定</a-button>
+                        <a-button @click="edit.type = ''">取消</a-button>
                     </div>
                 </div>
 
                 <span v-if="edit.type != 'tags' && (!form.tags || !form.tags.length)">-</span>
                 <span v-if="edit.type != 'tags'" class="c-blue cursor editbtn" @click="edit.type = 'tags'">修改</span>
-            </el-form-item>
+            </a-form-item>
 
-            <el-form-item label="注解" style="margin-bottom:10px;">
+            <a-form-item label="注解" style="margin-bottom:10px;">
                 {{ annotationKeys }}<span class="c-blue cursor ml-20" @click="openAnnotationEdit">编辑</span>
-            </el-form-item>
-            <el-form-item label="属性">
-                <div class="df df-c">
-                    <el-checkbox v-model="edit.once" @change="changeForm('once')">仅安装一次</el-checkbox>
-                    <el-checkbox v-model="edit.clusterPrivileges"
-                        @change="changeForm('clusterPrivileges')">集群特权</el-checkbox>
-                    <el-checkbox v-model="edit.registerSite" @change="changeForm('registerSite')">创建站点</el-checkbox>
+            </a-form-item>
+            <a-form-item label="属性">
+                <div class="version-info-checks">
+                    <a-checkbox v-model="edit.once" @change="changeForm('once')">仅安装一次</a-checkbox>
+                    <a-checkbox v-model="edit.clusterPrivileges"
+                        @change="changeForm('clusterPrivileges')">集群特权</a-checkbox>
+                    <a-checkbox v-model="edit.registerSite" @change="changeForm('registerSite')">创建站点</a-checkbox>
                 </div>
-            </el-form-item>
-        </el-form>
+            </a-form-item>
+        </a-form>
 
 
-        <el-dialog v-model="annotationEdit.show" title="注解" width="1000px">
+        <a-modal v-model:visible="annotationEdit.show" title="注解" :width="1000" :footer="false">
             <table class="table">
                 <thead>
                     <tr>
@@ -79,11 +78,10 @@
                 <tbody>
                     <tr v-for="(item, index) in annotationEdit.list" :key="index">
                         <td>
-                            <el-input v-model="item.key" placeholder="请输入" style="width:200px;"></el-input>
+                            <a-input v-model="item.key" placeholder="请输入" style="width:200px;" />
                         </td>
                         <td>
-                            <el-input v-model="item.value" placeholder="请输入" type="textarea" autosize
-                                style="width: 600px;"></el-input>
+                            <a-textarea v-model="item.value" placeholder="请输入" auto-size style="width: 600px;" />
                         </td>
                         <td>
                             <span class="c-blue cursor" @click="annotationEdit.list.splice(index, 1)">删除</span>
@@ -91,23 +89,22 @@
                     </tr>
                     <tr>
                         <td colspan="3" class="cursor txt-c" @click="annotationEdit.list.push({ key: '', value: '' })">
-                            <span class="addmenu"><el-icon :size="14">
-                                    <Plus />
-                                </el-icon>添加注解</span>
+                            <span class="addmenu"><span class="add-icon">+</span>添加注解</span>
                         </td>
                     </tr>
                 </tbody>
             </table>
             <div class="df ai-c jc-c mt-20">
-                <el-button @click="annotationEdit.show = false;">取消</el-button>
-                <el-button @click="submitAnnotation" type="primary">确定</el-button>
+                <a-button @click="annotationEdit.show = false;">取消</a-button>
+                <a-button @click="submitAnnotation" type="primary">确定</a-button>
             </div>
-        </el-dialog>
+        </a-modal>
     </div>
 </template>
 <script>
 import jsyaml from "js-yaml";
 import myAxios from '@/utils';
+import { messageSuccess } from '@/utils/ui-feedback';
 
 const defaultManifest = `application:
     name: ''
@@ -134,7 +131,7 @@ export default {
                 clusterPrivileges: false,
                 registerSite: false,
                 description: '',
-                taginput: '',
+                taginput: [],
             },
             edit: {
                 type: '',
@@ -204,7 +201,7 @@ export default {
             formdata.append('identifie', this.identifie);
             formdata.append('file', this.logofile);
             myAxios.post('/respo/icon', formdata).then(res => {
-                this.$message.success('添加成功');
+                messageSuccess('添加成功');
                 this.logoimg = res.data?.data?.url;
                 if (!/^https?:\/\//.test(this.logoimg)) {
                     this.logoimg = this.baseurl + this.logoimg;
@@ -220,7 +217,7 @@ export default {
                 tagId: this.form.tags[index].id,
                 formulaId: formulaId,
             }).then(res => {
-                this.$message.success('删除成功');
+                messageSuccess('删除成功');
                 this.form.tags.splice(index, 1);
                 this.edit.type = '';
                 this.$emit('refresh');
@@ -239,9 +236,9 @@ export default {
                     identifie: this.identifie,
                     name: name,
                 }).then(res => {
-                    this.$message.success('添加成功');
+                    messageSuccess('添加成功');
                     this.form.tags.push({ name: name, id: res.data.id });
-                    this.form.taginput = '';
+                    this.form.taginput = [];
                     this.edit.type = '';
                 }).catch(() => { });
             }
@@ -286,7 +283,7 @@ export default {
                 content: yaml,
                 version: String(this.info?.version?.id),
             }).then((res) => {
-                this.$message.success('操作成功');
+                messageSuccess('操作成功');
                 this.$emit('refresh');
             })
         },
@@ -300,18 +297,44 @@ export default {
 }
 </script>
 <style scoped>
+.version-info-layout {
+    display: flex;
+    align-items: flex-start;
+    gap: 32px;
+    min-width: 0;
+}
+
 .app-icon {
-    width: 64px;
-    height: 64px;
+    width: 72px;
+    height: 72px;
+    flex: 0 0 72px;
     position: relative;
     border-radius: 8px;
 }
 
 .app-icon .img {
-    width: 64px;
-    height: 64px;
+    width: 72px;
+    height: 72px;
     display: block;
     border-radius: 8px;
+}
+
+.version-info-form {
+    min-width: 0;
+}
+
+.version-info-form :deep(.arco-form-item) {
+    margin-bottom: 14px !important;
+}
+
+.version-info-form :deep(.arco-form-item-content) {
+    min-width: 0;
+}
+
+.version-info-checks {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
 }
 
 .app-icon input[type='file'] {
@@ -328,6 +351,23 @@ export default {
 
 .app-icon input[type='file']::-webkit-file-upload-button {
     display: none;
+}
+
+.upload-plus {
+    color: #666666;
+    font-size: 22px;
+    line-height: 1;
+}
+
+.add-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    margin-right: 2px;
+    font-size: 14px;
+    line-height: 1;
 }
 
 .tag {
@@ -404,12 +444,12 @@ export default {
 }
 </style>
 <style>
-.version-info-form .el-form-item .editbtn {
+.version-info-form .arco-form-item .editbtn {
     display: none;
     margin-left: 20px;
 }
 
-.version-info-form .el-form-item:hover .editbtn {
+.version-info-form .arco-form-item:hover .editbtn {
     display: inline;
 }
 </style>

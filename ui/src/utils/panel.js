@@ -1,5 +1,6 @@
 import axios from "axios";
-import { ElMessage } from 'element-plus';
+import { message } from './ui-feedback';
+import { getPanelToken } from './panel-token';
 
 const myAxios = axios.create({
     baseURL: '',
@@ -7,7 +8,7 @@ const myAxios = axios.create({
 });
 
 myAxios.interceptors.request.use(config => {
-    config.headers['X-W7Panel-Token'] = window?.$wujie?.props?.paneltoken || localStorage.getItem('X-W7Panel-Token') || "";
+    config.headers['X-W7Panel-Token'] = getPanelToken();
     return config
 }, err => {
     Promise.reject(err)
@@ -19,7 +20,7 @@ myAxios.interceptors.response.use(res => {
     }
 }, error => {
     if (error.response && !error.config.headers.cancelerror && error.response?.data?.error) {
-        ElMessage({
+        message({
             message: error.response.data.error,
             duration: 3000,
             type: 'error',

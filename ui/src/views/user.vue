@@ -3,83 +3,79 @@
         <div>
             <div>
                 <div class="bg-white bg-padding pb-24" style="border-top:1px solid #EEEEEE;">
-                    <el-button type="primary" @click="add">新建用户</el-button>
-                    <el-table :data="tableData" class="mt-20 table-header">
-                        <el-table-column prop="username" label="名称">
-                            <template #default="scope">
-                                <div>
-                                    <div>{{ scope.row.username }}</div>
-                                    <div style="font-size: 12px; color: #999;">
-                                        {{ scope.row.type === 1 ? '超级管理员' : (scope.row.desc || '暂无描述') }}
-                                        <el-button v-if="scope.row.type !== 1" type="text" icon="edit"
-                                            style="vertical-align: middle"
-                                            @click="editProp = 'desc'; edit(scope.row)"></el-button>
+                    <a-button type="primary" @click="add">新建用户</a-button>
+                    <a-table :data="tableData" :pagination="false" class="mt-20 table-header" row-key="id">
+                        <template #columns>
+                            <a-table-column data-index="username" title="名称">
+                                <template #cell="{ record }">
+                                    <div>
+                                        <div>{{ record.username }}</div>
+                                        <div style="font-size: 12px; color: #999;">
+                                            {{ record.type === 1 ? '超级管理员' : (record.desc || '暂无描述') }}
+                                            <a-button v-if="record.type !== 1" type="text" size="mini"
+                                                @click="editProp = 'desc'; edit(record)">编辑</a-button>
+                                        </div>
                                     </div>
-                                </div>
-                            </template>
-                        </el-table-column>
-
-                        <el-table-column prop="created_at" label="创建时间">
-                            <template #default="scope">{{ new Date(scope.row.created_at).toLocaleString() }}</template>
-                        </el-table-column>
-                        <el-table-column label="操作">
-                            <template #default="scope">
-                                <template v-if="scope.row.type !== 1">
-                                    <el-button type="text" @click="editProp = ''; edit(scope.row)">修改</el-button>
-                                    <el-button type="text" @click="del(scope.row)">删除</el-button>
                                 </template>
-                            </template>
-                        </el-table-column>
-                    </el-table>
+                            </a-table-column>
+
+                            <a-table-column data-index="created_at" title="创建时间">
+                                <template #cell="{ record }">{{ new Date(record.created_at).toLocaleString() }}</template>
+                            </a-table-column>
+                            <a-table-column title="操作">
+                                <template #cell="{ record }">
+                                    <template v-if="record.type !== 1">
+                                        <a-button type="text" @click="editProp = ''; edit(record)">修改</a-button>
+                                        <a-button type="text" status="danger" @click="del(record)">删除</a-button>
+                                    </template>
+                                </template>
+                            </a-table-column>
+                        </template>
+                    </a-table>
                     <div class="mt-20 df jc-e">
-                        <el-pagination background v-model:page-size="paginate" layout="sizes, prev, pager, next"
-                            :current-page="page" :page-count="last_page" :page-sizes="[10, 20, 30, 40]"
-                            @size-change="getData(1)" @current-change='getData'></el-pagination>
+                        <a-pagination v-model:current="page" v-model:page-size="paginate" :total="list.length"
+                            :page-size-options="[10, 20, 30, 40]" show-page-size
+                            @page-size-change="handlePageSizeChange" @change="getData" />
                     </div>
                 </div>
             </div>
         </div>
-        <el-dialog v-model="visible" :title="editId ? '编辑用户' : '添加用户'" :width="600">
-            <el-form ref="form" :model="form" label-width="80px" label-position="left">
-                <el-form-item label="用户名" prop="user_name" v-if="!editProp || editProp === 'user_name'"
+        <a-modal v-model:visible="visible" :title="editId ? '编辑用户' : '添加用户'" :width="600" :footer="false">
+            <a-form ref="form" :model="form" :label-col-props="{ span: 4, flex: '0 0 80px' }"
+                :wrapper-col-props="{ span: 20, flex: '1' }" label-align="left" class="user-form">
+                <a-form-item label="用户名" field="user_name" v-if="!editProp || editProp === 'user_name'"
                     :rules="[{ required: true, message: '用户名不能为空', trigger: 'manual' }]">
-                    <el-input v-model="form.user_name" />
-                </el-form-item>
+                    <a-input v-model="form.user_name" />
+                </a-form-item>
                 <template v-if="!editProp || editProp === 'password'">
-                    <el-form-item label="密码" prop="password" v-if="editId">
+                    <a-form-item label="密码" field="password" v-if="editId">
                         <div v-if="lockPassword" class="df" style="width: 100%;gap: 10px">
-                            <div class="df ai-c"
-                                style="cursor:not-allowed;flex: 1;gap: 5px;box-shadow: rgb(220, 223, 230) 0px 0px 0px 1px inset;border-radius: 4px;padding: 0 5px;background-color: rgb(245, 247, 250);color: #a8a7a7">
-                                <el-icon :size="20" color="#999">
-                                    <Lock />
-                                </el-icon>
-                                <span>已隐藏</span>
-                            </div>
-                            <el-button type="primary" @click="lockPassword = false">修改密码</el-button>
+                            <a-input model-value="已隐藏" disabled />
+                            <a-button type="primary" @click="lockPassword = false">修改密码</a-button>
                         </div>
-                        <el-input v-model="form.password" type="password" show-password v-else />
-                    </el-form-item>
-                    <el-form-item label="密码" prop="password"
+                        <a-input-password v-model="form.password" v-else />
+                    </a-form-item>
+                    <a-form-item label="密码" field="password"
                         :rules="[{ required: true, message: '密码不能为空', trigger: 'manual' }]" v-else>
-                        <el-input v-model="form.password" type="password" show-password />
-                    </el-form-item>
+                        <a-input-password v-model="form.password" />
+                    </a-form-item>
                 </template>
-                <el-form-item label="描述" prop="desc" v-if="!editProp || editProp === 'desc'">
-                    <el-input type="textarea" rows="5" v-model="form.desc" />
-                </el-form-item>
+                <a-form-item label="描述" field="desc" v-if="!editProp || editProp === 'desc'">
+                    <a-textarea v-model="form.desc" :auto-size="{ minRows: 5, maxRows: 5 }" />
+                </a-form-item>
 
-                <el-form-item>
-                    <el-button type="primary" size="large" @click="onSubmit">确定</el-button>
-                    <el-button size="large" @click="visible = false">取消</el-button>
-                </el-form-item>
-            </el-form>
-        </el-dialog>
+                <a-form-item>
+                    <a-button type="primary" size="large" @click="onSubmit">确定</a-button>
+                    <a-button size="large" @click="visible = false">取消</a-button>
+                </a-form-item>
+            </a-form>
+        </a-modal>
     </div>
 </template>
 
 <script>
 import myAxios from "@/utils";
-import { ElMessageBox, ElMessage } from 'element-plus';
+import { confirm, messageSuccess } from "@/utils/ui-feedback";
 
 export default {
     name: "zpk_namespace",
@@ -124,6 +120,9 @@ export default {
             }
 
         },
+        handlePageSizeChange() {
+            this.getData(1);
+        },
         add() {
             this.editProp = ''
             this.editId = ''
@@ -137,8 +136,8 @@ export default {
             this.visible = true
         },
         onSubmit() {
-            this.$refs.form.validate(async (valid) => {
-                if (!valid) {
+            this.$refs.form.validate(async (errors) => {
+                if (errors) {
                     return
                 }
                 let postId = this.editId || ''
@@ -167,14 +166,13 @@ export default {
                 }
 
                 if (postId) {
-                    this.$message.success('操作成功');
+                    messageSuccess('操作成功');
                     this.getData(1, false)
                     this.visible = false
                 }
             })
         },
         edit(row) {
-            this.editProp = ''
             this.editId = row.id
             this.lockPassword = true
             this.form = {
@@ -187,16 +185,18 @@ export default {
             this.visible = true
         },
         del(row) {
-            ElMessageBox.confirm('请确认删除', "提示", {
+            confirm({
+                title: "提示",
+                content: '请确认删除',
                 confirmButtonText: "确定",
                 cancelButtonText: "取消",
-            }).then(() => {
-                myAxios.post("/v2/api/user/del", { id: row.id }).then(res => {
-                    if (!res) { return }
-                    ElMessage({ message: '删除成功', type: 'success', })
-                    this.getData(1);
-                });
-            }).catch(() => {
+                onOk: () => {
+                    return myAxios.post("/v2/api/user/del", { id: row.id }).then(res => {
+                        if (!res) { return }
+                        messageSuccess('删除成功')
+                        this.getData(1);
+                    });
+                }
             });
         },
     }
@@ -206,5 +206,23 @@ export default {
 <style scoped>
 .ml-20 {
     margin-left: 20px;
+}
+
+.table-header :deep(.arco-table-th) {
+    background: #F3F3F3;
+    color: #666666;
+    font-weight: 500;
+}
+
+.user-form :deep(.arco-form-item-label-col) {
+    width: 80px;
+}
+
+.user-form :deep(.arco-form-item-label) {
+    white-space: nowrap;
+}
+
+.user-form :deep(.arco-form-item-wrapper-col) {
+    min-width: 0;
 }
 </style>

@@ -3,56 +3,60 @@
     <div>
       <div>
         <div class="bg-white bg-padding pb-24" style="border-top:1px solid #EEEEEE;">
-          <el-button type="primary" @click="add">
+          <a-button type="primary" @click="add">
             新建命名空间
-          </el-button>
-          <el-table :data="tableData" class="mt-20 table-header">
-            <el-table-column label="名称" prop="name" />
-            <el-table-column label="仓库数量">
-              <template #default="scope">
-                {{ namespaceCountMap[scope.row.name]?.count || 0 }}
-              </template>
-            </el-table-column>
-            <el-table-column label="访问级别">
-              <template #default="scope">
-                {{ visibleTypeMap[scope.row.visible_type] }}
-              </template>
-            </el-table-column>
-            <el-table-column label="创建时间" prop="created_at">
-              <template #default="scope">
-                {{ new Date(scope.row.created_at).toLocaleString() }}
-              </template>
-            </el-table-column>
-            <el-table-column label="操作">
-              <template #default="scope">
-                <template v-if="hasAccess(scope.row.user_id)">
-                  <el-button type="text" @click="edit(scope.row)">修改</el-button>
-                  <el-button v-if="scope.row.name != 'zpk_oci'" type="text" @click="del(scope.row)">删除</el-button>
+          </a-button>
+          <a-table :data="tableData" :pagination="false" class="mt-20 table-header" row-key="id">
+            <template #columns>
+              <a-table-column title="名称" data-index="name" />
+              <a-table-column title="仓库数量">
+                <template #cell="{ record }">
+                  {{ namespaceCountMap[record.name]?.count || 0 }}
                 </template>
-              </template>
-            </el-table-column>
-          </el-table>
+              </a-table-column>
+              <a-table-column title="访问级别">
+                <template #cell="{ record }">
+                  {{ visibleTypeMap[record.visible_type] }}
+                </template>
+              </a-table-column>
+              <a-table-column title="创建时间" data-index="created_at">
+                <template #cell="{ record }">
+                  {{ new Date(record.created_at).toLocaleString() }}
+                </template>
+              </a-table-column>
+              <a-table-column title="操作">
+                <template #cell="{ record }">
+                  <template v-if="hasAccess(record.user_id)">
+                    <a-button type="text" @click="edit(record)">修改</a-button>
+                    <a-button v-if="record.name != 'zpk_oci'" type="text" status="danger"
+                      @click="del(record)">删除</a-button>
+                  </template>
+                </template>
+              </a-table-column>
+            </template>
+          </a-table>
           <div class="mt-20 df jc-e">
-            <el-pagination v-model:page-size="paginate" :current-page="page" :page-count="last_page"
-              :page-sizes="[10, 20, 30, 40]" background layout="sizes, prev, pager, next" @size-change="getData(1)"
-              @current-change='getData'></el-pagination>
+            <a-pagination v-model:current="page" v-model:page-size="paginate" :total="list.length"
+              :page-size-options="[10, 20, 30, 40]" show-page-size
+              @page-size-change="handlePageSizeChange" @change="getData" />
           </div>
         </div>
       </div>
     </div>
-    <el-dialog v-model="visible" :title="editId ? '编辑命名空间' : '添加命名空间'" :width="800">
-      <el-form ref="form" :model="form" label-position="left" label-width="80px">
-        <el-form-item :rules="[{ required: true, message: '名称不能为空', trigger: 'manual' }]" label="名称" prop="name">
-          <el-input v-model="form.name" />
-        </el-form-item>
-        <el-form-item label="公共权限" prop="visible_type">
-          <el-radio-group v-model="form.visible_type">
-            <el-radio :label="1">私有读写</el-radio>
-            <el-radio :label="4">公有读私有写</el-radio>
-            <el-radio :label="2">公有读写</el-radio>
-          </el-radio-group>
-        </el-form-item>
-        <el-form-item v-if="userRole != 'normal'" label="用户权限">
+    <a-modal v-model:visible="visible" :title="editId ? '编辑命名空间' : '添加命名空间'" :width="800" :footer="false">
+      <a-form ref="form" :model="form" label-align="left" :label-col-props="{ span: 3, flex: '0 0 80px' }"
+        :wrapper-col-props="{ span: 21, flex: '1' }" class="namespace-form">
+        <a-form-item :rules="[{ required: true, message: '名称不能为空', trigger: 'manual' }]" label="名称" field="name">
+          <a-input v-model="form.name" />
+        </a-form-item>
+        <a-form-item label="公共权限" field="visible_type">
+          <a-radio-group v-model="form.visible_type">
+            <a-radio :value="1">私有读写</a-radio>
+            <a-radio :value="4">公有读私有写</a-radio>
+            <a-radio :value="2">公有读写</a-radio>
+          </a-radio-group>
+        </a-form-item>
+        <a-form-item v-if="userRole != 'normal'" label="用户权限">
           <table class="table">
             <thead>
               <tr>
@@ -64,16 +68,16 @@
             <tbody>
               <tr v-for="(item, index) in form.permissions" :key="index">
                 <td>
-                  <el-select v-model="item.user_id" placeholder="请选择">
-                    <el-option v-for="(item, index) in userList" :key="index" :label="item.username"
-                      :value="item.id"></el-option>
-                  </el-select>
+                  <a-select v-model="item.user_id" placeholder="请选择" class="permission-select">
+                    <a-option v-for="(item, index) in userList" :key="index" :label="item.username"
+                      :value="item.id"></a-option>
+                  </a-select>
                 </td>
                 <td>
-                  <el-radio-group v-model="item.permission">
-                    <el-radio :label="1">只读</el-radio>
-                    <el-radio :label="2">读写</el-radio>
-                  </el-radio-group>
+                  <a-radio-group v-model="item.permission">
+                    <a-radio :value="1">只读</a-radio>
+                    <a-radio :value="2">读写</a-radio>
+                  </a-radio-group>
                 </td>
                 <td>
                   <span class="cursor c-blue" @click="form.permissions.splice(index, 1)">删除</span>
@@ -81,26 +85,24 @@
               </tr>
               <tr>
                 <td @click="form.permissions.push({ username: '', permission: 1 })" class="cursor txt-c" colspan="3">
-                  <span class="addmenu"><el-icon :size="14">
-                      <Plus />
-                  </el-icon>添加用户</span>
+                  <span class="addmenu">+ 添加用户</span>
                 </td>
               </tr>
             </tbody>
           </table>
-        </el-form-item>
-        <el-form-item>
-          <el-button size="large" type="primary" @click="onSubmit">确定</el-button>
-          <el-button size="large" @click="visible = false">取消</el-button>
-        </el-form-item>
-      </el-form>
-    </el-dialog>
+        </a-form-item>
+        <a-form-item>
+          <a-button size="large" type="primary" @click="onSubmit">确定</a-button>
+          <a-button size="large" @click="visible = false">取消</a-button>
+        </a-form-item>
+      </a-form>
+    </a-modal>
   </div>
 </template>
 
 <script>
 import myAxios from "@/utils";
-import { ElMessageBox, ElMessage } from 'element-plus';
+import { confirm, messageSuccess } from "@/utils/ui-feedback";
 import userMixin from "@/utils/user-mixin";
 
 export default {
@@ -166,6 +168,9 @@ export default {
       }
 
     },
+    handlePageSizeChange() {
+      this.getData(1);
+    },
     add() {
       this.editId = ''
       this.form.name = ''
@@ -174,8 +179,8 @@ export default {
       this.visible = true
     },
     onSubmit() {
-      this.$refs.form.validate(async (valid) => {
-        if (!valid) { return }
+      this.$refs.form.validate(async (errors) => {
+        if (errors) { return }
         if (this.editId) {
           await myAxios.post('/v2/api/namespace/edit', { id: this.editId, ...this.form }).then(() => { })
         } else {
@@ -196,12 +201,12 @@ export default {
             namespace: this.form.name,
             permissions: permissions,
           }).then(res => {
-            this.$message.success('操作成功');
+            messageSuccess('操作成功');
             this.getData(1, false)
             this.visible = false
           })
         } else {
-          this.$message.success('操作成功');
+          messageSuccess('操作成功');
           this.getData(1, false)
           this.visible = false
         }
@@ -228,19 +233,19 @@ export default {
       this.visible = true
     },
     del(row) {
-      ElMessageBox.confirm('请确认删除', "提示", {
+      confirm({
+        title: "提示",
+        content: '请确认删除',
         confirmButtonText: "确定",
         cancelButtonText: "取消",
-      }).then(() => {
-        myAxios.post("/v2/api/namespace/del", { id: row.id }).then(res => {
-          if (!res) { return }
-          ElMessage({
-            message: '删除成功',
-            type: 'success',
-          })
-          this.getData(1);
-        });
-      }).catch(() => { });
+        onOk: () => {
+          return myAxios.post("/v2/api/namespace/del", { id: row.id }).then(res => {
+            if (!res) { return }
+            messageSuccess('删除成功')
+            this.getData(1);
+          });
+        }
+      });
     },
   }
 }
@@ -249,6 +254,28 @@ export default {
 <style scoped>
 .ml-20 {
   margin-left: 20px;
+}
+
+.table-header :deep(.arco-table-th) {
+  background: #F3F3F3;
+  color: #666666;
+  font-weight: 500;
+}
+
+.namespace-form :deep(.arco-form-item-label-col) {
+  width: 80px;
+}
+
+.namespace-form :deep(.arco-form-item-label) {
+  white-space: nowrap;
+}
+
+.namespace-form :deep(.arco-form-item-wrapper-col) {
+  min-width: 0;
+}
+
+.permission-select {
+  width: 220px;
 }
 
 .table {

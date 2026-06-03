@@ -1,6 +1,6 @@
 <template>
     <div id="zpk-description" class="description-page">
-        <div v-loading="loading || saving">
+        <a-spin :loading="loading || saving" class="description-spin">
             <div class="content-box">
                 <div class="sidebar df-s0">
                     <div class="sidebar-title df ai-c jc-b">
@@ -21,26 +21,27 @@
                                     }}</div>
                                 </div>
                                 <div class="sidebar-item-actions df ai-c">
-                                    <el-tooltip v-if="!item.isReadme" effect="dark" content="修改文档标题" placement="top"
-                                        :hide-after="0">
-                                        <el-icon class="sidebar-edit" :class="{ 'is-disabled': saving }" :size="16"
-                                            @click.stop="!saving && openRenameDialog(item)">
-                                            <Edit />
-                                        </el-icon>
-                                    </el-tooltip>
-                                    <el-tooltip v-if="!item.isReadme" effect="dark" content="删除文件" placement="top"
-                                        :hide-after="0">
-                                        <el-icon class="sidebar-delete" :class="{ 'is-disabled': saving }" :size="16"
-                                            @click.stop="!saving && deleteDoc(item.path)">
-                                            <Delete />
-                                        </el-icon>
-                                    </el-tooltip>
+                                    <a-tooltip v-if="!item.isReadme" content="修改文档标题" position="top">
+                                        <a-button class="sidebar-action sidebar-edit" :class="{ 'is-disabled': saving }"
+                                            type="text" size="mini" :disabled="saving"
+                                            @click.stop="openRenameDialog(item)">
+                                            <template #icon><icon-edit /></template>
+                                        </a-button>
+                                    </a-tooltip>
+                                    <a-tooltip v-if="!item.isReadme" content="删除文件" position="top">
+                                        <a-button class="sidebar-action sidebar-delete" :class="{ 'is-disabled': saving }"
+                                            type="text" size="mini" :disabled="saving" @click.stop="deleteDoc(item.path)">
+                                            <template #icon><icon-delete /></template>
+                                        </a-button>
+                                    </a-tooltip>
                                 </div>
                             </div>
                         </div>
                         <div class="sidebar-add">
-                            <el-button type="text" icon="plus" :disabled="saving"
-                                @click="openCreateDialog">添加文档</el-button>
+                            <a-button type="text" :disabled="saving" @click="openCreateDialog">
+                                <template #icon><icon-plus /></template>
+                                添加文档
+                            </a-button>
                         </div>
                     </div>
                 </div>
@@ -51,8 +52,8 @@
                             <div class="editor-title">{{ currentTitle }}</div>
                         </div>
                         <div class="editor-actions df ai-c">
-                            <el-button type="primary" :loading="saveButtonLoading" :disabled="saving"
-                                @click="saveDoc(currentEditingPath)">保存</el-button>
+                            <a-button type="primary" :loading="saveButtonLoading" :disabled="saving"
+                                @click="saveDoc(currentEditingPath)">保存</a-button>
                         </div>
                     </div>
 
@@ -64,35 +65,35 @@
                     </div>
                 </div>
             </div>
-        </div>
+        </a-spin>
 
-        <el-dialog v-model="createDialog.show" title="添加文件" width="560px">
+        <a-modal v-model:visible="createDialog.show" title="添加文件" :width="560">
             <div class="create-form">
                 <div class="form-row">
                     <div class="form-label">文件标题</div>
-                    <el-input v-model="createDialog.title" :spellcheck="false"
-                        placeholder="请输入文件标题，无需输入 .md"></el-input>
+                    <a-input v-model="createDialog.title" :spellcheck="false"
+                        placeholder="请输入文件标题，无需输入 .md"></a-input>
                 </div>
             </div>
             <template #footer>
-                <el-button @click="createDialog.show = false">取消</el-button>
-                <el-button type="primary" @click="submitCreate">确认</el-button>
+                <a-button @click="createDialog.show = false">取消</a-button>
+                <a-button type="primary" @click="submitCreate">确认</a-button>
             </template>
-        </el-dialog>
+        </a-modal>
 
-        <el-dialog v-model="renameDialog.show" title="修改文档标题" width="560px">
+        <a-modal v-model:visible="renameDialog.show" title="修改文档标题" :width="560">
             <div class="create-form">
                 <div class="form-row">
                     <div class="form-label">文件标题</div>
-                    <el-input v-model="renameDialog.title" :spellcheck="false"
-                        placeholder="请输入文件标题，无需输入 .md"></el-input>
+                    <a-input v-model="renameDialog.title" :spellcheck="false"
+                        placeholder="请输入文件标题，无需输入 .md"></a-input>
                 </div>
             </div>
             <template #footer>
-                <el-button @click="renameDialog.show = false">取消</el-button>
-                <el-button type="primary" :loading="saving" @click="submitRename">确认</el-button>
+                <a-button @click="renameDialog.show = false">取消</a-button>
+                <a-button type="primary" :loading="saving" @click="submitRename">确认</a-button>
             </template>
-        </el-dialog>
+        </a-modal>
     </div>
 </template>
 
@@ -100,6 +101,8 @@
 import MarkdownIt from 'markdown-it';
 import markdownItTaskLists from 'markdown-it-task-lists';
 import myAxios from '@/utils';
+import { IconDelete, IconEdit, IconPlus } from '@arco-design/web-vue/es/icon';
+import { confirm, messageError, messageSuccess, messageWarning } from '@/utils/ui-feedback';
 
 const README_PATH = 'readme.md';
 const DOCS_DIR = 'docs';
@@ -282,6 +285,7 @@ const createDocFile = (title, content = '') => {
 
 export default {
     name: 'ProductDescriptionPage',
+    components: { IconDelete, IconEdit, IconPlus },
     data() {
         return {
             identifie: '',
@@ -475,7 +479,7 @@ export default {
             try {
                 await this.postDocsOrderFile(this.getDocsOrderContent());
                 if (successText) {
-                    this.$message.success(successText);
+                    messageSuccess(successText);
                 }
             } catch (error) {
                 await this.getFiles();
@@ -570,11 +574,11 @@ export default {
         async submitCreate() {
             let title = (this.createDialog.title || '').trim().replace(/\.md$/i, '').trim();
             if (!title) {
-                this.$message.warning('请输入文件标题');
+                messageWarning('请输入文件标题');
                 return;
             }
             if (/[\\/]/.test(title)) {
-                this.$message.warning('文件标题不能包含“/”或“\\”');
+                messageWarning('文件标题不能包含“/”或“\\”');
                 return;
             }
 
@@ -582,7 +586,7 @@ export default {
             let targetPath = normalizePath(file.path);
             let exists = this.docsFiles.some(item => normalizePath(item.path) === targetPath || item.title === title);
             if (exists) {
-                this.$message.error('已存在同名文档');
+                messageError('已存在同名文档');
                 return;
             }
 
@@ -593,7 +597,7 @@ export default {
                 let latestList = latest?.data?.data?.list || {};
                 let remoteExists = Object.keys(latestList).some(path => normalizePath(path) === targetPath);
                 if (remoteExists) {
-                    this.$message.error('已存在同名文档');
+                    messageError('已存在同名文档');
                     await this.getFiles();
                     return;
                 }
@@ -607,7 +611,7 @@ export default {
                 this.docsFiles = [...this.docsFiles];
                 await this.postDocsOrderFile(this.getDocsOrderContent());
                 this.createDialog.show = false;
-                this.$message.success('添加成功');
+                messageSuccess('添加成功');
 
                 await this.$nextTick();
                 this.selectDoc(file.path);
@@ -624,17 +628,17 @@ export default {
                 return;
             }
             if (!title) {
-                this.$message.warning('请输入文件标题');
+                messageWarning('请输入文件标题');
                 return;
             }
             if (/[\\/]/.test(title)) {
-                this.$message.warning('文件标题不能包含“/”或“\\”');
+                messageWarning('文件标题不能包含“/”或“\\”');
                 return;
             }
 
             let current = this.docsFiles.find(item => normalizePath(item.path) === oldPath);
             if (!current) {
-                this.$message.error('文档不存在');
+                messageError('文档不存在');
                 this.renameDialog.show = false;
                 await this.getFiles();
                 return;
@@ -652,7 +656,7 @@ export default {
                 return path !== oldPath && (path === targetPath || item.title === title);
             });
             if (exists) {
-                this.$message.error('已存在同名文档');
+                messageError('已存在同名文档');
                 return;
             }
 
@@ -669,7 +673,7 @@ export default {
                     return normalized !== oldPath && normalized === targetPath;
                 });
                 if (remoteExists) {
-                    this.$message.error('已存在同名文档');
+                    messageError('已存在同名文档');
                     await this.getFiles();
                     return;
                 }
@@ -701,7 +705,7 @@ export default {
                 this.renameDialog.show = false;
                 this.renameDialog.path = '';
                 this.renameDialog.title = '';
-                this.$message.success('修改成功');
+                messageSuccess('修改成功');
                 await this.getFiles();
             } finally {
                 this.saving = false;
@@ -711,35 +715,35 @@ export default {
         async deleteDoc(path) {
             if (!path) { return }
             if (normalizePath(path) === normalizePath(README_PATH)) {
-                this.$message.warning('readme.md 不可删除');
+                messageWarning('readme.md 不可删除');
                 return;
             }
             this.persistEditorContent();
             let current = this.docsFiles.find(item => item.path === path);
             if (!current) { return }
-            try {
-                await this.$confirm('确定要删除“' + current.title + '”吗', "提示", {
-                    confirmButtonText: "确定",
-                    cancelButtonText: "取消",
-                });
-            } catch (error) {
-                return;
-            }
-            if (this.saving) { return }
-            let currentIndex = this.docsFiles.findIndex(item => item.path === path);
-            if (currentIndex < 0) { return }
-            this.docsFiles.splice(currentIndex, 1);
-            this.docsFiles = [...this.docsFiles];
-            let nextDoc = this.docsFiles[currentIndex] || this.docsFiles[currentIndex - 1] || null;
-            this.isEditing = true;
-            if (this.docsFiles.length) {
-                this.activeDocPath = nextDoc?.path || '';
-                this.inputContent(nextDoc?.content || '');
-            } else {
-                this.activeDocPath = README_PATH;
-                this.inputContent(this.readmeContent);
-            }
-            await this.saveMultipleDocs('', [path], '删除成功');
+            confirm({
+                title: '提示',
+                content: '确定要删除“' + current.title + '”吗',
+                confirmButtonText: '确定',
+                cancelButtonText: '取消',
+                onOk: async () => {
+                    if (this.saving) { return }
+                    let currentIndex = this.docsFiles.findIndex(item => item.path === path);
+                    if (currentIndex < 0) { return }
+                    this.docsFiles.splice(currentIndex, 1);
+                    this.docsFiles = [...this.docsFiles];
+                    let nextDoc = this.docsFiles[currentIndex] || this.docsFiles[currentIndex - 1] || null;
+                    this.isEditing = true;
+                    if (this.docsFiles.length) {
+                        this.activeDocPath = nextDoc?.path || '';
+                        this.inputContent(nextDoc?.content || '');
+                    } else {
+                        this.activeDocPath = README_PATH;
+                        this.inputContent(this.readmeContent);
+                    }
+                    await this.saveMultipleDocs('', [path], '删除成功');
+                },
+            });
         },
         persistEditorContent(activeDocPath = this.activeDocPath) {
             let content = this.mdtxt;
@@ -831,7 +835,7 @@ export default {
                     filename: README_PATH,
                     content: this.readmeContent,
                 });
-                this.$message.success('保存成功');
+                messageSuccess('保存成功');
                 await this.getFiles();
                 this.isEditing = true;
             } finally {
@@ -875,7 +879,7 @@ export default {
                     await this.postDocsOrderFile(this.getDocsOrderContent());
                 }
 
-                this.$message.success(successText);
+                messageSuccess(successText);
                 await this.getFiles();
                 this.isEditing = true;
             } finally {
@@ -891,6 +895,10 @@ export default {
 .description-page {
     min-height: 100vh;
     background: #fff;
+}
+
+.description-spin {
+    display: block;
 }
 
 .page-header {
@@ -1025,6 +1033,12 @@ export default {
     opacity: 1;
 }
 
+.sidebar-action {
+    width: 22px;
+    height: 22px;
+    padding: 0;
+}
+
 .sidebar-edit,
 .sidebar-delete {
     cursor: pointer;
@@ -1054,7 +1068,7 @@ export default {
     cursor: not-allowed;
 }
 
-.sidebar-add .el-button {
+.sidebar-add .arco-btn {
     width: 100%;
 }
 

@@ -1,51 +1,56 @@
 <template>
     <div style="height:100vh;">
         <div style="padding:20px; border-bottom:1px solid #E7E7E7;">
-            <el-breadcrumb separator="/">
-                <el-breadcrumb-item :to="{ path: '/zpk' }"><template #default><span
-                            class="c-99 fw-400">我的制品库</span></template></el-breadcrumb-item>
-                <el-breadcrumb-item
-                    :to="{ path: '/zpk-version', query: { id: this.identifie, title: vtitle } }"><template
-                        #default><span class="c-99 fw-400">版本管理</span></template></el-breadcrumb-item>
-                <el-breadcrumb-item><template #default><span
-                            class="c-33 fw-400">编辑前端托管</span></template></el-breadcrumb-item>
-            </el-breadcrumb>
+            <a-breadcrumb>
+                <a-breadcrumb-item><router-link to="/zpk" class="c-99 fw-400">我的制品库</router-link></a-breadcrumb-item>
+                <a-breadcrumb-item>
+                    <router-link :to="{ path: '/zpk-version', query: { id: identifie, title: vtitle } }"
+                        class="c-99 fw-400">版本管理</router-link>
+                </a-breadcrumb-item>
+                <a-breadcrumb-item><span class="c-33 fw-400">编辑前端托管</span></a-breadcrumb-item>
+            </a-breadcrumb>
         </div>
-        <div v-if="manifest" v-loading="deleteLoading">
-            <div class="df jc-b" style="padding:20px 20px 0">
-                <div class="df">
-                    <el-button @click="dependsIndex = -1;" :type="dependsIndex == -1 ? 'primary' : ''">主应用</el-button>
-                    <div v-for="(item, index) in depends" :key="item.identifie"
-                        style="margin-left:10px;position:relative;">
-                        <el-button :type="dependsIndex == index ? 'primary' : ''"
-                            @click="dependsIndex = index; edit({ stop: true })">{{ item.identifie }}</el-button>
+        <a-spin :loading="deleteLoading" class="edit-spin">
+            <div v-if="manifest">
+                <div class="df jc-b" style="padding:20px 20px 0">
+                    <div class="df">
+                        <a-button @click="dependsIndex = -1;"
+                            :type="dependsIndex == -1 ? 'primary' : 'secondary'">主应用</a-button>
+                        <div v-for="(item, index) in depends" :key="item.identifie"
+                            style="margin-left:10px;position:relative;">
+                            <a-button :type="dependsIndex == index ? 'primary' : 'secondary'"
+                                @click="dependsIndex = index; edit({ stop: true })">{{ item.identifie }}</a-button>
+                        </div>
                     </div>
                 </div>
+                <files-manifestfront v-show="dependsIndex == -1" :data="manifest" :version_id="version_id" ref="form"
+                    :option="{ edit: true, imginstall: true, mainapp: true, app_ports: this.app_ports }"
+                    :identifie="identifie" @addfile="addfileInside" @complete="complete"
+                    @structure="structure"></files-manifestfront>
+                <files-manifestfront v-for="(item, index) in depends" :key="item.identifie" :ref="'depends' + index"
+                    v-show="dependsIndex == index" :data="depends[index].manifest"
+                    :option="{ pureManifest: true, imginstall: true }" :identifie="item.identifie"
+                    :manifest-info="item" @complete="dependsComplete" @structure="structure"></files-manifestfront>
             </div>
-            <files-manifestfront v-show="dependsIndex == -1" :data="manifest" :version_id="version_id" ref="form"
-                :option="{ edit: true, imginstall: true, mainapp: true, app_ports: this.app_ports }"
-                :identifie="identifie" @addfile="addfileInside" @complete="complete"
-                @structure="structure"></files-manifestfront>
-            <files-manifestfront v-for="(item, index) in depends" :key="item.identifie" :ref="'depends' + index"
-                v-show="dependsIndex == index" :data="depends[index].manifest"
-                :option="{ pureManifest: true, imginstall: true }" @complete="dependsComplete"
-                @structure="structure"></files-manifestfront>
-        </div>
+        </a-spin>
     </div>
 
-    <el-dialog v-model="impt.show" title="导入制品库" width="560px">
+    <a-modal v-model:visible="impt.show" title="导入制品库" :width="560" :footer="false"
+        modal-class="zpk-version-dialog">
         <div class="df" style="padding:10px;">
-            <el-autocomplete v-model="impt.title" ref="imptzpk" :fetch-suggestions="addQuerySearch" placeholder="请选择制品库"
-                style="width:400px;" value-key="name" size="large" @select="addSelect" :spellcheck="false" />
-            <el-button type="primary" @click="imptSubmit()" class="ml-10" size="large">确定</el-button>
+            <a-auto-complete v-model="impt.title" ref="imptzpk" :data="impt.options" placeholder="请选择制品库"
+                style="width:400px;" size="large" allow-clear :filter-option="false" @search="addQuerySearch"
+                @change="handleImportTitleChange" @select="addSelect" :spellcheck="false" />
+            <a-button type="primary" @click="imptSubmit()" class="ml-10" size="large">确定</a-button>
         </div>
-    </el-dialog>
+    </a-modal>
 </template>
 
 <script>
 import myAxios from '@/utils';
 import filesManifestfront from '@/components/files-manifestfront.vue';
 import jsyaml from "js-yaml";
+import { confirm, messageError, messageSuccess, messageWarning } from '@/utils/ui-feedback';
 const defaultManifest = `application:
     name: ''
     identifie: ''
@@ -65,6 +70,7 @@ platform:
 `;
 
 export default {
+    inheritAttrs: false,
     components: { filesManifestfront },
     data() {
         return {
@@ -88,6 +94,7 @@ export default {
                 show: false,
                 title: '',
                 data: null,
+                options: [],
             },
 
             app_ports: []
@@ -193,7 +200,7 @@ export default {
             }
         },
         imptSubmit() {
-            if (!this.impt.data) { this.$message.warning('请选择制品库'); return; }
+            if (!this.impt.data) { messageWarning('请选择制品库'); return; }
             this.jsonp('https://console.w7.cc/zpk?path=/respo/v2/info/' + this.impt.data.identifie + '/' + this.version_id, 'getimportmanifest', data => {
                 let manifest = data?.data?.manifest || defaultManifest;
                 let json = jsyaml.load(manifest);
@@ -204,18 +211,28 @@ export default {
             })
         },
 
-        addQuerySearch(query, cb) {
-            this.jsonp('https://console.w7.cc/zpk?status=2&page=1&limit=999&keyword=' + query + '&path=/respo/list', 'getimport', (data) => {
+        addQuerySearch(query = '') {
+            this.jsonp('https://console.w7.cc/zpk?status=2&page=1&limit=999&keyword=' + encodeURIComponent(query) + '&path=/respo/list', 'getimport', (data) => {
                 let list = data?.data?.list || [];
                 list = list.splice(0, 20);
-                cb(list)
+                this.impt.options = list.map(item => ({
+                    label: item.name,
+                    value: item.name,
+                    raw: item,
+                }));
             })
         },
 
-        addSelect(data) {
-            this.$refs.imptzpk.close();
-            this.$refs.imptzpk.inputRef.blur();
-            this.impt.data = data;
+        handleImportTitleChange(value) {
+            if (this.impt.data?.name == value) { return; }
+            let option = this.impt.options.find(item => item.value == value);
+            this.impt.data = option?.raw || null;
+        },
+
+        addSelect(value) {
+            let option = this.impt.options.find(item => item.value == value);
+            this.impt.data = option?.raw || null;
+            this.$refs.imptzpk?.blur?.();
         },
         addfileInside(json, yaml, data) {
             myAxios.post('/respo/file', {
@@ -240,7 +257,7 @@ export default {
                 });
             }).catch((error) => {
                 if (error?.response?.data?.error) {
-                    this.$message.error(error.response.data.error);
+                    messageError(error.response.data.error);
                 }
             });
         },
@@ -271,7 +288,7 @@ export default {
                 version: this.version_id,
             }).then(() => {
                 this.getInfo(this.identifie, () => {
-                    this.$message.success('操作成功');
+                    messageSuccess('操作成功');
                 });
                 this.getFile();
             });
@@ -297,7 +314,7 @@ export default {
                     (typeof callback == 'function') && callback();
                     return;
                 }
-                this.$message.success('修改成功');
+                messageSuccess('修改成功');
                 (typeof callback == 'function') && callback();
                 this.getInfo(this.identifie, () => {
                     this.publish(true).then(() => {
@@ -308,7 +325,7 @@ export default {
 
             }).catch((error) => {
                 if (error?.response?.data?.error) {
-                    this.$message.error(error.response.data.error);
+                    messageError(error.response.data.error);
                 }
             });
         },
@@ -320,7 +337,7 @@ export default {
                 }
             }).catch((error) => {
                 if (error?.response?.data?.error) {
-                    this.$message.error(error.response.data.error);
+                    messageError(error.response.data.error);
                 }
             });
         },
@@ -359,17 +376,18 @@ export default {
             this.$refs.form.submit(data);
         },
         del(row) {
-            this.$confirm('确定要删除"' + row.label + '"吗', "提示", {
+            confirm({
+                title: '提示',
+                content: '确定要删除"' + row.label + '"吗',
                 confirmButtonText: "确定",
                 cancelButtonText: "取消",
-            }).then(() => {
-                myAxios.post('/respo/file', {
+                onOk: () => myAxios.post('/respo/file', {
                     identifie: this.identifie,
                     filename: row.label,
                     content: '',
                     version: this.version_id,
                 }).then(res => {
-                    this.$message.success('删除成功');
+                    messageSuccess('删除成功');
                     this.getInfo(this.identifie, () => {
                         this.publish(1);
                         setTimeout(() => {
@@ -400,6 +418,11 @@ export default {
 }
 </script>
 <style scoped>
+.edit-spin {
+    display: block;
+    min-height: calc(100vh - 65px);
+}
+
 .table {
     width: 100%;
 }
@@ -419,13 +442,11 @@ export default {
 }
 </style>
 <style>
-.zpk-version-dialog .el-dialog__header {
-    margin-right: 0;
-    padding-right: 36px;
+.zpk-version-dialog .arco-modal-header {
     border-bottom: 1px solid #dcdcdc;
 }
 
-.zpk-version-dialog .el-dialog__footer {
+.zpk-version-dialog .arco-modal-footer {
     text-align: center;
     border-top: 1px solid #dcdcdc;
 }

@@ -1,9 +1,10 @@
 import axios from "axios";
 import { alert, message } from './ui-feedback';
 import { getPanelToken } from './panel-token';
+import { getZpkBaseURL } from './request-base';
 
 const myAxios = axios.create({
-    baseURL: process.env.NODE_ENV === 'production' ? (window?.$wujie?.props?.url ? window?.$wujie?.props?.url + '/zpk' : '/zpk') : '/zpk',
+    baseURL: getZpkBaseURL(),
     timeout: 90000
 });
 

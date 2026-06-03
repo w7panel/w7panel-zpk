@@ -243,7 +243,7 @@
                                                     </div>
                                                     <div class="mb-20 manifest-front-table-block">
                                                         <div class="manifest-front-table-title">请求头(Header)</div>
-                                                        <table class="table">
+                                                        <table class="table manifest-param-table">
                                                             <thead>
                                                                 <tr>
                                                                     <td>key</td>
@@ -285,7 +285,7 @@
                                                     </div>
                                                     <div v-if="!(form.menu_type == 'thirdparty_cd' && r.name == 'normal')" class="manifest-front-table-block">
                                                         <div class="manifest-front-table-title">请求参数(Query)</div>
-                                                        <table class="table">
+                                                        <table class="table manifest-param-table">
                                                             <thead>
                                                                 <tr>
                                                                     <td>key</td>
@@ -326,11 +326,12 @@
                                                         </table>
                                                     </div>
                                                 </div>
-                                                <div class="df ai-c manifest-front-section-title">前端配置<a-tooltip content="面板提供microapp机制渲染前端包，可通过window.$wujie.props.frontend_props 从JS变量获取传递值"><ArcoIcon name="icon-41" :size="16"/></a-tooltip></div>
+                                                <div v-if="!(form.menu_type == 'thirdparty_cd' && r.name == 'normal')"
+                                                    class="df ai-c manifest-front-section-title">前端配置<a-tooltip content="面板提供microapp机制渲染前端包，可通过window.$wujie.props.frontend_props 从JS变量获取传递值"><ArcoIcon name="icon-41" :size="16"/></a-tooltip></div>
                                                 <div
                                                     v-if="!(form.menu_type == 'thirdparty_cd' && r.name == 'normal')" class="manifest-front-block">
                                                     <div class="manifest-front-table-title">前端配置</div>
-                                                    <table class="table">
+                                                    <table class="table manifest-param-table">
                                                         <thead>
                                                             <tr>
                                                                 <td>key</td>
@@ -580,10 +581,11 @@
             <sel-svg @submit="selectIcon"></sel-svg>
         </a-modal>
         <a-modal v-model:visible="showIngress" title="添加业务端" :width="640" :footer="false">
-            <a-form ref="ingress" :model="newIngressEnd" :label-col-props="{ flex: '0 0 80px' }">
+            <a-form ref="ingress" :model="newIngressEnd" label-align="left" class="manifest-dialog-form"
+                :label-col-props="{ flex: '0 0 80px' }" :wrapper-col-props="{ flex: '1' }">
                 <a-form-item label="名称" field="name" :rules="[{ required: true, message: '内容不能为空', trigger: 'blur' }]">
                     <a-input placeholder="请输入业务端名称" v-model="newIngressEnd.name" size="large"
-                        style="width:500px;"></a-input>
+                        style="width:100%;"></a-input>
                 </a-form-item>
                 <a-form-item label="" class="mt-20">
                     <a-button @click="addIngressEnd" type="primary" size="large">确定</a-button>
@@ -592,14 +594,15 @@
         </a-modal>
 
         <a-modal v-model:visible="showAddRole" title="添加管理端" :width="640" :footer="false">
-            <a-form ref="role" :model="newRole" :label-col-props="{ flex: '0 0 80px' }">
+            <a-form ref="role" :model="newRole" label-align="left" class="manifest-dialog-form"
+                :label-col-props="{ flex: '0 0 80px' }" :wrapper-col-props="{ flex: '1' }">
                 <a-form-item label="名称" field="title" :rules="[{ required: true, message: '内容不能为空', trigger: 'blur' }]">
                     <a-input placeholder="请输入管理端名称" v-model="newRole.title" size="large"
-                        style="width:500px;"></a-input>
+                        style="width:100%;"></a-input>
                 </a-form-item>
                 <a-form-item label="标识" field="name" :rules="[{ required: true, message: '内容不能为空', trigger: 'blur' }]">
                     <a-input placeholder="请输入管理端标识" v-model="newRole.name" size="large"
-                        style="width:500px;"></a-input>
+                        style="width:100%;"></a-input>
                 </a-form-item>
                 <a-form-item label="" class="mt-20">
                     <a-button @click="addRole" type="primary" size="large">确定</a-button>
@@ -2199,6 +2202,23 @@ export default {
     line-height: 22px;
 }
 
+.manifest-param-table {
+    width: 100%;
+    table-layout: fixed;
+}
+
+.manifest-param-table td:nth-child(1) {
+    width: 30%;
+}
+
+.manifest-param-table td:nth-child(2) {
+    width: 55%;
+}
+
+.manifest-param-table td:nth-child(3) {
+    width: 15%;
+}
+
 .proxy-address-row {
     margin-bottom: 22px;
     line-height: 22px;
@@ -2260,7 +2280,9 @@ export default {
 }
 
 .start-param-select {
-    width: 240px;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
 }
 
 .backend-url-protocol {
@@ -2340,6 +2362,35 @@ export default {
 
 .manifest-form .arco-form-item-label {
     color: rgba(0, 0, 0, 0.9);
+}
+
+.manifest-param-table .start-param-select {
+    width: 100% !important;
+    min-width: 0;
+    max-width: 100%;
+}
+
+.manifest-param-table .arco-input-wrapper {
+    width: 100% !important;
+    max-width: 100%;
+}
+
+.manifest-dialog-form .arco-form-item-label-col {
+    flex: 0 0 80px !important;
+    width: 80px;
+    max-width: 80px;
+}
+
+.manifest-dialog-form .arco-form-item-wrapper-col {
+    flex: 1 1 auto !important;
+    max-width: calc(100% - 80px);
+    min-width: 0;
+}
+
+.manifest-dialog-form .arco-form-item-content-wrapper,
+.manifest-dialog-form .arco-form-item-content {
+    width: 100%;
+    min-width: 0;
 }
 
 .envdialog .arco-modal-body {

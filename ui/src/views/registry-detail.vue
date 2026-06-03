@@ -21,14 +21,24 @@
                                                 :wrapper-col-props="{ span: 18, flex: '1' }" class="registry-detail-form">
                                                 <a-form-item label="镜像ID(SHA256)" style="margin-bottom:0;">
                                                     <span>{{ record.Digest }}</span>
-                                                    <span class="copy-action" @click="onekeyCopy(record.Digest)">复制</span>
+                                                    <a-tooltip content="复制">
+                                                        <a-button class="icon-action" type="text" shape="circle" size="mini"
+                                                            @click="onekeyCopy(record.Digest)">
+                                                            <template #icon><icon-copy /></template>
+                                                        </a-button>
+                                                    </a-tooltip>
                                                 </a-form-item>
                                                 <a-form-item label="平台" style="margin-bottom:0;">{{ record.Platform }}</a-form-item>
                                                 <a-form-item label="制品类型" style="margin-bottom:0;">{{ record.Type }}</a-form-item>
                                             </a-form>
                                         </template>
                                     </a-popover>
-                                    <span class="copy-action" @click="onekeyCopy(record.TagName)">复制</span>
+                                    <a-tooltip content="复制">
+                                        <a-button class="icon-action" type="text" shape="circle" size="mini"
+                                            @click="onekeyCopy(record.TagName)">
+                                            <template #icon><icon-copy /></template>
+                                        </a-button>
+                                    </a-tooltip>
                                 </template>
                             </a-table-column>
 
@@ -63,19 +73,32 @@
                             <a-form-item label="仓库名称">{{ data.namespace }}/{{ data.name }}</a-form-item>
                             <a-form-item label="仓库地址">
                                 {{ data.registry }}/{{ data.namespace }}/{{ data.name }}
-                                <span class="copy-action"
-                                    @click="onekeyCopy(`${data.registry}/${data.namespace}/${data.name}`)">复制</span>
+                                <a-tooltip content="复制">
+                                    <a-button class="icon-action" type="text" shape="circle" size="mini"
+                                        @click="onekeyCopy(`${data.registry}/${data.namespace}/${data.name}`)">
+                                        <template #icon><icon-copy /></template>
+                                    </a-button>
+                                </a-tooltip>
                             </a-form-item>
                             <a-form-item label="命名空间">{{ data.namespace }}</a-form-item>
                             <a-form-item label="公共权限">
                                 {{ data.visible_type === 3 ? namespaceTypeMap[data.namespace] :
                                     visibleTypeMap[data.visible_type]}}
-                                <span class="edit-action" @click="edit('visible_type')"
-                                    v-if="hasAccess(data.user_id)">编辑</span>
+                                <a-tooltip v-if="hasAccess(data.user_id)" content="编辑">
+                                    <a-button class="icon-action" type="text" shape="circle" size="mini"
+                                        @click="edit('visible_type')">
+                                        <template #icon><icon-edit /></template>
+                                    </a-button>
+                                </a-tooltip>
                             </a-form-item>
                             <a-form-item label="描述">
                                 {{ data.desc }}
-                                <span class="edit-action" @click="edit('desc')" v-if="hasAccess(data.user_id)">编辑</span>
+                                <a-tooltip v-if="hasAccess(data.user_id)" content="编辑">
+                                    <a-button class="icon-action" type="text" shape="circle" size="mini"
+                                        @click="edit('desc')">
+                                        <template #icon><icon-edit /></template>
+                                    </a-button>
+                                </a-tooltip>
                             </a-form-item>
                             <a-form-item label="创建时间">{{ data.created_at ? new Date(data.created_at).toLocaleString() : '' }}</a-form-item>
                         </a-form>
@@ -317,8 +340,13 @@ import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
 import userMixin from "@/utils/user-mixin";
 import { confirm, messageSuccess } from "@/utils/ui-feedback";
+import { IconCopy, IconEdit } from '@arco-design/web-vue/es/icon';
 
 export default {
+    components: {
+        IconCopy,
+        IconEdit,
+    },
     data() {
         return {
             visibleTypeMap: {
@@ -935,11 +963,10 @@ export default {
     line-height: 1;
 }
 
-.copy-action,
-.edit-action {
+.icon-action {
     margin-left: 6px;
     color: #3370ff;
-    cursor: pointer;
+    vertical-align: middle;
 }
 
 .table-header :deep(.arco-table-th) {

@@ -6,12 +6,20 @@
           <div class="shortcut-desc">Linux 平台示例工具名：</div>
           <div class="shortcut-content">
             <pre>zpk_linux_amd64</pre>
-            <span class="copy-action" @click="onekeyCopy(`zpk_linux_amd64`)">复制</span>
+            <a-tooltip content="复制">
+              <a-button class="copy-action" type="text" shape="circle" size="mini" @click="onekeyCopy(`zpk_linux_amd64`)">
+                <template #icon><icon-copy /></template>
+              </a-button>
+            </a-tooltip>
           </div>
           <div class="shortcut-desc">如果下载后无法直接执行，请先添加执行权限：</div>
           <div class="shortcut-content">
             <pre>chmod +x zpk_linux_amd64</pre>
-            <span class="copy-action" @click="onekeyCopy(`chmod +x zpk_linux_amd64`)">复制</span>
+            <a-tooltip content="复制">
+              <a-button class="copy-action" type="text" shape="circle" size="mini" @click="onekeyCopy(`chmod +x zpk_linux_amd64`)">
+                <template #icon><icon-copy /></template>
+              </a-button>
+            </a-tooltip>
           </div>
 
           <div class="shortcut-header">2. 登录镜像仓库</div>
@@ -19,7 +27,11 @@
           <div class="shortcut-desc">执行登录命令：</div>
           <div class="shortcut-content">
             <pre>./zpk_linux_amd64 login --username={{ userInfo.username }} --password=xxx --host={{ host }}</pre>
-            <span class="copy-action" @click="onekeyCopy(`./zpk_linux_amd64 login --username=${userInfo.username} --password=xxx --host=${host}`)">复制</span>
+            <a-tooltip content="复制">
+              <a-button class="copy-action" type="text" shape="circle" size="mini" @click="onekeyCopy(`./zpk_linux_amd64 login --username=${userInfo.username} --password=xxx --host=${host}`)">
+                <template #icon><icon-copy /></template>
+              </a-button>
+            </a-tooltip>
           </div>
           <div class="shortcut-desc">参数说明：</div>
           <ul class="shortcut-list">
@@ -32,23 +44,35 @@
           <div class="shortcut-desc">登录成功后，选择需要操作的制品：</div>
           <div class="shortcut-content">
             <pre>./zpk_linux_amd64 use {{ $route.query.id }}</pre>
-            <span class="copy-action" @click="onekeyCopy(`./zpk_linux_amd64 use ${$route.query.id}`)">复制</span>
+            <a-tooltip content="复制">
+              <a-button class="copy-action" type="text" shape="circle" size="mini" @click="onekeyCopy(`./zpk_linux_amd64 use ${$route.query.id}`)">
+                <template #icon><icon-copy /></template>
+              </a-button>
+            </a-tooltip>
           </div>
 
           <div class="shortcut-header">4. 添加附件</div>
           <div class="shortcut-desc">使用 <code>attach add</code> 命令添加附件：</div>
           <div class="shortcut-content">
             <pre>./zpk_linux_amd64 attach add --path=./xxx --type=helm</pre>
-            <span class="copy-action" @click="onekeyCopy(`./zpk_linux_amd64 attach add --path=./xxx --type=helm`)">复制</span>
+            <a-tooltip content="复制">
+              <a-button class="copy-action" type="text" shape="circle" size="mini" @click="onekeyCopy(`./zpk_linux_amd64 attach add --path=./xxx --type=helm`)">
+                <template #icon><icon-copy /></template>
+              </a-button>
+            </a-tooltip>
           </div>
           <div class="shortcut-desc">也可以根据附件类型选择不同的 <code>--type</code>：</div>
           <div class="shortcut-content">
-            <pre>./zpk_linux_amd64 attach add --path=./xxx --type=helm
+<pre>./zpk_linux_amd64 attach add --path=./xxx --type=helm
 ./zpk_linux_amd64 attach add --path=./xxx --type=backend
 ./zpk_linux_amd64 attach add --path=./xxx --type=frontend</pre>
-            <span class="copy-action" @click="onekeyCopy(`./zpk_linux_amd64 attach add --path=./xxx --type=helm
+            <a-tooltip content="复制">
+              <a-button class="copy-action" type="text" shape="circle" size="mini" @click="onekeyCopy(`./zpk_linux_amd64 attach add --path=./xxx --type=helm
 ./zpk_linux_amd64 attach add --path=./xxx --type=backend
-./zpk_linux_amd64 attach add --path=./xxx --type=frontend`)">复制</span>
+./zpk_linux_amd64 attach add --path=./xxx --type=frontend`)">
+                <template #icon><icon-copy /></template>
+              </a-button>
+            </a-tooltip>
           </div>
           <div class="shortcut-desc">参数说明：</div>
           <ul class="shortcut-list">
@@ -58,7 +82,11 @@
           <div class="shortcut-desc">如果需要为子应用添加附件，可以使用 <code>--sub_artifact</code> 参数：</div>
           <div class="shortcut-content">
             <pre>./zpk_linux_amd64 attach add --path=./xxx --type=backend --sub_artifact=sub_app_name</pre>
-            <span class="copy-action" @click="onekeyCopy(`./zpk_linux_amd64 attach add --path=./xxx --type=backend --sub_artifact=sub_app_name`)">复制</span>
+            <a-tooltip content="复制">
+              <a-button class="copy-action" type="text" shape="circle" size="mini" @click="onekeyCopy(`./zpk_linux_amd64 attach add --path=./xxx --type=backend --sub_artifact=sub_app_name`)">
+                <template #icon><icon-copy /></template>
+              </a-button>
+            </a-tooltip>
           </div>
           <div class="shortcut-desc">参数说明：</div>
           <ul class="shortcut-list">
@@ -69,7 +97,11 @@
           <div class="shortcut-desc">所有附件添加完成后，执行推送命令：</div>
           <div class="shortcut-content">
             <pre>./zpk_linux_amd64 push</pre>
-            <span class="copy-action" @click="onekeyCopy(`./zpk_linux_amd64 push`)">复制</span>
+            <a-tooltip content="复制">
+              <a-button class="copy-action" type="text" shape="circle" size="mini" @click="onekeyCopy(`./zpk_linux_amd64 push`)">
+                <template #icon><icon-copy /></template>
+              </a-button>
+            </a-tooltip>
           </div>
     </div>
 </template>
@@ -77,8 +109,12 @@
 <script>
 import myAxios from '@/utils/index';
 import { messageSuccess } from '@/utils/ui-feedback';
+import { IconCopy } from '@arco-design/web-vue/es/icon';
 export default {
     name: "publish-settings",
+    components: {
+      IconCopy,
+    },
     props:{
       userInfo:{
         type:Object,
@@ -134,7 +170,6 @@ export default {
 }
 .copy-action {
   color: #3370ff;
-  cursor: pointer;
   flex-shrink: 0;
 }
 .shortcut-content pre{

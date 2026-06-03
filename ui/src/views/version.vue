@@ -118,7 +118,8 @@
             <a-tab-pane key="paidset" title="付费设置">
                 <div>
                     <a-form :model="instFee" ref="instFee" :rules="rules" label-align="left"
-                        :label-col-props="{ span: 4, flex: '0 0 80px' }" :wrapper-col-props="{ span: 20, flex: '1' }">
+                        class="version-paid-form"
+                        :label-col-props="{ flex: '0 0 72px' }" :wrapper-col-props="{ flex: '1' }">
                         <a-form-item label="">
                             <div class="df df-c" style="flex:1;">
                                 <a-radio-group v-model="instFee.product_type">
@@ -958,6 +959,16 @@ export default {
 
 .version-setting-block {
     width: 100%;
+}
+
+.version-paid-form :deep(.arco-form-item-label-col) {
+    flex: 0 0 72px !important;
+    width: 72px;
+}
+
+.version-paid-form :deep(.arco-form-item-wrapper-col) {
+    flex: 1 1 auto;
+    min-width: 0;
 }
 
 .table td {

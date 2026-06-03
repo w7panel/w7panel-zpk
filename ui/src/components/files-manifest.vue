@@ -397,7 +397,14 @@
                         </a-form-item>
 
                         <a-form-item class="mt-20" label="安装依赖">
-                            <table class="table">
+                            <table class="table install-depend-table">
+                                <colgroup>
+                                    <col class="install-depend-name-col" />
+                                    <col class="install-depend-sub-col" />
+                                    <col class="install-depend-required-col" />
+                                    <col class="install-depend-identifie-col" />
+                                    <col class="install-depend-action-col" />
+                                </colgroup>
                                 <thead>
                                     <tr>
                                         <td>名称</td>
@@ -858,7 +865,7 @@ export default {
             }
         },
         'option.app_ports'(v) {
-            this.computedAppPort(this.json.platform?.['container-v2']);
+            this.computedAppPort();
         }
     },
     beforeUnmount() {
@@ -878,6 +885,15 @@ export default {
         computedSpDisabled(item) {
             return ((this.disabledDomainStartParams || this.form.type == 'tradition') && item.mark === 'domain')
                 || (this.json?.platform?.['volumeClaimTemplates']?.length && item.mark === 'storage');
+        },
+        formatIngressRoutes(routes = []) {
+            return routes.filter(r => r.path && r.backend?.port).map(r => ({
+                ...r,
+                backend: {
+                    ...r.backend,
+                    port: Number(r.backend.port),
+                },
+            }));
         },
         openAppset() {
             let volumes = this.json?.platform?.volumes;
@@ -913,10 +929,7 @@ export default {
 
                 this.json.platform.ingress = (this.form.ingress || []).map(i => ({
                     name: i.name,
-                    routes: i.routes.filter(r => {
-                        if (r.backend.port) r.backend.port = Number(r.backend.port);
-                        return r.path && r.backend?.port;
-                    }),
+                    routes: this.formatIngressRoutes(i.routes),
                 }));
 
                 this.yaml = jsyaml.dump(this.json);
@@ -1061,20 +1074,41 @@ export default {
             })
         },
 
-        async computedAppPort(containers) {
+        async computedAppPort(containers = this.form.containers) {
+            const normalizePorts = (ports) => {
+                if (!Array.isArray(ports)) { ports = ports ? [ports] : [] }
+                return [...new Set(ports.map(i => {
+                    if (typeof i === 'object' && i !== null) {
+                        return i.port ?? i.containerPort ?? '';
+                    }
+                    return i;
+                }).filter(i => i !== '' && i !== undefined && i !== null).map(i => String(i)))]
+            };
             let ports = {};
             let arr = [];
             if (containers) {
                 containers?.map?.(i => {
-                    arr = arr.concat(i?.ports?.map?.(j => j.containerPort) || [])
+                    arr = arr.concat(normalizePorts(i?.ports || []));
+                    if (i?.port || i?.containerPort) {
+                        arr = arr.concat(normalizePorts([i.port ?? i.containerPort]));
+                    }
                 })
             }
+            let legacyContainer = this.json?.platform?.container;
+            if (legacyContainer) {
+                arr = arr.concat(normalizePorts(legacyContainer?.ports || []));
+                if (legacyContainer?.port || legacyContainer?.containerPort) {
+                    arr = arr.concat(normalizePorts([legacyContainer.port ?? legacyContainer.containerPort]));
+                }
+            }
+            arr = arr.concat(normalizePorts(this.json?.platform?.port || []));
             arr = [...new Set(arr)];
             ports[this.identifie] = arr;
 
             if (this.option?.app_ports?.length) {
                 this.option.app_ports.map(i => {
-                    ports[i.name] = i.port;
+                    if (i.name == this.identifie) { return; }
+                    ports[i.name] = normalizePorts(i.port || i.ports || []);
                 })
             }
             this.app_ports = ports;
@@ -1086,7 +1120,7 @@ export default {
             }];
 
             if (this.option?.app_ports?.length) {
-                names = names.concat(this.option.app_ports.map(i => {
+                names = names.concat(this.option.app_ports.filter(i => i.name != this.identifie).map(i => {
                     return {
                         id: i.name,
                         name: i.name,
@@ -1215,10 +1249,7 @@ platform:
 
                         this.json.platform.ingress = (this.form.ingress || []).map(i => ({
                             name: i.name,
-                            routes: i.routes.filter(r => {
-                                if (r.backend.port) r.backend.port = Number(r.backend.port);
-                                return r.path && r.backend?.port;
-                            }),
+                            routes: this.formatIngressRoutes(i.routes),
                         }));
                     }
 
@@ -1367,7 +1398,7 @@ platform:
             this.vtitle = this.json?.application?.name;
             this.initJSON();
             this.changeForm();
-            this.computedAppPort(this.json.platform?.['container-v2']);
+            this.computedAppPort();
         },
 
         initJSON() {
@@ -1539,10 +1570,7 @@ platform:
 
                     this.json.platform.ingress = (this.form.ingress || []).map(i => ({
                         name: i.name,
-                        routes: i.routes.filter(r => {
-                            if (r.backend.port) r.backend.port = Number(r.backend.port);
-                            return r.path && r.backend?.port;
-                        }),
+                        routes: this.formatIngressRoutes(i.routes),
                     }));
                 }
 
@@ -1685,10 +1713,7 @@ platform:
 
                     this.json.platform.ingress = (this.form.ingress || []).map(i => ({
                         name: i.name,
-                        routes: i.routes.filter(r => {
-                            if (r.backend.port) { r.backend.port = Number(r.backend.port); }
-                            return r.path && r.backend?.port;
-                        }),
+                        routes: this.formatIngressRoutes(i.routes),
                     }));
                 }
             }
@@ -1799,6 +1824,45 @@ platform:
 
 .start-param-services :deep(.arco-checkbox) {
     margin-right: 0;
+}
+
+.install-depend-table {
+    width: 100%;
+    table-layout: fixed;
+}
+
+.install-depend-name-col {
+    width: 36%;
+}
+
+.install-depend-sub-col {
+    width: 34%;
+}
+
+.install-depend-required-col {
+    width: 10%;
+}
+
+.install-depend-identifie-col {
+    width: 12%;
+}
+
+.install-depend-action-col {
+    width: 8%;
+}
+
+.install-depend-table td {
+    box-sizing: border-box;
+}
+
+.install-depend-table :deep(.arco-select),
+.install-depend-table :deep(.arco-input-wrapper) {
+    width: 100%;
+}
+
+.install-depend-table td:nth-child(3),
+.install-depend-table td:last-child {
+    white-space: nowrap;
 }
 
 .upfilebox {

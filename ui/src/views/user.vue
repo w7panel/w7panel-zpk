@@ -12,8 +12,12 @@
                                         <div>{{ record.username }}</div>
                                         <div style="font-size: 12px; color: #999;">
                                             {{ record.type === 1 ? '超级管理员' : (record.desc || '暂无描述') }}
-                                            <a-button v-if="record.type !== 1" type="text" size="mini"
-                                                @click="editProp = 'desc'; edit(record)">编辑</a-button>
+                                            <a-tooltip v-if="record.type !== 1" content="编辑">
+                                                <a-button class="user-icon-action" type="text" shape="circle" size="mini"
+                                                    @click="editProp = 'desc'; edit(record)">
+                                                    <template #icon><icon-edit /></template>
+                                                </a-button>
+                                            </a-tooltip>
                                         </div>
                                     </div>
                                 </template>
@@ -76,9 +80,13 @@
 <script>
 import myAxios from "@/utils";
 import { confirm, messageSuccess } from "@/utils/ui-feedback";
+import { IconEdit } from '@arco-design/web-vue/es/icon';
 
 export default {
     name: "zpk_namespace",
+    components: {
+        IconEdit,
+    },
     data() {
         return {
             editProp: '',
@@ -225,4 +233,10 @@ export default {
 .user-form :deep(.arco-form-item-wrapper-col) {
     min-width: 0;
 }
+
+.user-icon-action {
+    color: #3370ff;
+    vertical-align: middle;
+}
+
 </style>

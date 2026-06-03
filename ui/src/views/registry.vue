@@ -8,12 +8,12 @@
               <span>命名空间：</span>
               <a-select v-model="activeNamespace" class="registry-filter-select" @change="changeActiveNamespace">
                 <a-option :value="-1" label="所有命名空间" />
-                <a-option v-for="item in namespace" :key="item.id" :value="item.name" />
+                <a-option v-for="item in namespace" :key="item.id" :label="item.name" :value="item.name" />
               </a-select>
               <span style="margin-left:10px;">二级命名空间：</span>
               <a-select v-model="subNamespace" class="registry-filter-select" @change="getData(1)">
                 <a-option :value="-1" label="所有命名空间" />
-                <a-option v-for="item in subNamespaceData" :key="item" :value="item" />
+                <a-option v-for="item in subNamespaceData" :key="item" :label="item" :value="item" />
               </a-select>
             </div>
             <a-button type="primary" @click="add">
@@ -34,19 +34,23 @@
             <template #columns>
               <a-table-column title="名称" data-index="name" :width="150">
                 <template #cell="{ record }">
-                  <router-link :to="'/zpk-registry/' + record.id" class="registry-link"
-                    style="padding: 0">
+                  <span class="registry-link" @click="goDetail(record)">
                     {{ record.name }}
-                  </router-link>
+                  </span>
                 </template>
               </a-table-column>
               <a-table-column title="镜像地址">
                 <template #cell="{ record }">
                   {{ record.registry }}/{{ record.namespace }}/{{ record.name }}
-                  <span class="registry-copy-action" @click="onekeyCopy(`${record.registry}/${record.namespace}/${record.name}`)">复制</span>
+                  <a-tooltip content="复制">
+                    <a-button class="registry-icon-action" type="text" shape="circle" size="mini"
+                      @click="onekeyCopy(`${record.registry}/${record.namespace}/${record.name}`)">
+                      <template #icon><icon-copy /></template>
+                    </a-button>
+                  </a-tooltip>
                 </template>
               </a-table-column>
-              <a-table-column title="类型" :width="100">
+              <a-table-column title="类型" :width="130" class="registry-type-column">
                 <template #cell="{ record }">
                   {{ record.visible_type === 3 ? namespaceTypeMap[record.namespace] :
                     visibleTypeMap[record.visible_type]}}
@@ -115,23 +119,43 @@
       <div class="shortcut-header">登录容器镜像服务 Docker Registry</div>
       <div class="shortcut-content">
         <div>{{ `docker login ${shortcutData.registry} --username=${userInfo.username}` }}</div>
-        <span class="registry-copy-action" @click="onekeyCopy(`docker login ${shortcutData.registry} --username=${userInfo.username}`)">复制</span>
+        <a-tooltip content="复制">
+          <a-button class="registry-icon-action" type="text" shape="circle" size="mini"
+            @click="onekeyCopy(`docker login ${shortcutData.registry} --username=${userInfo.username}`)">
+            <template #icon><icon-copy /></template>
+          </a-button>
+        </a-tooltip>
       </div>
       <div class="shortcut-header">从 Registry 拉取镜像</div>
       <div class="shortcut-content">
         <div>{{ `docker pull ${shortcutData.registry}/${shortcutData.namespace}/${shortcutData.name}:[tag]` }}</div>
-        <span class="registry-copy-action" @click="onekeyCopy(`docker pull ${shortcutData.registry}/${shortcutData.namespace}/${shortcutData.name}:[tag]`)">复制</span>
+        <a-tooltip content="复制">
+          <a-button class="registry-icon-action" type="text" shape="circle" size="mini"
+            @click="onekeyCopy(`docker pull ${shortcutData.registry}/${shortcutData.namespace}/${shortcutData.name}:[tag]`)">
+            <template #icon><icon-copy /></template>
+          </a-button>
+        </a-tooltip>
       </div>
       <div class="shortcut-desc">其中［tag］请根据您需要拉取镜像的具体版本镜像替换，如latest。</div>
       <div class="shortcut-header">向 Registry 中推送镜像</div>
       <div class="shortcut-content">
         <div>{{ `docker tag [imageId] ${shortcutData.registry}/${shortcutData.namespace}/${shortcutData.name}:[tag]` }}
         </div>
-        <span class="registry-copy-action" @click="onekeyCopy(`docker tag [imageId] ${shortcutData.registry}/${shortcutData.namespace}/${shortcutData.name}:[tag]`)">复制</span>
+        <a-tooltip content="复制">
+          <a-button class="registry-icon-action" type="text" shape="circle" size="mini"
+            @click="onekeyCopy(`docker tag [imageId] ${shortcutData.registry}/${shortcutData.namespace}/${shortcutData.name}:[tag]`)">
+            <template #icon><icon-copy /></template>
+          </a-button>
+        </a-tooltip>
       </div>
       <div class="shortcut-content">
         <div>{{ `docker push ${shortcutData.registry}/${shortcutData.namespace}/${shortcutData.name}:[tag]` }}</div>
-        <span class="registry-copy-action" @click="onekeyCopy(`docker push ${shortcutData.registry}/${shortcutData.namespace}/${shortcutData.name}:[tag]`)">复制</span>
+        <a-tooltip content="复制">
+          <a-button class="registry-icon-action" type="text" shape="circle" size="mini"
+            @click="onekeyCopy(`docker push ${shortcutData.registry}/${shortcutData.namespace}/${shortcutData.name}:[tag]`)">
+            <template #icon><icon-copy /></template>
+          </a-button>
+        </a-tooltip>
       </div>
       <div class="shortcut-desc">其中［ImageId］请替换力您所要推送的实际镜像ID，或使用本地镜像的完整路径，［tag］请替换为您期待的镜像版本。</div>
     </a-modal>
@@ -149,12 +173,14 @@ import { confirm, messageSuccess } from "@/utils/ui-feedback";
 import userMixin from "@/utils/user-mixin";
 import Access from '@/views/access.vue';
 import ArcoIcon from "@/components/arco-icon.vue";
+import { IconCopy } from '@arco-design/web-vue/es/icon';
 
 export default {
   name: "zpk_registry",
   components: {
     Access,
-    ArcoIcon
+    ArcoIcon,
+    IconCopy
   },
   mixins: [userMixin],
   data() {
@@ -327,8 +353,8 @@ export default {
         }
       });
     },
-    see(row) {
-      this.$router.push({ path: "/registry-detail/" + row.id });
+    goDetail(row) {
+      this.$router.push({ name: 'zpk-registry-detail', params: { id: row.id } });
     },
   }
 }
@@ -388,14 +414,24 @@ export default {
   font-weight: 500;
 }
 
-.registry-copy-action {
-  margin-left: 6px;
-  color: #3370ff;
-  cursor: pointer;
+.table-header .arco-table-tr .arco-table-th:nth-child(3),
+.table-header .arco-table-tr .arco-table-td:nth-child(3) {
+  white-space: nowrap;
 }
 
 .registry-link {
   color: #3370ff;
+  cursor: pointer;
+}
+
+.registry-link:hover {
+  text-decoration: underline;
+}
+
+.registry-icon-action {
+  margin-left: 4px;
+  color: #3370ff;
+  vertical-align: middle;
 }
 
 .registry-form .arco-form-item-label-col {

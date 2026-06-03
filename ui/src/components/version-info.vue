@@ -14,8 +14,12 @@
             :wrapper-col-props="{ span: 19, flex: '1' }" @keydown.enter.prevent>
             <a-form-item label="名称" style="margin-bottom:10px;">
                 <span v-if="edit.type != 'name'">{{ form.name || '-' }}</span>
-                <span v-if="edit.type != 'name'" class="c-blue cursor editbtn"
-                    @click="edit.type = 'name'; edit.name = form.name;">修改</span>
+                <a-tooltip v-if="edit.type != 'name'" content="修改">
+                    <a-button class="editbtn" type="text" shape="circle" size="mini"
+                        @click="edit.type = 'name'; edit.name = form.name;">
+                        <template #icon><icon-edit /></template>
+                    </a-button>
+                </a-tooltip>
                 <a-input v-if="edit.type == 'name'" v-model="edit.name" placeholder="请输入"
                     style="width:160px;" />
                 <span v-if="edit.type == 'name'" class="c-blue cursor ml-20" @click="changeForm('name')">确定</span>
@@ -25,8 +29,12 @@
             </a-form-item>
             <a-form-item label="描述" style="margin-bottom:10px;">
                 <span v-if="edit.type != 'description'">{{ form.description || '-' }}</span>
-                <span v-if="edit.type != 'description'" class="c-blue cursor editbtn"
-                    @click="edit.type = 'description'; edit.description = form.description;">修改</span>
+                <a-tooltip v-if="edit.type != 'description'" content="修改">
+                    <a-button class="editbtn" type="text" shape="circle" size="mini"
+                        @click="edit.type = 'description'; edit.description = form.description;">
+                        <template #icon><icon-edit /></template>
+                    </a-button>
+                </a-tooltip>
                 <a-input v-if="edit.type == 'description'" v-model="edit.description" placeholder="请输入"
                     style="width:160px;" />
                 <span v-if="edit.type == 'description'" class="c-blue cursor ml-20"
@@ -49,11 +57,21 @@
                 </div>
 
                 <span v-if="edit.type != 'tags' && (!form.tags || !form.tags.length)">-</span>
-                <span v-if="edit.type != 'tags'" class="c-blue cursor editbtn" @click="edit.type = 'tags'">修改</span>
+                <a-tooltip v-if="edit.type != 'tags'" content="修改">
+                    <a-button class="editbtn" type="text" shape="circle" size="mini" @click="edit.type = 'tags'">
+                        <template #icon><icon-edit /></template>
+                    </a-button>
+                </a-tooltip>
             </a-form-item>
 
             <a-form-item label="注解" style="margin-bottom:10px;">
-                {{ annotationKeys }}<span class="c-blue cursor ml-20" @click="openAnnotationEdit">编辑</span>
+                {{ annotationKeys }}
+                <a-tooltip content="编辑">
+                    <a-button class="inline-icon-action" type="text" shape="circle" size="mini"
+                        @click="openAnnotationEdit">
+                        <template #icon><icon-edit /></template>
+                    </a-button>
+                </a-tooltip>
             </a-form-item>
             <a-form-item label="属性">
                 <div class="version-info-checks">
@@ -105,6 +123,7 @@
 import jsyaml from "js-yaml";
 import myAxios from '@/utils';
 import { messageSuccess } from '@/utils/ui-feedback';
+import { IconEdit } from '@arco-design/web-vue/es/icon';
 
 const defaultManifest = `application:
     name: ''
@@ -116,6 +135,9 @@ v: 2
 `
 
 export default {
+    components: {
+        IconEdit,
+    },
     props: ['identifie', 'info'],
     data() {
         return {
@@ -446,10 +468,18 @@ export default {
 <style>
 .version-info-form .arco-form-item .editbtn {
     display: none;
-    margin-left: 20px;
+    margin-left: 8px;
+    color: #3370ff;
+    vertical-align: middle;
 }
 
 .version-info-form .arco-form-item:hover .editbtn {
-    display: inline;
+    display: inline-flex;
+}
+
+.version-info-form .inline-icon-action {
+    margin-left: 8px;
+    color: #3370ff;
+    vertical-align: middle;
 }
 </style>

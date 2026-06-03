@@ -32,8 +32,8 @@
                     @structure="structure"></files-manifest>
                 <files-manifest v-for="(item, index) in depends" :key="item.identifie" :ref="'depends' + index"
                     v-show="dependsIndex == index" :data="depends[index].manifest"
-                    :option="{ pureManifest: true, imginstall: true, required: item.required }" @complete="dependsComplete"
-                    @structure="structure"></files-manifest>
+                    :option="{ pureManifest: true, imginstall: true, required: item.required, app_ports: this.app_ports }"
+                    :identifie="item.identifie" @complete="dependsComplete" @structure="structure"></files-manifest>
             </div>
             <div v-else>
                 <a-empty description="" class="manifest-empty">
@@ -116,29 +116,66 @@ export default {
         window.removeEventListener('message', this.winMessage);
     },
     watch: {
-        depends() {
+        manifest() {
+            this.updateAppPorts();
+        },
+        depends: {
+            handler() {
+                this.updateAppPorts();
+            },
+            deep: true,
+        },
+    },
+    methods: {
+        getManifestIdentifie(json, fallback) {
+            let identifie = json?.platform?.baseInfo?.identifie || json?.application?.identifie || fallback || '';
+            let author = json?.application?.author || '';
+            if (identifie && author && !/^[^-]+-.+$/.test(identifie)) {
+                return author + '-' + identifie;
+            }
+            return identifie;
+        },
+        extractManifestPorts(manifest, fallback) {
+            let json = jsyaml.load(manifest || '') || {};
+            let ports = [];
+            json?.platform?.['container-v2']?.forEach?.(container => {
+                ports = ports.concat(container?.ports?.map?.(item => item?.port ?? item?.containerPort) || []);
+                if (container?.port || container?.containerPort) {
+                    ports.push(container.port ?? container.containerPort);
+                }
+            });
+            let legacyContainer = json?.platform?.container;
+            if (legacyContainer) {
+                ports = ports.concat(legacyContainer?.ports?.map?.(item => item?.port ?? item?.containerPort) || []);
+                if (legacyContainer?.port || legacyContainer?.containerPort) {
+                    ports.push(legacyContainer.port ?? legacyContainer.containerPort);
+                }
+            }
+            if (Array.isArray(json?.platform?.port)) {
+                ports = ports.concat(json.platform.port.map(item => item?.port ?? item?.containerPort ?? item));
+            } else if (json?.platform?.port) {
+                ports.push(json.platform.port);
+            }
+            return {
+                name: this.getManifestIdentifie(json, fallback),
+                title: json?.platform?.baseInfo?.name || json?.application?.name || '',
+                port: [...new Set(ports.filter(item => item !== '' && item !== undefined && item !== null).map(item => String(item)))]
+            };
+        },
+        updateAppPorts() {
             let arr = [];
+            let main = this.extractManifestPorts(this.manifest, this.identifie);
+            if (main.name && main.port.length) {
+                arr.push(main);
+            }
             for (let i = 0; i < this.depends.length; i++) {
-                let manifest = this.depends[i]?.manifest || '';
-                let json = jsyaml.load(manifest) || {};
-                if (json?.platform?.['container-v2']) {
-                    let port = [];
-                    json?.platform?.['container-v2']?.map?.(i => {
-                        port = port.concat(i.ports.map(j => j.containerPort))
-                    })
-                    port = [...new Set(port)];
-
-                    arr.push({
-                        name: this.depends[i].identifie,
-                        title: json?.application?.name,
-                        port: port
-                    })
+                let item = this.extractManifestPorts(this.depends[i]?.manifest || '', this.depends[i]?.identifie);
+                if (item.name && item.port.length) {
+                    arr.push(item);
                 }
             }
             this.app_ports = arr;
-        }
-    },
-    methods: {
+        },
         structure() {
             let app_name = '';
             if (window.__MICRO_APP_ENVIRONMENT__) {
@@ -303,6 +340,7 @@ export default {
                     });
                     this.depends = depends;
                 }
+                this.updateAppPorts();
             }).finally(() => {
                 this.deleteLoading = false;
             });

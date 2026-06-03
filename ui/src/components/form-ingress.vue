@@ -19,7 +19,14 @@
                 </div>
             </div>
 
-            <table class="table mt-10">
+            <table class="table ingress-table mt-10">
+                <colgroup>
+                    <col class="ingress-match-col" />
+                    <col class="ingress-path-col" />
+                    <col class="ingress-app-col" />
+                    <col class="ingress-port-col" />
+                    <col class="ingress-action-col" />
+                </colgroup>
                 <thead>
                     <tr>
                         <td>匹配模式</td>
@@ -43,18 +50,18 @@
                         </td>
                         <td>
                             <a-select v-if="route.backend && mainapp" v-model="route.backend.name"
-                                @change="route.backend.port = '';" placeholder="请选择应用">
+                                @change="value => changeBackendName(route, value)" placeholder="请选择应用">
                                 <a-option v-for="p in appNames" :key="p.id" :label="p.title" :value="p.id"></a-option>
                             </a-select>
                             <a-select v-if="route.backend && !mainapp" v-model="route.backend.name"
-                                @change="route.backend.port = '';" placeholder="请选择应用">
+                                @change="value => changeBackendName(route, value)" placeholder="请选择应用">
                                 <a-option v-for="p in appNamesFilter" :key="p.id" :label="p.title"
                                     :value="p.id"></a-option>
                             </a-select>
                         </td>
                         <td>
                             <a-select v-if="route.backend" v-model="route.backend.port" placeholder="请选择端口">
-                                <a-option v-for="p in appPorts[route.backend.name] || []" :key="p" :label="p"
+                                <a-option v-for="p in getBackendPorts(route.backend.name)" :key="p" :label="p"
                                     :value="p"></a-option>
                             </a-select>
                         </td>
@@ -65,8 +72,7 @@
                         </td>
                     </tr>
                     <tr>
-                        <td colspan="8" class="cursor txt-c"
-                            @click="item.routes.push({ path: '/', backend: { port: '', name: '', match: 'Prefix' } })">
+                        <td colspan="8" class="cursor txt-c" @click="addRoute(item)">
                             <span class="addmenu">添加配置</span>
                         </td>
                     </tr>
@@ -144,7 +150,15 @@ export default {
                     this.checked = true;
                     this.$emit('checkDomainStartParams', true);
                 }
+                this.fillDefaultPorts();
             },
+            immediate: true
+        },
+        appPorts: {
+            handler() {
+                this.fillDefaultPorts();
+            },
+            deep: true,
             immediate: true
         }
     },
@@ -154,6 +168,54 @@ export default {
         },
     },
     methods: {
+        getDefaultBackendName() {
+            if (this.mainapp) {
+                return this.identifie || this.appNames?.[0]?.id || '';
+            }
+            return this.identifie || 'current';
+        },
+        createRoute() {
+            let name = this.getDefaultBackendName();
+            return {
+                path: '/',
+                backend: {
+                    port: this.getBackendPorts(name)[0] || '',
+                    name,
+                    match: 'Prefix',
+                },
+            };
+        },
+        addRoute(item) {
+            item.routes = item.routes || [];
+            item.routes.push(this.createRoute());
+            this.emitUpdate();
+        },
+        changeBackendName(route, name) {
+            route.backend.name = name;
+            route.backend.port = this.getBackendPorts(name)[0] || '';
+            this.emitUpdate();
+        },
+        getBackendPorts(name) {
+            if (!name) { return [] }
+            let ports = this.appPorts?.[name] || [];
+            return [...new Set((ports.length ? ports : [80]).map(p => String(p)))];
+        },
+        fillDefaultPorts() {
+            let changed = false;
+            this.modelValue?.forEach?.(item => {
+                item.routes?.forEach?.(route => {
+                    let backend = route.backend;
+                    if (!backend || backend.port) { return }
+                    let ports = this.getBackendPorts(backend.name);
+                    if (!ports.length) { return }
+                    backend.port = ports[0];
+                    changed = true;
+                });
+            });
+            if (changed) {
+                this.emitUpdate();
+            }
+        },
         openEdit(row, index, ridx) {
             window.$wujie?.bus.$emit("ingressEdit", {
                 ingress: row,
@@ -181,12 +243,7 @@ export default {
             }
             this.modelValue.push({
                 name: name || 'web_' + Math.random().toString(36).slice(2, 8),
-                routes: [
-                    {
-                        path: '/',
-                        backend: { port: '', name: this.mainapp ? '' : 'current' },
-                    }
-                ],
+                routes: [this.createRoute()],
             });
             this.emitUpdate();
         },
@@ -216,7 +273,32 @@ export default {
     width: 100%;
 }
 
+.ingress-table {
+    table-layout: fixed;
+}
+
+.ingress-match-col {
+    width: 18%;
+}
+
+.ingress-path-col {
+    width: 28%;
+}
+
+.ingress-app-col {
+    width: 26%;
+}
+
+.ingress-port-col {
+    width: 16%;
+}
+
+.ingress-action-col {
+    width: 12%;
+}
+
 .table td {
+    box-sizing: border-box;
     padding: 10px;
     line-height: 1.4;
     border: 1px solid #cccccc;
@@ -236,6 +318,15 @@ export default {
 .table thead tr:first-child td {
     background: #f3f3f3;
     border-top: 0;
+}
+
+.ingress-table :deep(.arco-select),
+.ingress-table :deep(.arco-input-wrapper) {
+    width: 100%;
+}
+
+.ingress-table td:last-child {
+    white-space: nowrap;
 }
 
 .handle+.handle {

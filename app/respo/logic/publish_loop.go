@@ -152,10 +152,6 @@ func (l *FormulaPublishLoop) handle(task formulaPublishTask) error {
 		return err
 	}
 
-	if formula.PublishOfficialStoreStatus > 0 {
-		_ = FormulaRemote{}.PushFormulaToOfficialStore(formula)
-	}
-
 	return nil
 }
 

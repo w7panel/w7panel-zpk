@@ -60,33 +60,32 @@ func DeleteFormulaByName(formulaName string) {
 }
 
 type Formula struct {
-	ID                         int32
-	UserId                     int32
-	Name                       string
-	Title                      string
-	VersionId                  int32
-	LatestVersionId            int32
-	Version                    string
-	Icon                       string
-	Manifest                   *logic2.Manifest
-	AllManifest                []*logic2.Manifest
-	ZipPath                    string
-	WebZipPaths                map[string]string
-	HelmPaths                  map[string]string
-	CosPath                    string
-	IsCosFile                  bool
-	Tags                       []entity.Tag
-	ConsoleUid                 int64
-	InstallServiceFee          float64
-	ServicePackages            *accessor.ServicePackagesOption
-	VersionPrices              *accessor.VersionPricesOption
-	IsFreeUpgrade              int32
-	ProductType                int32
-	GoodsId                    int32
-	GoodsProductId             int32
-	PublishOfficialStoreStatus int32
-	RemoteFormulaInfoUrl       string
-	AuditStatus                int32
+	ID                   int32
+	UserId               int32
+	Name                 string
+	Title                string
+	VersionId            int32
+	LatestVersionId      int32
+	Version              string
+	Icon                 string
+	Manifest             *logic2.Manifest
+	AllManifest          []*logic2.Manifest
+	ZipPath              string
+	WebZipPaths          map[string]string
+	HelmPaths            map[string]string
+	CosPath              string
+	IsCosFile            bool
+	Tags                 []entity.Tag
+	ConsoleUid           int64
+	InstallServiceFee    float64
+	ServicePackages      *accessor.ServicePackagesOption
+	VersionPrices        *accessor.VersionPricesOption
+	IsFreeUpgrade        int32
+	ProductType          int32
+	GoodsId              int32
+	GoodsProductId       int32
+	RemoteFormulaInfoUrl string
+	AuditStatus          int32
 }
 
 func (self *Formula) GetVersionByName(version string) *entity.Version {

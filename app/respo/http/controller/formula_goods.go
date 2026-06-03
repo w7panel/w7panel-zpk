@@ -15,7 +15,6 @@ import (
 	logic2 "github.com/w7panel/w7panel-zpk/common/logic"
 	"github.com/w7panel/w7panel-zpk/common/service/w7"
 	"github.com/w7panel/w7panel-zpk/common/service/w7/devcenter"
-	"github.com/w7panel/w7panel-zpk/common/service/w7/zpk"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 )
 
@@ -35,18 +34,6 @@ func (c FormulaGoods) GoodsInfo(ctx *gin.Context) {
 	formula, err := c.getDepot().GetFormula(params.Identifie, "", nil)
 	if err != nil {
 		c.JsonResponseWithError(ctx, err, 500)
-		return
-	}
-
-	if formula.RemoteFormulaInfoUrl != "" {
-		info, err := w7.ZpkSdk.GetRemoteFormulaInfo(formula.RemoteFormulaInfoUrl, zpk.InfoRequest{
-			Identifie: params.Identifie,
-		})
-		if err != nil {
-			c.JsonResponseWithError(ctx, err, 500)
-			return
-		}
-		c.JsonResponseWithoutError(ctx, info)
 		return
 	}
 

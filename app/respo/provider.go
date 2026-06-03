@@ -232,19 +232,11 @@ func (provider *Provider) Register(httpServer *http_server.Server, console conso
 
 		cors.Match([]string{"GET", "OPTIONS"}, "/static/*path", controller.Static{}.File)
 
-		group.Match([]string{"POST", "OPTIONS"}, "/add-to-official", middleware.DenyDomainReq{}.Process, middleware.W7PanelUser{}.Process, middleware.AdminUser{}.Process, controller.FormulaRemote{}.PushToOfficialZpkStore)
-
-		group.Match([]string{"POST", "OPTIONS"}, "/audit/list", middleware.DenyDomainReq{}.Process, middleware.W7PanelUser{}.Process, middleware.AdminUser{}.Process, controller.FormulaAudit{}.List)
-		group.Match([]string{"POST", "OPTIONS"}, "/audit/audit", middleware.DenyDomainReq{}.Process, middleware.W7PanelUser{}.Process, middleware.AdminUser{}.Process, controller.FormulaAudit{}.Audit)
-
 		cors.Match([]string{"POST", "OPTIONS"}, "/helm/chart/list", middleware.DenyDomainReq{}.Process, middleware.W7PanelUser{}.Process, controller.Helm{}.GetHelmRepositoryCharts)
 		cors.Match([]string{"POST", "OPTIONS"}, "/helm/chart/version/list", middleware.DenyDomainReq{}.Process, middleware.W7PanelUser{}.Process, controller.Helm{}.GetHelmRepositoryChartVersions)
 
 		openApiGroup := group.Group("/open-api", middleware.W7AppV2{}.Process)
 		{
-			openApiGroup.Match([]string{"POST", "OPTIONS"}, "/add-from-remote", middleware.W7AppUser{}.Process, controller.FormulaRemote{}.AddRemote)
-			openApiGroup.Match([]string{"POST", "OPTIONS"}, "/audit/notify", controller.FormulaRemote{}.OfficialZpkStoreAuditNotify)
-
 			openApiGroup.Match([]string{"POST", "OPTIONS"}, "/formula/info", controller.Formula{}.Info)
 		}
 		group.Match([]string{"POST", "OPTIONS"}, "/open-api/formula/base-info", controller.Formula{}.BaseInfo)

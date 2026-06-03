@@ -4,9 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log/slog"
 	"os"
-	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -15,9 +13,7 @@ import (
 	"github.com/w7panel/w7panel-zpk/app/respo/logic"
 	"github.com/w7panel/w7panel-zpk/common/dao"
 	"github.com/w7panel/w7panel-zpk/common/entity"
-	"github.com/w7panel/w7panel-zpk/common/function"
 	logic2 "github.com/w7panel/w7panel-zpk/common/logic"
-	"github.com/w7panel/w7panel-zpk/common/service/w7"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"sigs.k8s.io/yaml"
 )
@@ -213,14 +209,6 @@ func (c FormulaAttach) GetIcon(ctx *gin.Context) {
 	if err != nil {
 		c.JsonResponseWithError(ctx, err, 500)
 		return
-	}
-	if formula.RemoteFormulaInfoUrl != "" {
-		iconSavePath := filepath.Join(c.getDepot().GetBasePath(), formula.GetIconRelativePath())
-		function.CreateDirIfNotExist(filepath.Dir(iconSavePath), os.ModePerm)
-		err = w7.ZpkSdk.DownloadRemoteFormulaIcon(formula.RemoteFormulaInfoUrl, iconSavePath)
-		if err != nil {
-			slog.Error("download remote formula icon error", "formula", formula.Name, "err", err)
-		}
 	}
 
 	iconFile, err := logic.GetLocalClient().GetFile(formula.GetIconRelativePath())

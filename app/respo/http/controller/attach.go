@@ -3,7 +3,6 @@ package controller
 import (
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"mime"
 	"net/http"
@@ -16,7 +15,6 @@ import (
 	"github.com/w7panel/w7panel-zpk/app/respo/logic"
 	"github.com/w7panel/w7panel-zpk/common/function"
 	logic2 "github.com/w7panel/w7panel-zpk/common/logic"
-	"github.com/w7panel/w7panel-zpk/common/service/w7"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/core/err_handler"
 )
 
@@ -204,25 +202,6 @@ func (c Attach) GetFrontendZipFileContent(ctx *gin.Context) {
 	formula, err := depot.GetFormula(params.Identifie, params.Version, nil)
 	if err != nil {
 		c.JsonResponseWithServerError(ctx, err)
-		return
-	}
-
-	if formula.RemoteFormulaInfoUrl != "" {
-		resp, err := w7.ZpkSdk.DownloadFrontendFile(formula.RemoteFormulaInfoUrl, params.Identifie, params.Version, params.Path, params.Ticket)
-		if err != nil {
-			c.JsonResponseWithServerError(ctx, err)
-			return
-		}
-		mimeType := mime.TypeByExtension(resp.Header.Get("Content-Type"))
-		if mimeType == "" {
-			mimeType = "application/octet-stream"
-		}
-		content, err := io.ReadAll(resp.Body)
-		if err != nil {
-			c.JsonResponseWithServerError(ctx, err)
-			return
-		}
-		ctx.Data(http.StatusOK, mimeType, content)
 		return
 	}
 

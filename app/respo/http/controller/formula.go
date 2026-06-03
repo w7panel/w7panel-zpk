@@ -14,7 +14,6 @@ import (
 	logic2 "github.com/w7panel/w7panel-zpk/common/logic"
 	"github.com/w7panel/w7panel-zpk/common/service/w7"
 	"github.com/w7panel/w7panel-zpk/common/service/w7/devcenter"
-	"github.com/w7panel/w7panel-zpk/common/service/w7/zpk"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/core/err_handler"
 	"gorm.io/gen/field"
@@ -106,26 +105,6 @@ func (c Formula) Info(ctx *gin.Context) {
 			c.JsonResponseWithServerError(ctx, errors.New("非法请求"))
 			return
 		}
-	}
-
-	if formula.RemoteFormulaInfoUrl != "" {
-		//代理请求远程制品库信息并返回
-		info, err := w7.ZpkSdk.GetRemoteFormulaInfo(formula.RemoteFormulaInfoUrl, zpk.InfoRequest{
-			Identifie:    params.Identifie,
-			Version:      params.Version,
-			CName:        params.CName,
-			IsUpgrade:    params.IsUpgrade,
-			CheckUpgrade: params.CheckUpgrade,
-			CurVersion:   params.CurVersion,
-			OrderSn:      params.OrderSn,
-			ConsoleUid:   consoleUid,
-		})
-		if err != nil {
-			c.JsonResponseWithError(ctx, err, 500)
-			return
-		}
-		c.JsonResponseWithoutError(ctx, info)
-		return
 	}
 
 	ok := logic.Order{}.CheckFormulaCanInstallOrUpgrade(*formula, consoleUid, params.OrderSn, params.IsUpgrade > 0)
@@ -443,24 +422,23 @@ func (c Formula) List(ctx *gin.Context) {
 	}
 
 	type ResultNode struct {
-		Name                       string                 `json:"name"`
-		Description                string                 `json:"description"`
-		Identifie                  string                 `json:"identifie"`
-		Icon                       string                 `json:"icon"`
-		Tag                        []entity.Tag           `json:"tag"`
-		InstallTotal               int32                  `json:"install_total"`
-		Version                    *entity.Version        `json:"version"`
-		Status                     int32                  `json:"status"`
-		ProductType                int32                  `json:"product_type"`
-		InstallOnlyOnce            bool                   `json:"install_only_once"`
-		PublishOfficialStoreStatus int32                  `json:"publish_official_store_status"`
-		RemoteFormulaInfoURL       string                 `json:"remote_formula_info_url"`
-		AuditStatus                int32                  `json:"audit_status"`
-		AuditRemark                string                 `json:"audit_remark"`
-		Utoken                     string                 `json:"utoken"`
-		Annotation                 map[string]interface{} `yaml:"annotation" json:"annotation"`
-		InstallUsersAvatar         []string               `json:"install_users_avatar"`
-		GoodsId                    int32                  `json:"goods_id"`
+		Name                 string                 `json:"name"`
+		Description          string                 `json:"description"`
+		Identifie            string                 `json:"identifie"`
+		Icon                 string                 `json:"icon"`
+		Tag                  []entity.Tag           `json:"tag"`
+		InstallTotal         int32                  `json:"install_total"`
+		Version              *entity.Version        `json:"version"`
+		Status               int32                  `json:"status"`
+		ProductType          int32                  `json:"product_type"`
+		InstallOnlyOnce      bool                   `json:"install_only_once"`
+		RemoteFormulaInfoURL string                 `json:"remote_formula_info_url"`
+		AuditStatus          int32                  `json:"audit_status"`
+		AuditRemark          string                 `json:"audit_remark"`
+		Utoken               string                 `json:"utoken"`
+		Annotation           map[string]interface{} `yaml:"annotation" json:"annotation"`
+		InstallUsersAvatar   []string               `json:"install_users_avatar"`
+		GoodsId              int32                  `json:"goods_id"`
 	}
 
 	var user *entity.RegistryUser
@@ -582,23 +560,22 @@ func (c Formula) List(ctx *gin.Context) {
 					installUserAvatars = make([]string, 0)
 				}
 				resultItem := ResultNode{
-					Name:                       item.Title,
-					Description:                formula.Manifest.Application.Description,
-					Identifie:                  item.Name,
-					Icon:                       formula.Icon,
-					Tag:                        item.Tag,
-					Version:                    item.Version,
-					Status:                     item.Status,
-					ProductType:                formula.ProductType,
-					InstallOnlyOnce:            formula.Manifest.Application.InstallOnlyOnce,
-					AuditStatus:                item.AuditStatus,
-					AuditRemark:                item.AuditRemark,
-					PublishOfficialStoreStatus: item.PublishOfficialStoreStatus,
-					RemoteFormulaInfoURL:       item.RemoteFormulaInfoURL,
-					Annotation:                 formula.Manifest.Application.Annotation,
-					InstallUsersAvatar:         installUserAvatars,
-					InstallTotal:               installTotal,
-					GoodsId:                    item.GoodsID,
+					Name:                 item.Title,
+					Description:          formula.Manifest.Application.Description,
+					Identifie:            item.Name,
+					Icon:                 formula.Icon,
+					Tag:                  item.Tag,
+					Version:              item.Version,
+					Status:               item.Status,
+					ProductType:          formula.ProductType,
+					InstallOnlyOnce:      formula.Manifest.Application.InstallOnlyOnce,
+					AuditStatus:          item.AuditStatus,
+					AuditRemark:          item.AuditRemark,
+					RemoteFormulaInfoURL: item.RemoteFormulaInfoURL,
+					Annotation:           formula.Manifest.Application.Annotation,
+					InstallUsersAvatar:   installUserAvatars,
+					InstallTotal:         installTotal,
+					GoodsId:              item.GoodsID,
 				}
 				if !isAdminUser {
 					resultItem.Utoken = logic.GetFormulaFounderToken(item.UserID)

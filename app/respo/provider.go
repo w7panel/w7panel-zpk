@@ -218,7 +218,7 @@ func (provider *Provider) Register(httpServer *http_server.Server, console conso
 		// 制品压缩包管理
 		group.Match([]string{"POST", "OPTIONS"}, "/get-zip-file-list", middleware.W7PanelUser{}.Process, controller.Attach{}.GetBackendZipFileList)
 		group.Match([]string{"POST", "OPTIONS"}, "/get-zip-file-content", middleware.W7PanelUser{}.Process, controller.Attach{}.GetBackendZipFileContent)
-		group.Match([]string{"POST", "OPTIONS"}, "/attach/frontend/:identifie/:version/*path", middleware.W7PanelUser{}.Process, controller.Attach{}.GetFrontendZipFileContent)
+		group.Match([]string{"GET", "OPTIONS"}, "/attach/frontend/:identifie/:version/*path", controller.Attach{}.GetFrontendZipFileContent)
 
 		cors.Match([]string{"POST", "OPTIONS"}, "/zip/upload", middleware.DenyDomainReq{}.Process, middleware.W7PanelUser{}.Process, controller.Attach{}.Upload)
 		cors.GET("/zip/download/:id", controller.Attach{}.Download)

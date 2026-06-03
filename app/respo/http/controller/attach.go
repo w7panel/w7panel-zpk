@@ -232,7 +232,7 @@ func (c Attach) GetFrontendZipFileContent(ctx *gin.Context) {
 		c.JsonResponseWithServerError(ctx, err)
 		return
 	}
-	if ticketInfo.FormulaId != formula.ID || ticketInfo.FormulaVersion != formula.Version {
+	if ticketInfo.FormulaId != formula.ID {
 		c.JsonResponseWithServerError(ctx, errors.New("ticket错误"))
 		return
 	}

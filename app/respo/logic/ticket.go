@@ -1,6 +1,7 @@
 package logic
 
 import (
+	"encoding/base64"
 	"encoding/json"
 
 	"github.com/w7panel/w7panel-zpk/common/function"
@@ -28,12 +29,16 @@ func (l Ticket) GetTicket(ticketInfo TicketInfo) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return ticket, nil
+	return encodeURLSafeTicket(ticket)
 }
 
 func (l Ticket) ParseTicket(ticket string) (*TicketInfo, error) {
 	key := function.GetMd5(facade.GetConfig().GetString("setting.secret"))
-	info, err := function.AesDecrypt(ticket, key)
+	aesTicket, err := decodeURLSafeTicket(ticket)
+	if err != nil {
+		aesTicket = ticket
+	}
+	info, err := function.AesDecrypt(aesTicket, key)
 	if err != nil {
 		return nil, err
 	}
@@ -45,4 +50,20 @@ func (l Ticket) ParseTicket(ticket string) (*TicketInfo, error) {
 	}
 
 	return ticketInfo, nil
+}
+
+func encodeURLSafeTicket(ticket string) (string, error) {
+	ciphertext, err := base64.StdEncoding.DecodeString(ticket)
+	if err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(ciphertext), nil
+}
+
+func decodeURLSafeTicket(ticket string) (string, error) {
+	ciphertext, err := base64.RawURLEncoding.DecodeString(ticket)
+	if err != nil {
+		return "", err
+	}
+	return base64.StdEncoding.EncodeToString(ciphertext), nil
 }

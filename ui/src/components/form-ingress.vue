@@ -1,20 +1,18 @@
 <template>
     <div>
         <div>
-            <el-checkbox v-model="checked" :disabled="checked && modelValue.length"
-                @change="v => v ? addIngressEnd('default') : $emit('checkDomainStartParams', false)" label="启用域名" />
+            <a-checkbox v-model="checked" :disabled="checked && modelValue.length"
+                @change="v => v ? addIngressEnd('default') : $emit('checkDomainStartParams', false)">启用域名</a-checkbox>
         </div>
 
         <div v-for="(item, index) in modelValue" :key="index" class="mt-10" style="width:100%; margin-bottom:10px;">
             <div class="df ai-c jc-b">
                 <div class="df ai-c">
-                    <el-input v-if="ingressEditIndex == index" :spellcheck="false" v-model="ingressEdit"
-                        @blur="ingressEditIndex = -1; ingressEdit && (item.name = ingressEdit); emitUpdate()"></el-input>
+                    <a-input v-if="ingressEditIndex == index" :spellcheck="false" v-model="ingressEdit"
+                        @blur="ingressEditIndex = -1; ingressEdit && (item.name = ingressEdit); emitUpdate()"></a-input>
                     <div v-else @click="ingressEditIndex = index; ingressEdit = item.name;" class="df ai-c cursor">
                         <span class="lh-1">{{ item.name }}</span>
-                        <el-icon color="#333333" :size="14" style="margin-left:4px;">
-                            <Edit />
-                        </el-icon>
+                        <icon-edit class="ingress-edit-icon" />
                     </div>
                     <div class="ml-40 c-blue cursor df-s0" @click="ingressEditIndex = -1; removeIngress(index);">删除业务端
                     </div>
@@ -34,31 +32,31 @@
                 <tbody>
                     <tr v-for="(route, ridx) in item.routes" :key="ridx">
                         <td>
-                            <el-select v-if="route.backend" v-model="route.backend.match" placeholder="请选择">
-                                <el-option label="前缀匹配" value="Prefix" />
-                                <el-option label="精准匹配" value="Exact" />
-                                <el-option label="正则匹配" value="ImplementationSpecific" />
-                            </el-select>
+                            <a-select v-if="route.backend" v-model="route.backend.match" placeholder="请选择">
+                                <a-option label="前缀匹配" value="Prefix" />
+                                <a-option label="精准匹配" value="Exact" />
+                                <a-option label="正则匹配" value="ImplementationSpecific" />
+                            </a-select>
                         </td>
                         <td>
-                            <el-input v-model="route.path" placeholder="请输入路径"></el-input>
+                            <a-input v-model="route.path" placeholder="请输入路径"></a-input>
                         </td>
                         <td>
-                            <el-select v-if="route.backend && mainapp" v-model="route.backend.name"
+                            <a-select v-if="route.backend && mainapp" v-model="route.backend.name"
                                 @change="route.backend.port = '';" placeholder="请选择应用">
-                                <el-option v-for="p in appNames" :key="p.id" :label="p.title" :value="p.id"></el-option>
-                            </el-select>
-                            <el-select v-if="route.backend && !mainapp" v-model="route.backend.name"
+                                <a-option v-for="p in appNames" :key="p.id" :label="p.title" :value="p.id"></a-option>
+                            </a-select>
+                            <a-select v-if="route.backend && !mainapp" v-model="route.backend.name"
                                 @change="route.backend.port = '';" placeholder="请选择应用">
-                                <el-option v-for="p in appNamesFilter" :key="p.id" :label="p.title"
-                                    :value="p.id"></el-option>
-                            </el-select>
+                                <a-option v-for="p in appNamesFilter" :key="p.id" :label="p.title"
+                                    :value="p.id"></a-option>
+                            </a-select>
                         </td>
                         <td>
-                            <el-select v-if="route.backend" v-model="route.backend.port" placeholder="请选择端口">
-                                <el-option v-for="p in appPorts[route.backend.name] || []" :key="p" :label="p"
-                                    :value="p"></el-option>
-                            </el-select>
+                            <a-select v-if="route.backend" v-model="route.backend.port" placeholder="请选择端口">
+                                <a-option v-for="p in appPorts[route.backend.name] || []" :key="p" :label="p"
+                                    :value="p"></a-option>
+                            </a-select>
                         </td>
                         <td>
                             <span class="c-blue cursor handle" @click="openEdit(route, index, ridx)">修改</span>
@@ -86,8 +84,10 @@
 </template>
 
 <script>
+import { IconEdit } from '@arco-design/web-vue/es/icon';
 
 export default {
+    components: { IconEdit },
     props: {
         modelValue: {
             type: Array,
@@ -204,6 +204,12 @@ export default {
     background: rgb(240, 243, 250);
     padding: 10px;
     box-sizing: border-box;
+}
+
+.ingress-edit-icon {
+    color: #333333;
+    font-size: 14px;
+    margin-left: 4px;
 }
 
 .table {

@@ -3,7 +3,7 @@
         <div class="tabs">
             <span class="active">应用介绍</span>
         </div>
-        <el-empty v-if="!docEntries.length" :image-size="140" description="暂无应用介绍" />
+        <a-empty v-if="!docEntries.length" :image-size="140" description="暂无应用介绍" />
 
         <div v-else class="description__layout" :class="{ 'is-single': !showSidebar }">
             <aside v-if="showSidebar" class="description__sidebar">

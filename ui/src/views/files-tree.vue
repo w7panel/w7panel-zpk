@@ -1,55 +1,58 @@
 <template>
     <div id="zpkfiltertree" class="bg-white" style="height:100%;">
         <div style="padding:20px; border-bottom:1px solid #E7E7E7;">
-            <el-breadcrumb separator="/">
-                <el-breadcrumb-item :to="{ path: '/zpk' }"><template #default><span
-                            class="c-99 fw-400">我的制品库</span></template></el-breadcrumb-item>
-                <el-breadcrumb-item :to="{ path: '/zpk-version', query: { id: this.identifie, title: vtitle } }"><template
-                        #default><span class="c-99 fw-400">版本管理</span></template></el-breadcrumb-item>
-                <el-breadcrumb-item :to="{ path: '/zpk-edit', query: { id: identifie, versionid: versionid } }"><template
-                        #default><span class="c-99 fw-400">应用基础信息修改</span></template></el-breadcrumb-item>
-                <el-breadcrumb-item><template #default><span
-                            class="c-33 fw-400">文件编辑</span></template></el-breadcrumb-item>
-            </el-breadcrumb>
+            <a-breadcrumb>
+                <a-breadcrumb-item><router-link to="/zpk" class="c-99 fw-400">我的制品库</router-link></a-breadcrumb-item>
+                <a-breadcrumb-item>
+                    <router-link :to="{ path: '/zpk-version', query: { id: identifie, title: vtitle } }"
+                        class="c-99 fw-400">版本管理</router-link>
+                </a-breadcrumb-item>
+                <a-breadcrumb-item>
+                    <router-link :to="{ path: '/zpk-edit', query: { id: identifie, versionid } }"
+                        class="c-99 fw-400">应用基础信息修改</router-link>
+                </a-breadcrumb-item>
+                <a-breadcrumb-item><span class="c-33 fw-400">文件编辑</span></a-breadcrumb-item>
+            </a-breadcrumb>
         </div>
         <div class="df box">
             <div class="treebox df-s0">
                 <div class="df jc-s ml-10" style="margin-bottom:10px;">
-                    <el-button @click.stop="openCreatefile" size="small">+ 新建文件</el-button>
+                    <a-button class="create-file-btn" @click.stop="openCreatefile" size="small">+ 新建文件</a-button>
                 </div>
-                <el-tree ref="eltree" :data="tree" @node-click="nodeClick" :default-expanded-keys="treeExpanded"
-                    :props="treeProps" node-key="id" class="tree">
-                    <template #default="{ node, data }">
-                        <div class="custom-tree-node df ai-c jc-b f1 fs-14">
-                            <span>{{ node.label }}</span>
-                            <span class="operation ml-10 c-blue" style="margin-right:6px;">
-                                <span v-if="!data.children" @click.stop="deleteFile(node, data)" class="cursor">删除</span>
-                                <span v-else @click.stop="createFile(node, data)" class="c-blue cursor">新建文件</span>
-                            </span>
-                        </div>
+                <a-empty v-if="!tree.length" description="暂无数据" class="tree-empty" />
+                <a-tree v-else v-model:selected-keys="selectedKeys" v-model:expanded-keys="treeExpanded" :data="tree"
+                    :field-names="treeFieldNames" block-node class="tree" @select="nodeClick">
+                    <template #title="data">
+                        <span>{{ data.label }}</span>
                     </template>
-                </el-tree>
+                    <template #extra="data">
+                        <span class="operation ml-10 c-blue" style="margin-right:6px;">
+                            <span v-if="!data.children" @click.stop="deleteFile(data)" class="cursor">删除</span>
+                            <span v-else @click.stop="createFile(data)" class="c-blue cursor">新建文件</span>
+                        </span>
+                    </template>
+                </a-tree>
             </div>
             <div class="fc right df df-c" style="padding:0;">
                 <div id="editor_file"></div>
             </div>
         </div>
         <div class="mt-16 df jc-c">
-            <el-button type="primary" style="width:100px;" @click="save">保存</el-button>
+            <a-button type="primary" style="width:100px;" @click="save">保存</a-button>
         </div>
     </div>
 
-    <el-dialog v-model="addfile.show" title="添加文件" width="600px" modal-class="zpk-version-dialog">
+    <a-modal v-model:visible="addfile.show" title="添加文件" :width="600" :footer="false"
+        modal-class="zpk-version-dialog">
         <div class="mt-20 df ai-c ml-20">
             <div style="width:70px;">文件名</div>
-            <el-input v-model="addfile.filename" placeholder="请输入文件名" :spellcheck="false"
-                style="width:400px;"></el-input>
+            <a-input v-model="addfile.filename" placeholder="请输入文件名" :spellcheck="false" style="width:400px;" />
         </div>
-        <template #footer>
-            <el-button @click="addfile.show = false;">取消</el-button>
-            <el-button type="primary" @click="newFileName(addfile.filename)">确认添加</el-button>
-        </template>
-    </el-dialog>
+        <div class="dialog-footer">
+            <a-button @click="addfile.show = false;">取消</a-button>
+            <a-button type="primary" @click="newFileName(addfile.filename)">确认添加</a-button>
+        </div>
+    </a-modal>
 </template>
 
 <script>
@@ -57,7 +60,7 @@ import myAxios from '@/utils'
 import { basicSetup } from "codemirror"
 import { indentWithTab } from "@codemirror/commands"
 import { EditorView, keymap } from "@codemirror/view"
-const customNodeClass = (data, node) => data.isActive ? 'active' : null;
+import { confirm, messageSuccess, messageWarning } from '@/utils/ui-feedback';
 export default {
     data() {
         return {
@@ -65,13 +68,13 @@ export default {
             versionid: '',
             identifie: '',
             tree: [],
-            treeProps: {
-                label: 'label',
+            treeFieldNames: {
+                key: 'id',
+                title: 'label',
                 children: 'children',
-                isLeaf: 'isLeaf',
-                class: customNodeClass
             },
             treeExpanded: [],
+            selectedKeys: [],
             addfile: {
                 show: false,
                 filename: '',
@@ -92,82 +95,69 @@ export default {
     methods: {
         openCreatefile() {
             this.addfile.show = true;
-            this.addfile.filename = this.$refs.eltree.getCurrentKey();
+            this.addfile.filename = this.activePath || '';
         },
         newFileName(path) {
-            path = path.replace(/^\/+/, '');
+            path = (path || '').replace(/^\/+/, '');
+            if (!path) { return }
             this.addfile.show = false;
             this.eachTree(path, '');
 
-
-            for (let i in this.tree) {
-                this.clearActive(this.tree[i]);
-            }
             this.activePath = path;
+            this.selectedKeys = [path];
+            this.treeExpanded = this.getParentKeys(path);
 
             this.$nextTick(() => {
-                this.treeExpanded = [path];
-                let node = this.$refs.eltree.getNode(path);
-                for (let i in this.tree) {
-                    this.clearActive(this.tree[i]);
-                }
-                node.data.isActive = true;
-                if (node?.data?.hasOwnProperty('content')) {
-                    this.inputContent(node.data.content);
+                let node = this.findTreeNode(path);
+                if (node?.hasOwnProperty('content')) {
+                    this.inputContent(node.content);
                     return;
                 }
             });
         },
         createFile(data) {
-            let path = data.data.id;
-            this.$msgbox.prompt('文件名', '新建文件').then((data) => {
-                let value = data.value.replace(/(^\/+)|(\/+$)/, '')
-                if (!value.value) { return; }
-                this.newFileName(path + value);
-            }).catch(() => { })
+            this.addfile.show = true;
+            this.addfile.filename = data.id || '';
         },
-        deleteFile(node, data) {
-            this.$confirm('确定要删除"' + data.label + '"吗', "提示", {
-                confirmButtonText: "确定",
-                cancelButtonText: "取消",
-            }).then(() => {
-                let nd = node;
-                let path = data.label;
-                while (nd?.parent?.data?.label) {
-                    path = nd.parent.data.label + '/' + path;
-                    nd = nd.parent;
-                }
-
-                myAxios.post('/respo/file', {
+        deleteFile(data) {
+            confirm({
+                title: '提示',
+                content: '确定要删除"' + data.label + '"吗',
+                confirmButtonText: '确定',
+                cancelButtonText: '取消',
+                onOk: () => myAxios.post('/respo/file', {
                     identifie: this.identifie,
-                    filename: path,
+                    filename: data.id,
                     content: '',
                     version: this.versionid,
                 }).then(() => {
                     this.getInfo(this.identifie, () => {
-                        this.$message.success('操作成功');
+                        messageSuccess('操作成功');
                         this.activePath = '';
+                        this.selectedKeys = [];
                         this.tree = [];
                         this.inputContent();
                         this.getZipFileList();
                     });
-                });
+                })
             });
         },
         save() {
             let txt = this.editor.state.doc.toString();
             if (!this.activePath) { return; }
-            if (!txt) { this.$message.warning('文件内容不能为空'); return; }
+            if (!txt) { messageWarning('文件内容不能为空'); return; }
             myAxios.post('/respo/file', {
                 identifie: this.identifie,
                 filename: this.activePath,
                 content: txt,
                 version: this.versionid,
             }).then(() => {
-                let node = this.$refs.eltree.getNode(this.activePath);
-                node.data.content = txt;
+                let node = this.findTreeNode(this.activePath);
+                if (node) {
+                    node.content = txt;
+                }
                 this.getInfo(this.identifie, () => {
-                    this.$message.success('操作成功');
+                    messageSuccess('操作成功');
                 });
             });
         },
@@ -198,38 +188,47 @@ export default {
             });
         },
 
-        inputContent(file) {
+        inputContent(file = '') {
             if (!this.editor) { return }
             let txt = this.editor.state.doc.toString();
             this.editor.dispatch({ changes: { from: 0, to: txt.length, insert: file } });
         },
 
-        nodeClick(clicknode, info) {
-            if (clicknode.children) { return }
-            let path = clicknode.label;
-            for (let i in this.tree) {
-                this.clearActive(this.tree[i]);
+        nodeClick(selectedKeys, event) {
+            let clicknode = event?.node;
+            if (!clicknode) { return }
+            if (clicknode.children) {
+                this.selectedKeys = this.activePath ? [this.activePath] : [];
+                return
             }
-            clicknode.isActive = true;
-            let node = info;
-            while (node?.parent?.data?.label) {
-                path = node.parent.data.label + '/' + path;
-                node = node.parent;
-            }
+            let path = clicknode.id;
             this.activePath = path;
+            this.selectedKeys = [path];
             if (clicknode.hasOwnProperty('content')) {
                 this.inputContent(clicknode.content);
                 return;
             }
             this.getContent(path);
         },
-        clearActive(obj) {
-            if (obj.isActive) { obj.isActive = false; }
-            if (obj.children?.length) {
-                for (let i in obj.children) {
-                    this.clearActive(obj.children[i]);
+        findTreeNode(key, nodes = this.tree) {
+            for (let item of nodes) {
+                if (item.id === key) {
+                    return item;
+                }
+                if (item.children?.length) {
+                    let found = this.findTreeNode(key, item.children);
+                    if (found) { return found }
                 }
             }
+            return null;
+        },
+        getParentKeys(path) {
+            let parts = path.replace(/^\/+|\/+$/g, '').split('/').filter(Boolean);
+            let keys = [];
+            for (let i = 0; i < parts.length - 1; i++) {
+                keys.push(parts.slice(0, i + 1).join('/') + '/');
+            }
+            return keys;
         },
 
         getContent(path) {
@@ -239,6 +238,10 @@ export default {
                 path: path,
             }).then(res => {
                 let cont = res?.data?.data?.content || '';
+                let node = this.findTreeNode(path);
+                if (node) {
+                    node.content = cont;
+                }
                 this.inputContent(cont);
             })
         },
@@ -365,6 +368,26 @@ export default {
     background: #f1f1f1;
 }
 
+.tree-empty {
+    margin-top: 28px;
+}
+
+.tree-empty :deep(.arco-empty-image) {
+    height: 56px;
+}
+
+.create-file-btn {
+    background: #ffffff;
+    border-color: #dcdfe6;
+    color: #606266;
+}
+
+.create-file-btn:hover {
+    background: #ffffff;
+    border-color: #3370ff;
+    color: #3370ff;
+}
+
 .right {
     box-sizing: border-box;
     max-height: 700px;
@@ -373,24 +396,56 @@ export default {
 }
 </style>
 <style>
-.treebox .active>.el-tree-node__content {
-    background: #3296fa !important;
-    color: #ffffff !important;
+.dialog-footer {
+    border-top: 1px solid #E7E7E7;
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin: 20px -20px -4px;
+    padding: 16px 20px 0;
 }
 
-.treebox .el-tree-node__children {
+.treebox .arco-tree-node-children {
     overflow: visible !important;
 }
 
-.treebox .custom-tree-node .operation {
+.treebox .operation {
     display: none;
 }
 
-.treebox .custom-tree-node:hover .operation {
+.treebox .arco-tree-node:hover .operation {
     display: inline;
 }
 
-.treebox .active .custom-tree-node:hover .operation {
-    color: #ffffff;
+.treebox .arco-tree-node {
+    padding-left: 0;
+}
+
+.treebox .arco-tree-node-selected,
+.treebox .arco-tree-node-selected:hover {
+    background: #3296fa !important;
+}
+
+.treebox .arco-tree-node-selected .arco-tree-node-title,
+.treebox .arco-tree-node-selected .arco-tree-node-title:hover,
+.treebox .arco-tree-node-selected .arco-tree-node-title-block,
+.treebox .arco-tree-node-selected .arco-tree-node-title-block:hover {
+    background: transparent !important;
+    color: #ffffff !important;
+    border-radius: 0;
+}
+
+.treebox .arco-tree-node-selected .arco-tree-node-title-text,
+.treebox .arco-tree-node-selected .arco-tree-node-switcher,
+.treebox .arco-tree-node-selected .operation,
+.treebox .arco-tree-node-selected .operation .c-blue {
+    color: #ffffff !important;
+}
+
+.treebox .arco-tree-node-selected .operation .arco-btn,
+.treebox .arco-tree-node-selected .operation .arco-btn:hover {
+    background: transparent !important;
+    border-color: transparent !important;
+    color: #ffffff !important;
 }
 </style>

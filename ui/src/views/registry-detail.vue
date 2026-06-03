@@ -2,310 +2,310 @@
     <div class="bg-white" style="min-height:100%;">
         <div class="com-back df ai-c ">
             <span class="backbtn df ai-c" @click="$router.go(-1)">
-                <el-icon class="backicon" color="#0052D9" :size="20">
-                    <Back />
-                </el-icon>
+                <span class="backicon">&lt;</span>
                 <span class="fs-18">{{ data.namespace }}/{{ data.name }}</span>
             </span>
         </div>
         <div class="bg-white" style="padding: 0 24px 6px;">
-            <el-tabs v-model="tabsActive">
-                <el-tab-pane label="版本管理" name="version">
-                    <el-table v-loading="loading" :data="tags" style="width: 100%"
-                        :header-cell-style="{ background: '#F5F7FA', color: '#909399' }">
-                        <el-table-column label="镜像版本">
-                            <template #default="scope">
-                                <el-popover placement="bottom-start" width="800px">
-                                    <template #reference>
-                                        <span class="c-blue cursor">{{ scope.row.TagName }}</span>
-                                    </template>
-                                    <el-form label-width="160px">
-                                        <el-form-item label="镜像ID(SHA256)" style="margin-bottom:0;">
-                                            <span>{{ scope.row.Digest }}</span>
-                                            <el-icon :size="12" @click="onekeyCopy(scope.row.Digest)"
-                                                style="cursor:pointer;margin-left:6px;">
-                                                <DocumentCopy />
-                                            </el-icon>
-                                        </el-form-item>
-                                        <el-form-item label="平台"
-                                            style="margin-bottom:0;">{{ scope.row.Platform }}</el-form-item>
-                                        <el-form-item label="制品类型"
-                                            style="margin-bottom:0;">{{ scope.row.Type }}</el-form-item>
-                                    </el-form>
-                                </el-popover>
-                                <el-icon :size="12" @click="onekeyCopy(scope.row.TagName)"
-                                    style="cursor:pointer;margin-left:6px;">
-                                    <DocumentCopy />
-                                </el-icon>
-                            </template>
-                        </el-table-column>
+            <a-tabs v-model:active-key="tabsActive">
+                <a-tab-pane key="version" title="版本管理">
+                    <a-table :loading="loading" :data="tags" style="width: 100%" class="table-header"
+                        :pagination="false" row-key="TagName">
+                        <template #columns>
+                            <a-table-column title="镜像版本">
+                                <template #cell="{ record }">
+                                    <a-popover position="bottom">
+                                        <span class="c-blue cursor">{{ record.TagName }}</span>
+                                        <template #content>
+                                            <a-form :model="record" label-align="left" :label-col-props="{ span: 6, flex: '0 0 160px' }"
+                                                :wrapper-col-props="{ span: 18, flex: '1' }" class="registry-detail-form">
+                                                <a-form-item label="镜像ID(SHA256)" style="margin-bottom:0;">
+                                                    <span>{{ record.Digest }}</span>
+                                                    <span class="copy-action" @click="onekeyCopy(record.Digest)">复制</span>
+                                                </a-form-item>
+                                                <a-form-item label="平台" style="margin-bottom:0;">{{ record.Platform }}</a-form-item>
+                                                <a-form-item label="制品类型" style="margin-bottom:0;">{{ record.Type }}</a-form-item>
+                                            </a-form>
+                                        </template>
+                                    </a-popover>
+                                    <span class="copy-action" @click="onekeyCopy(record.TagName)">复制</span>
+                                </template>
+                            </a-table-column>
 
-                        <el-table-column label="大小" prop="size"></el-table-column>
+                            <a-table-column title="大小" data-index="size" />
 
-
-                        <el-table-column label="创建时间" prop="CreatedAt" width="200">
-                            <template #default="scope">
-                                {{ scope.row.CreatedAt ? new Date(scope.row.CreatedAt).toLocaleString() : '未知' }}
-                            </template>
-                        </el-table-column>
-                        <el-table-column label="修改时间" prop="CreatedAt" width="200">
-                            <template #default="scope">
-                                {{ scope.row.UpdatedAt ? new Date(scope.row.UpdatedAt).toLocaleString() : '未知' }}
-                            </template>
-                        </el-table-column>
-                        <el-table-column label="操作">
-                            <template #default="scope">
-                                <el-button type="text" size="mini" @click="del(scope.row)">删除</el-button>
-                            </template>
-                        </el-table-column>
-                    </el-table>
-                    <div class="df jc-e mt-20">
-                        <el-pagination background layout="prev, pager, next" v-model:current-page="tagPage.page"
-                            :total="tagPage.total" :page-size="tagPage.pageSize"
-                            @current-change="getVersion"></el-pagination>
+                            <a-table-column title="创建时间" data-index="CreatedAt" :width="200">
+                                <template #cell="{ record }">
+                                    {{ record.CreatedAt ? new Date(record.CreatedAt).toLocaleString() : '未知' }}
+                                </template>
+                            </a-table-column>
+                            <a-table-column title="修改时间" data-index="CreatedAt" :width="200">
+                                <template #cell="{ record }">
+                                    {{ record.UpdatedAt ? new Date(record.UpdatedAt).toLocaleString() : '未知' }}
+                                </template>
+                            </a-table-column>
+                            <a-table-column title="操作">
+                                <template #cell="{ record }">
+                                    <a-button type="text" @click="del(record)">删除</a-button>
+                                </template>
+                            </a-table-column>
+                        </template>
+                    </a-table>
+                    <div v-if="tagPage.total > tagPage.pageSize" class="df jc-e mt-20">
+                        <a-pagination v-model:current="tagPage.page" :total="tagPage.total"
+                            :page-size="tagPage.pageSize" @change="getVersion" />
                     </div>
-                </el-tab-pane>
-                <el-tab-pane label="仓库信息" name="info">
-                    <el-form v-loading="loading" label-suffix="：" label-width="150px" class="mt-24">
-                        <el-form-item label="仓库名称">{{ data.namespace }}/{{ data.name }}</el-form-item>
-                        <el-form-item label="仓库地址">{{ data.registry }}/{{ data.namespace }}/{{ data.name }}<el-icon
-                                class="ml-10" :size="12"
-                                @click="onekeyCopy(`${data.registry}/${data.namespace}/${data.name}`)"
-                                style="cursor:pointer">
-                                <DocumentCopy />
-                            </el-icon></el-form-item>
-                        <el-form-item label="命名空间">{{ data.namespace }}</el-form-item>
-                        <el-form-item label="公共权限">{{ data.visible_type === 3 ? namespaceTypeMap[data.namespace] :
-                            visibleTypeMap[data.visible_type]}}<el-icon class="ml-10" :size="12"
-                                @click="edit('visible_type')" style="cursor:pointer" v-if="hasAccess(data.user_id)">
-                                <EditPen />
-                            </el-icon></el-form-item>
-                        <el-form-item label="描述">{{ data.desc }}<el-icon class="ml-10" :size="12" @click="edit('desc')"
-                                style="cursor:pointer" v-if="hasAccess(data.user_id)">
-                                <EditPen />
-                            </el-icon></el-form-item>
-                        <el-form-item label="创建时间">{{ new Date(data.created_at).toLocaleString() }}</el-form-item>
-                    </el-form>
-                </el-tab-pane>
-                <el-tab-pane label="镜像部署" name="build" v-if="hasAccess(data.user_id)">
+                </a-tab-pane>
+                <a-tab-pane key="info" title="仓库信息">
+                    <a-spin :loading="loading">
+                        <a-form :model="data" label-align="left" :label-col-props="{ span: 5, flex: '0 0 150px' }"
+                            :wrapper-col-props="{ span: 19, flex: '1' }" class="registry-detail-form mt-24">
+                            <a-form-item label="仓库名称">{{ data.namespace }}/{{ data.name }}</a-form-item>
+                            <a-form-item label="仓库地址">
+                                {{ data.registry }}/{{ data.namespace }}/{{ data.name }}
+                                <span class="copy-action"
+                                    @click="onekeyCopy(`${data.registry}/${data.namespace}/${data.name}`)">复制</span>
+                            </a-form-item>
+                            <a-form-item label="命名空间">{{ data.namespace }}</a-form-item>
+                            <a-form-item label="公共权限">
+                                {{ data.visible_type === 3 ? namespaceTypeMap[data.namespace] :
+                                    visibleTypeMap[data.visible_type]}}
+                                <span class="edit-action" @click="edit('visible_type')"
+                                    v-if="hasAccess(data.user_id)">编辑</span>
+                            </a-form-item>
+                            <a-form-item label="描述">
+                                {{ data.desc }}
+                                <span class="edit-action" @click="edit('desc')" v-if="hasAccess(data.user_id)">编辑</span>
+                            </a-form-item>
+                            <a-form-item label="创建时间">{{ data.created_at ? new Date(data.created_at).toLocaleString() : '' }}</a-form-item>
+                        </a-form>
+                    </a-spin>
+                </a-tab-pane>
+                <a-tab-pane key="build" title="镜像部署" v-if="hasAccess(data.user_id)">
                     <div>
-                        <el-button type="primary" @click="openBuildForm()">新增自动部署任务</el-button>
+                        <a-button type="primary" @click="openBuildForm()">新增自动部署任务</a-button>
                     </div>
-                    <el-table v-loading="loading" :data="builds" class="mt-20" style="width: 100%"
-                        :header-cell-style="{ background: '#F5F7FA', color: '#909399' }">
-                        <el-table-column label="应用">
-                            <template #default="scope">
-                                <span class="c-blue cursor"
-                                    @click="showLog(scope.row)">{{ scope.row.k8s_app_name }}</span>
-                            </template>
-                        </el-table-column>
+                    <a-table :loading="loading" :data="builds" class="mt-20 table-header" style="width: 100%"
+                        :pagination="false" row-key="id">
+                        <template #columns>
+                            <a-table-column title="应用">
+                                <template #cell="{ record }">
+                                    <span class="c-blue cursor" @click="showLog(record)">{{ record.k8s_app_name }}</span>
+                                </template>
+                            </a-table-column>
 
-                        <el-table-column label="触发方式">
-                            <template #default="scope">{{ scope.row.deploy_type_txt }}</template>
-                        </el-table-column>
-                        <el-table-column label="上次执行时间">
-                            <template #default="scope">{{ scope.row.lastrun }}</template>
-                        </el-table-column>
-                        <el-table-column label="创建时间">
-                            <template #default="scope">{{ scope.row.created }}</template>
-                        </el-table-column>
+                            <a-table-column title="触发方式">
+                                <template #cell="{ record }">{{ record.deploy_type_txt }}</template>
+                            </a-table-column>
+                            <a-table-column title="上次执行时间">
+                                <template #cell="{ record }">{{ record.lastrun }}</template>
+                            </a-table-column>
+                            <a-table-column title="创建时间">
+                                <template #cell="{ record }">{{ record.created }}</template>
+                            </a-table-column>
 
-                        <el-table-column label="操作">
-                            <template #default="scope">
-                                <el-button type="text" size="mini" @click="getBuildDetail(scope.row)">详情</el-button>
-                                <el-button type="text" size="mini" @click="openBuildForm(scope.row)">修改</el-button>
-                                <el-button type="text" size="mini" @click="delBuild(scope.row)">删除</el-button>
-                            </template>
-                        </el-table-column>
-                    </el-table>
-                </el-tab-pane>
-            </el-tabs>
+                            <a-table-column title="操作">
+                                <template #cell="{ record }">
+                                    <a-button type="text" @click="getBuildDetail(record)">详情</a-button>
+                                    <a-button type="text" @click="openBuildForm(record)">修改</a-button>
+                                    <a-button type="text" @click="delBuild(record)">删除</a-button>
+                                </template>
+                            </a-table-column>
+                        </template>
+                    </a-table>
+                </a-tab-pane>
+            </a-tabs>
         </div>
 
-        <el-dialog v-model="visible" title="编辑镜像" :width="500">
-            <el-form ref="form" :model="form" label-width="80px" label-position="left">
-                <el-form-item label="描述" prop="desc" v-if="editProp === 'desc'">
-                    <el-input v-model="form.desc" type="textarea" :rows="5" />
-                </el-form-item>
-                <el-form-item label="公共权限" prop="visible_type" v-if="editProp === 'visible_type'">
-                    <el-checkbox v-model="formVisibleType3" @change="v => form.visible_type = v ? 3 : 1">跟随命名空间</el-checkbox>
-                    <el-radio-group v-model="form.visible_type" :disabled="formVisibleType3">
-                        <el-radio :label="1">私有读写</el-radio>
-                        <el-radio :label="4">公有读私有写</el-radio>
-                        <el-radio :label="2">公有读写</el-radio>
-                    </el-radio-group>
-                </el-form-item>
-                <el-form-item>
-                    <el-button type="primary" size="large" @click="onSubmit">确定</el-button>
-                    <el-button size="large" @click="visible = false">取消</el-button>
-                </el-form-item>
-            </el-form>
-        </el-dialog>
+        <a-modal v-model:visible="visible" title="编辑镜像" :width="500" :footer="false">
+            <a-form ref="form" :model="form" label-align="left" :label-col-props="{ span: 4, flex: '0 0 80px' }"
+                :wrapper-col-props="{ span: 20, flex: '1' }" class="registry-detail-form">
+                <a-form-item label="描述" field="desc" v-if="editProp === 'desc'">
+                    <a-textarea v-model="form.desc" :auto-size="{ minRows: 5, maxRows: 5 }" />
+                </a-form-item>
+                <a-form-item label="公共权限" field="visible_type" v-if="editProp === 'visible_type'">
+                    <div class="df df-c" style="flex:1;">
+                        <a-checkbox v-model="formVisibleType3" @change="v => form.visible_type = v ? 3 : 1">跟随命名空间</a-checkbox>
+                        <a-radio-group v-model="form.visible_type" :disabled="formVisibleType3">
+                            <a-radio :value="1">私有读写</a-radio>
+                            <a-radio :value="4">公有读私有写</a-radio>
+                            <a-radio :value="2">公有读写</a-radio>
+                        </a-radio-group>
+                    </div>
+                </a-form-item>
+                <a-form-item>
+                    <a-button type="primary" size="large" @click="onSubmit">确定</a-button>
+                    <a-button size="large" @click="visible = false">取消</a-button>
+                </a-form-item>
+            </a-form>
+        </a-modal>
 
-        <el-dialog v-model="buildForm.show" :title="buildForm.id ? '修改自动部署任务' : '新增自动部署任务'" :width="800">
-            <el-form ref="buildForm" :model="buildForm" :rules="rules" label-width="120px">
-                <el-form-item label="" style="margin-bottom:10px;">
-                    <el-radio-group v-model="buildForm.selectType" style="margin-bottom:0;"
+        <a-modal v-model:visible="buildForm.show" :title="buildForm.id ? '修改自动部署任务' : '新增自动部署任务'"
+            :width="800" :footer="false">
+            <a-form ref="buildForm" :model="buildForm" :rules="rules" label-align="left"
+                :label-col-props="{ span: 5, flex: '0 0 120px' }" :wrapper-col-props="{ span: 19, flex: '1' }"
+                class="registry-detail-form">
+                <a-form-item label="" style="margin-bottom:10px;">
+                    <a-radio-group v-model="buildForm.selectType" style="margin-bottom:0;"
                         @change="changeBuildFormType">
-                        <el-radio :value="1" :label="1" size="large">当前集群</el-radio>
-                        <el-radio :value="2" :label="2" size="large">第三方集群</el-radio>
-                    </el-radio-group>
-                </el-form-item>
+                        <a-radio :value="1">当前集群</a-radio>
+                        <a-radio :value="2">第三方集群</a-radio>
+                    </a-radio-group>
+                </a-form-item>
 
                 <div v-if="buildForm.selectType == 1">
-                    <el-form-item label="选择应用" prop="k8s_container_name_arr">
+                    <a-form-item label="选择应用" field="k8s_container_name_arr">
                         <div class="df df-c" style="flex:1;">
-                            <el-select v-model="buildForm.ccApp" placeholder="请选择应用" size="large" style="width:600px;"
+                            <a-select v-model="buildForm.ccApp" placeholder="请选择应用" size="large" style="width:600px;"
                                 @change="buildForm.selectCcapp">
-                                <el-option v-for="(value, key) in buildForm.appgroups" :key="key" :label="value.title"
-                                    :value="key"></el-option>
-                            </el-select>
+                                <a-option v-if="!Object.keys(buildForm.appgroups || {}).length" disabled
+                                    value="__empty__" label="暂无可选应用" />
+                                <a-option v-for="(value, key) in buildForm.appgroups" :key="key" :label="value.title"
+                                    :value="key" />
+                            </a-select>
 
-                            <div class="mt-10"
-                                style="padding:10px;background:rgb(247,247,250);width:600px;box-sizing:border-box;">
-                                <el-tree style="width:580px" class="buildformtree" :data="buildForm.treeData"
-                                    v-loading="buildForm.treeLoading" default-expand-all>
-                                    <template #default="{ node, data }">
-                                        <el-checkbox v-if="data.type == 'container'"
-                                            v-model="buildForm.k8s_container_name_arr"
-                                            @change="changeTreeContainer(data)" :label="node.label" />
-                                        <span v-else>{{ node.label }}</span>
-                                    </template>
-                                </el-tree>
+                            <div v-if="buildForm.treeLoading || buildForm.treeData.length" class="mt-10 buildformtree">
+                                <a-spin :loading="buildForm.treeLoading">
+                                    <div v-for="item in buildForm.treeData" :key="item.name" class="build-tree-group">
+                                        <div class="build-tree-title">{{ item.label }}</div>
+                                        <div v-for="child in item.children" :key="child.name" class="build-tree-container">
+                                            <a-checkbox :model-value="buildForm.k8s_container_name_arr.includes(child.label)"
+                                                @change="checked => toggleTreeContainer(child, checked)">
+                                                {{ child.label }}
+                                            </a-checkbox>
+                                        </div>
+                                    </div>
+                                </a-spin>
                             </div>
 
                         </div>
-                    </el-form-item>
+                    </a-form-item>
                 </div>
 
                 <div v-if="buildForm.selectType == 2">
-                    <el-form-item label="KUBECONFIG" prop="k8s_config">
+                    <a-form-item label="KUBECONFIG" field="k8s_config">
                         <div class="df df-c" style="flex:1;">
-                            <el-input type="textarea" v-model="buildForm.k8s_config" size="large" :rows="8"
+                            <a-textarea v-model="buildForm.k8s_config" size="large" :auto-size="{ minRows: 8, maxRows: 8 }"
                                 @blur="buildForm.getNamespace()" style="width:600px;"
-                                placeholder="请输入config"></el-input>
+                                placeholder="请输入config" />
                             <div class="mt-10 df jc-e" style="width:600px;">
                                 <div class="upfile df ml-10">
                                     <input type="file" class="fileinput" @change="upfile" />
-                                    <el-button type="primary">导入</el-button>
+                                    <a-button type="primary">导入</a-button>
                                 </div>
                             </div>
                         </div>
-                    </el-form-item>
-                    <el-form-item label="命名空间" prop="k8s_namespace">
-                        <el-select v-model="buildForm.k8s_namespace" size="large" style="width:600px" placeholder="请选择"
+                    </a-form-item>
+                    <a-form-item label="命名空间" field="k8s_namespace">
+                        <a-select v-model="buildForm.k8s_namespace" size="large" style="width:600px" placeholder="请选择"
                             @change="buildForm.getApps()">
-                            <el-option v-for="item in namespaces" :key="item" :value="item" :label="item"></el-option>
-                        </el-select>
-                    </el-form-item>
-                    <el-form-item label="应用类型" prop="k8s_controller_type">
-                        <el-select v-model="buildForm.k8s_controller_type" size="large" style="width:600px"
+                            <a-option v-for="item in namespaces" :key="item" :value="item" :label="item" />
+                        </a-select>
+                    </a-form-item>
+                    <a-form-item label="应用类型" field="k8s_controller_type">
+                        <a-select v-model="buildForm.k8s_controller_type" size="large" style="width:600px"
                             placeholder="请选择" @change="buildForm.getApps()">
-                            <el-option v-for="(value, key) in controllerTypes" :key="key" :value="key"
-                                :label="value"></el-option>
-                        </el-select>
-                    </el-form-item>
-                    <div class="df" style="width:720px;">
-                        <div class="f1">
-                            <el-form-item label="选择应用" prop="k8s_app_name">
-                                <el-select v-model="buildForm.k8s_app_name" size="large" placeholder="请选择"
-                                    style="flex:1;" @change="buildForm.getContainer()">
-                                    <el-option v-for="item in apps" :key="item.name" :label="item.title"
-                                        :value="item.name"></el-option>
-                                </el-select>
-                            </el-form-item>
-                        </div>
-                        <div class="f1">
-                            <el-form-item label="选择容器" prop="k8s_container_name_arr">
-                                <el-select v-model="buildForm.k8s_container_name_arr" size="large" multiple
-                                    placeholder="请选择" style="flex:1;">
-                                    <el-option v-for="item in containers" :key="item.name" :label="item.title"
-                                        :value="item.name"></el-option>
-                                </el-select>
-                            </el-form-item>
-                        </div>
+                            <a-option v-for="(value, key) in controllerTypes" :key="key" :value="key"
+                                :label="value" />
+                        </a-select>
+                    </a-form-item>
+                    <div class="build-inline-form-row">
+                        <a-form-item label="选择应用" field="k8s_app_name">
+                                <a-select v-model="buildForm.k8s_app_name" size="large" placeholder="请选择"
+                                    @change="buildForm.getContainer()">
+                                    <a-option v-if="!apps.length" disabled value="__empty__" label="暂无可选应用" />
+                                    <a-option v-for="item in apps" :key="item.name" :label="item.title"
+                                        :value="item.name" />
+                                </a-select>
+                        </a-form-item>
+                        <a-form-item label="选择容器" field="k8s_container_name_arr">
+                            <a-select v-model="buildForm.k8s_container_name_arr" size="large" multiple
+                                placeholder="请选择">
+                                <a-option v-for="item in containers" :key="item.name" :label="item.title"
+                                    :value="item.name" />
+                            </a-select>
+                        </a-form-item>
                     </div>
                 </div>
 
-                <el-form-item label="触发方式">
+                <a-form-item label="触发方式">
                     <div class="df df-c" style="flex:1;">
-                        <el-radio-group v-model="buildForm.deploy_type" style="margin-bottom:0;">
-                            <el-radio :value="1" :label="1" size="large">更新版本</el-radio>
-                            <el-radio :value="2" :label="2" size="large">新增版本</el-radio>
-                        </el-radio-group>
+                        <a-radio-group v-model="buildForm.deploy_type" style="margin-bottom:0;">
+                            <a-radio :value="1">更新版本</a-radio>
+                            <a-radio :value="2">新增版本</a-radio>
+                        </a-radio-group>
                         <span v-if="buildForm.deploy_type == 1" class="c-99 fs-12">对指定的版本名称更新镜像时，会自动执行部署任务</span>
                         <span v-if="buildForm.deploy_type == 2" class="c-99 fs-12">对匹配到的版本名称新增镜像版本时，会自动执行部署任务</span>
                     </div>
-                </el-form-item>
-                <el-form-item v-if="buildForm.deploy_type == 2" label="匹配方式" prop="repository_tag">
+                </a-form-item>
+                <a-form-item v-if="buildForm.deploy_type == 2" label="匹配方式" field="repository_tag">
 
                     <div class="df ai-c" style="width:600px;">
-                        <el-select v-model="buildForm.match_type" size="large" placeholder="请选择匹配方式">
-                            <el-option label="前缀匹配" :value="1"></el-option>
-                            <el-option label="正则匹配" :value="2"></el-option>
-                        </el-select>
+                        <a-select v-model="buildForm.match_type" size="large" placeholder="请选择匹配方式">
+                            <a-option label="前缀匹配" :value="1" />
+                            <a-option label="正则匹配" :value="2" />
+                        </a-select>
                         <div class="tag-cpn df df-ww ml-20" style="flex:1;">
-                            <el-tag v-for="(tag, index) in buildForm.repository_tag_arr" :key="index" class="tag"
-                                closable @close="deleteTag(index)">{{ tag }}</el-tag>
+                            <a-tag v-for="(tag, index) in buildForm.repository_tag_arr" :key="index" class="tag"
+                                closable @close="deleteTag(index)">{{ tag }}</a-tag>
                             <div class="input fc">
                                 <input type="text" placeholder="请输入匹配规则" v-model="buildForm.taginput"
                                     @keydown.enter="addTag" @blur="addTag" />
                             </div>
                         </div>
                     </div>
-                </el-form-item>
-                <el-form-item v-if="buildForm.deploy_type == 1"
-                    :label="(buildForm.deploy_type == 2 && buildForm.match_type == 2) ? '匹配规则' : '版本名称'" prop="repository_tag">
+                </a-form-item>
+                <a-form-item v-if="buildForm.deploy_type == 1"
+                    :label="(buildForm.deploy_type == 2 && buildForm.match_type == 2) ? '匹配规则' : '版本名称'" field="repository_tag">
                     <div class="tag-cpn df df-ww">
-                        <el-tag v-for="(tag, index) in buildForm.repository_tag_arr" :key="index" class="tag" closable
-                            @close="deleteTag(index)">{{ tag }}</el-tag>
+                        <a-tag v-for="(tag, index) in buildForm.repository_tag_arr" :key="index" class="tag" closable
+                            @close="deleteTag(index)">{{ tag }}</a-tag>
                         <div class="input fc">
                             <input type="text" placeholder="请输入" v-model="buildForm.taginput" @keydown.enter="addTag"
                                 @blur="addTag" />
                         </div>
                     </div>
-                </el-form-item>
-                <el-form-item>
-                    <el-button type="primary" size="large" @click="submitBuildForm">确定</el-button>
-                    <el-button size="large" @click="buildForm.show = false">取消</el-button>
-                </el-form-item>
-            </el-form>
-        </el-dialog>
+                </a-form-item>
+                <a-form-item>
+                    <a-button type="primary" size="large" @click="submitBuildForm">确定</a-button>
+                    <a-button size="large" @click="buildForm.show = false">取消</a-button>
+                </a-form-item>
+            </a-form>
+        </a-modal>
 
-        <el-dialog v-model="buildDetail.show" title="自动部署任务详情" :width="750">
-            <el-form ref="buildForm" :model="buildDetail" :rules="rules" label-width="150px">
-                <el-form-item label="KUBECONFIG">
+        <a-modal v-model:visible="buildDetail.show" title="自动部署任务详情" :width="750" :footer="false">
+            <a-form :model="buildDetail" label-align="left" :label-col-props="{ span: 6, flex: '0 0 150px' }"
+                :wrapper-col-props="{ span: 18, flex: '1' }" class="registry-detail-form">
+                <a-form-item label="KUBECONFIG">
                     <span v-if="!buildDetail.k8s_config">-</span>
-                    <el-input v-else type="textarea" v-model="buildDetail.k8s_config" rows="5" readonly />
-                </el-form-item>
-                <el-form-item label="命名空间">{{ buildDetail.k8s_namespace }}</el-form-item>
-                <el-form-item label="应用">{{ buildDetail.k8s_app_name }}</el-form-item>
-                <el-form-item label="容器">{{ buildDetail.k8s_container_name }}</el-form-item>
-                <el-form-item label="应用类型">{{ buildDetail.k8s_controller_type_txt }}</el-form-item>
-                <el-form-item label="触发方式">{{ buildDetail.deploy_type_txt }}</el-form-item>
-                <el-form-item label="版本名称">{{ buildDetail.tag_name }}</el-form-item>
-                <el-form-item label="创建时间">{{ buildDetail.created }}</el-form-item>
-            </el-form>
-        </el-dialog>
+                    <a-textarea v-else v-model="buildDetail.k8s_config" :auto-size="{ minRows: 5, maxRows: 5 }" readonly />
+                </a-form-item>
+                <a-form-item label="命名空间">{{ buildDetail.k8s_namespace }}</a-form-item>
+                <a-form-item label="应用">{{ buildDetail.k8s_app_name }}</a-form-item>
+                <a-form-item label="容器">{{ buildDetail.k8s_container_name }}</a-form-item>
+                <a-form-item label="应用类型">{{ buildDetail.k8s_controller_type_txt }}</a-form-item>
+                <a-form-item label="触发方式">{{ buildDetail.deploy_type_txt }}</a-form-item>
+                <a-form-item label="版本名称">{{ buildDetail.tag_name }}</a-form-item>
+                <a-form-item label="创建时间">{{ buildDetail.created }}</a-form-item>
+            </a-form>
+        </a-modal>
 
-        <el-dialog v-model="logls.show" :width="1000" title="执行记录" @opened="logls.opened = true; termInit();">
-            <div v-loading="logls.loading" class="df">
-                <div>
-                    <div class="df jc-e" style="height:400px; overflow:auto; max-width:300px;">
-                        <el-tabs v-model="logls.act" tab-position="left" class="logtabs" @tab-change="termInit">
-                            <el-tab-pane v-for="(item, index) in logls.list" :key="index">
-                                <template #label>
-                                    <span>{{ item.created }}</span>
-                                </template>
-                            </el-tab-pane>
-                        </el-tabs>
+        <a-modal v-model:visible="logls.show" :width="1000" title="执行记录" :footer="false">
+            <a-spin :loading="logls.loading">
+                <div class="df">
+                    <div>
+                        <div class="df jc-e" style="height:400px; overflow:auto; max-width:300px;">
+                            <a-tabs v-model:active-key="logls.act" position="left" class="logtabs" @change="termInit">
+                                <a-tab-pane v-for="(item, index) in logls.list" :key="String(index)" :title="item.created" />
+                            </a-tabs>
+                        </div>
+                    </div>
+                    <div class="ml-20 fc">
+                        <div ref="term" id="term" class="mt-10" style="height:400px;"></div>
                     </div>
                 </div>
-                <div class="ml-20 fc">
-                    <div ref="term" id="term" class="mt-10" style="height:400px;"></div>
-                </div>
-            </div>
-        </el-dialog>
+            </a-spin>
+        </a-modal>
 
     </div>
 </template>
@@ -316,6 +316,7 @@ import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
 import userMixin from "@/utils/user-mixin";
+import { confirm, messageSuccess } from "@/utils/ui-feedback";
 
 export default {
     data() {
@@ -427,6 +428,11 @@ export default {
         'buildForm.k8s_container_name_arr'(v) {
             this.buildForm.k8s_container_name = v.join(',');
         },
+        'logls.show'(v) {
+            if (!v) { return }
+            this.logls.opened = true;
+            this.$nextTick(() => this.termInit());
+        },
     },
     methods: {
         showLog(row) {
@@ -461,6 +467,14 @@ export default {
             this.buildForm.k8s_app_name = data.app;
             this.buildForm.k8s_container_name_arr = [data.label];
             this.buildForm.k8s_controller_type = data.kind;
+        },
+        toggleTreeContainer(data, checked) {
+            if (!checked) {
+                this.buildForm.k8s_container_name_arr = this.buildForm.k8s_container_name_arr.filter(item => item !== data.label);
+                return;
+            }
+            this.buildForm.k8s_container_name_arr = [data.label];
+            this.changeTreeContainer(data);
         },
 
         upfile(file) {
@@ -631,8 +645,8 @@ export default {
             }
         },
         submitBuildForm() {
-            this.$refs.buildForm.validate((valid) => {
-                if (!valid) { return }
+            this.$refs.buildForm.validate((errors) => {
+                if (errors) { return }
 
                 let bf = this.buildForm;
                 let formdata = {
@@ -656,13 +670,13 @@ export default {
 
                 if (bf.id) {
                     myAxios.post('/v2/api/repository/deploy_rule/edit', formdata).then(res => {
-                        this.$message.success('操作成功');
+                        messageSuccess('操作成功');
                         this.getData();
                         this.buildForm.show = false;
                     }).catch(() => { })
                 } else {
                     myAxios.post('/v2/api/repository/deploy_rule/add', formdata).then(res => {
-                        this.$message.success('操作成功');
+                        messageSuccess('操作成功');
                         this.getData();
                         this.buildForm.show = false;
                     }).catch(() => { })
@@ -722,37 +736,37 @@ export default {
             }).catch(() => { });
         },
         del(tag) {
-            this.$confirm('此操作将永久删除该版本, 是否继续?', '提示', {
+            confirm({
+                title: '提示',
+                content: '此操作将永久删除该版本, 是否继续?',
                 confirmButtonText: '确定',
                 cancelButtonText: '取消',
-                type: 'warning'
-            }).then(() => {
-                myAxios.post("/v2/api/repository/tags/del", {
+                onOk: () => myAxios.post("/v2/api/repository/tags/del", {
                     id: parseInt(this.$route.params.id),
                     tag: tag.TagName
                 }).then(res => {
-                    this.$message.success("删除成功");
+                    messageSuccess("删除成功");
                     this.getData();
-                }).catch(() => { });
-            })
+                }).catch(() => { })
+            });
         },
         delBuild(row) {
-            this.$confirm('确定要删除吗, 是否继续?', '提示', {
+            confirm({
+                title: '提示',
+                content: '确定要删除吗, 是否继续?',
                 confirmButtonText: '确定',
                 cancelButtonText: '取消',
-                type: 'warning'
-            }).then(() => {
-                myAxios.post('/v2/api/repository/deploy_rule/del', {
+                onOk: () => myAxios.post('/v2/api/repository/deploy_rule/del', {
                     id: row.id
                 }).then(res => {
-                    this.$message.success('操作成功');
+                    messageSuccess('操作成功');
                     this.getBuild();
                 }).catch(() => { })
-            }).catch(() => { });
+            });
         },
         onSubmit() {
             myAxios.post('/v2/api/repository/edit', { id: parseInt(this.$route.params.id), ...this.form }).then(() => {
-                this.$message.success('操作成功');
+                messageSuccess('操作成功');
                 this.getData();
                 this.visible = false
             }).catch(() => { })
@@ -768,7 +782,7 @@ export default {
             textarea.select();
             document.execCommand('copy', true);
             document.body.removeChild(textarea);
-            this.$message.success("复制成功");
+            messageSuccess("复制成功");
         },
         getData() {
             if (this.tabsActive == 'version') {
@@ -907,6 +921,105 @@ export default {
 
 .backbtn {
     cursor: pointer;
+}
+
+.backicon {
+    color: #0052D9;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    margin-right: 4px;
+    font-size: 20px;
+    line-height: 1;
+}
+
+.copy-action,
+.edit-action {
+    margin-left: 6px;
+    color: #3370ff;
+    cursor: pointer;
+}
+
+.table-header :deep(.arco-table-th) {
+    background: #F3F3F3;
+    color: #666666;
+    font-weight: 500;
+}
+
+.table-header :deep(.arco-table-container) {
+    border-left: 0;
+    border-right: 0;
+}
+
+.table-header :deep(.arco-table-th:first-child),
+.table-header :deep(.arco-table-td:first-child) {
+    border-left: 0;
+}
+
+.table-header :deep(.arco-table-th:last-child),
+.table-header :deep(.arco-table-td:last-child) {
+    border-right: 0;
+}
+
+.registry-detail-form :deep(.arco-form-item-label) {
+    white-space: nowrap;
+}
+
+.registry-detail-form :deep(.arco-form-item-wrapper-col) {
+    min-width: 0;
+}
+
+.buildformtree {
+    padding: 10px;
+    background: rgb(247, 247, 250);
+    width: 600px;
+    box-sizing: border-box;
+}
+
+.build-tree-group + .build-tree-group {
+    margin-top: 8px;
+}
+
+.build-tree-title {
+    color: #333333;
+    font-weight: 500;
+    line-height: 28px;
+}
+
+.build-tree-container {
+    padding-left: 18px;
+    line-height: 28px;
+}
+
+.build-inline-form-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 16px;
+    width: 760px;
+}
+
+.build-inline-form-row :deep(.arco-form-item) {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: flex-start;
+    min-width: 0;
+}
+
+.build-inline-form-row :deep(.arco-form-item-label-col) {
+    flex: 0 0 158px !important;
+    width: 158px;
+    max-width: 158px;
+}
+
+.build-inline-form-row :deep(.arco-form-item-wrapper-col) {
+    flex: 1 1 auto !important;
+    min-width: 0;
+}
+
+.build-inline-form-row :deep(.arco-select) {
+    width: 100%;
 }
 
 .pd-20 {

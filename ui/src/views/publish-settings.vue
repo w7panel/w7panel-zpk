@@ -6,12 +6,12 @@
           <div class="shortcut-desc">Linux 平台示例工具名：</div>
           <div class="shortcut-content">
             <pre>zpk_linux_amd64</pre>
-            <el-icon :size="12" style="cursor:pointer" @click="onekeyCopy(`zpk_linux_amd64`)"><DocumentCopy /></el-icon>
+            <span class="copy-action" @click="onekeyCopy(`zpk_linux_amd64`)">复制</span>
           </div>
           <div class="shortcut-desc">如果下载后无法直接执行，请先添加执行权限：</div>
           <div class="shortcut-content">
             <pre>chmod +x zpk_linux_amd64</pre>
-            <el-icon :size="12" style="cursor:pointer" @click="onekeyCopy(`chmod +x zpk_linux_amd64`)"><DocumentCopy /></el-icon>
+            <span class="copy-action" @click="onekeyCopy(`chmod +x zpk_linux_amd64`)">复制</span>
           </div>
 
           <div class="shortcut-header">2. 登录镜像仓库</div>
@@ -19,7 +19,7 @@
           <div class="shortcut-desc">执行登录命令：</div>
           <div class="shortcut-content">
             <pre>./zpk_linux_amd64 login --username={{ userInfo.username }} --password=xxx --host={{ host }}</pre>
-            <el-icon :size="12" style="cursor:pointer" @click="onekeyCopy(`./zpk_linux_amd64 login --username=${userInfo.username} --password=xxx --host=${host}`)"><DocumentCopy /></el-icon>
+            <span class="copy-action" @click="onekeyCopy(`./zpk_linux_amd64 login --username=${userInfo.username} --password=xxx --host=${host}`)">复制</span>
           </div>
           <div class="shortcut-desc">参数说明：</div>
           <ul class="shortcut-list">
@@ -32,23 +32,23 @@
           <div class="shortcut-desc">登录成功后，选择需要操作的制品：</div>
           <div class="shortcut-content">
             <pre>./zpk_linux_amd64 use {{ $route.query.id }}</pre>
-            <el-icon :size="12" style="cursor:pointer" @click="onekeyCopy(`./zpk_linux_amd64 use ${$route.query.id}`)"><DocumentCopy /></el-icon>
+            <span class="copy-action" @click="onekeyCopy(`./zpk_linux_amd64 use ${$route.query.id}`)">复制</span>
           </div>
 
           <div class="shortcut-header">4. 添加附件</div>
           <div class="shortcut-desc">使用 <code>attach add</code> 命令添加附件：</div>
           <div class="shortcut-content">
             <pre>./zpk_linux_amd64 attach add --path=./xxx --type=helm</pre>
-            <el-icon :size="12" style="cursor:pointer" @click="onekeyCopy(`./zpk_linux_amd64 attach add --path=./xxx --type=helm`)"><DocumentCopy /></el-icon>
+            <span class="copy-action" @click="onekeyCopy(`./zpk_linux_amd64 attach add --path=./xxx --type=helm`)">复制</span>
           </div>
           <div class="shortcut-desc">也可以根据附件类型选择不同的 <code>--type</code>：</div>
           <div class="shortcut-content">
             <pre>./zpk_linux_amd64 attach add --path=./xxx --type=helm
 ./zpk_linux_amd64 attach add --path=./xxx --type=backend
 ./zpk_linux_amd64 attach add --path=./xxx --type=frontend</pre>
-            <el-icon :size="12" style="cursor:pointer" @click="onekeyCopy(`./zpk_linux_amd64 attach add --path=./xxx --type=helm
+            <span class="copy-action" @click="onekeyCopy(`./zpk_linux_amd64 attach add --path=./xxx --type=helm
 ./zpk_linux_amd64 attach add --path=./xxx --type=backend
-./zpk_linux_amd64 attach add --path=./xxx --type=frontend`)"><DocumentCopy /></el-icon>
+./zpk_linux_amd64 attach add --path=./xxx --type=frontend`)">复制</span>
           </div>
           <div class="shortcut-desc">参数说明：</div>
           <ul class="shortcut-list">
@@ -58,7 +58,7 @@
           <div class="shortcut-desc">如果需要为子应用添加附件，可以使用 <code>--sub_artifact</code> 参数：</div>
           <div class="shortcut-content">
             <pre>./zpk_linux_amd64 attach add --path=./xxx --type=backend --sub_artifact=sub_app_name</pre>
-            <el-icon :size="12" style="cursor:pointer" @click="onekeyCopy(`./zpk_linux_amd64 attach add --path=./xxx --type=backend --sub_artifact=sub_app_name`)"><DocumentCopy /></el-icon>
+            <span class="copy-action" @click="onekeyCopy(`./zpk_linux_amd64 attach add --path=./xxx --type=backend --sub_artifact=sub_app_name`)">复制</span>
           </div>
           <div class="shortcut-desc">参数说明：</div>
           <ul class="shortcut-list">
@@ -69,13 +69,14 @@
           <div class="shortcut-desc">所有附件添加完成后，执行推送命令：</div>
           <div class="shortcut-content">
             <pre>./zpk_linux_amd64 push</pre>
-            <el-icon :size="12" style="cursor:pointer" @click="onekeyCopy(`./zpk_linux_amd64 push`)"><DocumentCopy /></el-icon>
+            <span class="copy-action" @click="onekeyCopy(`./zpk_linux_amd64 push`)">复制</span>
           </div>
     </div>
 </template>
 
 <script>
 import myAxios from '@/utils/index';
+import { messageSuccess } from '@/utils/ui-feedback';
 export default {
     name: "publish-settings",
     props:{
@@ -110,7 +111,7 @@ export default {
         textarea.select();
         document.execCommand('copy', true);
         document.body.removeChild(textarea);
-        this.$message.success("复制成功");
+        messageSuccess("复制成功");
       },
     }
 }
@@ -130,6 +131,11 @@ export default {
   justify-content: space-between;
   background:#f0f3fa; padding:10px; border-radius:4px;
   gap: 12px;
+}
+.copy-action {
+  color: #3370ff;
+  cursor: pointer;
+  flex-shrink: 0;
 }
 .shortcut-content pre{
   margin:0;

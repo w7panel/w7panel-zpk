@@ -120,7 +120,7 @@ export default{
 .iconbox::-webkit-scrollbar {width:10px;}
 .iconbox::-webkit-scrollbar-track {background: transparent;}
 .iconbox::-webkit-scrollbar-thumb {background: #eee; border-radius: 6px;}
-.iconbox>>>svg{width:24px;height:24px;}
+.iconbox :deep(svg){width:24px;height:24px;}
 
 .icon{border:1px solid #f0f0f0; box-sizing:border-box; width:64px; height:64px;}
 .icon:hover i{color:#2d5fff;}

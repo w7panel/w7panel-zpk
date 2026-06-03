@@ -120,7 +120,7 @@ export default {
     color: #1f2937;
     background: #fff;
     border-radius: 2px;
-    box-shadow: 0 0 0 1px var(--el-input-border-color, var(--el-border-color)) inset;
+    box-shadow: 0 0 0 1px #dcdfe6 inset;
     position: relative;
 }
 
@@ -149,7 +149,7 @@ export default {
 
 .w7-identifie__author {
     width: 66px;
-    border-right: 1px solid var(--el-border-color);
+    border-right: 1px solid #dcdfe6;
 }
 
 .w7-identifie__separator {

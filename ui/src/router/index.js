@@ -22,14 +22,14 @@ const routes = [
         component: () => import("../views/respo-detail.vue"),
     },
     {
-        path: '/zpk-edit',
-        name: 'zpk-edit',
-        component: () => import("../views/respo-edit.vue"),
-    },
-    {
         path: '/zpk-editfront',
         name: 'zpk-editfront',
         component: () => import("../views/respo-editfront.vue"),
+    },
+    {
+        path: '/zpk-edit',
+        name: 'zpk-edit',
+        component: () => import("../views/respo-edit.vue"),
     },
     {
         path: '/zpk-manifest',
@@ -50,6 +50,11 @@ const routes = [
         path: '/zpk-manifest-editor',
         name: 'zpk-manifest-editor',
         component: () => import("../components/manifest-editor.vue"),
+    },
+    {
+        path: '/zpk-description',
+        name: 'zpk-description',
+        component: () => import("../views/description.vue"),
     },
     {
         path: '/zpk-access',

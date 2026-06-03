@@ -2,11 +2,11 @@
     <div class="site-detail-page">
         <div class="content" :class="{ 'p-0': !isWujie }">
             <div class="top-panel">
-                <div style="flex: 0 0 956px;">
-                    <div style="display: flex;">
+                <div class="goods-main-panel">
+                    <div class="goods-main-inner">
                         <div class="goods-info-box">
                             <div class="goods-base">
-                                <img :src="appInfo.icon_url" class="goods-base__logo" alt="">
+                                <img :src="logoSrc" class="goods-base__logo" alt="" @error="onLogoError">
                                 <div class="goods-base__info ">
                                     <div class="goods-base__title">
                                         <span>
@@ -20,7 +20,7 @@
                                     </div>
                                 </div>
                             </div>
-                            <div style="display: flex;align-items: start;padding-left: 16px;margin-top: 20px;">
+                            <div class="goods-label-row">
                                 <span class="detail-text-2">关联标签</span>
                                 <div class="goods-base__label">
                                     <a v-for="label in appInfo.tags" class="label-item" :key="label.id"
@@ -29,9 +29,8 @@
                                     </a>
                                 </div>
                             </div>
-                            <div
-                                style="border-radius: 8px;overflow: visible;background-color: #cfe2fb91;margin-top: 16px">
-                                <div style="display: flex;overflow: hidden;padding: 16px 0 16px 16px;">
+                            <div class="goods-price-panel">
+                                <div class="goods-price-panel__inner">
                                     <div style="flex: 1">
                                         <div style="display: flex;align-items: center;height: 32px">
                                             <span class="detail-text-2" style="margin-right: 32px;">当前价格</span>
@@ -55,45 +54,42 @@
                                         <div class="detail-text-1"
                                             v-text="appInfo.install_total > 9 ? (appInfo.install_total + '人在使用') : '<10人在使用'">
                                         </div>
-                                        <div style="margin-top: 4px">
-                                            <el-icon :size="14" color="#FF7D00" v-for="i in 5" :key="i">
-                                                <StarFilled />
-                                            </el-icon>
+                                        <div class="store-star-list">
+                                            <icon-star-fill v-for="i in 5" :key="i" :size="14" />
                                         </div>
                                     </div>
                                 </div>
                             </div>
-                            <el-form style="margin-top: 20px" class="goods-product" label-width="90px"
-                                label-position="left">
-                                <el-form-item style="margin-bottom: 16px"
-                                    class="color-info el-form-item--support is-label" label="交付方式">
+                            <a-form :model="formModel" style="margin-top: 20px" class="goods-product" label-align="left"
+                                :label-col-props="{ span: 5, flex: '0 0 90px' }"
+                                :wrapper-col-props="{ span: 19, flex: '1' }">
+                                <a-form-item style="margin-bottom: 16px"
+                                    class="color-info form-item--support is-label" label="交付方式">
                                     <div class=" detail-text-1" style="line-height: 26px">
                                         微擎面板
                                     </div>
-                                </el-form-item>
-                                <el-form-item v-if="appInfo.service_packages && appInfo.service_packages.length"
+                                </a-form-item>
+                                <a-form-item v-if="appInfo.service_packages && appInfo.service_packages.length"
                                     class="color-info">
                                     <template #label>
                                         <div style="display: flex;align-items: center;">
-                                            服务周期<el-popover placement="top" trigger="hover">
-                                                <div>服务周期内，应用可免费更新。</div>
-                                                <template #reference>
-                                                    <i class="wi wi-explain color-danger"></i>
-                                                </template>
-                                            </el-popover>
+                                            服务周期
+                                            <a-tooltip content="服务周期内，应用可免费更新。" position="top">
+                                                <i class="wi wi-explain color-danger"></i>
+                                            </a-tooltip>
                                         </div>
                                     </template>
                                     <div>
-                                        <el-radio-group v-model="activeServicePackageId">
+                                        <a-radio-group v-model="activeServicePackageId">
                                             <template v-for="(item, key) in appInfo.service_packages" :key="key">
-                                                <el-radio class="el-radio--w7" :label="item.id" border>
+                                                <a-radio class="arco-radio--w7" :value="item.id">
                                                     <span class="price-tag">￥{{ item.price }}/{{ item.month / 12
-                                                    }}年</span><span v-if="item.is_gift">（赠送）</span></el-radio>
+                                                    }}年</span><span v-if="item.is_gift">（赠送）</span></a-radio>
                                             </template>
-                                        </el-radio-group>
+                                        </a-radio-group>
                                     </div>
-                                </el-form-item>
-                                <el-form-item label="授权信息" class="color-info" v-if="uid > 0 && sites.length > 0">
+                                </a-form-item>
+                                <a-form-item label="授权信息" class="color-info" v-if="uid > 0 && sites.length > 0">
                                     <div class="site-select-box" @click.stop="siteDialogVisible = true">
                                         <div class="text-over"
                                             style="position: relative;user-select: none;line-height: 22px;border: 1px solid #DCDCDC;box-sizing: border-box;padding: 5px 30px 5px 8px;border-radius: 3px;">
@@ -103,83 +99,84 @@
                                             </span>
                                             <span style="font-size: 14px;color: rgba(0, 0, 0, 0.9);">{{
                                                 activeSite.order_sn }}</span>
-                                            <i class="el-icon-arrow-down"
-                                                style="font-weight: bold;position: absolute;right: 8px;top: 8px;color: rgba(0, 0, 0, 0.6);" />
+                                            <icon-down class="site-select-arrow" />
                                         </div>
                                     </div>
-                                    <el-dialog title="授权信息" custom-class="site-dialog" append-to-body
-                                        v-model="siteDialogVisible" width="840px">
-                                        <el-table :data="sites" style="width: 100%">
-                                            <el-table-column prop="order_sn" label="订单编号" width="260">
-                                            </el-table-column>
-                                            <el-table-column prop="created_at" label="购买时间" width="180">
-                                            </el-table-column>
-                                            <el-table-column prop="service_expire_time" label="到期时间" width="180">
-                                                <template #default="scope">
-                                                    {{ scope.row.service_expire_time === '0001-01-01 00:00:00' ? '-' :
-                                                        scope.row.service_expire_time }}
-                                                </template>
-                                            </el-table-column>
-                                            <el-table-column prop="" label="操作" width="180">
-                                                <template #default="scope">
-                                                    <template v-if="appInfo.product_type === 2">
-                                                        <template v-if="appInfo.goods_id > 0">
-                                                            <el-button type="text"
-                                                                v-if="scope.row.canUpgrade && appInfo.is_free_upgrade > 0"
-                                                                @click="handleUpgrade(scope.row)">升级</el-button>
-                                                        </template>
-                                                        <el-tooltip v-if="scope.row.used_time" content="授权已被使用"
-                                                            placement="top">
-                                                            <el-button type="text" disabled>安装</el-button>
-                                                        </el-tooltip>
-                                                        <el-button type="text" v-else
-                                                            @click="order_sn = scope.row.order_sn; confirmInstall()">安装</el-button>
+                                    <a-modal title="授权信息" modal-class="site-dialog" v-model:visible="siteDialogVisible"
+                                        :width="840" :footer="false">
+                                        <a-table :data="sites" :pagination="false" style="width: 100%"
+                                            class="table-header" row-key="order_sn">
+                                            <template #columns>
+                                                <a-table-column data-index="order_sn" title="订单编号" :width="260" />
+                                                <a-table-column data-index="created_at" title="购买时间" :width="180" />
+                                                <a-table-column data-index="service_expire_time" title="到期时间"
+                                                    :width="180">
+                                                    <template #cell="{ record }">
+                                                        {{ record.service_expire_time === '0001-01-01 00:00:00' ? '-' :
+                                                            record.service_expire_time }}
                                                     </template>
-                                                    <template v-else>
-                                                        <template v-if="appInfo.goods_id > 0">
-                                                            <el-button type="text" v-if="scope.row.canUpgrade"
-                                                                @click="handleUpgrade(scope.row)">升级</el-button>
-                                                            <el-button type="text"
-                                                                v-if="appInfo.service_packages && appInfo.service_packages.length > 0"
-                                                                @click="handleRenew(scope.row)">续费</el-button>
+                                                </a-table-column>
+                                                <a-table-column title="操作" :width="180">
+                                                    <template #cell="{ record }">
+                                                        <template v-if="appInfo.product_type === 2">
+                                                            <template v-if="appInfo.goods_id > 0">
+                                                                <a-button type="text"
+                                                                    v-if="record.canUpgrade && appInfo.is_free_upgrade > 0"
+                                                                    @click="handleUpgrade(record)">升级</a-button>
+                                                            </template>
+                                                            <a-tooltip v-if="record.used_time" content="授权已被使用"
+                                                                position="top">
+                                                                <a-button type="text" disabled>安装</a-button>
+                                                            </a-tooltip>
+                                                            <a-button type="text" v-else
+                                                                @click="order_sn = record.order_sn; confirmInstall()">安装</a-button>
                                                         </template>
+                                                        <template v-else>
+                                                            <template v-if="appInfo.goods_id > 0">
+                                                                <a-button type="text" v-if="record.canUpgrade"
+                                                                    @click="handleUpgrade(record)">升级</a-button>
+                                                                <a-button type="text"
+                                                                    v-if="appInfo.service_packages && appInfo.service_packages.length > 0"
+                                                                    @click="handleRenew(record)">续费</a-button>
+                                                            </template>
 
-                                                        <el-tooltip v-if="scope.row.used_time" content="授权已被使用"
-                                                            placement="top">
-                                                            <el-button type="text" disabled>安装</el-button>
-                                                        </el-tooltip>
-                                                        <el-button type="text" v-else
-                                                            @click="order_sn = scope.row.order_sn; confirmInstall()">安装</el-button>
+                                                            <a-tooltip v-if="record.used_time" content="授权已被使用"
+                                                                position="top">
+                                                                <a-button type="text" disabled>安装</a-button>
+                                                            </a-tooltip>
+                                                            <a-button type="text" v-else
+                                                                @click="order_sn = record.order_sn; confirmInstall()">安装</a-button>
+                                                        </template>
                                                     </template>
-                                                </template>
-                                            </el-table-column>
-                                        </el-table>
-                                    </el-dialog>
-                                </el-form-item>
-                                <el-form-item class="is-label el-form-item--action">
+                                                </a-table-column>
+                                            </template>
+                                        </a-table>
+                                    </a-modal>
+                                </a-form-item>
+                                <a-form-item class="is-label form-item--action">
                                     <div class="buy-button-group" style="position: relative;">
-                                        <el-button
+                                        <a-button
                                             v-if="appInfo.goods_id === 0 || (appInfo.goods_audit_status === 4 && appInfo.goods_onshef === 2)"
                                             type="primary" class="buy-button-item" @click="checkOrder">{{
                                                 currentPrice === 0 ? '获取安装' :
-                                                    '购买安装' }}</el-button>
-                                        <el-button v-else disabled type="primary">商品已下架</el-button>
+                                                    '购买安装' }}</a-button>
+                                        <a-button v-else disabled type="primary">商品已下架</a-button>
                                     </div>
-                                </el-form-item>
-                                <el-form-item class="color-info is-label">
-                                    <el-checkbox class="color-info soe-checkbox" v-model="checkBuy">
+                                </a-form-item>
+                                <a-form-item class="color-info is-label">
+                                    <a-checkbox class="color-info soe-checkbox" v-model="checkBuy">
                                         <div style="font-size: 12px">
                                             购买即同意<a href="https://wiki.w7.cc/chapter/887?id=3909"
                                                 target="_blank">《微擎平台使用协议》</a>
                                         </div>
-                                    </el-checkbox>
-                                </el-form-item>
-                            </el-form>
+                                    </a-checkbox>
+                                </a-form-item>
+                            </a-form>
                         </div>
                     </div>
                 </div>
 
-                <div class="user-div" style="background-color: #fff">
+                <div class="user-div">
                     <div class="top-info">
 
                         <div class="div-company-name" style="margin-bottom: 20px;align-items: center;">
@@ -240,7 +237,7 @@
                             </div>
                             <div class="user-rate" v-if="developerInfo.reputation && developerInfo.reputation.stat">
                                 <template v-for="(item, key) in developerInfo.reputation.stat" :key="key">
-                                    <el-tooltip placement="left" effect="light" popper-class="reputation">
+                                    <a-tooltip position="left" mini class="reputation-tooltip">
                                         <template #content>
                                             <div :class="['rate-we7', item.class + '-theme']">
                                                 微擎开发者平均值：{{ item.all }}<span>{{ key !== 'active' ? item.differ : ''
@@ -253,7 +250,7 @@
                                                 {{ item.developer }}
                                             </span>
                                         </a>
-                                    </el-tooltip>
+                                    </a-tooltip>
                                 </template>
                             </div>
                             <div class="user-im" v-if="im && im.url">
@@ -286,65 +283,70 @@
                 </div>
             </div>
         </div>
-        <el-dialog top="5vh" v-model="payDialogVisible" title="支付" width="800px" destroy-on-close>
+        <a-modal v-model:visible="payDialogVisible" title="支付" :width="800" :footer="false" unmount-on-close>
             <iframe
                 :src="`https://ip.w7.cc/pay/${ticket}?header=false&footer=false&paid_callback=https%3A%2F%2Fuser.w7.cc%2Forder`"
                 width="100%" height="650px" frameborder="0"></iframe>
-        </el-dialog>
+        </a-modal>
 
 
-        <el-dialog v-model="renewDialogVisible" title="续费服务" width="520px" destroy-on-close>
+        <a-modal v-model:visible="renewDialogVisible" title="续费服务" :width="520" :footer="false"
+            unmount-on-close>
             <div v-if="renewSite">
-                <el-form label-width="90px" label-position="left">
-                    <el-form-item label="服务周期" v-if="appInfo.service_packages && appInfo.service_packages.length">
-                        <el-radio-group v-model="renewServicePackageId">
+                <a-form :model="formModel" label-align="left" :label-col-props="{ span: 5, flex: '0 0 90px' }"
+                    :wrapper-col-props="{ span: 19, flex: '1' }" class="store-modal-form">
+                    <a-form-item label="服务周期" v-if="appInfo.service_packages && appInfo.service_packages.length">
+                        <a-radio-group v-model="renewServicePackageId">
                             <template v-for="(item, key) in appInfo.service_packages" :key="key">
-                                <el-radio class="el-radio--w7" :label="item.id" border>
+                                <a-radio class="store-radio-card" :value="item.id">
                                     <span class="price-tag">{{ item.month / 12 }}年</span>
-                                </el-radio>
+                                </a-radio>
                             </template>
-                        </el-radio-group>
-                    </el-form-item>
-                    <el-form-item label="续费价格">
+                        </a-radio-group>
+                    </a-form-item>
+                    <a-form-item label="续费价格">
                         <span style="color: #2d5fff;font-size:24px;font-weight:500;">¥{{ renewPrice }}</span>
-                    </el-form-item>
-                </el-form>
+                    </a-form-item>
+                </a-form>
             </div>
-            <template #footer>
-                <el-button @click="renewDialogVisible = false">取消</el-button>
-                <el-button type="primary" @click="submitRenew">确认续费</el-button>
-            </template>
-        </el-dialog>
+            <div class="store-modal-footer">
+                <a-button @click="renewDialogVisible = false">取消</a-button>
+                <a-button type="primary" @click="submitRenew">确认续费</a-button>
+            </div>
+        </a-modal>
 
 
-        <el-dialog v-model="upgradeDialogVisible" title="升级版本" width="520px" destroy-on-close>
+        <a-modal v-model:visible="upgradeDialogVisible" title="升级版本" :width="520" :footer="false"
+            unmount-on-close>
             <div v-if="upgradeSite">
-                <el-form label-width="90px" label-position="left">
-                    <el-form-item label="升级版本">
-                        <el-radio-group v-model="upgradeTargetVersionId">
-                            <el-radio v-for="vp in availableUpgradeVersions" :key="vp.id" class="el-radio--w7"
-                                :label="vp.id" border>{{ vp.version === 9999 ? '其他版本' : 'V' + vp.version }}
-                            </el-radio>
-                        </el-radio-group>
-                    </el-form-item>
-                    <el-form-item label="升级价格">
+                <a-form :model="formModel" label-align="left" :label-col-props="{ span: 5, flex: '0 0 90px' }"
+                    :wrapper-col-props="{ span: 19, flex: '1' }" class="store-modal-form">
+                    <a-form-item label="升级版本">
+                        <a-radio-group v-model="upgradeTargetVersionId">
+                            <a-radio v-for="vp in availableUpgradeVersions" :key="vp.id" class="store-radio-card"
+                                :value="vp.id">{{ vp.version === 9999 ? '其他版本' : 'V' + vp.version }}
+                            </a-radio>
+                        </a-radio-group>
+                    </a-form-item>
+                    <a-form-item label="升级价格">
                         <span style="color: #2d5fff;font-size:24px;font-weight:500;">¥{{ upgradePrice }}</span>
-                    </el-form-item>
-                </el-form>
+                    </a-form-item>
+                </a-form>
             </div>
-            <template #footer>
-                <el-button @click="upgradeDialogVisible = false">取消</el-button>
-                <el-button type="primary" @click="submitUpgrade">确认升级</el-button>
-            </template>
-        </el-dialog>
+            <div class="store-modal-footer">
+                <a-button @click="upgradeDialogVisible = false">取消</a-button>
+                <a-button type="primary" @click="submitUpgrade">确认升级</a-button>
+            </div>
+        </a-modal>
 
-        <el-dialog v-model="installDialogVisible" title="支付成功" width="520px" destroy-on-close>
-            <el-result icon="success" title="支付成功" subTitle="请点击下方按钮去安装">
+        <a-modal v-model:visible="installDialogVisible" title="支付成功" :width="520" :footer="false"
+            unmount-on-close>
+            <a-result status="success" title="支付成功" subtitle="请点击下方按钮去安装">
                 <template #extra>
-                    <el-button type="primary" @click="confirmInstall">去安装</el-button>
+                    <a-button type="primary" @click="confirmInstall">去安装</a-button>
                 </template>
-            </el-result>
-        </el-dialog>
+            </a-result>
+        </a-modal>
     </div>
 </template>
 
@@ -354,11 +356,14 @@ import panelAxios from '@/utils/panel'
 import yaml from 'js-yaml'
 import jsonp from 'jsonp'
 import SiteDescription from '@/components/description.vue'
+import { IconDown, IconStarFill } from '@arco-design/web-vue/es/icon'
+import { messageWarning } from '@/utils/ui-feedback'
 
 export default {
     name: 'SiteDetail',
     data() {
         return {
+            formModel: {},
             installDialogVisible: false,
             order_sn: '',
             loading: false,
@@ -400,12 +405,13 @@ export default {
     },
     created() {
         this.init().then(() => {
-            this.fetchDetail()
-            this.getDescription()
+            this.loadDetail()
         })
     },
     components: {
         SiteDescription,
+        IconDown,
+        IconStarFill,
     },
     computed: {
         name() {
@@ -416,6 +422,9 @@ export default {
             const activeService = this.appInfo.service_packages?.find(item => item.id === this.activeServicePackageId)
             const servicePrice = activeService ? activeService.is_gift ? 0 : activeService.price : 0
             return appPrice + servicePrice
+        },
+        logoSrc() {
+            return this.appInfo.icon_url || '/api/core/logo'
         },
         availableUpgradeVersions() {
             if (!this.upgradeSite || !this.appInfo.version_prices) return []
@@ -433,14 +442,35 @@ export default {
             return vp ? vp.price : 0
         }
     },
+    watch: {
+        name(newName, oldName) {
+            if (newName === oldName) {
+                return
+            }
+            this.init().then(() => {
+                this.loadDetail()
+            })
+        }
+    },
     methods: {
+        loadDetail() {
+            this.appInfo = {}
+            this.description = {}
+            this.sites = []
+            this.activeSite = {}
+            this.activeServicePackageId = null
+            this.developerInfo = {}
+            this.developerId = null
+            this.fetchDetail()
+            this.getDescription()
+        },
         init() {
             return new Promise(async (res) => {
                 this.isWujie = !!window.$wujie
                 this.fromHost = this.$route.query.fromHost || ''
                 this.path = this.$route.query.path || ''
                 const token = this.$route.query.token || ''
-                if (token !== 'undefined') {
+                if (token !== 'undefined' && token) {
                     this.token = token
                     window.localStorage.setItem('X-W7Panel-Token', token || '')
                 }
@@ -484,7 +514,7 @@ export default {
         },
         submitRenew() {
             if (!this.renewServicePackageId) {
-                ElMessage.warning('请选择服务周期')
+                messageWarning('请选择服务周期')
                 return
             }
             this.renewDialogVisible = false
@@ -495,7 +525,7 @@ export default {
         },
         submitUpgrade() {
             if (!this.upgradeTargetVersionId) {
-                ElMessage.warning('请选择升级版本')
+                messageWarning('请选择升级版本')
                 return
             }
             this.upgradeDialogVisible = false
@@ -564,7 +594,7 @@ export default {
         },
         checkOrder() {
             if (!this.checkBuy) {
-                ElMessage.warning('请先同意《微擎平台使用协议》')
+                messageWarning('请先同意《微擎平台使用协议》')
                 return
             }
             if (this.currentPrice === 0) {
@@ -691,6 +721,10 @@ export default {
         onLogoError(event) {
             const target = event && event.target
             if (target) {
+                if (target.dataset.logoFallback === '1') {
+                    return
+                }
+                target.dataset.logoFallback = '1'
                 target.src = '/api/core/logo'
             }
         },
@@ -763,22 +797,39 @@ $--border-color-base: #e8e9eb;
 .goods-info-box {
     flex: 1;
     width: 0;
-    padding: 20px 15px;
+    padding: 20px 15px 24px;
     background-color: #ffffff;
     box-sizing: border-box;
     z-index: 10;
     font-size: 0;
 }
 
+.goods-main-panel {
+    flex: 0 0 956px;
+    display: flex;
+    min-width: 0;
+}
+
+.goods-main-inner {
+    display: flex;
+    width: 100%;
+    min-width: 0;
+}
+
 .goods-base {
     display: flex;
     font-size: 14px;
     position: relative;
+    padding-left: 16px;
 
     &__logo {
         width: 80px;
         height: 80px;
         border-radius: 8px;
+        border: 1px solid #edf0f5;
+        background: #f2f3f5;
+        object-fit: cover;
+        display: block;
         margin-right: 24px;
     }
 
@@ -826,7 +877,6 @@ $--border-color-base: #e8e9eb;
 
     &__label {
         flex: 1;
-        margin-left: 22px;
         font-size: 12px;
         color: rgba(0, 0, 0, 0.6);
         display: flex;
@@ -868,6 +918,33 @@ $--border-color-base: #e8e9eb;
     }
 }
 
+.goods-label-row {
+    display: flex;
+    align-items: flex-start;
+    padding-left: 16px;
+    margin-top: 20px;
+
+    >.detail-text-2 {
+        flex: 0 0 90px;
+        line-height: 22px;
+    }
+}
+
+.goods-price-panel {
+    margin-top: 16px;
+    border-radius: 8px;
+    overflow: hidden;
+    background-color: rgba(207, 226, 251, 0.57);
+}
+
+.goods-price-panel__inner {
+    display: flex;
+    min-height: 72px;
+    overflow: hidden;
+    padding: 16px 0 16px 16px;
+    box-sizing: border-box;
+}
+
 .goods-other {
     display: flex;
     font-size: 14px;
@@ -897,7 +974,7 @@ $--border-color-base: #e8e9eb;
 .goods-prices {
     padding: 0 10px 0px 15px;
 
-    .el-form-item {
+    :deep(.arco-form-item) {
         margin-bottom: 20px;
 
         &:last-child {
@@ -905,47 +982,45 @@ $--border-color-base: #e8e9eb;
         }
 
         &.is-label {
-            .el-form-item__label {
+            .arco-form-item-label {
                 line-height: 1;
             }
 
-            .el-form-item__content {
+            .arco-form-item-content {
                 line-height: 1;
             }
         }
-
-        &__label {
-            color: rgba(0, 0, 0, 0.6);
-            ;
-            line-height: 38px;
-        }
-
-        &__content {
-            line-height: 38px;
-        }
     }
 
-    .el-checkbox {
-        &__label {
-            color: $--color-info;
-        }
+    :deep(.arco-form-item-label) {
+        color: rgba(0, 0, 0, 0.6);
+        line-height: 38px;
     }
 
-    .el-radio-group,
-    .el-checkbox-group {
+    :deep(.arco-form-item-content) {
+        line-height: 38px;
+    }
+
+    :deep(.arco-checkbox-label) {
+        color: $--color-info;
+    }
+
+    :deep(.arco-radio-group),
+    :deep(.arco-checkbox-group) {
         display: flex;
         flex-wrap: wrap;
         margin-right: -12px;
         margin-bottom: -12px;
 
-        .el-radio,
-        .el-checkbox {
+        .arco-radio,
+        .arco-checkbox {
             margin-left: 0;
             margin-right: 12px;
             margin-top: 3px;
             margin-bottom: 9px;
             height: 32px;
             box-sizing: border-box;
+            border: 1px solid #DCDCDC;
             border-radius: 2px !important;
             padding-left: 16px;
             padding-right: 16px;
@@ -980,13 +1055,15 @@ $--border-color-base: #e8e9eb;
                 border-bottom-left-radius: 6px;
             }
 
-            &__label {
+            .arco-radio-label,
+            .arco-checkbox-label {
                 line-height: 32px;
                 padding-left: 1px;
                 padding-right: 1px;
             }
 
-            &.is-checked {
+            &.arco-radio-checked,
+            &.arco-checkbox-checked {
                 position: relative;
                 border-color: #2d5fff;
                 border-width: 1px;
@@ -1015,9 +1092,9 @@ $--border-color-base: #e8e9eb;
                     display: none;
                 }
 
-                .el-radio__label,
-                .el-checkbox__label {
-                    color: #F53F3F;
+                .arco-radio-label,
+                .arco-checkbox-label {
+                    color: #2d5fff;
                     padding-left: 0;
                     padding-right: 0;
                 }
@@ -1039,8 +1116,8 @@ $--border-color-base: #e8e9eb;
 .goods-prices {
     padding: 20px 15px;
 
-    .el-form-item--price {
-        .el-form-item__label {
+    .arco-form-item--price {
+        :deep(.arco-form-item-label) {
             line-height: 24px !important;
         }
     }
@@ -1076,7 +1153,7 @@ $--border-color-base: #e8e9eb;
 }
 
 .goods-comment-score {
-    border-left: 1px solid #FDCDC5;
+    border-left: 1px solid rgba(45, 95, 255, 0.16);
     flex: 0 0 154px;
     display: flex;
     align-items: center;
@@ -1084,18 +1161,37 @@ $--border-color-base: #e8e9eb;
     flex-direction: column;
 }
 
+.store-star-list {
+    margin-top: 4px;
+    color: #FF7D00;
+    display: flex;
+    gap: 2px;
+}
+
+.site-select-arrow {
+    position: absolute;
+    right: 8px;
+    top: 8px;
+    color: rgba(0, 0, 0, 0.6);
+    font-weight: bold;
+}
+
 .top-panel {
     display: flex;
     gap: 20px;
+    align-items: stretch;
 }
 
 .site-detail-page {
     min-height: 100vh;
+    padding: 20px 0 40px;
     background-color: #f2f3f5;
 
     .content {
         width: 1200px;
         margin: 0 auto;
+        padding: 0;
+        box-sizing: border-box;
 
         &.p-0 {
             padding: 0;
@@ -1107,10 +1203,13 @@ $--border-color-base: #e8e9eb;
     width: 224px;
     flex: 0 0 224px;
     position: relative;
+    background-color: #fff;
+    min-height: 402px;
 
     .top-info {
         padding: 20px 25px;
         font-size: 14px;
+        box-sizing: border-box;
 
         .title {
             font-size: 16px;
@@ -1427,24 +1526,91 @@ $--border-color-base: #e8e9eb;
     .description-box {
         flex: 0 0 956px;
         overflow: hidden;
+        background: #fff;
+
+        :deep(.description) {
+            padding: 20px;
+            background: #fff;
+        }
+
+        :deep(.tabs) {
+            margin-bottom: 20px;
+        }
+
+        :deep(.tabs span) {
+            margin: 0 24px 0 0;
+        }
+
+        :deep(.description__layout) {
+            gap: 0;
+        }
+
+        :deep(.description__sidebar) {
+            position: static;
+            flex: 0 0 120px;
+            width: 120px;
+            padding: 0;
+            border-right: 0;
+            border-radius: 0;
+        }
+
+        :deep(.description__nav-item) {
+            align-items: flex-start;
+            padding: 12px 16px;
+        }
+
+        :deep(.description__nav-item.is-active) {
+            padding-left: 16px;
+            border-left: 0;
+            background: #f2f7ff;
+        }
+
+        :deep(.description__main) {
+            border-radius: 0;
+            padding-left: 20px;
+        }
+
+        :deep(.description__viewer) {
+            min-height: 240px;
+        }
+
+        :deep(.arco-empty) {
+            padding: 48px 0;
+        }
     }
 }
 
-.site-dialog {
-    .el-dialog {
-        &__header {
-            padding: 20px;
-            line-height: 1;
-        }
+.store-modal-form :deep(.arco-form-item-label) {
+    white-space: nowrap;
+}
 
-        &__title {
-            font-size: 14px;
-            line-height: 1;
-        }
+.store-modal-form :deep(.arco-form-item-wrapper-col) {
+    min-width: 0;
+}
 
-        &__body {
-            padding: 0;
-        }
-    }
+.store-radio-card {
+    margin-right: 12px;
+}
+
+.store-modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 20px;
+}
+</style>
+<style>
+.site-dialog .arco-modal-header {
+    padding: 20px;
+    line-height: 1;
+}
+
+.site-dialog .arco-modal-title {
+    font-size: 14px;
+    line-height: 1;
+}
+
+.site-dialog .arco-modal-body {
+    padding: 0;
 }
 </style>

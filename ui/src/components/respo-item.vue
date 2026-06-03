@@ -50,6 +50,8 @@
 </template>
 
 <script>
+import { getPanelToken } from '@/utils/panel-token';
+
 export default {
     props: ['data', 'webUrl'],
     data() {
@@ -67,17 +69,18 @@ export default {
         },
         goDetail() {
             let path = this.webUrl + '/respo/info/' + this.data.identifie;
+            const panelToken = getPanelToken();
             if (!this.data.goods_id) {
                 if (window.$wujie) {
-                    window.open(`/app/store-install?path=${encodeURIComponent(path)}&thirdpartyCDToken=${window.$wujie?.props?.paneltoken}`)
+                    window.open(`/app/store-install?path=${encodeURIComponent(path)}&thirdpartyCDToken=${encodeURIComponent(panelToken)}`)
                 } else {
-                    this.$emit('goInstall', item);
+                    this.$emit('goInstall', this.data.identifie);
                 }
             } else {
                 if (window.$wujie) {
-                    this.$router.push(`/site-detail/${this.data.identifie}?token=${window?.$wujie?.props?.paneltoken}&path=${encodeURIComponent(path)}&fromHost=${location.origin}`)
+                    this.$router.push(`/site-detail/${this.data.identifie}?token=${encodeURIComponent(panelToken)}&path=${encodeURIComponent(path)}&fromHost=${location.origin}`)
                 } else {
-                    window.open(`#/site-detail/${this.data.identifie}?token=${window?.$wujie?.props?.paneltoken}&path=${encodeURIComponent(path)}&fromHost=${location.origin}`)
+                    window.open(`#/site-detail/${this.data.identifie}?token=${encodeURIComponent(panelToken)}&path=${encodeURIComponent(path)}&fromHost=${location.origin}`)
                 }
             }
         }

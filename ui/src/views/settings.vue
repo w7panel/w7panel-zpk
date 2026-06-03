@@ -1,13 +1,13 @@
 <template>
     <div class="pd-20">
-        <el-tabs v-model="activeTab" class="demo-tabs">
-            <el-tab-pane label="数据库设置" name="database">
+        <a-tabs v-model:active-key="activeTab" class="demo-tabs">
+            <a-tab-pane key="database" title="数据库设置">
                 <database-page></database-page>
-            </el-tab-pane>
-            <el-tab-pane label="存储设置" name="storage">
+            </a-tab-pane>
+            <a-tab-pane key="storage" title="存储设置">
                 <s3-page></s3-page>
-            </el-tab-pane>
-        </el-tabs>
+            </a-tab-pane>
+        </a-tabs>
     </div>
 </template>
 

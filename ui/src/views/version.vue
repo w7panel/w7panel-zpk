@@ -1,62 +1,58 @@
 <template>
-    <div v-loading="publishGoods.loading" class="content" style="min-height:100vh;box-sizing:border-box;">
+    <a-spin :loading="publishGoods.loading" class="content version-page-spin"
+        style="min-height:100vh;box-sizing:border-box;">
         <div>
-            <el-breadcrumb separator="/">
-                <el-breadcrumb-item :to="{ path: '/zpk' }" style="height:30px;">
-                    <template #default><span class="c-99 fw-400">{{ title || '制品库' }}</span></template>
-                </el-breadcrumb-item>
-                <el-breadcrumb-item style="height:30px;">
-                    <template #default><span>版本管理</span></template>
-                </el-breadcrumb-item>
-            </el-breadcrumb>
+            <a-breadcrumb>
+                <a-breadcrumb-item>
+                    <router-link to="/zpk" class="c-99 fw-400">{{ title || '制品库' }}</router-link>
+                </a-breadcrumb-item>
+                <a-breadcrumb-item>版本管理</a-breadcrumb-item>
+            </a-breadcrumb>
         </div>
-        <el-tabs v-model="activeTab" class="mt-10" @tab-click="handleTabClick">
-            <el-tab-pane label="版本管理" name="version">
+        <a-tabs v-model:active-key="activeTab" class="mt-10" @change="handleTabClick">
+            <a-tab-pane key="version" title="版本管理">
                 <div>
                     <div>
-                        <el-button type="primary"
+                        <a-button type="primary"
                             @click="form = { show: true, edit: false, version: '', description: '' }">+
-                            新建版本</el-button>
+                            新建版本</a-button>
                     </div>
-                    <div v-if="list.length" class="mt-20 df">
-                        <div class="white-box" style="flex:18;">
+                    <div v-if="list.length" class="mt-20 df version-summary">
+                        <div class="white-box version-current-card">
                             <div class="c-16 b">当前线上版本</div>
-                            <div class="df mt-20">
-                                <div style="width:400px;">
+                            <div class="version-current-content">
+                                <div class="version-current-primary">
                                     <div class="c-66">版本号</div>
                                     <div class="mt-20">
                                         <span class="lh-1 fs-20 b">{{ version.name }}</span>
                                     </div>
                                 </div>
-                                <div>
-                                    <div>
-                                        <span class="c-66">发布状态</span>
-                                        <span class="ml-20">已发布</span>
+                                <div class="version-current-fields">
+                                    <div class="version-detail-row">
+                                        <span class="c-66 version-detail-label">发布状态</span>
+                                        <span class="version-detail-value">已发布</span>
 
-                                        <el-tooltip v-if="goods_id" effect="dark" content="应用已发布至微擎云市场"
-                                            placement="top-start">
+                                        <a-tooltip v-if="goods_id" content="应用已发布至微擎云市场" position="top">
                                             <a class="ml-10 cursor c-blue" target="_blank"
                                                 :href="'https://dev.w7.cc/publishgoods/' + goods_id">
-                                                <el-icon class="va-middle">
-                                                    <MostlyCloudy />
-                                                </el-icon>
+                                                <span class="va-middle cloud-icon">云</span>
                                                 <span class="ml-4">微擎云市场</span>
                                             </a>
-                                        </el-tooltip>
+                                        </a-tooltip>
                                     </div>
-                                    <div class="mt-20">
-                                        <span class="c-66">交付方式</span>
-                                        <span v-if="noPlatform" class="ml-20">在线使用（无服务器）</span>
-                                        <span v-else class="ml-20">安装部署（有服务器）</span>
+                                    <div class="version-detail-row">
+                                        <span class="c-66 version-detail-label">交付方式</span>
+                                        <span v-if="noPlatform" class="version-detail-value">在线使用（无服务器）</span>
+                                        <span v-else class="version-detail-value">安装部署（有服务器）</span>
                                     </div>
-                                    <div class="mt-20">
-                                        <span class="c-66">创建时间</span>
-                                        <span class="ml-20">{{ version.created_at }}</span>
+                                    <div class="version-detail-row">
+                                        <span class="c-66 version-detail-label">创建时间</span>
+                                        <span class="version-detail-value">{{ version.created_at }}</span>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                        <div class="white-box ml-20" style="flex:12;">
+                        <div class="white-box version-base-card">
                             <div class="c-16 b">基础信息</div>
                             <div class="mt-20">
                                 <version-info :identifie="identifie" :info="info"
@@ -67,17 +63,17 @@
                     <div class="mt-20 gray-box">
                         <div class="c-16 b">开发版本</div>
                         <div class="mt-10">
-                            <div v-for="(item, index) in list" :key="index" class="item df">
-                                <div style="width:400px;">
+                            <div v-for="(item, index) in list" :key="index" class="item version-dev-item">
+                                <div class="version-dev-main">
                                     <div class="c-66">版本号</div>
                                     <div class="mt-20" style="display: flex; align-items: center;height: 24px;">
                                         <span class="lh-1 fs-20 b">{{ item.name }}</span>
 
-                                        <el-tooltip
+                                        <a-tooltip
                                             v-if="item.id == version.id && goods_id && audit_status && audit_status < 4"
-                                            effect="dark" content="应用已发布至微擎云市场，等待管理员审核" placement="top-start">
+                                            content="应用已发布至微擎云市场，等待管理员审核" position="top">
                                             <span class="ml-10 cursor" style="color:#E6A23C;">待审核</span>
-                                        </el-tooltip>
+                                        </a-tooltip>
 
                                         <span v-if="item.id == version.id" class="c-blue"
                                             style="border: 1px solid #0052d9;margin-left: 12px;padding: 1px;">线上版本</span>
@@ -89,17 +85,13 @@
                                             style="border:1px solid;padding:1px 3px;">点击发布</span>
 
                                         <template v-if="item.publish_status == 3">
-                                            <el-tooltip effect="dark" :content="item.publish_fail_reason"
-                                                placement="top">
-                                                <el-icon class="va-middle" color="#D00805" :size="16"
-                                                    style="margin-left:4px;">
-                                                    <Warning />
-                                                </el-icon>
-                                            </el-tooltip>
+                                            <a-tooltip :content="item.publish_fail_reason" position="top">
+                                                <span class="warning-icon va-middle" style="margin-left:4px;">!</span>
+                                            </a-tooltip>
                                         </template>
                                     </div>
                                 </div>
-                                <div class="fc">
+                                <div class="version-dev-meta">
                                     <div class="mt-20">
                                         <span class="c-66">创建时间</span>
                                         <span class="ml-20">{{ item.created_at }}</span>
@@ -107,126 +99,128 @@
                                 </div>
 
 
-                                <el-button @click="edit(item)">后端包管理</el-button>
-                                <el-button @click="editfront(item)">前端包管理</el-button>
-                                <el-button @click="editVersion(item)">版本说明</el-button>
+                                <div class="version-dev-actions">
+                                    <a-button @click="edit(item)">后端包管理</a-button>
+                                    <a-button @click="editfront(item)">前端包管理</a-button>
+                                    <a-button @click="editVersion(item)">版本说明</a-button>
+                                </div>
 
 
                             </div>
                         </div>
-                        <div class="mt-20 df jc-c">
-                            <el-pagination v-model:current-page="currentPage" :page-size="10" :total="total"
-                                layout="prev, pager, next" background @current-change="getList" />
+                        <div v-if="total > 10" class="mt-20 df jc-c">
+                            <a-pagination v-model:current="currentPage" :page-size="10" :total="total"
+                                @change="getList" />
                         </div>
                     </div>
                 </div>
-            </el-tab-pane>
-            <el-tab-pane label="付费设置" name="paidset">
+            </a-tab-pane>
+            <a-tab-pane key="paidset" title="付费设置">
                 <div>
-                    <el-form :model="instFee" ref="instFee" label-width="80px" :rules="rules">
-                        <el-form-item label="">
+                    <a-form :model="instFee" ref="instFee" :rules="rules" label-align="left"
+                        :label-col-props="{ span: 4, flex: '0 0 80px' }" :wrapper-col-props="{ span: 20, flex: '1' }">
+                        <a-form-item label="">
                             <div class="df df-c" style="flex:1;">
-                                <el-radio-group v-model="instFee.product_type">
-                                    <el-radio label="1">按授权付费</el-radio>
-                                    <el-radio label="2">按安装付费</el-radio>
-                                </el-radio-group>
+                                <a-radio-group v-model="instFee.product_type">
+                                    <a-radio value="1">按授权付费</a-radio>
+                                    <a-radio value="2">按安装付费</a-radio>
+                                </a-radio-group>
                                 <span v-if="instFee.product_type == '1'" class="c-99">仅针对项目拥有所有权的商家，可按项目授权出售</span>
                                 <span v-if="instFee.product_type == '2'"
                                     class="c-99">对该项目熟悉并打包成可用安装包的技术人员，可按安装付费出售</span>
                             </div>
-                        </el-form-item>
+                        </a-form-item>
 
-                        <el-form-item label="售价" prop="service_fee">
-                            <el-input v-model="instFee.service_fee" type="number" placeholder="请输入服务费">
+                        <a-form-item label="售价" field="service_fee">
+                            <a-input v-model="instFee.service_fee" type="number" placeholder="请输入服务费">
                                 <template #append>元</template>
-                            </el-input>
-                        </el-form-item>
+                            </a-input>
+                        </a-form-item>
 
-                        <el-form-item v-if="instFee.product_type == '1'" label="升级服务">
-
-                            <table class="table mt-10">
-                                <thead>
-                                    <tr>
-                                        <td>版本号</td>
-                                        <td>价格</td>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr v-for="(item, index) in instFee.version_prices" :key="index">
-                                        <td>{{ item.version === 9999 ? '其他版本' : item.version ? (item.version +
-                                            '.*.*')
-                                            : '' }}</td>
-                                        <td>￥{{ item.price }}</td>
-                                    </tr>
-                                    <tr v-if="!instFee.version_prices.length">
-                                        <td colspan="3" class="c-99 txt-c">暂无数据</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                            <el-button style="width:100%;margin-top:8px;" type="primary"
-                                @click="openVersionPrices(instFee.version_prices)">设置升级服务</el-button>
-                        </el-form-item>
-                        <el-form-item v-if="instFee.product_type == '2'" label="付费升级">
+                        <a-form-item v-if="instFee.product_type == '1'" label="升级服务">
+                            <div class="version-setting-block">
+                                <table class="table mt-10">
+                                    <thead>
+                                        <tr>
+                                            <td>版本号</td>
+                                            <td>价格</td>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr v-for="(item, index) in instFee.version_prices" :key="index">
+                                            <td>{{ item.version === 9999 ? '其他版本' : item.version ? (item.version +
+                                                '.*.*')
+                                                : '' }}</td>
+                                            <td>￥{{ item.price }}</td>
+                                        </tr>
+                                        <tr v-if="!instFee.version_prices.length">
+                                            <td colspan="3" class="c-99 txt-c">暂无数据</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                                <a-button style="width:100%;margin-top:8px;" type="primary"
+                                    @click="openVersionPrices(instFee.version_prices)">设置升级服务</a-button>
+                            </div>
+                        </a-form-item>
+                        <a-form-item v-if="instFee.product_type == '2'" label="付费升级">
                             <div>
-                                <el-switch v-model="instFee.is_free_upgrade"></el-switch>
+                                <a-switch v-model="instFee.is_free_upgrade" />
                                 <span class="c-99" style="margin-left:10px;">用户想升级到指定版本，需要付费。</span>
                             </div>
-                        </el-form-item>
+                        </a-form-item>
 
-                        <el-form-item v-if="instFee.product_type == '1'" label="服务周期">
-                            <div class="mt-6" style="line-height:18px;">
-                                <el-icon class="c-red" style="display:inline-block; vertical-align:middle;">
-                                    <Warning />
-                                </el-icon>
-                                <span class="c-99"
-                                    style="margin-left:4px; vertical-align:middle;">到期后无法维护更新,需要再次购买服务周期套餐才可以维护更新</span>
+                        <a-form-item v-if="instFee.product_type == '1'" label="服务周期">
+                            <div class="version-setting-block">
+                                <div class="mt-6" style="line-height:18px;">
+                                    <span class="warning-icon" style="display:inline-block; vertical-align:middle;">!</span>
+                                    <span class="c-99"
+                                        style="margin-left:4px; vertical-align:middle;">到期后无法维护更新,需要再次购买服务周期套餐才可以维护更新</span>
+                                </div>
+                                <table class="table mt-10">
+                                    <thead>
+                                        <tr>
+                                            <td>价格</td>
+                                            <td>时间</td>
+                                            <td>生效</td>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr v-for="(item, index) in instFee.service_packages" :key="index">
+                                            <td>￥{{ item.price }}</td>
+                                            <td>{{ item.month / 12 }}年</td>
+                                            <td>{{ item.enabled == 2 ? '是' : '否' }}</td>
+                                        </tr>
+                                        <tr v-if="!instFee.service_packages.length">
+                                            <td colspan="3" class="c-99 txt-c">暂无数据</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                                <a-button style="width:100%;margin-top:8px;" type="primary"
+                                    @click="openServicePackages(instFee.service_packages)">设置服务周期</a-button>
                             </div>
-                            <table class="table mt-10">
-                                <thead>
-                                    <tr>
-                                        <td>价格</td>
-                                        <td>时间</td>
-                                        <td>生效</td>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr v-for="(item, index) in instFee.service_packages" :key="index">
-                                        <td>￥{{ item.price }}</td>
-                                        <td>{{ item.month / 12 }}年</td>
-                                        <td>{{ item.enabled == 2 ? '是' : '否' }}</td>
-                                    </tr>
-                                    <tr v-if="!instFee.service_packages.length">
-                                        <td colspan="3" class="c-99 txt-c">暂无数据</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                            <el-button style="width:100%;margin-top:8px;" type="primary"
-                                @click="openServicePackages(instFee.service_packages)">设置服务周期</el-button>
-                        </el-form-item>
+                        </a-form-item>
 
-                        <el-form-item label="">
+                        <a-form-item label="">
                             <div>
-                                <el-button @click="instFee.show = false;">取消</el-button>
-                                <el-button type="primary" @click="submitInstFee">确定</el-button>
+                                <a-button @click="instFee.show = false;">取消</a-button>
+                                <a-button type="primary" @click="submitInstFee">确定</a-button>
                             </div>
-                        </el-form-item>
-                    </el-form>
+                        </a-form-item>
+                    </a-form>
                 </div>
 
-            </el-tab-pane>
-            <el-tab-pane label="应用介绍" name="appinfo">
+            </a-tab-pane>
+            <a-tab-pane key="appinfo" title="应用介绍">
                 <description v-if="activeTab == 'appinfo'" :identifie="identifie"></description>
-            </el-tab-pane>
-            <el-tab-pane label="发布设置" name="publish">
+            </a-tab-pane>
+            <a-tab-pane key="publish" title="发布设置">
                 <publish-settings v-if="activeTab == 'publish'" :identifie="identifie" :userInfo="userInfo"></publish-settings>
-            </el-tab-pane>
-        </el-tabs>
-    </div>
-    <el-dialog v-model="form.show" modal-class="createversiondialog" width="640px" title="新建版本">
-        <template #header>
-            <div class="fs-16 b">{{ form.edit ? '编辑版本' : '新建版本' }}</div>
-        </template>
-        <el-alert type="warning" class="primary-el-warning" :closable="false" style="line-height:1.5;">
+            </a-tab-pane>
+        </a-tabs>
+    </a-spin>
+    <a-modal v-model:visible="form.show" :width="640" :title="form.edit ? '编辑版本' : '新建版本'" :footer="false"
+        modal-class="createversiondialog">
+        <a-alert type="warning" class="primary-arco-warning" :closable="false" style="line-height:1.5;">
             <div class="b">版本分类标准</div>
             <div>1，格式：主版本号 . 次版本号 . 修订号</div>
             <div>2，小版本：仅修订号变更（例：1.0.0、1.0.2、1.0.10）</div>
@@ -234,27 +228,26 @@
             <div class="b mt-6">升级规则</div>
             <div>1，小版本：支持直接跨版升级（例：1.0.0 → 1.0.10 可直接完成）</div>
             <div>2，跨大版本：需逐次升级路径中所有大版本，不可跳过（例：1.0.0 → 1.1.2 → 1.10.2 → 2.0.0，不可跳过中间大版本直接升级）</div>
-        </el-alert>
+        </a-alert>
         <div style="margin-top:20px; padding-left:20px;">
-            <el-form :model="form" ref="newversionform" label-width="130px" :rules="rules" label-position="left">
-                <el-form-item prop="version" label="输入版本号">
-                    <el-input :disabled="form.edit" v-model="form.version" placeholder="请输入版本号"
-                        style="width:400px;"></el-input>
-                </el-form-item>
-                <el-form-item prop="description" label="版本说明">
-                    <el-input v-model="form.description" placeholder="请输入版本说明" type="textarea" :rows="3"
-                        style="width:400px;"></el-input>
-                </el-form-item>
-            </el-form>
+            <a-form :model="form" ref="newversionform" :rules="rules" label-align="left"
+                :label-col-props="{ span: 5, flex: '0 0 130px' }" :wrapper-col-props="{ span: 19, flex: '1' }">
+                <a-form-item field="version" label="输入版本号">
+                    <a-input :disabled="form.edit" v-model="form.version" placeholder="请输入版本号" style="width:400px;" />
+                </a-form-item>
+                <a-form-item field="description" label="版本说明">
+                    <a-textarea v-model="form.description" placeholder="请输入版本说明" :rows="3" style="width:400px;" />
+                </a-form-item>
+            </a-form>
         </div>
-        <template #footer>
-            <el-button @click="form.show = false;">取消</el-button>
-            <el-button type="primary" @click="addVersion">确定</el-button>
-        </template>
-    </el-dialog>
+        <div class="dialog-footer">
+            <a-button @click="form.show = false;">取消</a-button>
+            <a-button type="primary" @click="addVersion">确定</a-button>
+        </div>
+    </a-modal>
 
 
-    <el-dialog v-model="versionPrices.show" width="840px" title="设置升级服务">
+    <a-modal v-model:visible="versionPrices.show" :width="840" title="设置升级服务" :footer="false">
         <table class="table">
             <thead>
                 <tr>
@@ -266,15 +259,15 @@
             <tbody>
                 <tr v-for="(item, index) in versionPrices.list" :key="index">
                     <td>
-                        <el-select v-model="item.version" placeholder="请选择">
-                            <el-option v-for="vl in instFee.can_upgrade_versions" :key="vl" :value="vl"
-                                :label="vl === 9999 ? '其他版本' : (vl + '.*.*')"></el-option>
-                        </el-select>
+                        <a-select v-model="item.version" placeholder="请选择">
+                            <a-option v-for="vl in instFee.can_upgrade_versions" :key="vl" :value="vl"
+                                :label="vl === 9999 ? '其他版本' : (vl + '.*.*')"></a-option>
+                        </a-select>
                     </td>
                     <td style="width:300px;">
-                        <el-input v-model="item.price" type="number" placeholder="请输入">
+                        <a-input v-model="item.price" type="number" placeholder="请输入">
                             <template #append>元</template>
-                        </el-input>
+                        </a-input>
                     </td>
                     <td>
                         <span class="c-blue cursor" @click="versionPrices.list.splice(index, 1)">删除</span>
@@ -288,49 +281,51 @@
                 </tr>
             </tbody>
         </table>
-        <template #footer>
-            <el-button @click="versionPrices.show = false;">取消</el-button>
-            <el-button type="primary" @click="submitVersionPrices">确定</el-button>
-        </template>
-    </el-dialog>
+        <div class="dialog-footer">
+            <a-button @click="versionPrices.show = false;">取消</a-button>
+            <a-button type="primary" @click="submitVersionPrices">确定</a-button>
+        </div>
+    </a-modal>
 
 
-    <el-dialog v-model="service_packages.show" width="840px" title="设置服务周期">
+    <a-modal v-model:visible="service_packages.show" :width="840" title="设置服务周期" :footer="false">
 
         <div class="df service_packages mt-20">
-            <el-form v-for="(item, index) in service_packages.list" label-width="60px" class="fc" :key="index">
-                <el-form-item label="" style="margin-bottom:10px;"><span class="fs-16">套餐{{ index + 1
-                        }}</span></el-form-item>
-                <el-form-item label="价格" style="margin-bottom:10px;">
-                    <el-input v-model="item.price" type="number" placeholder="请输入" />
-                </el-form-item>
-                <el-form-item label="时长" style="margin-bottom:10px;">
+            <a-form v-for="(item, index) in service_packages.list" :model="item" label-align="left"
+                :label-col-props="{ span: 6, flex: '0 0 60px' }" :wrapper-col-props="{ span: 18, flex: '1' }"
+                class="fc" :key="index">
+                <a-form-item label="" style="margin-bottom:10px;"><span class="fs-16">套餐{{ index + 1
+                        }}</span></a-form-item>
+                <a-form-item label="价格" style="margin-bottom:10px;">
+                    <a-input v-model="item.price" type="number" placeholder="请输入" />
+                </a-form-item>
+                <a-form-item label="时长" style="margin-bottom:10px;">
 
-                    <el-select v-model="item.month" placeholder="请选择">
-                        <el-option label="1年" :value="12"></el-option>
-                        <el-option label="2年" :value="24"></el-option>
-                        <el-option label="3年" :value="36"></el-option>
-                        <el-option label="4年" :value="48"></el-option>
-                        <el-option label="5年" :value="60"></el-option>
-                    </el-select>
-                </el-form-item>
-                <el-form-item label="" style="margin-bottom:0;">
-                    <el-tooltip content="勾选后选择当前套餐赠送，自动取消别套餐。">
-                        <el-checkbox v-model="item.is_gift"
-                            @change="() => service_packages.list.map((i, id) => { (id != index) ? (i.is_gift = false) : null })">赠送</el-checkbox>
-                    </el-tooltip>
-                    <el-checkbox v-model="item.enabled">生效</el-checkbox>
-                </el-form-item>
-            </el-form>
+                    <a-select v-model="item.month" placeholder="请选择">
+                        <a-option label="1年" :value="12"></a-option>
+                        <a-option label="2年" :value="24"></a-option>
+                        <a-option label="3年" :value="36"></a-option>
+                        <a-option label="4年" :value="48"></a-option>
+                        <a-option label="5年" :value="60"></a-option>
+                    </a-select>
+                </a-form-item>
+                <a-form-item label="" style="margin-bottom:0;">
+                    <a-tooltip content="勾选后选择当前套餐赠送，自动取消别套餐。">
+                        <a-checkbox v-model="item.is_gift"
+                            @change="() => service_packages.list.map((i, id) => { (id != index) ? (i.is_gift = false) : null })">赠送</a-checkbox>
+                    </a-tooltip>
+                    <a-checkbox v-model="item.enabled">生效</a-checkbox>
+                </a-form-item>
+            </a-form>
         </div>
-        <template #footer>
-            <el-button @click="service_packages.show = false;">取消</el-button>
-            <el-button type="primary" @click="submitServicePackages">确定</el-button>
-        </template>
-    </el-dialog>
-    <el-dialog v-model="dialogVisible">
+        <div class="dialog-footer">
+            <a-button @click="service_packages.show = false;">取消</a-button>
+            <a-button type="primary" @click="submitServicePackages">确定</a-button>
+        </div>
+    </a-modal>
+    <a-modal v-model:visible="dialogVisible" :footer="false">
         <img w-full :src="dialogImageUrl" alt="Preview Image" />
-    </el-dialog>
+    </a-modal>
 </template>
 
 <script>
@@ -340,6 +335,7 @@ import jsyaml from "js-yaml";
 import description from './description.vue';
 import publishSettings from './publish-settings.vue';
 import userMixin from "@/utils/user-mixin";
+import { messageError, messageSuccess } from '@/utils/ui-feedback';
 
 export default {
     components: {
@@ -365,11 +361,11 @@ export default {
                 version: [
                     { required: true, message: '请输入版本号', trigger: 'blur' },
                     {
-                        validator: (rule, value, callback) => {
+                        validator: (value, callback) => {
                             if (/^\d+\.\d+\.\d+$/.test(value)) {
                                 callback()
                             } else {
-                                callback(new Error('版本格式有误'))
+                                callback('版本格式有误')
                             }
                         }, trigger: 'blur'
                     },
@@ -434,7 +430,9 @@ export default {
 
             noPlatform: true,
             currentPage: 1,
-            total: 0
+            total: 0,
+            dialogVisible: false,
+            dialogImageUrl: '',
         }
     },
     created() {
@@ -445,12 +443,12 @@ export default {
         this.getList();
     },
     methods: {
-        handleTabClick(tab) {
-            if (tab.props.name == 'paidset') {
+        handleTabClick(key) {
+            if (key == 'paidset') {
                 this.getInstFee();
-            } else if (tab.props.name == 'appinfo') {
+            } else if (key == 'appinfo') {
                 this.getInfo();
-            } else if (tab.props.name == 'publish') {
+            } else if (key == 'publish') {
                 this.getPublishInfo();
             }
         },
@@ -491,7 +489,7 @@ export default {
                     version: this.publishGoods.version,
                     logo: uploadIcon
                 }).then(res => {
-                    this.$message.success('操作成功');
+                    messageSuccess('操作成功');
                     this.publishGoods.loading = false;
                     this.publishGoods.show = false;
 
@@ -501,7 +499,7 @@ export default {
                     this.publishGoods.loading = false;
                 })
             } catch {
-                this.$message.error('操作失败');
+                messageError('操作失败');
                 this.publishGoods.loading = false;
             }
         },
@@ -590,8 +588,8 @@ export default {
             }
         },
         submitInstFee() {
-            this.$refs.instFee.validate((valid) => {
-                if (!valid) { return }
+            this.$refs.instFee.validate((errors) => {
+                if (errors) { return }
 
                 myAxios.post('/respo/goods/set-service-fee', {
                     identifie: this.identifie,
@@ -610,7 +608,7 @@ export default {
                         let item = this.list.find(i => i.id === this.version.id);
                         if (item) { this.toPublish(item); }
                     } else {
-                        this.$message.success('操作成功');
+                        messageSuccess('操作成功');
                     }
                     this.instFee.show = false;
                     this.getInfo();
@@ -683,8 +681,8 @@ export default {
             this.form.description = item.description;
         },
         addVersion() {
-            this.$refs.newversionform.validate((valid) => {
-                if (!valid) { return }
+            this.$refs.newversionform.validate((errors) => {
+                if (errors) { return }
 
                 myAxios.post('/respo/version-add', {
                     identifie: this.identifie,
@@ -692,7 +690,7 @@ export default {
                     description: this.form.description,
                 }).then(res => {
                     if (res?.data) {
-                        this.$message.success('操作成功');
+                        messageSuccess('操作成功');
                         this.getList();
                         this.form.show = false;
                     }
@@ -714,19 +712,19 @@ export default {
                 if (this.is_register && this.info.install_service_fee !== 0) {
                     this.openPublishGoods(item);
                 } else {
-                    this.$message.success('操作成功')
+                    messageSuccess('操作成功')
                     this.getInfo();
                     this.getList();
                 }
             }).catch((error) => {
                 this.publishGoods.loading = false;
                 if (error?.response?.data?.error) {
-                    this.$message.error(error.response.data.error);
+                    messageError(error.response.data.error);
                 }
 
                 let str = error?.response?.data?.message;
                 if (str) {
-                    this.$message.error(str);
+                    messageError(str);
                 }
             });
         },
@@ -842,16 +840,96 @@ export default {
 </script>
 
 <style scoped>
+.version-page-spin {
+    display: block;
+    width: 100%;
+}
+
 .gray-box {
     border: 1px solid #E7E7E7;
-    background: #FAFAFA;
+    background: #fff;
     padding: 20px;
     border-radius: 8px;
 }
 
-.gray-box .item {
+.version-summary {
+    align-items: stretch;
+    gap: 24px;
+}
+
+.version-current-card {
+    flex: 1 1 620px;
+}
+
+.version-base-card {
+    flex: 0 0 480px;
+}
+
+.version-current-content {
+    display: grid;
+    grid-template-columns: minmax(220px, 1fr) minmax(300px, 1.2fr);
+    gap: 32px;
+    margin-top: 24px;
+}
+
+.version-current-primary {
+    min-width: 0;
+}
+
+.version-current-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    min-width: 0;
+}
+
+.version-detail-row {
+    display: flex;
+    align-items: flex-start;
+    min-width: 0;
+    line-height: 22px;
+}
+
+.version-detail-label {
+    flex: 0 0 72px;
+    white-space: nowrap;
+}
+
+.version-detail-value {
+    min-width: 0;
+    margin-left: 24px;
+    word-break: keep-all;
+    white-space: nowrap;
+}
+
+.gray-box .item,
+.version-dev-item {
     padding: 20px 0;
     border-bottom: 1px solid #E7E7E7;
+}
+
+.version-dev-item {
+    display: flex;
+    align-items: center;
+    gap: 28px;
+}
+
+.version-dev-main {
+    flex: 0 0 400px;
+    min-width: 0;
+}
+
+.version-dev-meta {
+    flex: 1 1 auto;
+    min-width: 260px;
+}
+
+.version-dev-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    flex: 0 0 auto;
+    margin-left: auto;
 }
 
 .gray-box .item:last-child {
@@ -868,11 +946,17 @@ export default {
 
 .white-box {
     border: 1px solid #E7E7E7;
-    padding: 20px;
+    background: #fff;
+    padding: 22px 24px;
     border-radius: 8px;
+    min-width: 0;
 }
 
 .table {
+    width: 100%;
+}
+
+.version-setting-block {
     width: 100%;
 }
 
@@ -907,34 +991,53 @@ export default {
     cursor: pointer;
     display: none;
 }
-</style>
-<style>
-.createversiondialog .el-dialog__body {
-    border-top: 1px solid #E7E7E7;
-}
 
-.createversiondialog .el-dialog__footer {
+.dialog-footer {
     border-top: 1px solid #E7E7E7;
-    padding: 16px;
-    text-align: left;
     display: flex;
     justify-content: center;
+    gap: 8px;
+    margin: 20px -20px -4px;
+    padding: 16px 20px 0;
 }
 
-.publishigoods-uploadimg .el-upload-list__item-preview {
-    display: none !important;
+.warning-icon {
+    color: #D00805;
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1;
 }
 
-.publishigoods-uploadimg .el-upload-list__item-delete {
-    margin-left: 0 !important;
+.cloud-icon {
+    font-size: 14px;
+    line-height: 1;
 }
 
-.primary-el-warning {
-    background-color: var(--el-color-primary-light-9) !important;
-    color: var(--el-color-primary) !important;
+@media (max-width: 1040px) {
+    .version-summary {
+        flex-direction: column;
+    }
+
+    .version-base-card {
+        flex-basis: auto;
+    }
+
+    .version-current-content {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+<style>
+.createversiondialog .arco-modal-body {
+    border-top: 1px solid #E7E7E7;
 }
 
-.primary-el-warning .el-alert__description {
-    color: var(--el-color-primary) !important;
+.primary-arco-warning {
+    background-color: #eef4ff !important;
+    color: #0052D9 !important;
+}
+
+.primary-arco-warning .arco-alert-content {
+    color: #0052D9 !important;
 }
 </style>

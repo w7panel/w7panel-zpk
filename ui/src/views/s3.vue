@@ -1,7 +1,7 @@
 <template>
-    <div class="storage-page" v-loading="pageLoading">
+    <a-spin :loading="pageLoading" class="storage-page">
         <div>
-            <el-alert v-if="storageType !== 's3'" type="info" style="color: #2d5fff" :closable="false" show-icon
+            <a-alert v-if="storageType !== 's3'" type="info" style="color: #2d5fff" :closable="false" show-icon
                 title="提示" class="mb-20">
                 <template #default>
                     <div class="df jc-b">
@@ -10,63 +10,64 @@
                     href="https://wiki.w7.com/document/2575/8496" target="_blank">迁移文档</a>
                     </div>
                 </template>
-            </el-alert>
+            </a-alert>
 
-            <el-form ref="ruleFormRef" :model="form" :rules="rules" label-width="120px" label-position="left"
-                class="setting-form">
+            <a-form ref="ruleFormRef" :model="form" :rules="rules" :label-col-props="{ span: 5, flex: '0 0 120px' }"
+                :wrapper-col-props="{ span: 19, flex: '1' }" label-align="left" class="setting-form">
 
-                <el-form-item label="s3 服务地址" prop="s3_endpoint">
-                    <el-input v-model.trim="form.s3_endpoint" placeholder="请输入 S3 Endpoint"
+                <a-form-item label="s3 服务地址" field="s3_endpoint">
+                    <a-input v-model="form.s3_endpoint" placeholder="请输入 S3 Endpoint"
                         @input="handleEndpointInput">
                         <template #prepend>
-                            <el-select v-model="form.s3_protocol" class="protocol-select" @change="resetChecked">
-                                <el-option label="http" value="http" />
-                                <el-option label="https" value="https" />
-                            </el-select>
+                            <a-select v-model="form.s3_protocol" class="protocol-select" @change="resetChecked">
+                                <a-option label="http" value="http" />
+                                <a-option label="https" value="https" />
+                            </a-select>
                         </template>
-                    </el-input>
-                </el-form-item>
+                    </a-input>
+                </a-form-item>
 
-                <el-form-item label="s3 存储地区" prop="s3_region">
-                    <el-input v-model.trim="form.s3_region" placeholder="请输入 S3 Region" @input="resetChecked" />
-                </el-form-item>
+                <a-form-item label="s3 存储地区" field="s3_region">
+                    <a-input v-model="form.s3_region" placeholder="请输入 S3 Region" @input="(value) => handleTrimInput('s3_region', value)" />
+                </a-form-item>
 
-                <el-form-item label="s3 存储桶" prop="s3_bucket">
-                    <el-input v-model.trim="form.s3_bucket" placeholder="请输入 Bucket" @input="resetChecked" />
-                </el-form-item>
+                <a-form-item label="s3 存储桶" field="s3_bucket">
+                    <a-input v-model="form.s3_bucket" placeholder="请输入 Bucket" @input="(value) => handleTrimInput('s3_bucket', value)" />
+                </a-form-item>
 
-                <el-form-item label="根目录" prop="s3_root_directory">
-                    <el-input v-model.trim="form.s3_root_directory" placeholder="请输入根目录，如 / 或 registry"
+                <a-form-item label="根目录" field="s3_root_directory">
+                    <a-input v-model="form.s3_root_directory" placeholder="请输入根目录，如 / 或 registry"
+                        @input="(value) => handleTrimInput('s3_root_directory', value)" />
+                </a-form-item>
+
+                <a-form-item label="Access Key" field="s3_access_key">
+                    <a-input v-model="form.s3_access_key" placeholder="请输入 Access Key" @input="(value) => handleTrimInput('s3_access_key', value)" />
+                </a-form-item>
+
+                <a-form-item label="Secret Key" field="s3_secret_key">
+                    <a-input-password v-model="form.s3_secret_key" placeholder="请输入 Secret Key"
                         @input="resetChecked" />
-                </el-form-item>
+                </a-form-item>
 
-                <el-form-item label="Access Key" prop="s3_access_key">
-                    <el-input v-model.trim="form.s3_access_key" placeholder="请输入 Access Key" @input="resetChecked" />
-                </el-form-item>
-
-                <el-form-item label="Secret Key" prop="s3_secret_key">
-                    <el-input v-model="form.s3_secret_key" type="password" show-password placeholder="请输入 Secret Key"
-                        @input="resetChecked" />
-                </el-form-item>
-
-                <el-form-item>
+                <a-form-item>
                     <div class="action-row">
-                        <el-button type="primary" :loading="checking" @click="checkS3Status">测试连接</el-button>
-                        <el-button type="success" :loading="submitting" :disabled="!checked" @click="saveStorageConfig">
+                        <a-button type="primary" :loading="checking" @click="checkS3Status">测试连接</a-button>
+                        <a-button type="primary" status="success" :loading="submitting" :disabled="!checked" @click="saveStorageConfig">
                             保存设置
-                        </el-button>
+                        </a-button>
                     </div>
                     <div v-if="checked" class="checked-text">
                         连通性测试已通过，可以保存设置。
                     </div>
-                </el-form-item>
-            </el-form>
+                </a-form-item>
+            </a-form>
         </div>
-    </div>
+    </a-spin>
 </template>
 
 <script>
 import myAxios from '@/utils';
+import { messageSuccess, messageWarning } from '@/utils/ui-feedback';
 
 export default {
     name: 'S3Page',
@@ -120,7 +121,7 @@ export default {
                 this.statusError = '';
                 myAxios.post(`/system/util/registry/storage/s3/test`, this.buildS3Payload()).then(() => {
                     this.checked = true;
-                    this.$message.success('连通性测试成功');
+                    messageSuccess('连通性测试成功');
                 }).finally(() => {
                     this.checking = false;
                 });
@@ -129,13 +130,13 @@ export default {
         saveStorageConfig() {
             this.validateForm(() => {
                 if (!this.checked) {
-                    this.$message.warning('请先完成连通性测试');
+                    messageWarning('请先完成连通性测试');
                     return;
                 }
                 this.submitting = true;
                 this.statusError = '';
                 myAxios.post(`/system/util/registry/storage/config/update`, this.buildUpdatePayload()).then(() => {
-                    this.$message.success('存储设置成功');
+                    messageSuccess('存储设置成功');
                     this.storageType = 's3';
                     this.checked = false;
                     this.getStatus(false);
@@ -268,8 +269,8 @@ export default {
             return this.buildS3Payload();
         },
         validateForm(callback) {
-            this.$refs.ruleFormRef.validate((valid) => {
-                if (!valid) {
+            this.$refs.ruleFormRef.validate((errors) => {
+                if (errors) {
                     return false;
                 }
                 callback && callback();
@@ -281,6 +282,11 @@ export default {
                 this.form.s3_protocol = endpointInfo.protocol;
                 this.form.s3_endpoint = endpointInfo.endpoint;
             }
+            this.form.s3_endpoint = String(this.form.s3_endpoint || '').trim();
+            this.resetChecked();
+        },
+        handleTrimInput(field, value) {
+            this.form[field] = String(value || '').trim();
             this.resetChecked();
         },
         resetChecked() {
@@ -314,6 +320,23 @@ export default {
 
 .setting-form {
     max-width: 560px;
+}
+
+.storage-page {
+    display: block;
+    width: 100%;
+}
+
+.setting-form :deep(.arco-form-item-label-col) {
+    width: 120px;
+}
+
+.setting-form :deep(.arco-form-item-label) {
+    white-space: nowrap;
+}
+
+.setting-form :deep(.arco-form-item-wrapper-col) {
+    min-width: 0;
 }
 
 .action-row {

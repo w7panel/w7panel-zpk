@@ -212,7 +212,7 @@ func (self *Depot) GetFormula(name string, version string, user *entity.Registry
 		HelmPaths:            map[string]string{},
 		Icon:                 "/zpk/zip/icon/" + row.Name,
 		Tags:                 row.Tag,
-		ConsoleUid:           int64(row.RemoteUID),
+		ConsoleUid:           row.RemoteUID,
 		GoodsId:              row.GoodsID,
 		GoodsProductId:       row.GoodsProductID,
 		InstallServiceFee:    row.InstallServiceFee,

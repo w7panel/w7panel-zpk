@@ -16,7 +16,7 @@ import (
 const W7ZpkGoodsCategoryId = 13
 
 type PublishGoodsReq struct {
-	ConsoleUid  int32                    `json:"console_uid"`
+	ConsoleUid  int                      `json:"console_uid"`
 	Id          int                      `json:"id"`
 	Title       string                   `json:"title"`
 	Description string                   `json:"description"`
@@ -40,8 +40,8 @@ type PublishGoodsResp struct {
 }
 
 type PublishGoodsInfoReq struct {
-	ConsoleUid int32 `json:"console_uid"`
-	Id         int   `json:"id"`
+	ConsoleUid int `json:"console_uid"`
+	Id         int `json:"id"`
 }
 
 type GoodsProduct struct {
@@ -94,9 +94,9 @@ type AddLabelReq struct {
 }
 
 type ChangeGoodsStatusReq struct {
-	ConsoleUid int32 `json:"console_uid"`
-	GoodsId    int   `json:"goods_id"`
-	Status     int   `json:"on_shelf"`
+	ConsoleUid int `json:"console_uid"`
+	GoodsId    int `json:"goods_id"`
+	Status     int `json:"on_shelf"`
 }
 
 type GoodsService struct {

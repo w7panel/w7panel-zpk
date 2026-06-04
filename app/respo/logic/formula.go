@@ -76,7 +76,7 @@ type Formula struct {
 	CosPath              string
 	IsCosFile            bool
 	Tags                 []entity.Tag
-	ConsoleUid           int64
+	ConsoleUid           int32
 	InstallServiceFee    float64
 	ServicePackages      *accessor.ServicePackagesOption
 	VersionPrices        *accessor.VersionPricesOption

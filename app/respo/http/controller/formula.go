@@ -557,7 +557,7 @@ func (c Formula) Status(ctx *gin.Context) {
 			status = 2
 		}
 		err = w7.DevCenterGoodsSdk.ChangeGoodsStatus(devcenter.ChangeGoodsStatusReq{
-			ConsoleUid: logic2.User{}.GetConsoleUid(ctx),
+			ConsoleUid: int(logic2.User{}.GetConsoleUid(ctx)),
 			GoodsId:    int(formula.GoodsId),
 			Status:     status,
 		})

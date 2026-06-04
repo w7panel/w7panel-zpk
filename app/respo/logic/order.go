@@ -22,7 +22,7 @@ func (l Order) UseOrder(ticketInfo TicketInfo) error {
 
 func (l Order) CheckFormulaCanInstallOrUpgrade(formula Formula, consoleUid int32, orderSn string, isUpgrade bool) bool {
 	slog.Info("check order permission can install", "formula_name", formula.Name, "version", formula.Version, "consoleuid", consoleUid, "orderSn", orderSn, "isUpgrade", isUpgrade)
-	if formula.GoodsId == 0 || formula.ConsoleUid == int64(consoleUid) {
+	if formula.GoodsId == 0 || formula.ConsoleUid == consoleUid {
 		return true
 	}
 	if formula.GoodsId > 0 && orderSn == "" {
@@ -39,7 +39,7 @@ func (l Order) CheckFormulaCanInstallOrUpgrade(formula Formula, consoleUid int32
 func (l Order) GetFormulaCanUpgradeVersion(formula Formula, consoleUid int32, orderSn string) (string, bool, error) {
 	slog.Info("check order permission can upgrade", "formula", formula, "consoleuid", consoleUid, "orderSn", orderSn)
 
-	if formula.GoodsId == 0 || formula.ConsoleUid == int64(consoleUid) {
+	if formula.GoodsId == 0 || formula.ConsoleUid == consoleUid {
 		return "", false, nil
 	}
 

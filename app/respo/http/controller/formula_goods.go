@@ -153,6 +153,38 @@ func (c FormulaGoods) GetGoodsLabels(ctx *gin.Context) {
 	c.JsonResponseWithoutError(ctx, labels)
 }
 
+func (c FormulaGoods) GetGoodsAuditStatus(ctx *gin.Context) {
+	type ParamsValidate struct {
+		Identifie string `form:"identifie" json:"identifie" binding:"required"`
+	}
+	params := ParamsValidate{}
+	if !c.Validate(ctx, &params) {
+		return
+	}
+
+	depotLogin := c.getDepot()
+	formula, err := depotLogin.GetFormula(params.Identifie, "", nil)
+	if err != nil {
+		c.JsonResponseWithError(ctx, errors.New("制品不存在"), 500)
+		return
+	}
+	if formula.GoodsId == 0 {
+		c.JsonResponseWithoutError(ctx, gin.H{"audit_status": 0})
+		return
+	}
+
+	goodsInfo, err := w7.DevCenterGoodsSdk.PublishGoodsInfo(devcenter.PublishGoodsInfoReq{
+		ConsoleUid: int(formula.ConsoleUid),
+		Id:         int(formula.GoodsId),
+	})
+	if err != nil {
+		c.JsonResponseWithError(ctx, err, 500)
+		return
+	}
+
+	c.JsonResponseWithoutError(ctx, gin.H{"audit_status": goodsInfo.AuditStatus})
+}
+
 func (c FormulaGoods) PublishGoods(ctx *gin.Context) {
 	type ParamsValidate struct {
 		Identifie string `form:"identifie" binding:"required"`
@@ -176,13 +208,13 @@ func (c FormulaGoods) PublishGoods(ctx *gin.Context) {
 	}
 
 	consoleUid := logic2.User{}.GetConsoleUid(ctx)
-	if formula.ConsoleUid != 0 && formula.ConsoleUid != int64(consoleUid) {
+	if formula.ConsoleUid != 0 && formula.ConsoleUid != consoleUid {
 		c.JsonResponseWithError(ctx, errors.New("非法操作"), 500)
 		return
 	}
 
 	publishReq := devcenter.PublishGoodsReq{
-		ConsoleUid: consoleUid,
+		ConsoleUid: int(consoleUid),
 		Logo:       params.Logo,
 		WindowLogo: params.Logo,
 		GoodsImgs: []map[string]string{

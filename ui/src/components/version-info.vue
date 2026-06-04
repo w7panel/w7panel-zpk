@@ -471,6 +471,9 @@ export default {
     margin-left: 8px;
     color: #3370ff;
     vertical-align: middle;
+    width: 24px;
+    height: 24px;
+    font-size: 16px;
 }
 
 .version-info-form .arco-form-item:hover .editbtn {
@@ -481,5 +484,13 @@ export default {
     margin-left: 8px;
     color: #3370ff;
     vertical-align: middle;
+    width: 24px;
+    height: 24px;
+    font-size: 16px;
+}
+
+.version-info-form .editbtn .arco-icon,
+.version-info-form .inline-icon-action .arco-icon {
+    font-size: 16px;
 }
 </style>

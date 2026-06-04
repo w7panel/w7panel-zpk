@@ -432,6 +432,13 @@ export default {
   margin-left: 4px;
   color: #3370ff;
   vertical-align: middle;
+  width: 24px;
+  height: 24px;
+  font-size: 16px;
+}
+
+.registry-icon-action .arco-icon {
+  font-size: 16px;
 }
 
 .registry-form .arco-form-item-label-col {

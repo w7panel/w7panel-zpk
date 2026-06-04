@@ -237,6 +237,12 @@ export default {
 .user-icon-action {
     color: #3370ff;
     vertical-align: middle;
+    width: 12px;
+    height: 20px;
+}
+
+.user-icon-action :deep(.arco-icon) {
+    font-size: 14px;
 }
 
 </style>

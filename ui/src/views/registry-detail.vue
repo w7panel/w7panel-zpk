@@ -67,9 +67,9 @@
                     </div>
                 </a-tab-pane>
                 <a-tab-pane key="info" title="仓库信息">
-                    <a-spin :loading="loading">
-                        <a-form :model="data" label-align="left" :label-col-props="{ span: 5, flex: '0 0 150px' }"
-                            :wrapper-col-props="{ span: 19, flex: '1' }" class="registry-detail-form mt-24">
+                    <a-spin :loading="loading" class="registry-info-spin">
+                        <a-form :model="data" label-align="left" :label-col-props="{ flex: '0 0 96px' }"
+                            :wrapper-col-props="{ flex: '1' }" class="registry-detail-form registry-info-form mt-24">
                             <a-form-item label="仓库名称">{{ data.namespace }}/{{ data.name }}</a-form-item>
                             <a-form-item label="仓库地址">
                                 {{ data.registry }}/{{ data.namespace }}/{{ data.name }}
@@ -967,6 +967,40 @@ export default {
     margin-left: 6px;
     color: #3370ff;
     vertical-align: middle;
+    width: 24px;
+    height: 24px;
+    font-size: 16px;
+}
+
+.icon-action :deep(.arco-icon) {
+    font-size: 16px;
+}
+
+.registry-info-form {
+    width: 100%;
+}
+
+.registry-info-spin {
+    display: block;
+    width: 100%;
+}
+
+.registry-info-form :deep(.arco-form-item-label-col) {
+    flex: 0 0 96px !important;
+    width: 96px;
+    max-width: 96px;
+}
+
+.registry-info-form :deep(.arco-form-item-wrapper-col) {
+    flex: 1 1 auto !important;
+    min-width: 0;
+    max-width: calc(100% - 96px);
+}
+
+.registry-info-form :deep(.arco-form-item-content-wrapper),
+.registry-info-form :deep(.arco-form-item-content) {
+    width: 100%;
+    min-width: 0;
 }
 
 .table-header :deep(.arco-table-th) {

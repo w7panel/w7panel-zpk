@@ -205,7 +205,15 @@ export default {
             this.modelValue?.forEach?.(item => {
                 item.routes?.forEach?.(route => {
                     let backend = route.backend;
-                    if (!backend || backend.port) { return }
+                    if (!backend) { return }
+                    if (backend.port !== '' && backend.port !== undefined && backend.port !== null) {
+                        let normalizedPort = String(backend.port);
+                        if (backend.port !== normalizedPort) {
+                            backend.port = normalizedPort;
+                            changed = true;
+                        }
+                        return;
+                    }
                     let ports = this.getBackendPorts(backend.name);
                     if (!ports.length) { return }
                     backend.port = ports[0];

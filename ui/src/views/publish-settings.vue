@@ -171,6 +171,12 @@ export default {
 .copy-action {
   color: #3370ff;
   flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  font-size: 16px;
+}
+.copy-action :deep(.arco-icon) {
+  font-size: 16px;
 }
 .shortcut-content pre{
   margin:0;

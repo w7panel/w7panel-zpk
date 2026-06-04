@@ -587,10 +587,11 @@
                     <a-input placeholder="请输入业务端名称" v-model="newIngressEnd.name" size="large"
                         style="width:100%;"></a-input>
                 </a-form-item>
-                <a-form-item label="" class="mt-20">
-                    <a-button @click="addIngressEnd" type="primary" size="large">确定</a-button>
-                </a-form-item>
             </a-form>
+            <div class="dialog-footer">
+                <a-button size="large" @click="showIngress = false">取消</a-button>
+                <a-button @click="addIngressEnd" type="primary" size="large">确定</a-button>
+            </div>
         </a-modal>
 
         <a-modal v-model:visible="showAddRole" title="添加管理端" :width="640" :footer="false">
@@ -604,10 +605,11 @@
                     <a-input placeholder="请输入管理端标识" v-model="newRole.name" size="large"
                         style="width:100%;"></a-input>
                 </a-form-item>
-                <a-form-item label="" class="mt-20">
-                    <a-button @click="addRole" type="primary" size="large">确定</a-button>
-                </a-form-item>
             </a-form>
+            <div class="dialog-footer">
+                <a-button size="large" @click="showAddRole = false">取消</a-button>
+                <a-button @click="addRole" type="primary" size="large">确定</a-button>
+            </div>
         </a-modal>
     </div>
 </template>
@@ -2393,7 +2395,4 @@ export default {
     min-width: 0;
 }
 
-.envdialog .arco-modal-body {
-    padding-top: 0;
-}
 </style>

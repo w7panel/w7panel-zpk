@@ -1,11 +1,14 @@
 <template>
     <div class="bg-white" style="min-height:100vh;">
-        <div style="padding:20px; border:1px solid #E7E7E7;">
+        <div class="zpk-page-header">
+            <span class="backbtn df ai-c" @click="$router.go(-1)">
+                <icon-arrow-left class="backicon" />
+            </span>
             <a-breadcrumb>
-                <a-breadcrumb-item><router-link to="/zpk" class="c-99 fw-400">我的制品库</router-link></a-breadcrumb-item>
+                <a-breadcrumb-item><router-link to="/zpk" class="c-99 fw-400">制品管理</router-link></a-breadcrumb-item>
                 <a-breadcrumb-item>
                     <router-link :to="{ path: '/zpk-version', query: { id: identifie, title: vtitle } }"
-                        class="c-99 fw-400">版本管理</router-link>
+                        class="c-99 fw-400">{{ vtitle || identifie }}</router-link>
                 </a-breadcrumb-item>
                 <a-breadcrumb-item>
                     <router-link :to="{ path: '/zpk-edit', query: { id: identifie, versionid: version_id } }"
@@ -24,6 +27,7 @@
 import myAxios from '@/utils';
 import filesEditor from '@/components/files-editor.vue';
 import { messageSuccess } from '@/utils/ui-feedback';
+import { IconArrowLeft } from '@arco-design/web-vue/es/icon';
 export default {
     data(){
         return {
@@ -34,7 +38,7 @@ export default {
             filecont: '',
         }
     },
-    components: {filesEditor},
+    components: { filesEditor, IconArrowLeft },
     created(){
         this.vtitle = this.$route.query.vtitle;
         this.identifie = this.$route.query.identifie;
@@ -83,7 +87,3 @@ export default {
     }
 }
 </script>
-
-<style scoped>
-.top{padding:10px 20px; height:32px;}
-</style>

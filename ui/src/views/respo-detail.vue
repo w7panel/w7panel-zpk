@@ -1,9 +1,9 @@
 <template>
     <div class="bg-f2" style="min-height:100%;">
         <div class="top bg-white df ai-c">
-            <div class="df ai-c cursor" @click="$router.go(-1);">
-                <icon-left class="back-icon" />
-                <span class="c-66 fs-16" style="margin-left:4px;">返回</span>
+            <div class="backbtn df ai-c" @click="$router.go(-1);">
+                <icon-arrow-left class="backicon" />
+                <span class="c-66 fs-16">返回</span>
             </div>
         </div>
         <div class="pd-20">
@@ -44,12 +44,12 @@
 
 <script>
 import axios from 'axios';
-import { IconLeft } from '@arco-design/web-vue/es/icon';
+import { IconArrowLeft } from '@arco-design/web-vue/es/icon';
 import { messageSuccess } from '@/utils/ui-feedback';
 import { getZpkBaseURL, joinUrl } from '@/utils/request-base';
 
 export default {
-    components: { IconLeft },
+    components: { IconArrowLeft },
     data() {
         return {
             identifie: '',
@@ -121,11 +121,6 @@ export default {
 
 .top {
     padding: 20px;
-}
-
-.back-icon {
-    color: #666666;
-    font-size: 14px;
 }
 
 .version-select {

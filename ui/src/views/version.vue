@@ -1,20 +1,25 @@
 <template>
-    <a-spin :loading="publishGoods.loading" class="content version-page-spin"
+    <a-spin :loading="publishGoods.loading" class="version-page-spin"
         style="min-height:100vh;box-sizing:border-box;">
-        <div>
+        <div class="zpk-page-header">
+            <span class="backbtn df ai-c" @click="$router.go(-1)">
+                <icon-arrow-left class="backicon" />
+            </span>
             <a-breadcrumb>
                 <a-breadcrumb-item>
-                    <router-link to="/zpk" class="c-99 fw-400">{{ title || '制品库' }}</router-link>
+                    <router-link to="/zpk" class="c-99 fw-400">制品管理</router-link>
                 </a-breadcrumb-item>
-                <a-breadcrumb-item>版本管理</a-breadcrumb-item>
+                <a-breadcrumb-item>{{ title || identifie }}</a-breadcrumb-item>
             </a-breadcrumb>
         </div>
-        <a-tabs v-model:active-key="activeTab" class="mt-10" @change="handleTabClick">
+        <div class="content version-page-content pt-0">
+        <a-tabs v-model:active-key="activeTab" @change="handleTabClick">
             <a-tab-pane key="version" title="版本管理">
                 <div>
                     <div>
                         <a-button type="primary"
-                            @click="form = { show: true, edit: false, version: '', description: '' }">+
+                            @click="form = { show: true, edit: false, version: '', description: '' }">
+                            <template #icon><icon-plus /></template>
                             新建版本</a-button>
                     </div>
                     <div v-if="list.length" class="mt-20 df version-summary">
@@ -100,9 +105,15 @@
 
 
                                 <div class="version-dev-actions">
-                                    <a-button @click="edit(item)">后端包管理</a-button>
-                                    <a-button @click="editfront(item)">前端包管理</a-button>
-                                    <a-button @click="editVersion(item)">版本说明</a-button>
+                                    <a-button @click="edit(item)">
+                                        后端包管理
+                                    </a-button>
+                                    <a-button @click="editfront(item)">
+                                        前端包管理
+                                    </a-button>
+                                    <a-button @click="editVersion(item)">
+                                        版本说明
+                                    </a-button>
                                 </div>
 
 
@@ -218,6 +229,7 @@
                 <publish-settings v-if="activeTab == 'publish'" :identifie="identifie" :userInfo="userInfo"></publish-settings>
             </a-tab-pane>
         </a-tabs>
+        </div>
     </a-spin>
     <a-modal v-model:visible="form.show" :width="640" :title="form.edit ? '编辑版本' : '新建版本'" :footer="false"
         modal-class="createversiondialog">
@@ -231,7 +243,7 @@
             <div>2，跨大版本：需逐次升级路径中所有大版本，不可跳过（例：1.0.0 → 1.1.2 → 1.10.2 → 2.0.0，不可跳过中间大版本直接升级）</div>
         </a-alert>
         <div style="margin-top:20px; padding-left:20px;">
-            <a-form :model="form" ref="newversionform" :rules="rules" label-align="left"
+            <a-form :model="form" ref="newversionform" :rules="rules" label-align="left" class="version-create-form"
                 :label-col-props="{ span: 5, flex: '0 0 130px' }" :wrapper-col-props="{ span: 19, flex: '1' }">
                 <a-form-item field="version" label="输入版本号">
                     <a-input :disabled="form.edit" v-model="form.version" placeholder="请输入版本号" style="width:400px;" />
@@ -241,7 +253,7 @@
                 </a-form-item>
             </a-form>
         </div>
-        <div class="dialog-footer">
+        <div class="dialog-footer version-create-footer">
             <a-button @click="form.show = false;">取消</a-button>
             <a-button type="primary" @click="addVersion">确定</a-button>
         </div>
@@ -276,13 +288,14 @@
                 </tr>
                 <tr>
                     <td colspan="3">
-                        <div class="df ai-c jc-c cursor" @click="versionPrices.list.push({ version: '', price: '' })">添加
+                        <div class="df ai-c jc-c cursor" @click="versionPrices.list.push({ version: '', price: '' })">
+                            <span class="addmenu"><icon-plus />添加</span>
                         </div>
                     </td>
                 </tr>
             </tbody>
         </table>
-        <div class="dialog-footer">
+        <div class="dialog-footer" style="justify-content: center;margin-top: 20px;">
             <a-button @click="versionPrices.show = false;">取消</a-button>
             <a-button type="primary" @click="submitVersionPrices">确定</a-button>
         </div>
@@ -291,7 +304,7 @@
 
     <a-modal v-model:visible="service_packages.show" :width="840" title="设置服务周期" :footer="false">
 
-        <div class="df service_packages mt-20">
+        <div class="df service_packages">
             <a-form v-for="(item, index) in service_packages.list" :model="item" label-align="left"
                 :label-col-props="{ span: 6, flex: '0 0 60px' }" :wrapper-col-props="{ span: 18, flex: '1' }"
                 class="fc" :key="index">
@@ -319,7 +332,7 @@
                 </a-form-item>
             </a-form>
         </div>
-        <div class="dialog-footer">
+        <div class="dialog-footer" style="justify-content: center;margin-top: 20px;">
             <a-button @click="service_packages.show = false;">取消</a-button>
             <a-button type="primary" @click="submitServicePackages">确定</a-button>
         </div>
@@ -337,12 +350,15 @@ import description from './description.vue';
 import publishSettings from './publish-settings.vue';
 import userMixin from "@/utils/user-mixin";
 import { messageError, messageSuccess } from '@/utils/ui-feedback';
+import { IconArrowLeft, IconPlus } from '@arco-design/web-vue/es/icon';
 
 export default {
     components: {
         versionInfo,
         description,
         publishSettings,
+        IconArrowLeft,
+        IconPlus,
     },
     mixins: [userMixin],
     data() {
@@ -1003,15 +1019,6 @@ export default {
     display: none;
 }
 
-.dialog-footer {
-    border-top: 1px solid #E7E7E7;
-    display: flex;
-    justify-content: center;
-    gap: 8px;
-    margin: 20px -20px -4px;
-    padding: 16px 20px 0;
-}
-
 .warning-icon {
     color: #D00805;
     font-size: 16px;
@@ -1039,10 +1046,6 @@ export default {
 }
 </style>
 <style>
-.createversiondialog .arco-modal-body {
-    border-top: 1px solid #E7E7E7;
-}
-
 .primary-arco-warning {
     background-color: #eef4ff !important;
     color: #0052D9 !important;

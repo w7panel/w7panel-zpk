@@ -73,7 +73,7 @@
                     </tr>
                     <tr>
                         <td colspan="8" class="cursor txt-c" @click="addRoute(item)">
-                            <span class="addmenu">添加配置</span>
+                            <span class="addmenu"><icon-plus />添加配置</span>
                         </td>
                     </tr>
                 </tbody>
@@ -84,16 +84,18 @@
         </div>
 
         <div v-if="checked" class="mt-10 lh-1 addrole df ai-c jc-c cursor" style="width:100%;"
-            @click="addIngressEnd();">添加业务端</div>
+            @click="addIngressEnd();">
+            <span class="addmenu"><icon-plus />添加业务端</span>
+        </div>
 
     </div>
 </template>
 
 <script>
-import { IconEdit } from '@arco-design/web-vue/es/icon';
+import { IconEdit, IconPlus } from '@arco-design/web-vue/es/icon';
 
 export default {
-    components: { IconEdit },
+    components: { IconEdit, IconPlus },
     props: {
         modelValue: {
             type: Array,

@@ -1,10 +1,17 @@
 <template>
     <div class="bg-white" style="min-height:100%;">
-        <div class="com-back df ai-c ">
+        <div class="com-back registry-detail-breadcrumb df ai-c">
             <span class="backbtn df ai-c" @click="$router.go(-1)">
-                <span class="backicon">&lt;</span>
-                <span class="fs-18">{{ data.namespace }}/{{ data.name }}</span>
+                <icon-arrow-left class="backicon" />
             </span>
+            <a-breadcrumb>
+                <a-breadcrumb-item>
+                    <router-link to="/zpk-registry">镜像仓库</router-link>
+                </a-breadcrumb-item>
+                <a-breadcrumb-item>
+                    <span>{{ data.namespace }}/{{ data.name }}</span>
+                </a-breadcrumb-item>
+            </a-breadcrumb>
         </div>
         <div class="bg-white" style="padding: 0 24px 6px;">
             <a-tabs v-model:active-key="tabsActive">
@@ -14,19 +21,21 @@
                         <template #columns>
                             <a-table-column title="镜像版本">
                                 <template #cell="{ record }">
-                                    <a-popover position="bottom">
+                                    <a-popover position="bottom" content-class="registry-version-popover">
                                         <span class="c-blue cursor">{{ record.TagName }}</span>
                                         <template #content>
                                             <a-form :model="record" label-align="left" :label-col-props="{ span: 6, flex: '0 0 160px' }"
                                                 :wrapper-col-props="{ span: 18, flex: '1' }" class="registry-detail-form">
                                                 <a-form-item label="镜像ID(SHA256)" style="margin-bottom:0;">
-                                                    <span>{{ record.Digest }}</span>
-                                                    <a-tooltip content="复制">
-                                                        <a-button class="icon-action" type="text" shape="circle" size="mini"
-                                                            @click="onekeyCopy(record.Digest)">
-                                                            <template #icon><icon-copy /></template>
-                                                        </a-button>
-                                                    </a-tooltip>
+                                                    <span class="registry-version-digest-line">
+                                                        <span class="registry-version-digest">{{ record.Digest }}</span>
+                                                        <a-tooltip content="复制">
+                                                            <a-button class="icon-action" type="text" shape="circle" size="mini"
+                                                                @click="onekeyCopy(record.Digest)">
+                                                                <template #icon><icon-copy /></template>
+                                                            </a-button>
+                                                        </a-tooltip>
+                                                    </span>
                                                 </a-form-item>
                                                 <a-form-item label="平台" style="margin-bottom:0;">{{ record.Platform }}</a-form-item>
                                                 <a-form-item label="制品类型" style="margin-bottom:0;">{{ record.Type }}</a-form-item>
@@ -34,7 +43,8 @@
                                         </template>
                                     </a-popover>
                                     <a-tooltip content="复制">
-                                        <a-button class="icon-action" type="text" shape="circle" size="mini"
+                                        <a-button class="icon-action registry-tag-copy" type="text" shape="circle" size="mini"
+                                            style="color:#333333;"
                                             @click="onekeyCopy(record.TagName)">
                                             <template #icon><icon-copy /></template>
                                         </a-button>
@@ -105,8 +115,11 @@
                     </a-spin>
                 </a-tab-pane>
                 <a-tab-pane key="build" title="镜像部署" v-if="hasAccess(data.user_id)">
-                    <div>
-                        <a-button type="primary" @click="openBuildForm()">新增自动部署任务</a-button>
+                    <div class="zpk-toolbar-left">
+                        <a-button type="primary" @click="openBuildForm()">
+                            <template #icon><icon-plus /></template>
+                            新增自动部署任务
+                        </a-button>
                     </div>
                     <a-table :loading="loading" :data="builds" class="mt-20 table-header" style="width: 100%"
                         :pagination="false" row-key="id">
@@ -156,18 +169,18 @@
                         </a-radio-group>
                     </div>
                 </a-form-item>
-                <a-form-item>
-                    <a-button type="primary" size="large" @click="onSubmit">确定</a-button>
-                    <a-button size="large" @click="visible = false">取消</a-button>
-                </a-form-item>
             </a-form>
+            <div class="dialog-footer">
+                <a-button size="large" @click="visible = false">取消</a-button>
+                <a-button type="primary" size="large" @click="onSubmit">确定</a-button>
+            </div>
         </a-modal>
 
         <a-modal v-model:visible="buildForm.show" :title="buildForm.id ? '修改自动部署任务' : '新增自动部署任务'"
             :width="800" :footer="false">
             <a-form ref="buildForm" :model="buildForm" :rules="rules" label-align="left"
                 :label-col-props="{ span: 5, flex: '0 0 120px' }" :wrapper-col-props="{ span: 19, flex: '1' }"
-                class="registry-detail-form">
+                class="registry-detail-form registry-build-form">
                 <a-form-item label="" style="margin-bottom:10px;">
                     <a-radio-group v-model="buildForm.selectType" style="margin-bottom:0;"
                         @change="changeBuildFormType">
@@ -289,11 +302,11 @@
                         </div>
                     </div>
                 </a-form-item>
-                <a-form-item>
-                    <a-button type="primary" size="large" @click="submitBuildForm">确定</a-button>
-                    <a-button size="large" @click="buildForm.show = false">取消</a-button>
-                </a-form-item>
             </a-form>
+            <div class="dialog-footer">
+                <a-button size="large" @click="buildForm.show = false">取消</a-button>
+                <a-button type="primary" size="large" @click="submitBuildForm">确定</a-button>
+            </div>
         </a-modal>
 
         <a-modal v-model:visible="buildDetail.show" title="自动部署任务详情" :width="750" :footer="false">
@@ -340,12 +353,14 @@ import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
 import userMixin from "@/utils/user-mixin";
 import { confirm, messageSuccess } from "@/utils/ui-feedback";
-import { IconCopy, IconEdit } from '@arco-design/web-vue/es/icon';
+import { IconArrowLeft, IconCopy, IconEdit, IconPlus } from '@arco-design/web-vue/es/icon';
 
 export default {
     components: {
+        IconArrowLeft,
         IconCopy,
         IconEdit,
+        IconPlus,
     },
     data() {
         return {
@@ -846,6 +861,131 @@ export default {
                 "page": this.tagPage.page,
                 "page_size": this.tagPage.pageSize,
             }).then(res => {
+                res.data = {
+    "code": 200,
+    "data": {
+        "list": [
+            {
+                "RepositoryName": "dpanel",
+                "TagName": "doc-c4a2e86d8",
+                "Digest": "sha256:23e75db0d2324fb4283b9babf8b281f6850de5bc3a74fb5675be3e928279fc41",
+                "Manifest": {
+                    "schemaVersion": 2,
+                    "mediaType": "application/vnd.oci.image.index.v1+json",
+                    "manifests": [
+                        {
+                            "mediaType": "application/vnd.oci.image.manifest.v1+json",
+                            "digest": "sha256:729f48d8633de5b2e1ceb9d81c72fdc0de733f4e29e64cd49659a904cd4fb2be",
+                            "size": 3323,
+                            "platform": {
+                                "architecture": "amd64",
+                                "os": "linux"
+                            }
+                        },
+                        {
+                            "mediaType": "application/vnd.oci.image.manifest.v1+json",
+                            "digest": "sha256:bbff73d29c68434cb9c6b7814d4893df66bf8aa04ca591fcdd58ffcd49b837f2",
+                            "size": 565,
+                            "annotations": {
+                                "vnd.docker.reference.digest": "sha256:729f48d8633de5b2e1ceb9d81c72fdc0de733f4e29e64cd49659a904cd4fb2be",
+                                "vnd.docker.reference.type": "attestation-manifest"
+                            },
+                            "platform": {
+                                "architecture": "unknown",
+                                "os": "unknown"
+                            }
+                        }
+                    ]
+                },
+                "Platform": "amd64",
+                "Type": "Oci",
+                "CreatedAt": "2026-05-11T10:28:23.947852816Z",
+                "UpdatedAt": "",
+                "Size": 81077288
+            },
+            {
+                "RepositoryName": "dpanel",
+                "TagName": "doc-ac52c3a1e",
+                "Digest": "sha256:fd9b1e79a39d4e1b79f3d8c00af15bd29e1fe0fac8cc2907c2706779d3504460",
+                "Manifest": {
+                    "schemaVersion": 2,
+                    "mediaType": "application/vnd.oci.image.index.v1+json",
+                    "manifests": [
+                        {
+                            "mediaType": "application/vnd.oci.image.manifest.v1+json",
+                            "digest": "sha256:97b8a479fcf126980290901ea8c5afe022294729ee913ebb9a4b29e1691a5931",
+                            "size": 3323,
+                            "platform": {
+                                "architecture": "amd64",
+                                "os": "linux"
+                            }
+                        },
+                        {
+                            "mediaType": "application/vnd.oci.image.manifest.v1+json",
+                            "digest": "sha256:8c01374c3fcfd1202f102072089669d980f26a982334d30d58d0dbdd111408f5",
+                            "size": 565,
+                            "annotations": {
+                                "vnd.docker.reference.digest": "sha256:97b8a479fcf126980290901ea8c5afe022294729ee913ebb9a4b29e1691a5931",
+                                "vnd.docker.reference.type": "attestation-manifest"
+                            },
+                            "platform": {
+                                "architecture": "unknown",
+                                "os": "unknown"
+                            }
+                        }
+                    ]
+                },
+                "Platform": "amd64",
+                "Type": "Oci",
+                "CreatedAt": "2026-04-29T09:16:47.133200235Z",
+                "UpdatedAt": "",
+                "Size": 81093295
+            },
+            {
+                "RepositoryName": "dpanel",
+                "TagName": "doc-62de5f642",
+                "Digest": "sha256:ebf1c0079b7e48e9c1df61b219e6c6766e4548368a9039022bf6ec6e02c9e3ad",
+                "Manifest": {
+                    "schemaVersion": 2,
+                    "mediaType": "application/vnd.oci.image.index.v1+json",
+                    "manifests": [
+                        {
+                            "mediaType": "application/vnd.oci.image.manifest.v1+json",
+                            "digest": "sha256:8b1373614c9c0e7484267cb5cd0fc72980ca06f9b8b0e3361aaebb08a25e1197",
+                            "size": 3323,
+                            "platform": {
+                                "architecture": "amd64",
+                                "os": "linux"
+                            }
+                        },
+                        {
+                            "mediaType": "application/vnd.oci.image.manifest.v1+json",
+                            "digest": "sha256:182d947ef89d15a4169e3318e1b093add4c093b11cfcf55ef16750efe3a4b93e",
+                            "size": 565,
+                            "annotations": {
+                                "vnd.docker.reference.digest": "sha256:8b1373614c9c0e7484267cb5cd0fc72980ca06f9b8b0e3361aaebb08a25e1197",
+                                "vnd.docker.reference.type": "attestation-manifest"
+                            },
+                            "platform": {
+                                "architecture": "unknown",
+                                "os": "unknown"
+                            }
+                        }
+                    ]
+                },
+                "Platform": "amd64",
+                "Type": "Oci",
+                "CreatedAt": "2026-05-25T04:08:53.466352904Z",
+                "UpdatedAt": "2026-05-25T12:12:17+08:00",
+                "Size": 81083161
+            }
+        ],
+        "page": 1,
+        "size": 10,
+        "total": 3
+    }
+}
+
                 let data = res.data.data?.list || [];
 
 
@@ -947,20 +1087,9 @@ export default {
     margin-bottom: 30px;
 }
 
-.backbtn {
-    cursor: pointer;
-}
-
-.backicon {
-    color: #0052D9;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 20px;
-    height: 20px;
-    margin-right: 4px;
-    font-size: 20px;
-    line-height: 1;
+.registry-detail-breadcrumb {
+    height: 56px;
+    padding: 0 24px;
 }
 
 .icon-action {
@@ -974,6 +1103,15 @@ export default {
 
 .icon-action :deep(.arco-icon) {
     font-size: 16px;
+}
+
+.registry-tag-copy,
+.registry-tag-copy :deep(.arco-icon) {
+    color: #333333 !important;
+}
+
+:deep(.arco-btn.registry-tag-copy) {
+    color: #333333 !important;
 }
 
 .registry-info-form {
@@ -1004,9 +1142,9 @@ export default {
 }
 
 .table-header :deep(.arco-table-th) {
-    background: #F3F3F3;
-    color: #666666;
-    font-weight: 500;
+    background: #f2f3f5;
+    color: var(--color-text-1);
+    font-weight: 400;
 }
 
 .table-header :deep(.arco-table-container) {
@@ -1160,5 +1298,40 @@ export default {
 
 .upfile .fileinput::file-selector-button {
     display: none;
+}
+</style>
+<style>
+.registry-version-popover {
+    max-width: 520px;
+    white-space: normal;
+}
+
+.registry-version-popover .arco-popover-content,
+.registry-version-popover .registry-version-digest-line,
+.registry-version-popover .arco-form-item-content {
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-all;
+}
+
+.registry-version-popover .registry-version-digest-line {
+    display: inline;
+    line-height: 24px;
+}
+
+.registry-version-popover .registry-version-digest {
+    display: inline;
+}
+
+.registry-version-popover .registry-version-digest-line .icon-action {
+    display: inline-flex;
+    margin-left: 4px;
+    vertical-align: middle;
+}
+
+.registry-tag-copy,
+.registry-tag-copy .arco-icon {
+    color: #333333 !important;
 }
 </style>

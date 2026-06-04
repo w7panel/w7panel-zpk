@@ -107,12 +107,12 @@
                     </tr>
                     <tr>
                         <td colspan="3" class="cursor txt-c" @click="annotationEdit.list.push({ key: '', value: '' })">
-                            <span class="addmenu"><span class="add-icon">+</span>添加注解</span>
+                            <span class="addmenu"><icon-plus />添加注解</span>
                         </td>
                     </tr>
                 </tbody>
             </table>
-            <div class="df ai-c jc-c mt-20">
+            <div class="dialog-footer">
                 <a-button @click="annotationEdit.show = false;">取消</a-button>
                 <a-button @click="submitAnnotation" type="primary">确定</a-button>
             </div>
@@ -123,7 +123,7 @@
 import jsyaml from "js-yaml";
 import myAxios from '@/utils';
 import { messageSuccess } from '@/utils/ui-feedback';
-import { IconEdit } from '@arco-design/web-vue/es/icon';
+import { IconEdit, IconPlus } from '@arco-design/web-vue/es/icon';
 
 const defaultManifest = `application:
     name: ''
@@ -137,6 +137,7 @@ v: 2
 export default {
     components: {
         IconEdit,
+        IconPlus,
     },
     props: ['identifie', 'info'],
     data() {
@@ -378,17 +379,6 @@ export default {
 .upload-plus {
     color: #666666;
     font-size: 22px;
-    line-height: 1;
-}
-
-.add-icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 14px;
-    height: 14px;
-    margin-right: 2px;
-    font-size: 14px;
     line-height: 1;
 }
 

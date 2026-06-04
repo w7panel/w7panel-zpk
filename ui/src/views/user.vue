@@ -3,7 +3,10 @@
         <div>
             <div>
                 <div class="bg-white bg-padding pb-24" style="border-top:1px solid #EEEEEE;">
-                    <a-button type="primary" @click="add">新建用户</a-button>
+                    <a-button type="primary" @click="add">
+                        <template #icon><icon-plus /></template>
+                        新建用户
+                    </a-button>
                     <a-table :data="tableData" :pagination="false" class="mt-20 table-header" row-key="id">
                         <template #columns>
                             <a-table-column data-index="username" title="名称">
@@ -54,7 +57,11 @@
                 <template v-if="!editProp || editProp === 'password'">
                     <a-form-item label="密码" field="password" v-if="editId">
                         <div v-if="lockPassword" class="df" style="width: 100%;gap: 10px">
-                            <a-input model-value="已隐藏" disabled />
+                            <a-input class="user-hidden-password" model-value="已隐藏" disabled>
+                                <template #prefix>
+                                    <icon-lock />
+                                </template>
+                            </a-input>
                             <a-button type="primary" @click="lockPassword = false">修改密码</a-button>
                         </div>
                         <a-input-password v-model="form.password" v-else />
@@ -68,11 +75,11 @@
                     <a-textarea v-model="form.desc" :auto-size="{ minRows: 5, maxRows: 5 }" />
                 </a-form-item>
 
-                <a-form-item>
-                    <a-button type="primary" size="large" @click="onSubmit">确定</a-button>
-                    <a-button size="large" @click="visible = false">取消</a-button>
-                </a-form-item>
             </a-form>
+            <div class="dialog-footer">
+                <a-button size="large" @click="visible = false">取消</a-button>
+                <a-button type="primary" size="large" @click="onSubmit">确定</a-button>
+            </div>
         </a-modal>
     </div>
 </template>
@@ -80,12 +87,14 @@
 <script>
 import myAxios from "@/utils";
 import { confirm, messageSuccess } from "@/utils/ui-feedback";
-import { IconEdit } from '@arco-design/web-vue/es/icon';
+import { IconEdit, IconLock, IconPlus } from '@arco-design/web-vue/es/icon';
 
 export default {
     name: "zpk_namespace",
     components: {
         IconEdit,
+        IconLock,
+        IconPlus,
     },
     data() {
         return {
@@ -232,6 +241,11 @@ export default {
 
 .user-form :deep(.arco-form-item-wrapper-col) {
     min-width: 0;
+}
+
+.user-hidden-password :deep(.arco-icon) {
+    color: #86909c;
+    font-size: 16px;
 }
 
 .user-icon-action {

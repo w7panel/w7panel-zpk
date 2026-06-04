@@ -1,12 +1,15 @@
 <template>
     <div ref="content" style="height:100vh;overflow:auto;">
         <div>
-            <div style="padding:20px; border:1px solid #E7E7E7;">
+            <div class="zpk-page-header">
+                <span class="backbtn df ai-c" @click="$router.go(-1)">
+                    <icon-arrow-left class="backicon" />
+                </span>
                 <a-breadcrumb>
-                    <a-breadcrumb-item><router-link to="/zpk" class="c-99 fw-400">我的制品库</router-link></a-breadcrumb-item>
+                    <a-breadcrumb-item><router-link to="/zpk" class="c-99 fw-400">制品管理</router-link></a-breadcrumb-item>
                     <a-breadcrumb-item>
                         <router-link :to="{ path: '/zpk-version', query: { id: identifie, title: vtitle } }"
-                            class="c-99 fw-400">版本管理</router-link>
+                            class="c-99 fw-400">{{ vtitle || identifie }}</router-link>
                     </a-breadcrumb-item>
                     <a-breadcrumb-item>
                         <router-link :to="{ path: '/zpk-edit', query: { id: identifie, versionid: version_id } }"
@@ -42,6 +45,7 @@ platform:
 `;
 
 import filesManifest from './files-manifest.vue';
+import { IconArrowLeft } from '@arco-design/web-vue/es/icon';
 
 
 export default {
@@ -54,7 +58,7 @@ export default {
             title: '',
         }
     },
-    components: { filesManifest },
+    components: { filesManifest, IconArrowLeft },
     created() {
         this.vtitle = this.$route.query.vtitle;
         this.identifie = this.$route.query.identifie;

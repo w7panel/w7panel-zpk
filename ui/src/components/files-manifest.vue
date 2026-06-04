@@ -349,7 +349,7 @@
                                         <a-checkbox v-model="form.redis">redis</a-checkbox>
                                         <a-checkbox v-model="form.mongodb6">mongodb</a-checkbox>
                                     </div>
-                                    <a-button type="primary" @click="openSpEdit">批量修改</a-button>
+                                    <a-button @click="openSpEdit">批量修改</a-button>
                                 </div>
                                 <table class="table mt-10">
                                     <thead>
@@ -453,10 +453,8 @@
                     </div>
 
                     <div class="bg-white pb-24 mt-20 df ai-c">
-                        <a-button v-if="option.pureManifest" :loading="submiting" type="primary"
-                            @click="submit(otherData)" style="width:90px;">确定提交</a-button>
-                        <a-button v-else :loading="submiting" type="primary" @click="submit()"
-                            style="width:90px;">确定提交</a-button>
+                        <a-button v-if="option.pureManifest" :loading="submiting" type="primary" @click="submit(otherData)">确定提交</a-button>
+                        <a-button v-else :loading="submiting" type="primary" @click="submit()">确定提交</a-button>
                     </div>
                 </a-form>
             </div>
@@ -475,7 +473,7 @@
             @close="dependForm = { show: false, editIndex: -1, identifie_before: '', identifie_last: '', identifie: '', name: '', required: false, from: '' };">
             <a-form ref="depend" :rules="addRules" :model="dependForm"
                 :label-col-props="{ span: 5, flex: '0 0 80px' }"
-                :wrapper-col-props="{ span: 19, flex: '1' }">
+                :wrapper-col-props="{ span: 19, flex: '1' }" class="manifest-dialog-form">
                 <a-form-item label="标识" field="identifie">
                     <w7-identifie v-model:author="dependForm.identifie_before"
                         v-model:identifie="dependForm.identifie_last" @change="onChange" :author-disabled="true" />
@@ -487,10 +485,11 @@
                 <a-form-item label="可选安装" field="from">
                     <a-switch v-model="dependForm.required" :checked-value="false" :unchecked-value="true" />
                 </a-form-item>
-                <a-form-item label="" class="mt-20">
-                    <a-button type="primary" size="large" @click="addDepend">确定</a-button>
-                </a-form-item>
             </a-form>
+            <div class="dialog-footer">
+                <a-button size="large" @click="dependForm.show = false">取消</a-button>
+                <a-button type="primary" size="large" @click="addDepend">确定</a-button>
+            </div>
         </a-modal>
 
         <a-modal v-model:visible="spEdit.show" title="启动参数" :width="700" modal-class="envdialog" :footer="false">
@@ -498,7 +497,7 @@
             <a-textarea v-model="spEdit.values" class="mt-10" :spellcheck="false"
                 placeholder="格式：键=值 #标题 : 描述 : 必填(1或0) : 依赖组件标识" :rows="12"
                 :auto-size="false"></a-textarea>
-            <div class="df ai-c jc-c mt-20">
+            <div class="dialog-footer">
                 <a-button @click="spEdit.show = false;">取消</a-button>
                 <a-button @click="submitSpEdit" type="primary">确定</a-button>
             </div>
@@ -2237,7 +2236,4 @@ platform:
     min-width: 0;
 }
 
-.envdialog .arco-modal-body {
-    padding-top: 0;
-}
 </style>

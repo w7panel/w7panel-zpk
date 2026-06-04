@@ -4,6 +4,7 @@
       <div>
         <div class="bg-white bg-padding pb-24" style="border-top:1px solid #EEEEEE;">
           <a-button type="primary" @click="add">
+            <template #icon><icon-plus /></template>
             新建命名空间
           </a-button>
           <a-table :data="tableData" :pagination="false" class="mt-20 table-header" row-key="id">
@@ -85,17 +86,17 @@
               </tr>
               <tr>
                 <td @click="form.permissions.push({ username: '', permission: 1 })" class="cursor txt-c" colspan="3">
-                  <span class="addmenu">+ 添加用户</span>
+                  <span class="addmenu"><icon-plus />添加用户</span>
                 </td>
               </tr>
             </tbody>
           </table>
         </a-form-item>
-        <a-form-item>
-          <a-button size="large" type="primary" @click="onSubmit">确定</a-button>
-          <a-button size="large" @click="visible = false">取消</a-button>
-        </a-form-item>
       </a-form>
+      <div class="dialog-footer">
+        <a-button size="large" @click="visible = false">取消</a-button>
+        <a-button size="large" type="primary" @click="onSubmit">确定</a-button>
+      </div>
     </a-modal>
   </div>
 </template>
@@ -104,9 +105,13 @@
 import myAxios from "@/utils";
 import { confirm, messageSuccess } from "@/utils/ui-feedback";
 import userMixin from "@/utils/user-mixin";
+import { IconPlus } from '@arco-design/web-vue/es/icon';
 
 export default {
   name: "zpk_namespace",
+  components: {
+    IconPlus,
+  },
   data() {
     return {
       visibleTypeMap: {

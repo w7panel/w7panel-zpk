@@ -18,7 +18,6 @@ import (
 var (
 	Q                                    = new(Query)
 	Formula                              *formula
-	Order                                *order
 	RegistryNamespace                    *registryNamespace
 	RegistryRepository                   *registryRepository
 	RegistryRepositoryDeployRule         *registryRepositoryDeployRule
@@ -35,7 +34,6 @@ var (
 func SetDefault(db *gorm.DB, opts ...gen.DOOption) {
 	*Q = *Use(db, opts...)
 	Formula = &Q.Formula
-	Order = &Q.Order
 	RegistryNamespace = &Q.RegistryNamespace
 	RegistryRepository = &Q.RegistryRepository
 	RegistryRepositoryDeployRule = &Q.RegistryRepositoryDeployRule
@@ -53,7 +51,6 @@ func Use(db *gorm.DB, opts ...gen.DOOption) *Query {
 	return &Query{
 		db:                                   db,
 		Formula:                              newFormula(db, opts...),
-		Order:                                newOrder(db, opts...),
 		RegistryNamespace:                    newRegistryNamespace(db, opts...),
 		RegistryRepository:                   newRegistryRepository(db, opts...),
 		RegistryRepositoryDeployRule:         newRegistryRepositoryDeployRule(db, opts...),
@@ -72,7 +69,6 @@ type Query struct {
 	db *gorm.DB
 
 	Formula                              formula
-	Order                                order
 	RegistryNamespace                    registryNamespace
 	RegistryRepository                   registryRepository
 	RegistryRepositoryDeployRule         registryRepositoryDeployRule
@@ -92,7 +88,6 @@ func (q *Query) clone(db *gorm.DB) *Query {
 	return &Query{
 		db:                                   db,
 		Formula:                              q.Formula.clone(db),
-		Order:                                q.Order.clone(db),
 		RegistryNamespace:                    q.RegistryNamespace.clone(db),
 		RegistryRepository:                   q.RegistryRepository.clone(db),
 		RegistryRepositoryDeployRule:         q.RegistryRepositoryDeployRule.clone(db),
@@ -119,7 +114,6 @@ func (q *Query) ReplaceDB(db *gorm.DB) *Query {
 	return &Query{
 		db:                                   db,
 		Formula:                              q.Formula.replaceDB(db),
-		Order:                                q.Order.replaceDB(db),
 		RegistryNamespace:                    q.RegistryNamespace.replaceDB(db),
 		RegistryRepository:                   q.RegistryRepository.replaceDB(db),
 		RegistryRepositoryDeployRule:         q.RegistryRepositoryDeployRule.replaceDB(db),
@@ -136,7 +130,6 @@ func (q *Query) ReplaceDB(db *gorm.DB) *Query {
 
 type queryCtx struct {
 	Formula                              IFormulaDo
-	Order                                IOrderDo
 	RegistryNamespace                    IRegistryNamespaceDo
 	RegistryRepository                   IRegistryRepositoryDo
 	RegistryRepositoryDeployRule         IRegistryRepositoryDeployRuleDo
@@ -153,7 +146,6 @@ type queryCtx struct {
 func (q *Query) WithContext(ctx context.Context) *queryCtx {
 	return &queryCtx{
 		Formula:                              q.Formula.WithContext(ctx),
-		Order:                                q.Order.WithContext(ctx),
 		RegistryNamespace:                    q.RegistryNamespace.WithContext(ctx),
 		RegistryRepository:                   q.RegistryRepository.WithContext(ctx),
 		RegistryRepositoryDeployRule:         q.RegistryRepositoryDeployRule.WithContext(ctx),

@@ -7,15 +7,14 @@ import (
 	"github.com/w7panel/w7panel-zpk/common/service/w7/cloudapi"
 	"github.com/w7panel/w7panel-zpk/common/service/w7/devcenter"
 	"github.com/w7panel/w7panel-zpk/common/service/w7/ip"
-	"github.com/w7panel/w7panel-zpk/common/service/w7/zpk"
+	zpk_market "github.com/w7panel/w7panel-zpk/common/service/w7/zpk-market"
 )
 
 var DevCenterNotAppSdk *devcenter.NotAppService
 var DevCenterGoodsSdk *devcenter.GoodsService
 var W7CloudAttach *cloudapi.Attach
-var IpOrderSdk *ip.OrderService
 var IpGoodsSdk *ip.GoodsService
-var ZpkSdk *zpk.ZpkService
+var ZpkMarketSdk *zpk_market.ZpkMarketService
 
 func InitW7Sdk(config *viper.Viper) {
 	if config.GetString("w7.user_agent") != "" {
@@ -32,13 +31,6 @@ func InitW7Sdk(config *viper.Viper) {
 	DevCenterNotAppSdk = &devcenter.NotAppService{
 		Base: base.Base{
 			BaseUrl: "http://dev.w7.cc",
-			Appid:   config.GetString("zpk.appid"),
-			Secret:  config.GetString("zpk.secret"),
-		},
-	}
-	IpOrderSdk = &ip.OrderService{
-		Base: base.Base{
-			BaseUrl: "http://ip.w7.cc",
 			Appid:   config.GetString("zpk.appid"),
 			Secret:  config.GetString("zpk.secret"),
 		},
@@ -60,9 +52,9 @@ func InitW7Sdk(config *viper.Viper) {
 		BaseUrl:    attachBaseUrl,
 	}
 
-	ZpkSdk = &zpk.ZpkService{
+	ZpkMarketSdk = &zpk_market.ZpkMarketService{
 		Base: base.Base{
-			BaseUrl: "https://zpk.w7.cc",
+			BaseUrl: config.GetString("setting.depot_market.base_url"),
 			Appid:   config.GetString("zpk.appid"),
 			Secret:  config.GetString("zpk.secret"),
 		},

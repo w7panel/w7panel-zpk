@@ -496,69 +496,10 @@ func (c Formula) List(ctx *gin.Context) {
 	}
 
 	formulaList, total, _ := query.FindByPage((params.Page-1)*params.Limit, params.Limit)
-	installTotalMap := make(map[int32]int32)
-	installRemoteUserAvatarMap := make(map[int32][]string)
 	if formulaList != nil {
-		if !params.Owner {
-			formulaIDs := make([]int32, 0, len(formulaList))
-			for _, item := range formulaList {
-				formulaIDs = append(formulaIDs, item.ID)
-			}
-
-			type formulaInstallTotalRow struct {
-				FormulaID    int32 `gorm:"column:formula_id"`
-				InstallTotal int32 `gorm:"column:install_total"`
-			}
-			installRows := make([]formulaInstallTotalRow, 0)
-			_ = dao.Q.Order.
-				Select(dao.Q.Order.FormulaID, dao.Q.Order.ID.Count().As("install_total")).
-				Where(
-					dao.Q.Order.FormulaID.In(formulaIDs...),
-					dao.Q.Order.OrderType.Eq(logic.OrderTypeBase),
-					dao.Q.Order.PayStatus.Eq(logic.OrderPayStatusSuccess),
-				).
-				Group(dao.Q.Order.FormulaID).
-				Scan(&installRows)
-			for _, row := range installRows {
-				installTotalMap[row.FormulaID] = row.InstallTotal
-			}
-
-			type formulaRemoteConsoleUIDRow struct {
-				FormulaID        int32 `gorm:"column:formula_id"`
-				RemoteConsoleUID int32 `gorm:"column:remote_buyer_uid"`
-			}
-			remoteConsoleUIDRows := make([]formulaRemoteConsoleUIDRow, 0)
-			_ = dao.Q.Order.
-				Select(dao.Q.Order.FormulaID, dao.Q.Order.RemoteBuyerUID).
-				Where(
-					dao.Q.Order.FormulaID.In(formulaIDs...),
-					dao.Q.Order.OrderType.Eq(logic.OrderTypeBase),
-					dao.Q.Order.PayStatus.Eq(logic.OrderPayStatusSuccess),
-					dao.Q.Order.RemoteBuyerUID.Gt(0),
-				).
-				Group(dao.Q.Order.FormulaID, dao.Q.Order.RemoteBuyerUID).
-				Order(dao.Q.Order.FormulaID.Asc(), dao.Q.Order.RemoteBuyerUID.Desc()).
-				Scan(&remoteConsoleUIDRows)
-			for _, row := range remoteConsoleUIDRows {
-				if len(installRemoteUserAvatarMap[row.FormulaID]) >= 3 {
-					continue
-				}
-				if _, exists := installRemoteUserAvatarMap[row.FormulaID]; !exists {
-					installRemoteUserAvatarMap[row.FormulaID] = make([]string, 0)
-				}
-
-				installRemoteUserAvatarMap[row.FormulaID] = append(installRemoteUserAvatarMap[row.FormulaID], logic2.User{}.GetUserAvatar(int(row.RemoteConsoleUID)))
-			}
-		}
-
 		for _, item := range formulaList {
 			formula, err := depotLogin.GetFormula(item.Name, "", user)
 			if err == nil {
-				installTotal, _ := installTotalMap[item.ID]
-				installUserAvatars, _ := installRemoteUserAvatarMap[item.ID]
-				if installUserAvatars == nil {
-					installUserAvatars = make([]string, 0)
-				}
 				resultItem := ResultNode{
 					Name:                 item.Title,
 					Description:          formula.Manifest.Application.Description,
@@ -573,8 +514,6 @@ func (c Formula) List(ctx *gin.Context) {
 					AuditRemark:          item.AuditRemark,
 					RemoteFormulaInfoURL: item.RemoteFormulaInfoURL,
 					Annotation:           formula.Manifest.Application.Annotation,
-					InstallUsersAvatar:   installUserAvatars,
-					InstallTotal:         installTotal,
 					GoodsId:              item.GoodsID,
 				}
 				if !isAdminUser {

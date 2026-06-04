@@ -2,7 +2,6 @@ package controller
 
 import (
 	"errors"
-	"fmt"
 	"slices"
 	"sort"
 
@@ -15,94 +14,10 @@ import (
 	logic2 "github.com/w7panel/w7panel-zpk/common/logic"
 	"github.com/w7panel/w7panel-zpk/common/service/w7"
 	"github.com/w7panel/w7panel-zpk/common/service/w7/devcenter"
-	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 )
 
 type FormulaGoods struct {
 	Abstract
-}
-
-func (c FormulaGoods) GoodsInfo(ctx *gin.Context) {
-	type ParamsValidate struct {
-		Identifie string `uri:"id" binding:"required"`
-	}
-	params := ParamsValidate{}
-	if !c.Validate(ctx, &params) {
-		return
-	}
-
-	formula, err := c.getDepot().GetFormula(params.Identifie, "", nil)
-	if err != nil {
-		c.JsonResponseWithError(ctx, err, 500)
-		return
-	}
-
-	version, _ := dao.Version.Where(dao.Version.ID.Eq(formula.LatestVersionId)).First()
-
-	servicePackages := make([]devcenter.NotAppServicePackage, 0)
-	if formula.ServicePackages != nil && formula.ServicePackages.List != nil {
-		for _, item := range formula.ServicePackages.List {
-			if item.IsEnable == logic.ServicePackageEnable {
-				servicePackages = append(servicePackages, item)
-			}
-		}
-	}
-	versionPrices := make([]devcenter.NotAppBranchVersionPriceInfo, 0)
-	if formula.VersionPrices != nil && formula.VersionPrices.List != nil {
-		versionPrices = formula.VersionPrices.List
-	}
-	if formula.IsFreeUpgrade == -1 {
-		formula.IsFreeUpgrade = 0
-	}
-	formulaFounderUserName := ""
-	if formula.ConsoleUid == 0 && formula.UserId > 0 {
-		user, _ := logic2.User{}.GetById(int(formula.UserId))
-		if user != nil {
-			formulaFounderUserName = user.Username
-		}
-	}
-
-	installTotal, _ := dao.Q.Order.
-		Where(
-			dao.Q.Order.FormulaID.Eq(formula.ID),
-			dao.Q.Order.OrderType.Eq(logic.OrderTypeBase),
-			dao.Q.Order.PayStatus.Eq(logic.OrderPayStatusSuccess),
-		).Count()
-
-	goodsAuditStatus := 0
-	goodsOnshef := 0
-	if formula.GoodsId > 0 {
-		info, err := w7.DevCenterGoodsSdk.PublishGoodsInfo(devcenter.PublishGoodsInfoReq{
-			ConsoleUid: int32(formula.ConsoleUid),
-			Id:         int(formula.GoodsId),
-		})
-		if err == nil {
-			goodsAuditStatus = info.AuditStatus
-			goodsOnshef = info.OnShelf
-		}
-	}
-
-	schemaHttp := "https://"
-	domain := facade.GetConfig().GetString("setting.depot.external_domain")
-	c.JsonResponseWithoutError(ctx, gin.H{
-		"title":               formula.Title,
-		"description":         formula.Manifest.Application.Description,
-		"version":             version,
-		"icon_url":            fmt.Sprintf("%s%s%s", schemaHttp, domain, formula.Icon),
-		"install_service_fee": formula.InstallServiceFee,
-		"service_packages":    servicePackages,
-		"version_prices":      versionPrices,
-		"is_free_upgrade":     formula.IsFreeUpgrade,
-		"product_type":        formula.ProductType,
-		"goods_id":            formula.GoodsId,
-		"tags":                formula.Tags,
-		"formula_type":        formula.Manifest.Application.Type,
-		"founder_console_uid": formula.ConsoleUid,
-		"founder_username":    formulaFounderUserName,
-		"install_total":       installTotal,
-		"goods_audit_status":  goodsAuditStatus,
-		"goods_onshef":        goodsOnshef,
-	})
 }
 
 func (c FormulaGoods) GetCanFeeUpgradeVersions(ctx *gin.Context) {

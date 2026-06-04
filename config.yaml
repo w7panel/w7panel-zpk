@@ -61,6 +61,8 @@ setting:
       local:
         endpoint: ${DOMAIN_URL}/zip
         path: ${DEPOT_LOCAL_BASE_DIR-/tmp/respo}
+  depot_market:
+    base_url: ${DEPOT_MARKET_DOMAIN-172.16.1.161:8000}
   registry:
     intranet_url: ${REGISTRY_NATIVE_URL-}
     external_domain: ${REGISTRY_EXTERNAL_DOMAIN-}

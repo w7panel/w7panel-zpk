@@ -49,5 +49,4 @@ relation:
   - table: registry_repository_deploy_rule
   - table: registry_repository_tag
   - table: registry_repository_deploy_rule_match_log
-  - table: order
   - table: w7panel_user

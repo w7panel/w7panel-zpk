@@ -41,7 +41,6 @@ func (provider *Provider) initDb() {
 			&entity.Tag{},
 			&entity.TagFormula{},
 			&entity.Version{},
-			&entity.Order{},
 			&entity.W7panelUser{},
 		)
 		db.Config.DisableForeignKeyConstraintWhenMigrating = disableFK
@@ -186,26 +185,17 @@ func (provider *Provider) Register(httpServer *http_server.Server, console conso
 		group.Match([]string{"POST", "OPTIONS"}, "/icon", middleware.DenyDomainReq{}.Process, middleware.W7PanelUser{}.Process, controller.FormulaAttach{}.EditIcon)
 		group.Match([]string{"POST", "OPTIONS"}, "/status", middleware.DenyDomainReq{}.Process, middleware.W7PanelUser{}.Process, controller.Formula{}.Status)
 
-		group.Match([]string{"GET", "OPTIONS"}, "/user/info", middleware.W7PanelUser{CanSkip: true, NoAutoCreateUser: true}.Process, middleware.ConsoleUser{CanSkip: true}.Process, controller.User{}.Info)
-
 		//设置商品价格属性
 		group.Match([]string{"POST", "OPTIONS"}, "/goods/can-upgrade-versions", middleware.DenyDomainReq{}.Process, middleware.W7PanelUser{}.Process, controller.FormulaGoods{}.GetCanFeeUpgradeVersions)
 		//发布商品
 		group.Match([]string{"POST", "OPTIONS"}, "/goods/set-service-fee", middleware.DenyDomainReq{}.Process, middleware.W7PanelUser{}.Process, controller.FormulaGoods{}.SetServiceFee)
 		group.Match([]string{"POST", "OPTIONS"}, "/goods/publish", middleware.DenyDomainReq{}.Process, middleware.W7PanelUser{}.Process, middleware.ConsoleUser{}.Process, controller.FormulaGoods{}.PublishGoods)
-		group.Match([]string{"GET", "OPTIONS"}, "/goods/info/:id", controller.FormulaGoods{}.GoodsInfo)
 		group.Match([]string{"POST", "OPTIONS"}, "/goods/labels", middleware.W7PanelUser{}.Process, middleware.ConsoleUser{}.Process, controller.FormulaGoods{}.GetGoodsLabels)
 		group.Match([]string{"POST", "OPTIONS"}, "/attach/upload-img", middleware.DenyDomainReq{}.Process, middleware.W7PanelUser{}.Process, middleware.ConsoleUser{}.Process, controller.CloudAttach{}.UploadImg)
 
 		//从云端同步应用
 		group.Match([]string{"POST", "OPTIONS"}, "/cloud-app/notapp/list", middleware.DenyDomainReq{}.Process, middleware.W7PanelUser{}.Process, middleware.ConsoleUser{}.Process, controller.CloudApp{}.NotAppList)
 		group.Match([]string{"POST", "OPTIONS"}, "/cloud-app/notapp/unpack", middleware.DenyDomainReq{}.Process, middleware.W7PanelUser{}.Process, middleware.ConsoleUser{}.Process, controller.CloudApp{}.UnPackNotApp)
-
-		group.Match([]string{"POST", "OPTIONS"}, "/order/pay", middleware.W7PanelUser{}.Process, middleware.ConsoleUser{}.Process, controller.Order{}.Pay)
-		group.Match([]string{"POST", "OPTIONS"}, "/order/info", middleware.W7PanelUser{}.Process, middleware.ConsoleUser{}.Process, controller.Order{}.Query)
-		group.Match([]string{"POST", "OPTIONS"}, "/order/list", middleware.W7PanelUser{}.Process, middleware.ConsoleUser{}.Process, controller.Order{}.List)
-		group.Match([]string{"POST", "OPTIONS"}, "/order/pay-notify", middleware.W7App{}.Process, controller.Order{}.PayNotify)
-		group.Match([]string{"POST", "OPTIONS"}, "/order/refund-notify", middleware.W7App{}.Process, controller.Order{}.RefundNotify)
 
 		//安装成功
 		group.Match([]string{"POST", "OPTIONS"}, "/install/complete-notify", controller.Formula{}.InstallComplete)
@@ -235,10 +225,6 @@ func (provider *Provider) Register(httpServer *http_server.Server, console conso
 		cors.Match([]string{"POST", "OPTIONS"}, "/helm/chart/list", middleware.DenyDomainReq{}.Process, middleware.W7PanelUser{}.Process, controller.Helm{}.GetHelmRepositoryCharts)
 		cors.Match([]string{"POST", "OPTIONS"}, "/helm/chart/version/list", middleware.DenyDomainReq{}.Process, middleware.W7PanelUser{}.Process, controller.Helm{}.GetHelmRepositoryChartVersions)
 
-		openApiGroup := group.Group("/open-api", middleware.W7AppV2{}.Process)
-		{
-			openApiGroup.Match([]string{"POST", "OPTIONS"}, "/formula/info", controller.Formula{}.Info)
-		}
 		group.Match([]string{"POST", "OPTIONS"}, "/open-api/formula/base-info", controller.Formula{}.BaseInfo)
 	})
 

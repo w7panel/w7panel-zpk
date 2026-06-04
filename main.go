@@ -2,9 +2,7 @@ package main
 
 import (
 	"bytes"
-	"embed"
 	_ "embed"
-	"io/fs"
 	nethttp "net/http"
 
 	"github.com/gin-gonic/gin"
@@ -27,9 +25,6 @@ import (
 
 //go:embed config.yaml
 var ConfigFileContent []byte
-
-//go:embed public
-var Asset embed.FS
 
 func main() {
 	app := app.NewApp(app.Option{
@@ -66,12 +61,6 @@ func main() {
 		})
 		ctx.Abort()
 	})
-	httpServer.RegisterRouters(
-		func(engine *gin.Engine) {
-			staticFp, _ := fs.Sub(Asset, "public")
-			engine.NoRoute(gin.WrapH(nethttp.FileServer(nethttp.FS(staticFp))))
-		},
-	)
 
 	response.SetErrResponseHandler(func(ctx *gin.Context, env string, err error, statusCode int) {
 		ctx.JSON(statusCode, map[string]interface{}{

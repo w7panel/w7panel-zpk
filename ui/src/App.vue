@@ -180,7 +180,7 @@ export default {
 	align-items: flex-start;
 }
 
-.zpk-primary-alert .arco-alert-icon {
+.zpk-primary-alert.no-title .arco-alert-icon {
 	margin-top: 5px;
 }
 
@@ -192,7 +192,6 @@ export default {
 }
 
 .zpk-primary-alert .arco-alert-content {
-	margin-top: 4px;
 	color: var(--color-text-2) !important;
 	font-size: 14px !important;
 	line-height: 22px;

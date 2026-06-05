@@ -23,7 +23,7 @@
               </a-select>
             </div>
           </div>
-          <a-alert type="info" show-icon class="zpk-primary-alert registry-primary-warning mt-20" :closable="false">
+          <a-alert type="info" show-icon class="zpk-primary-alert no-title registry-primary-warning mt-20" :closable="false">
             <div class="registry-alert-item">docker login命令登录信息可在 <span class="credential-link" @click="accessDialogShow = true"><ArcoIcon name="icon-244" :size="16" color="#3370ff" />访问凭证</span>中获取
             </div>
             <div class="registry-alert-item mt-6">外网地址：<span class="cursor txt-line"

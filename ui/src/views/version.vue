@@ -233,14 +233,15 @@
     </a-spin>
     <a-modal v-model:visible="form.show" :width="640" :title="form.edit ? '编辑版本' : '新建版本'" :footer="false"
         modal-class="createversiondialog">
-        <a-alert type="warning" class="primary-arco-warning" :closable="false" style="line-height:1.5;">
-            <div class="b">版本分类标准</div>
-            <div>1，格式：主版本号 . 次版本号 . 修订号</div>
-            <div>2，小版本：仅修订号变更（例：1.0.0、1.0.2、1.0.10）</div>
-            <div>3，大版本：主 / 次版本号变更（例：1.0.0、1.1.2、1.10.2、2.0.0）</div>
-            <div class="b mt-6">升级规则</div>
-            <div>1，小版本：支持直接跨版升级（例：1.0.0 → 1.0.10 可直接完成）</div>
-            <div>2，跨大版本：需逐次升级路径中所有大版本，不可跳过（例：1.0.0 → 1.1.2 → 1.10.2 → 2.0.0，不可跳过中间大版本直接升级）</div>
+        
+        <a-alert type="info" class="zpk-primary-alert" :closable="false">
+            <div class="arco-alert-title">版本分类标准</div>
+            <div class="registry-alert-item">1，格式：主版本号 . 次版本号 . 修订号</div>
+            <div class="registry-alert-item">2，小版本：仅修订号变更（例：1.0.0、1.0.2、1.0.10）</div>
+            <div class="registry-alert-item">3，大版本：主 / 次版本号变更（例：1.0.0、1.1.2、1.10.2、2.0.0）</div>
+            <div class="arco-alert-title mt-6">升级规则</div>
+            <div class="registry-alert-item">1，小版本：支持直接跨版升级（例：1.0.0 → 1.0.10 可直接完成）</div>
+            <div class="registry-alert-item">2，跨大版本：需逐次升级路径中所有大版本，不可跳过（例：1.0.0 → 1.1.2 → 1.10.2 → 2.0.0，不可跳过中间大版本直接升级）</div>
         </a-alert>
         <div style="margin-top:20px; padding-left:20px;">
             <a-form :model="form" ref="newversionform" :rules="rules" label-align="left" class="version-create-form"

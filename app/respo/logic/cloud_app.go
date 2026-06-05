@@ -98,7 +98,7 @@ func (l CloudApp) UnpackNotAppToFormula(notAppId int, user *entity.RegistryUser,
 	goodsExt := make(map[string]interface{})
 	if notAppInfo.GoodsId > 0 {
 		goodsInfo, err := w7.DevCenterGoodsSdk.PublishGoodsInfo(devcenter.PublishGoodsInfoReq{
-			ConsoleUid: consoleUid,
+			ConsoleUid: int(consoleUid),
 			Id:         notAppInfo.GoodsId,
 		})
 		if err != nil {

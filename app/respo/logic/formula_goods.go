@@ -132,7 +132,7 @@ func (l FormulaGoods) PublishGoods(formula *Formula, publishGoodsReq devcenter.P
 	_, err = dao.Formula.Where(dao.Formula.ID.Eq(formula.ID)).Updates(entity.Formula{
 		GoodsID:        int32(goods.Id),
 		GoodsProductID: int32(goodsProductId),
-		RemoteUID:      publishGoodsReq.ConsoleUid,
+		RemoteUID:      int32(publishGoodsReq.ConsoleUid),
 	})
 	return err
 }

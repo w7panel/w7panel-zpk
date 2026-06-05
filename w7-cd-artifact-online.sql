@@ -54,34 +54,6 @@ CREATE TABLE `ims_formula` (
 -- --------------------------------------------------------
 
 --
--- 表的结构 `ims_order`
---
-
-CREATE TABLE `ims_order` (
-                             `id` int NOT NULL,
-                             `parent_id` int DEFAULT NULL,
-                             `order_sn` varchar(128) NOT NULL,
-                             `user_id` int DEFAULT '0',
-                             `remote_buyer_uid` int NOT NULL DEFAULT '0',
-                             `order_type` tinyint NOT NULL DEFAULT '0',
-                             `total_fee` decimal(10,2) NOT NULL DEFAULT '0.00',
-                             `buy_shop` varchar(255) NOT NULL,
-                             `formula_id` int NOT NULL DEFAULT '0',
-                             `formula_version` varchar(64) DEFAULT NULL,
-                             `product_type` tinyint NOT NULL DEFAULT '0',
-                             `out_order_sn` varchar(128) DEFAULT NULL,
-                             `used_time` datetime DEFAULT NULL,
-                             `service_expire_time` int DEFAULT '0',
-                             `service_expire_time_v2` datetime DEFAULT NULL,
-                             `pay_status` tinyint NOT NULL DEFAULT '0',
-                             `paid_at` datetime DEFAULT NULL,
-                             `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                             `updated_at` datetime DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
--- --------------------------------------------------------
-
---
 -- 表的结构 `ims_registry_namespace`
 --
 
@@ -278,13 +250,6 @@ ALTER TABLE `ims_formula`
   ADD UNIQUE KEY `name` (`name`);
 
 --
--- 表的索引 `ims_order`
---
-ALTER TABLE `ims_order`
-    ADD PRIMARY KEY (`id`),
-  ADD KEY `order_sn` (`order_sn`);
-
---
 -- 表的索引 `ims_registry_namespace`
 --
 ALTER TABLE `ims_registry_namespace`
@@ -368,12 +333,6 @@ ALTER TABLE `sessions`
 -- 使用表AUTO_INCREMENT `ims_formula`
 --
 ALTER TABLE `ims_formula`
-    MODIFY `id` int NOT NULL AUTO_INCREMENT;
-
---
--- 使用表AUTO_INCREMENT `ims_order`
---
-ALTER TABLE `ims_order`
     MODIFY `id` int NOT NULL AUTO_INCREMENT;
 
 --

@@ -61,6 +61,19 @@ func (l FormulaGoods) PublishGoods(formula *Formula, publishGoodsReq devcenter.P
 		publishGoodsReq.Description = publishGoodsReq.Title
 	}
 
+	servicePackages := make([]devcenter.NotAppServicePackage, 0)
+	if formula.ServicePackages != nil && formula.ServicePackages.List != nil {
+		for _, item := range formula.ServicePackages.List {
+			if item.IsEnable == ServicePackageEnable {
+				servicePackages = append(servicePackages, item)
+			}
+		}
+	}
+	versionPrices := make([]devcenter.NotAppBranchVersionPriceInfo, 0)
+	if formula.VersionPrices != nil && formula.VersionPrices.List != nil {
+		versionPrices = formula.VersionPrices.List
+	}
+
 	if formula.GoodsId > 0 {
 		info, err := w7.DevCenterGoodsSdk.PublishGoodsInfo(devcenter.PublishGoodsInfoReq{
 			ConsoleUid: publishGoodsReq.ConsoleUid,
@@ -80,8 +93,12 @@ func (l FormulaGoods) PublishGoods(formula *Formula, publishGoodsReq devcenter.P
 	publishGoodsReq.Enable = 1
 	publishGoodsReq.Water = 2
 	publishGoodsReq.Extra = map[string]interface{}{
-		"product_type":    formula.ProductType,
-		"is_free_upgrade": formula.IsFreeUpgrade,
+		"respo_identify":       formula.Name,
+		"respo_latest_version": formula.Version,
+		"service_packages":     servicePackages,
+		"version_prices":       versionPrices,
+		"product_type":         formula.ProductType,
+		"is_free_upgrade":      formula.IsFreeUpgrade,
 	}
 	domain := facade.GetConfig().GetString("setting.depot.external_domain")
 	publishGoodsReq.RespoUrl = fmt.Sprintf("https://%s/zpk/respo/info/%s", domain, formula.Name)

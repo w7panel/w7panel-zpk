@@ -112,7 +112,7 @@
                     </tr>
                 </tbody>
             </table>
-            <div class="dialog-footer">
+            <div class="dialog-footer df jc-c mt-20">
                 <a-button @click="annotationEdit.show = false;">取消</a-button>
                 <a-button @click="submitAnnotation" type="primary">确定</a-button>
             </div>

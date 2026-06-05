@@ -40,7 +40,7 @@
                                         <a-tooltip v-if="goods_id" content="应用已发布至微擎云市场" position="top">
                                             <a class="ml-10 cursor c-blue" target="_blank"
                                                 :href="'https://dev.w7.cc/publishgoods/' + goods_id">
-                                                <span class="va-middle cloud-icon">云</span>
+                                                <IconCloud />
                                                 <span class="ml-4">微擎云市场</span>
                                             </a>
                                         </a-tooltip>
@@ -350,7 +350,7 @@ import description from './description.vue';
 import publishSettings from './publish-settings.vue';
 import userMixin from "@/utils/user-mixin";
 import { messageError, messageSuccess } from '@/utils/ui-feedback';
-import { IconArrowLeft, IconPlus } from '@arco-design/web-vue/es/icon';
+import { IconArrowLeft, IconPlus, IconCloud } from '@arco-design/web-vue/es/icon';
 
 export default {
     components: {
@@ -359,6 +359,7 @@ export default {
         publishSettings,
         IconArrowLeft,
         IconPlus,
+        IconCloud,
     },
     mixins: [userMixin],
     data() {

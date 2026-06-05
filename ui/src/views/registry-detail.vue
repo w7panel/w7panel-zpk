@@ -21,7 +21,7 @@
                         <template #columns>
                             <a-table-column title="镜像版本">
                                 <template #cell="{ record }">
-                                    <a-popover position="bottom" content-class="registry-version-popover">
+                                    <a-popover position="bl" content-class="registry-version-popover">
                                         <span class="c-blue cursor">{{ record.TagName }}</span>
                                         <template #content>
                                             <a-form :model="record" label-align="left" :label-col-props="{ span: 6, flex: '0 0 160px' }"

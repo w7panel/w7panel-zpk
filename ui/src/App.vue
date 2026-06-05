@@ -169,10 +169,11 @@ export default {
 	margin-left: 16px;
 }
 
-.zpk-primary-alert {
+.arco-alert.zpk-primary-alert {
 	color: var(--color-text-2) !important;
 	background: #f2f7ff !important;
 	border: 0 !important;
+	align-items: start;
 }
 
 .zpk-primary-alert .arco-alert-body {
@@ -180,7 +181,7 @@ export default {
 }
 
 .zpk-primary-alert .arco-alert-icon {
-	margin-top: 2px;
+	margin-top: 5px;
 }
 
 .zpk-primary-alert .arco-alert-title {

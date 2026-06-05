@@ -56,9 +56,9 @@ func (l FormulaGoods) PublishGoods(formula *Formula, publishGoodsReq devcenter.P
 	}
 
 	publishGoodsReq.Title = formula.Manifest.Application.Name
-	publishGoodsReq.Description = formula.Manifest.Application.Description
-	if publishGoodsReq.Description == "" {
-		publishGoodsReq.Description = publishGoodsReq.Title
+	publishGoodsReq.Summary = formula.Manifest.Application.Description
+	if publishGoodsReq.Summary == "" {
+		publishGoodsReq.Summary = publishGoodsReq.Title
 	}
 
 	servicePackages := make([]devcenter.NotAppServicePackage, 0)

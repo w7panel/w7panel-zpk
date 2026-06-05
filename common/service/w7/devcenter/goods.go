@@ -19,7 +19,7 @@ type PublishGoodsReq struct {
 	ConsoleUid  int32                    `json:"console_uid"`
 	Id          int                      `json:"id"`
 	Title       string                   `json:"title"`
-	Description string                   `json:"description"`
+	Summary     string                   `json:"summary"`
 	GoodsType   int                      `json:"category_id"`
 	Logo        string                   `json:"logo"`
 	WindowLogo  string                   `json:"window_logo"`

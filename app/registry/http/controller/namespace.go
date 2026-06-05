@@ -120,8 +120,8 @@ func (c Namespace) List(ctx *gin.Context) {
 	isAdminUser := user != nil && logic2.User{}.IsAdminUser(user)
 	ignoreNamespaceConfig := facade.GetConfig().GetString("setting.registry.list_ignore_namespaces")
 	ignoredNamespaces := strings.Split(ignoreNamespaceConfig, ",")
-	respList := make([]NamespaceRespInfo, len(list))
-	for i, item := range list {
+	respList := make([]NamespaceRespInfo, 0)
+	for _, item := range list {
 		if !isAdminUser && slices.Contains(ignoredNamespaces, item.Name) {
 			continue
 		}
@@ -129,7 +129,7 @@ func (c Namespace) List(ctx *gin.Context) {
 			RegistryNamespace: *item,
 			CanEdit:           logic.Permission{}.IsCanOperate(ctx, item.UserID),
 		}
-		respList[i] = info
+		respList = append(respList, info)
 	}
 
 	type NamespaceRegistryCount struct {

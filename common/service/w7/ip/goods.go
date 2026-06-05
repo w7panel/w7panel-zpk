@@ -3,11 +3,12 @@ package ip
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/w7panel/w7panel-zpk/common/service/w7/base"
 	"io"
 	"net/http"
 	"strconv"
 	"time"
+
+	"github.com/w7panel/w7panel-zpk/common/service/w7/base"
 )
 
 type GoodsService struct {
@@ -43,7 +44,7 @@ func (s GoodsService) SetOrderSetting(setGoodsSettingReq SetGoodsSettingReq) err
 		req.Header.Set("User-Agent", base.DefaultUserAgent)
 	}
 	req.Header.Set("x-requested-with", "XMLHttpRequest")
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	resp, err := client.Do(req)
 	if err != nil {
 		return err

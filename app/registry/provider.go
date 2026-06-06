@@ -2,11 +2,14 @@ package registry
 
 import (
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/w7panel/w7panel-zpk/app/registry/http/controller"
 	"github.com/w7panel/w7panel-zpk/app/registry/logic"
 	respologic "github.com/w7panel/w7panel-zpk/app/system/logic"
+	"github.com/w7panel/w7panel-zpk/common/accessor"
 	"github.com/w7panel/w7panel-zpk/common/dao"
 	"github.com/w7panel/w7panel-zpk/common/entity"
 	"github.com/w7panel/w7panel-zpk/common/function"
@@ -144,6 +147,76 @@ func (p Provider) initDb() {
 			panic(err)
 		}
 	}
+
+	initLockFile := filepath.Join(facade.GetConfig().GetString("setting.db_dir"), ".initdb.lock")
+	if _, err := os.Stat(initLockFile); os.IsNotExist(err) {
+		if err := p.syncRegistryUserPermissions(); err != nil {
+			panic(err)
+		}
+		if err := os.WriteFile(initLockFile, []byte("done"), 0o644); err != nil {
+			panic(err)
+		}
+	} else if err != nil {
+		panic(err)
+	}
+}
+
+func (provider *Provider) syncRegistryUserPermissions() error {
+	ociNamespace := facade.GetConfig().GetString("setting.depot.oci_namespace")
+	if ociNamespace == "" {
+		return nil
+	}
+
+	actions := accessor.PermissionActionOption{
+		"push",
+		"pull",
+	}
+
+	users, err := dao.Q.RegistryUser.Find()
+	if err != nil {
+		return err
+	}
+	userIDs := make([]int32, 0, len(users))
+	for _, user := range users {
+		userIDs = append(userIDs, user.ID)
+	}
+	if len(userIDs) > 0 {
+		newPermissions := make([]*entity.RegistryUserPermission, 0)
+		for _, user := range users {
+			newPermissions = append(newPermissions, &entity.RegistryUserPermission{
+				UserID:        user.ID,
+				ResourceType:  "namespace",
+				ResourceValue: ociNamespace,
+				Action:        &actions,
+			})
+		}
+		if len(newPermissions) > 0 {
+			if err := dao.Q.RegistryUserPermission.CreateInBatches(newPermissions, 100); err != nil {
+				return err
+			}
+		}
+	}
+
+	formulas, err := dao.Q.Formula.Find()
+	if err != nil {
+		return err
+	}
+	repositoryPermissions := make([]*entity.RegistryUserPermission, 0)
+	for _, formula := range formulas {
+		if formula.UserID <= 0 || strings.TrimSpace(formula.Name) == "" {
+			continue
+		}
+		repositoryPermissions = append(repositoryPermissions, &entity.RegistryUserPermission{
+			UserID:        formula.UserID,
+			ResourceType:  "repository",
+			ResourceValue: ociNamespace + "/" + strings.ReplaceAll(formula.Name, "-", "_"),
+			Action:        &actions,
+		})
+	}
+	if len(repositoryPermissions) == 0 {
+		return nil
+	}
+	return dao.Q.RegistryUserPermission.CreateInBatches(repositoryPermissions, 100)
 }
 
 func (p Provider) Register(httpServer *httpserver.Server) {

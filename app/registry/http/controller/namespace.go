@@ -2,6 +2,8 @@ package controller
 
 import (
 	"errors"
+	"slices"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/w7panel/w7panel-zpk/app/registry/logic"
@@ -9,6 +11,7 @@ import (
 	"github.com/w7panel/w7panel-zpk/common/dao"
 	"github.com/w7panel/w7panel-zpk/common/entity"
 	logic2 "github.com/w7panel/w7panel-zpk/common/logic"
+	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 )
 
@@ -113,13 +116,20 @@ func (c Namespace) List(ctx *gin.Context) {
 		c.JsonResponseWithServerError(ctx, err)
 		return
 	}
-	respList := make([]NamespaceRespInfo, len(list))
-	for i, item := range list {
+
+	isAdminUser := user != nil && logic2.User{}.IsAdminUser(user)
+	ignoreNamespaceConfig := facade.GetConfig().GetString("setting.registry.list_ignore_namespaces")
+	ignoredNamespaces := strings.Split(ignoreNamespaceConfig, ",")
+	respList := make([]NamespaceRespInfo, 0)
+	for _, item := range list {
+		if !isAdminUser && slices.Contains(ignoredNamespaces, item.Name) {
+			continue
+		}
 		info := NamespaceRespInfo{
 			RegistryNamespace: *item,
 			CanEdit:           logic.Permission{}.IsCanOperate(ctx, item.UserID),
 		}
-		respList[i] = info
+		respList = append(respList, info)
 	}
 
 	type NamespaceRegistryCount struct {

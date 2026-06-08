@@ -415,6 +415,10 @@ a,
 	padding: 20px;
 }
 
+.pt-0 {
+	padding-top: 0;
+}
+
 .fs-0 {
 	font-size: 0;
 }
@@ -529,32 +533,45 @@ a,
 
 .table {
     width: 100%;
+    color: var(--color-text-1, #1d2129);
+    font-size: 14px;
 }
 
-.table .thead .td {
-    background-color: #f2f3f5;
+.table .thead .td,
+.table thead tr:first-child td {
+    color: var(--color-text-1, #1d2129);
+    font-weight: 400;
+    background: #f2f3f5;
+    border-top: 0;
 }
 
 .table td {
-    padding: 10px;
-    line-height: 1.4;
+    padding: 10px 16px;
+    color: var(--color-text-1, #1d2129);
+    line-height: 22px;
     border: 1px solid #f2f3f5;
     border-left: 0;
     border-right: 0;
+    background: #ffffff;
+}
+
+.table tbody tr:hover td {
     background: #f7f8fa;
 }
 
+.table tbody tr td.cursor.txt-c,
+.table tbody tr:hover td.cursor.txt-c,
+.table tr:last-child td.cursor.txt-c,
+.table.nolast tr:last-child td.cursor.txt-c {
+    background: #ffffff;
+}
+
 .table tr:last-child td {
-    background: transparent;
+    background: #ffffff;
 }
 
 .table.nolast tr:last-child td {
-    background: #f0f3fa;
-}
-
-.table thead tr:first-child td {
-    background: #f3f3f3;
-    border-top: 0;
+    background: #f7f8fa;
 }
 
 
@@ -563,28 +580,37 @@ a,
 }
 
 .addmenu {
-    padding: 5px 20px;
+    min-height: 32px;
+    padding: 0 16px;
     display: flex;
     justify-content: center;
     align-items: center;
     gap: 6px;
-    line-height: 1;
+    color: #333333;
+    font-size: 14px;
+    line-height: 32px;
+    background: transparent;
+    border-radius: 2px;
 }
 
 .addmenu:hover {
-    color: #2d5fff;
+    color: #165dff;
+    background: transparent;
 }
 
 
 .greybox {
     padding: 16px;
     background-color: #f7f8fa;
+    border-radius: 2px;
 }
 
 .greybox .greybox-title {
-    font-weight: bold;
-    line-height: 20px;
-    margin-bottom: 20px;
+    color: var(--color-text-1, #1d2129);
+    font-size: 16px;
+    font-weight: 500;
+    line-height: 24px;
+    margin-bottom: 16px;
 	display: flex;
 	align-items: center;
 }

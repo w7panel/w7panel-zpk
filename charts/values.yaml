@@ -8,7 +8,7 @@ image:
   repository: zpk.w7.cc/public/zpk
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: v2.5.58
+  tag: v2.6.1
 
 imagePullSecrets: []
 nameOverride: ""
@@ -91,6 +91,7 @@ global:
     storageRWMode: "ReadWriteOnce"
   zpk:
     storageSize: "1Gi"
+    storageClaimName: "w7-zpkv2-v2"
 
   DOMAIN:
   WEBHOOK_TOKEN: qW3eR9t

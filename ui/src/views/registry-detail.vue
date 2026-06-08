@@ -1,10 +1,17 @@
 <template>
     <div class="bg-white" style="min-height:100%;">
-        <div class="com-back df ai-c ">
+        <div class="com-back registry-detail-breadcrumb df ai-c">
             <span class="backbtn df ai-c" @click="$router.go(-1)">
-                <span class="backicon">&lt;</span>
-                <span class="fs-18">{{ data.namespace }}/{{ data.name }}</span>
+                <icon-arrow-left class="backicon" />
             </span>
+            <a-breadcrumb>
+                <a-breadcrumb-item>
+                    <router-link to="/zpk-registry">镜像仓库</router-link>
+                </a-breadcrumb-item>
+                <a-breadcrumb-item>
+                    <span>{{ data.namespace }}/{{ data.name }}</span>
+                </a-breadcrumb-item>
+            </a-breadcrumb>
         </div>
         <div class="bg-white" style="padding: 0 24px 6px;">
             <a-tabs v-model:active-key="tabsActive">
@@ -14,21 +21,34 @@
                         <template #columns>
                             <a-table-column title="镜像版本">
                                 <template #cell="{ record }">
-                                    <a-popover position="bottom">
+                                    <a-popover position="bl" content-class="registry-version-popover">
                                         <span class="c-blue cursor">{{ record.TagName }}</span>
                                         <template #content>
                                             <a-form :model="record" label-align="left" :label-col-props="{ span: 6, flex: '0 0 160px' }"
                                                 :wrapper-col-props="{ span: 18, flex: '1' }" class="registry-detail-form">
                                                 <a-form-item label="镜像ID(SHA256)" style="margin-bottom:0;">
-                                                    <span>{{ record.Digest }}</span>
-                                                    <span class="copy-action" @click="onekeyCopy(record.Digest)">复制</span>
+                                                    <span class="registry-version-digest-line">
+                                                        <span class="registry-version-digest">{{ record.Digest }}</span>
+                                                        <a-tooltip content="复制">
+                                                            <a-button class="icon-action" type="text" shape="circle" size="mini"
+                                                                @click="onekeyCopy(record.Digest)">
+                                                                <template #icon><icon-copy /></template>
+                                                            </a-button>
+                                                        </a-tooltip>
+                                                    </span>
                                                 </a-form-item>
                                                 <a-form-item label="平台" style="margin-bottom:0;">{{ record.Platform }}</a-form-item>
                                                 <a-form-item label="制品类型" style="margin-bottom:0;">{{ record.Type }}</a-form-item>
                                             </a-form>
                                         </template>
                                     </a-popover>
-                                    <span class="copy-action" @click="onekeyCopy(record.TagName)">复制</span>
+                                    <a-tooltip content="复制">
+                                        <a-button class="icon-action registry-tag-copy" type="text" shape="circle" size="mini"
+                                            style="color:#333333;"
+                                            @click="onekeyCopy(record.TagName)">
+                                            <template #icon><icon-copy /></template>
+                                        </a-button>
+                                    </a-tooltip>
                                 </template>
                             </a-table-column>
 
@@ -57,33 +77,49 @@
                     </div>
                 </a-tab-pane>
                 <a-tab-pane key="info" title="仓库信息">
-                    <a-spin :loading="loading">
-                        <a-form :model="data" label-align="left" :label-col-props="{ span: 5, flex: '0 0 150px' }"
-                            :wrapper-col-props="{ span: 19, flex: '1' }" class="registry-detail-form mt-24">
+                    <a-spin :loading="loading" class="registry-info-spin">
+                        <a-form :model="data" label-align="left" :label-col-props="{ flex: '0 0 96px' }"
+                            :wrapper-col-props="{ flex: '1' }" class="registry-detail-form registry-info-form mt-24">
                             <a-form-item label="仓库名称">{{ data.namespace }}/{{ data.name }}</a-form-item>
                             <a-form-item label="仓库地址">
                                 {{ data.registry }}/{{ data.namespace }}/{{ data.name }}
-                                <span class="copy-action"
-                                    @click="onekeyCopy(`${data.registry}/${data.namespace}/${data.name}`)">复制</span>
+                                <a-tooltip content="复制">
+                                    <a-button class="icon-action" type="text" shape="circle" size="mini"
+                                        @click="onekeyCopy(`${data.registry}/${data.namespace}/${data.name}`)">
+                                        <template #icon><icon-copy /></template>
+                                    </a-button>
+                                </a-tooltip>
                             </a-form-item>
                             <a-form-item label="命名空间">{{ data.namespace }}</a-form-item>
                             <a-form-item label="公共权限">
                                 {{ data.visible_type === 3 ? namespaceTypeMap[data.namespace] :
                                     visibleTypeMap[data.visible_type]}}
-                                <span class="edit-action" @click="edit('visible_type')"
-                                    v-if="hasAccess(data.user_id)">编辑</span>
+                                <a-tooltip v-if="hasAccess(data.user_id)" content="编辑">
+                                    <a-button class="icon-action" type="text" shape="circle" size="mini"
+                                        @click="edit('visible_type')">
+                                        <template #icon><icon-edit /></template>
+                                    </a-button>
+                                </a-tooltip>
                             </a-form-item>
                             <a-form-item label="描述">
                                 {{ data.desc }}
-                                <span class="edit-action" @click="edit('desc')" v-if="hasAccess(data.user_id)">编辑</span>
+                                <a-tooltip v-if="hasAccess(data.user_id)" content="编辑">
+                                    <a-button class="icon-action" type="text" shape="circle" size="mini"
+                                        @click="edit('desc')">
+                                        <template #icon><icon-edit /></template>
+                                    </a-button>
+                                </a-tooltip>
                             </a-form-item>
                             <a-form-item label="创建时间">{{ data.created_at ? new Date(data.created_at).toLocaleString() : '' }}</a-form-item>
                         </a-form>
                     </a-spin>
                 </a-tab-pane>
                 <a-tab-pane key="build" title="镜像部署" v-if="hasAccess(data.user_id)">
-                    <div>
-                        <a-button type="primary" @click="openBuildForm()">新增自动部署任务</a-button>
+                    <div class="zpk-toolbar-left">
+                        <a-button type="primary" @click="openBuildForm()">
+                            <template #icon><icon-plus /></template>
+                            新增自动部署任务
+                        </a-button>
                     </div>
                     <a-table :loading="loading" :data="builds" class="mt-20 table-header" style="width: 100%"
                         :pagination="false" row-key="id">
@@ -133,18 +169,18 @@
                         </a-radio-group>
                     </div>
                 </a-form-item>
-                <a-form-item>
-                    <a-button type="primary" size="large" @click="onSubmit">确定</a-button>
-                    <a-button size="large" @click="visible = false">取消</a-button>
-                </a-form-item>
             </a-form>
+            <div class="dialog-footer">
+                <a-button size="large" @click="visible = false">取消</a-button>
+                <a-button type="primary" size="large" @click="onSubmit">确定</a-button>
+            </div>
         </a-modal>
 
         <a-modal v-model:visible="buildForm.show" :title="buildForm.id ? '修改自动部署任务' : '新增自动部署任务'"
             :width="800" :footer="false">
             <a-form ref="buildForm" :model="buildForm" :rules="rules" label-align="left"
                 :label-col-props="{ span: 5, flex: '0 0 120px' }" :wrapper-col-props="{ span: 19, flex: '1' }"
-                class="registry-detail-form">
+                class="registry-detail-form registry-build-form">
                 <a-form-item label="" style="margin-bottom:10px;">
                     <a-radio-group v-model="buildForm.selectType" style="margin-bottom:0;"
                         @change="changeBuildFormType">
@@ -266,11 +302,11 @@
                         </div>
                     </div>
                 </a-form-item>
-                <a-form-item>
-                    <a-button type="primary" size="large" @click="submitBuildForm">确定</a-button>
-                    <a-button size="large" @click="buildForm.show = false">取消</a-button>
-                </a-form-item>
             </a-form>
+            <div class="dialog-footer">
+                <a-button size="large" @click="buildForm.show = false">取消</a-button>
+                <a-button type="primary" size="large" @click="submitBuildForm">确定</a-button>
+            </div>
         </a-modal>
 
         <a-modal v-model:visible="buildDetail.show" title="自动部署任务详情" :width="750" :footer="false">
@@ -317,8 +353,15 @@ import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
 import userMixin from "@/utils/user-mixin";
 import { confirm, messageSuccess } from "@/utils/ui-feedback";
+import { IconArrowLeft, IconCopy, IconEdit, IconPlus } from '@arco-design/web-vue/es/icon';
 
 export default {
+    components: {
+        IconArrowLeft,
+        IconCopy,
+        IconEdit,
+        IconPlus,
+    },
     data() {
         return {
             visibleTypeMap: {
@@ -919,33 +962,64 @@ export default {
     margin-bottom: 30px;
 }
 
-.backbtn {
-    cursor: pointer;
+.registry-detail-breadcrumb {
+    height: 56px;
+    padding: 0 24px;
 }
 
-.backicon {
-    color: #0052D9;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 20px;
-    height: 20px;
-    margin-right: 4px;
-    font-size: 20px;
-    line-height: 1;
-}
-
-.copy-action,
-.edit-action {
+.icon-action {
     margin-left: 6px;
     color: #3370ff;
-    cursor: pointer;
+    vertical-align: middle;
+    width: 24px;
+    height: 24px;
+    font-size: 16px;
+}
+
+.icon-action :deep(.arco-icon) {
+    font-size: 16px;
+}
+
+.registry-tag-copy,
+.registry-tag-copy :deep(.arco-icon) {
+    color: #333333 !important;
+}
+
+:deep(.arco-btn.registry-tag-copy) {
+    color: #333333 !important;
+}
+
+.registry-info-form {
+    width: 100%;
+}
+
+.registry-info-spin {
+    display: block;
+    width: 100%;
+}
+
+.registry-info-form :deep(.arco-form-item-label-col) {
+    flex: 0 0 96px !important;
+    width: 96px;
+    max-width: 96px;
+}
+
+.registry-info-form :deep(.arco-form-item-wrapper-col) {
+    flex: 1 1 auto !important;
+    min-width: 0;
+    max-width: calc(100% - 96px);
+}
+
+.registry-info-form :deep(.arco-form-item-content-wrapper),
+.registry-info-form :deep(.arco-form-item-content) {
+    width: 100%;
+    min-width: 0;
 }
 
 .table-header :deep(.arco-table-th) {
-    background: #F3F3F3;
-    color: #666666;
-    font-weight: 500;
+    background: #f2f3f5;
+    color: var(--color-text-1);
+    font-weight: 400;
 }
 
 .table-header :deep(.arco-table-container) {
@@ -1099,5 +1173,40 @@ export default {
 
 .upfile .fileinput::file-selector-button {
     display: none;
+}
+</style>
+<style>
+.registry-version-popover {
+    max-width: 520px;
+    white-space: normal;
+}
+
+.registry-version-popover .arco-popover-content,
+.registry-version-popover .registry-version-digest-line,
+.registry-version-popover .arco-form-item-content {
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-all;
+}
+
+.registry-version-popover .registry-version-digest-line {
+    display: inline;
+    line-height: 24px;
+}
+
+.registry-version-popover .registry-version-digest {
+    display: inline;
+}
+
+.registry-version-popover .registry-version-digest-line .icon-action {
+    display: inline-flex;
+    margin-left: 4px;
+    vertical-align: middle;
+}
+
+.registry-tag-copy,
+.registry-tag-copy .arco-icon {
+    color: #333333 !important;
 }
 </style>

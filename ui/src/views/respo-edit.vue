@@ -1,30 +1,39 @@
 <template>
     <div style="height:100vh;">
-        <div style="padding:20px; border-bottom:1px solid #E7E7E7;">
+        <div class="zpk-page-header">
+            <span class="backbtn df ai-c" @click="$router.go(-1)">
+                <icon-arrow-left class="backicon" />
+            </span>
             <a-breadcrumb>
-                <a-breadcrumb-item><router-link to="/zpk" class="c-99 fw-400">我的制品库</router-link></a-breadcrumb-item>
+                <a-breadcrumb-item><router-link to="/zpk" class="c-99 fw-400">制品管理</router-link></a-breadcrumb-item>
                 <a-breadcrumb-item>
                     <router-link :to="{ path: '/zpk-version', query: { id: identifie, title: vtitle } }"
-                        class="c-99 fw-400">版本管理</router-link>
+                        class="c-99 fw-400">{{ vtitle || identifie }}</router-link>
                 </a-breadcrumb-item>
                 <a-breadcrumb-item><span class="c-33 fw-400">应用基础信息修改</span></a-breadcrumb-item>
             </a-breadcrumb>
         </div>
         <a-spin :loading="deleteLoading" class="edit-spin">
             <div v-if="manifest && (!noPlatform || isCreate)">
-                <div class="df jc-b" style="padding:20px 20px 0">
-                    <div class="df">
+                <div class="zpk-page-toolbar edit-package-toolbar">
+                    <div class="zpk-toolbar-left">
                         <a-button @click="dependsIndex = -1;"
                             :type="dependsIndex == -1 ? 'primary' : 'secondary'">主应用</a-button>
-                        <div v-for="(item, index) in depends" :key="item.identifie"
-                            style="margin-left:10px;position:relative;">
+                        <div v-for="(item, index) in depends" :key="item.identifie" style="position:relative;">
                             <a-button :type="dependsIndex == index ? 'primary' : 'secondary'"
                                 @click="dependsIndex = index; edit({ stop: true })">{{ item.identifie }}</a-button>
                             <span @click="delDepend(index)" class="depend-close c-red fs-20 cursor">×</span>
                         </div>
-                        <a-button @click="openAddDepend" style="margin-left:10px;">+ 添加子应用</a-button>
+                        <a-button @click="openAddDepend">
+                            <template #icon><icon-plus /></template>
+                            添加子应用
+                        </a-button>
                     </div>
-                    <a-button type="primary" @click="impt.show = true; impt.data = null;">导入制品库</a-button>
+                    <div class="zpk-toolbar-right">
+                        <a-button type="primary" @click="impt.show = true; impt.data = null;">
+                            导入制品库
+                        </a-button>
+                    </div>
                 </div>
                 <files-manifest v-show="dependsIndex == -1" :data="manifest" :version_id="version_id" ref="form"
                     :option="{ edit: true, imginstall: true, mainapp: true, app_ports: this.app_ports }"
@@ -32,8 +41,8 @@
                     @structure="structure"></files-manifest>
                 <files-manifest v-for="(item, index) in depends" :key="item.identifie" :ref="'depends' + index"
                     v-show="dependsIndex == index" :data="depends[index].manifest"
-                    :option="{ pureManifest: true, imginstall: true, required: item.required }" @complete="dependsComplete"
-                    @structure="structure"></files-manifest>
+                    :option="{ pureManifest: true, imginstall: true, required: item.required, app_ports: this.app_ports }"
+                    :identifie="item.identifie" @complete="dependsComplete" @structure="structure"></files-manifest>
             </div>
             <div v-else>
                 <a-empty description="" class="manifest-empty">
@@ -45,11 +54,14 @@
     </div>
     <a-modal v-model:visible="impt.show" title="导入制品库" :width="560" :footer="false"
         modal-class="zpk-version-dialog">
-        <div class="df" style="padding:10px;">
+        <div class="zpk-modal-content import-zpk-content">
             <a-auto-complete v-model="impt.title" ref="imptzpk" :data="impt.options" placeholder="请选择制品库"
                 style="width:400px;" size="large" allow-clear :filter-option="false" @search="addQuerySearch"
                 @change="handleImportTitleChange" @select="addSelect" :spellcheck="false" />
-            <a-button type="primary" @click="imptSubmit()" class="ml-10" size="large">确定</a-button>
+        </div>
+        <div class="dialog-footer">
+            <a-button @click="impt.show = false">取消</a-button>
+            <a-button type="primary" @click="imptSubmit()" size="large">确定</a-button>
         </div>
     </a-modal>
 </template>
@@ -59,6 +71,7 @@ import myAxios from '@/utils';
 import filesManifest from '@/components/files-manifest.vue';
 import jsyaml from "js-yaml";
 import { confirm, messageError, messageSuccess, messageWarning } from '@/utils/ui-feedback';
+import { IconArrowLeft, IconPlus } from '@arco-design/web-vue/es/icon';
 const defaultManifest = `application:
     name: ''
     identifie: ''
@@ -74,7 +87,7 @@ platform:
 `;
 
 export default {
-    components: { filesManifest },
+    components: { filesManifest, IconArrowLeft, IconPlus },
     data() {
         return {
             identifie: '',
@@ -116,29 +129,66 @@ export default {
         window.removeEventListener('message', this.winMessage);
     },
     watch: {
-        depends() {
+        manifest() {
+            this.updateAppPorts();
+        },
+        depends: {
+            handler() {
+                this.updateAppPorts();
+            },
+            deep: true,
+        },
+    },
+    methods: {
+        getManifestIdentifie(json, fallback) {
+            let identifie = json?.platform?.baseInfo?.identifie || json?.application?.identifie || fallback || '';
+            let author = json?.application?.author || '';
+            if (identifie && author && !/^[^-]+-.+$/.test(identifie)) {
+                return author + '-' + identifie;
+            }
+            return identifie;
+        },
+        extractManifestPorts(manifest, fallback) {
+            let json = jsyaml.load(manifest || '') || {};
+            let ports = [];
+            json?.platform?.['container-v2']?.forEach?.(container => {
+                ports = ports.concat(container?.ports?.map?.(item => item?.port ?? item?.containerPort) || []);
+                if (container?.port || container?.containerPort) {
+                    ports.push(container.port ?? container.containerPort);
+                }
+            });
+            let legacyContainer = json?.platform?.container;
+            if (legacyContainer) {
+                ports = ports.concat(legacyContainer?.ports?.map?.(item => item?.port ?? item?.containerPort) || []);
+                if (legacyContainer?.port || legacyContainer?.containerPort) {
+                    ports.push(legacyContainer.port ?? legacyContainer.containerPort);
+                }
+            }
+            if (Array.isArray(json?.platform?.port)) {
+                ports = ports.concat(json.platform.port.map(item => item?.port ?? item?.containerPort ?? item));
+            } else if (json?.platform?.port) {
+                ports.push(json.platform.port);
+            }
+            return {
+                name: this.getManifestIdentifie(json, fallback),
+                title: json?.platform?.baseInfo?.name || json?.application?.name || '',
+                port: [...new Set(ports.filter(item => item !== '' && item !== undefined && item !== null).map(item => String(item)))]
+            };
+        },
+        updateAppPorts() {
             let arr = [];
+            let main = this.extractManifestPorts(this.manifest, this.identifie);
+            if (main.name && main.port.length) {
+                arr.push(main);
+            }
             for (let i = 0; i < this.depends.length; i++) {
-                let manifest = this.depends[i]?.manifest || '';
-                let json = jsyaml.load(manifest) || {};
-                if (json?.platform?.['container-v2']) {
-                    let port = [];
-                    json?.platform?.['container-v2']?.map?.(i => {
-                        port = port.concat(i.ports.map(j => j.containerPort))
-                    })
-                    port = [...new Set(port)];
-
-                    arr.push({
-                        name: this.depends[i].identifie,
-                        title: json?.application?.name,
-                        port: port
-                    })
+                let item = this.extractManifestPorts(this.depends[i]?.manifest || '', this.depends[i]?.identifie);
+                if (item.name && item.port.length) {
+                    arr.push(item);
                 }
             }
             this.app_ports = arr;
-        }
-    },
-    methods: {
+        },
         structure() {
             let app_name = '';
             if (window.__MICRO_APP_ENVIRONMENT__) {
@@ -303,6 +353,7 @@ export default {
                     });
                     this.depends = depends;
                 }
+                this.updateAppPorts();
             }).finally(() => {
                 this.deleteLoading = false;
             });
@@ -467,6 +518,10 @@ export default {
     min-height: calc(100vh - 65px);
 }
 
+.edit-package-toolbar {
+    padding: 20px 20px 0;
+}
+
 .depend-close {
     position: absolute;
     top: -10px;
@@ -505,15 +560,5 @@ export default {
 .table thead tr:first-child td {
     background: #f3f3f3;
     border-top: 0;
-}
-</style>
-<style>
-.zpk-version-dialog .arco-modal-header {
-    border-bottom: 1px solid #dcdcdc;
-}
-
-.zpk-version-dialog .arco-modal-footer {
-    text-align: center;
-    border-top: 1px solid #dcdcdc;
 }
 </style>

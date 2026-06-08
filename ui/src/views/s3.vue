@@ -1,13 +1,12 @@
 <template>
     <a-spin :loading="pageLoading" class="storage-page">
         <div>
-            <a-alert v-if="storageType !== 's3'" type="info" style="color: #2d5fff" :closable="false" show-icon
-                title="提示" class="mb-20">
+            <a-alert v-if="storageType !== 's3'" type="info" :closable="false" show-icon
+                title="提示" class="zpk-primary-alert storage-primary-alert mb-20">
                 <template #default>
-                    <div class="df jc-b">
-                        <span style="color: var(--gray-800);">修改存储配置前，请先完成历史数据迁移，否则切换后旧镜像可能无法继续拉取。</span>
-                        <a style="text-decoration: none;color: #2d5fff;"
-                    href="https://wiki.w7.com/document/2575/8496" target="_blank">迁移文档</a>
+                    <div>
+                        修改存储配置前，请先完成历史数据迁移，否则切换后旧镜像可能无法继续拉取。
+                        <a class="storage-doc-link" href="https://wiki.w7.com/document/2575/8496" target="_blank">查看迁移文档</a>
                     </div>
                 </template>
             </a-alert>
@@ -367,5 +366,10 @@ export default {
 
 .protocol-select {
     width: 96px;
+}
+
+.storage-doc-link {
+    margin-left: 6px;
+    color: #165dff;
 }
 </style>

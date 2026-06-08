@@ -3,50 +3,57 @@
     <div>
       <div>
         <div class="bg-white bg-padding pb-24" style="border-top:1px solid #EEEEEE;">
-          <div class="df jc-b">
-            <div>
+          <div class="zpk-page-toolbar">
+            <div class="zpk-toolbar-left">
+              <a-button type="primary" @click="add">
+                <template #icon><icon-plus /></template>
+                新建镜像
+              </a-button>
+            </div>
+            <div class="zpk-toolbar-right registry-filter-group">
               <span>命名空间：</span>
               <a-select v-model="activeNamespace" class="registry-filter-select" @change="changeActiveNamespace">
                 <a-option :value="-1" label="所有命名空间" />
-                <a-option v-for="item in namespace" :key="item.id" :value="item.name" />
+                <a-option v-for="item in namespace" :key="item.id" :label="item.name" :value="item.name" />
               </a-select>
-              <span style="margin-left:10px;">二级命名空间：</span>
+              <span>二级命名空间：</span>
               <a-select v-model="subNamespace" class="registry-filter-select" @change="getData(1)">
                 <a-option :value="-1" label="所有命名空间" />
-                <a-option v-for="item in subNamespaceData" :key="item" :value="item" />
+                <a-option v-for="item in subNamespaceData" :key="item" :label="item" :value="item" />
               </a-select>
             </div>
-            <a-button type="primary" @click="add">
-              新建镜像
-            </a-button>
           </div>
-          <a-alert type="warning" class="registry-primary-warning mt-20 fs-14" :closable="false">
-            <div>docker login命令登录信息可在 <span class="credential-link" @click="accessDialogShow = true"><ArcoIcon name="icon-244" :size="16" color="#3370ff" style="vertical-align: text-top;line-height: 1;"/>访问凭证</span>中获取
+          <a-alert type="info" show-icon class="zpk-primary-alert registry-primary-warning mt-20" title="提示" :closable="false">
+            <div class="registry-alert-item">docker login命令登录信息可在 <span class="credential-link" @click="accessDialogShow = true"><ArcoIcon name="icon-244" :size="16" color="#3370ff" />访问凭证</span>中获取
             </div>
-            <div class="mt-6">外网地址：<span class="cursor txt-line"
+            <div class="registry-alert-item mt-6">外网地址：<span class="cursor txt-line"
                 @click="serverdomain.external_domain ? onekeyCopy(serverdomain.external_domain) : null">{{ serverdomain.external_domain || '' }}</span>
             </div>
-            <div class="mt-6">内网地址：<span class="cursor txt-line"
+            <div class="registry-alert-item mt-6">内网地址：<span class="cursor txt-line"
                 @click="serverdomain.intranet_domain ? onekeyCopy(serverdomain.intranet_domain) : null">{{ serverdomain.intranet_domain || '' }}</span>
             </div>
           </a-alert>
           <a-table :data="tableData" :pagination="false" class="mt-20 table-header" row-key="id">
             <template #columns>
-              <a-table-column title="名称" data-index="name" :width="150">
+              <a-table-column title="名称" data-index="name" :width="320">
                 <template #cell="{ record }">
-                  <router-link :to="'/zpk-registry/' + record.id" class="registry-link"
-                    style="padding: 0">
-                    {{ record.name }}
-                  </router-link>
+                  <div class="registry-name-cell">
+                    <span class="registry-link" @click="goDetail(record)">
+                      {{ record.name }}
+                    </span>
+                    <div class="registry-address-line">
+                      <span class="one-hide">{{ record.registry }}/{{ record.namespace }}/{{ record.name }}</span>
+                      <a-tooltip content="复制">
+                        <a-button class="registry-icon-action" type="text" shape="circle" size="mini"
+                          @click="onekeyCopy(`${record.registry}/${record.namespace}/${record.name}`)">
+                          <template #icon><icon-copy /></template>
+                        </a-button>
+                      </a-tooltip>
+                    </div>
+                  </div>
                 </template>
               </a-table-column>
-              <a-table-column title="镜像地址">
-                <template #cell="{ record }">
-                  {{ record.registry }}/{{ record.namespace }}/{{ record.name }}
-                  <span class="registry-copy-action" @click="onekeyCopy(`${record.registry}/${record.namespace}/${record.name}`)">复制</span>
-                </template>
-              </a-table-column>
-              <a-table-column title="类型" :width="100">
+              <a-table-column title="类型" :width="130" class="registry-type-column">
                 <template #cell="{ record }">
                   {{ record.visible_type === 3 ? namespaceTypeMap[record.namespace] :
                     visibleTypeMap[record.visible_type]}}
@@ -78,8 +85,8 @@
         </div>
       </div>
     </div>
-    <a-modal v-model:visible="visible" :title="editId ? '编辑镜像' : '添加镜像'" :width="500" :footer="false">
-      <a-form ref="form" :model="form" label-align="left" :label-col-props="{ span: 4, flex: '0 0 80px' }"
+    <a-modal v-model:visible="visible" :title="editId ? '编辑镜像' : '添加镜像'" :width="640" :footer="false">
+      <a-form ref="form" :model="form" label-align="left" :label-col-props="{ span: 4, flex: '0 0 96px' }"
         :wrapper-col-props="{ span: 20, flex: '1' }" class="registry-form">
         <a-form-item :rules="[{ required: true, message: '名称不能为空', trigger: 'manual' }]" label="名称" field="name">
           <a-input v-model="form.name" />
@@ -95,7 +102,7 @@
           <a-textarea v-model="form.desc" :auto-size="{ minRows: 5, maxRows: 5 }" />
         </a-form-item>
         <a-form-item label="公共权限" field="visible_type">
-          <div class="df df-c" style="flex:1;">
+          <div class="registry-permission-control">
             <a-checkbox v-model="formVisibleType3" @change="v => form.visible_type = v ? 3 : 1">跟随命名空间</a-checkbox>
             <a-radio-group v-model="form.visible_type" :disabled="formVisibleType3">
 
@@ -105,39 +112,59 @@
             </a-radio-group>
           </div>
         </a-form-item>
-        <a-form-item>
-          <a-button size="large" type="primary" @click="onSubmit">确定</a-button>
-          <a-button size="large" @click="visible = false">取消</a-button>
-        </a-form-item>
       </a-form>
+      <div class="dialog-footer">
+        <a-button size="large" @click="visible = false">取消</a-button>
+        <a-button size="large" type="primary" @click="onSubmit">确定</a-button>
+      </div>
     </a-modal>
     <a-modal v-model:visible="shortcutVisible" :width="800" title="快捷指令" :footer="false">
       <div class="shortcut-header">登录容器镜像服务 Docker Registry</div>
       <div class="shortcut-content">
         <div>{{ `docker login ${shortcutData.registry} --username=${userInfo.username}` }}</div>
-        <span class="registry-copy-action" @click="onekeyCopy(`docker login ${shortcutData.registry} --username=${userInfo.username}`)">复制</span>
+        <a-tooltip content="复制">
+          <a-button class="registry-icon-action" type="text" shape="circle" size="mini"
+            @click="onekeyCopy(`docker login ${shortcutData.registry} --username=${userInfo.username}`)">
+            <template #icon><icon-copy /></template>
+          </a-button>
+        </a-tooltip>
       </div>
       <div class="shortcut-header">从 Registry 拉取镜像</div>
       <div class="shortcut-content">
         <div>{{ `docker pull ${shortcutData.registry}/${shortcutData.namespace}/${shortcutData.name}:[tag]` }}</div>
-        <span class="registry-copy-action" @click="onekeyCopy(`docker pull ${shortcutData.registry}/${shortcutData.namespace}/${shortcutData.name}:[tag]`)">复制</span>
+        <a-tooltip content="复制">
+          <a-button class="registry-icon-action" type="text" shape="circle" size="mini"
+            @click="onekeyCopy(`docker pull ${shortcutData.registry}/${shortcutData.namespace}/${shortcutData.name}:[tag]`)">
+            <template #icon><icon-copy /></template>
+          </a-button>
+        </a-tooltip>
       </div>
       <div class="shortcut-desc">其中［tag］请根据您需要拉取镜像的具体版本镜像替换，如latest。</div>
       <div class="shortcut-header">向 Registry 中推送镜像</div>
       <div class="shortcut-content">
         <div>{{ `docker tag [imageId] ${shortcutData.registry}/${shortcutData.namespace}/${shortcutData.name}:[tag]` }}
         </div>
-        <span class="registry-copy-action" @click="onekeyCopy(`docker tag [imageId] ${shortcutData.registry}/${shortcutData.namespace}/${shortcutData.name}:[tag]`)">复制</span>
+        <a-tooltip content="复制">
+          <a-button class="registry-icon-action" type="text" shape="circle" size="mini"
+            @click="onekeyCopy(`docker tag [imageId] ${shortcutData.registry}/${shortcutData.namespace}/${shortcutData.name}:[tag]`)">
+            <template #icon><icon-copy /></template>
+          </a-button>
+        </a-tooltip>
       </div>
       <div class="shortcut-content">
         <div>{{ `docker push ${shortcutData.registry}/${shortcutData.namespace}/${shortcutData.name}:[tag]` }}</div>
-        <span class="registry-copy-action" @click="onekeyCopy(`docker push ${shortcutData.registry}/${shortcutData.namespace}/${shortcutData.name}:[tag]`)">复制</span>
+        <a-tooltip content="复制">
+          <a-button class="registry-icon-action" type="text" shape="circle" size="mini"
+            @click="onekeyCopy(`docker push ${shortcutData.registry}/${shortcutData.namespace}/${shortcutData.name}:[tag]`)">
+            <template #icon><icon-copy /></template>
+          </a-button>
+        </a-tooltip>
       </div>
       <div class="shortcut-desc">其中［ImageId］请替换力您所要推送的实际镜像ID，或使用本地镜像的完整路径，［tag］请替换为您期待的镜像版本。</div>
     </a-modal>
-    <a-modal v-model:visible="accessDialogShow" title="访问凭证" :width="800" :footer="false">
-      <div>
-        <Access :userInfo="userInfo" />
+    <a-modal v-model:visible="accessDialogShow" title="访问凭证" :width="560" :footer="false">
+      <div class="zpk-modal-content">
+        <Access :userInfo="userInfo" embedded />
       </div>
     </a-modal>
   </div>
@@ -149,12 +176,15 @@ import { confirm, messageSuccess } from "@/utils/ui-feedback";
 import userMixin from "@/utils/user-mixin";
 import Access from '@/views/access.vue';
 import ArcoIcon from "@/components/arco-icon.vue";
+import { IconCopy, IconPlus } from '@arco-design/web-vue/es/icon';
 
 export default {
   name: "zpk_registry",
   components: {
     Access,
-    ArcoIcon
+    ArcoIcon,
+    IconCopy,
+    IconPlus
   },
   mixins: [userMixin],
   data() {
@@ -327,8 +357,8 @@ export default {
         }
       });
     },
-    see(row) {
-      this.$router.push({ path: "/registry-detail/" + row.id });
+    goDetail(row) {
+      this.$router.push({ name: 'zpk-registry-detail', params: { id: row.id } });
     },
   }
 }
@@ -359,47 +389,82 @@ export default {
   margin-top: 30px;
 }
 
-.registry-primary-warning {
-  background-color: #e8f3ff !important;
-  color: #3370ff !important;
-}
-
-.registry-primary-warning .arco-alert-content {
-  margin: 0;
-  padding: 5px 0;
-  color: #3370ff !important;
-}
-
 .credential-link {
-  display: inline-block;
-  line-height: 1;
+  display: inline;
+  line-height: inherit;
+  vertical-align: baseline;
   color: #3370ff;
-  border-bottom: 1px solid #3370ff;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
   cursor: pointer;
+}
+
+.credential-link .arco-icon {
+  margin-right: 2px;
+  vertical-align: -3px;
 }
 
 .registry-filter-select {
   width: 180px;
 }
 
-.table-header .arco-table-th {
-  background: #F3F3F3;
-  color: #666666;
-  font-weight: 500;
+.registry-filter-group {
+  color: var(--color-text-2);
+  font-size: 14px;
 }
 
-.registry-copy-action {
-  margin-left: 6px;
-  color: #3370ff;
-  cursor: pointer;
+.table-header .arco-table-th {
+  background: #f2f3f5;
+  color: var(--color-text-1);
+  font-weight: 400;
+}
+
+.table-header .arco-table-tr .arco-table-th:nth-child(3),
+.table-header .arco-table-tr .arco-table-td:nth-child(3) {
+  white-space: nowrap;
 }
 
 .registry-link {
   color: #3370ff;
+  cursor: pointer;
+}
+
+.registry-link:hover {
+  text-decoration: underline;
+}
+
+.registry-name-cell {
+  min-width: 0;
+}
+
+.registry-address-line {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  margin-top: 4px;
+  color: var(--color-text-3);
+  font-size: 12px;
+  line-height: 20px;
+}
+
+.registry-icon-action {
+  margin-left: 4px;
+  color: #3370ff;
+  vertical-align: middle;
+  width: 24px;
+  height: 24px;
+  font-size: 16px;
+}
+
+.registry-icon-action .arco-icon {
+  font-size: 16px;
 }
 
 .registry-form .arco-form-item-label-col {
-  width: 80px;
+  flex: 0 0 96px !important;
+  width: 96px;
+  max-width: 96px;
 }
 
 .registry-form .arco-form-item-label {
@@ -408,5 +473,23 @@ export default {
 
 .registry-form .arco-form-item-wrapper-col {
   min-width: 0;
+}
+
+.registry-permission-control {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.registry-permission-control .arco-radio-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+}
+
+.registry-permission-control .arco-radio {
+  margin-right: 0;
 }
 </style>

@@ -1,9 +1,9 @@
 <template>
     <div class="bg-f2" style="min-height:100%;">
         <div class="top bg-white df ai-c">
-            <div class="df ai-c cursor" @click="$router.go(-1);">
-                <icon-left class="back-icon" />
-                <span class="c-66 fs-16" style="margin-left:4px;">返回</span>
+            <div class="backbtn df ai-c" @click="$router.go(-1);">
+                <icon-arrow-left class="backicon" />
+                <span class="c-66 fs-16">返回</span>
             </div>
         </div>
         <div class="pd-20">
@@ -44,11 +44,12 @@
 
 <script>
 import axios from 'axios';
-import { IconLeft } from '@arco-design/web-vue/es/icon';
+import { IconArrowLeft } from '@arco-design/web-vue/es/icon';
 import { messageSuccess } from '@/utils/ui-feedback';
+import { getZpkBaseURL, joinUrl } from '@/utils/request-base';
 
 export default {
-    components: { IconLeft },
+    components: { IconArrowLeft },
     data() {
         return {
             identifie: '',
@@ -66,19 +67,19 @@ export default {
         this.identifie = this.$route.params.id;
         this.getData();
 
-        let host = window?.$wujie?.props?.url || window.location.origin;
-        let url = host + '/respo/v2/info/' + this.identifie + '/1.0.0';
+        let host = window.$wujie ? getZpkBaseURL() : window.location.origin;
+        let url = joinUrl(host, '/respo/v2/info/' + this.identifie + '/1.0.0');
         this.url = 'https://console.w7.cc/api/deploy/thirdparty_cd/redirect?route=/zpk-install?path=' + encodeURIComponent(url);
     },
     methods: {
         installurl() {
-            let host = window?.$wujie?.props?.url || window.location.origin;
-            let url = host + '/respo/v2/info/' + this.identifie + '/' + this.version;
+            let host = window.$wujie ? getZpkBaseURL() : window.location.origin;
+            let url = joinUrl(host, '/respo/v2/info/' + this.identifie + '/' + this.version);
             window.parent.postMessage({ type: "zpkinstall", url: url }, "*");
         },
         getData() {
             axios.get('/respo/v2/detail/' + this.identifie + '/1.0.0', {
-                baseURL: window?.$wujie?.props?.url,
+                baseURL: window.$wujie ? getZpkBaseURL() : undefined,
             }).then(res => {
                 this.info = res.data?.data || {};
                 this.mdtxt = res.data?.data?.content;
@@ -90,8 +91,8 @@ export default {
             })
         },
         toinstall() {
-            let host = window?.$wujie?.props?.url || window.location.origin;
-            let url = host + '/respo/v2/info/' + this.identifie + '/' + this.version;
+            let host = window.$wujie ? getZpkBaseURL() : window.location.origin;
+            let url = joinUrl(host, '/respo/v2/info/' + this.identifie + '/' + this.version);
             url = 'https://console.w7.cc/api/deploy/thirdparty_cd/redirect?route=/zpk-install?path=' + encodeURIComponent(url);
             this.onekeyCopy(url);
         },
@@ -120,11 +121,6 @@ export default {
 
 .top {
     padding: 20px;
-}
-
-.back-icon {
-    color: #666666;
-    font-size: 14px;
 }
 
 .version-select {

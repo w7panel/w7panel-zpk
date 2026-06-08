@@ -349,7 +349,7 @@
                                         <a-checkbox v-model="form.redis">redis</a-checkbox>
                                         <a-checkbox v-model="form.mongodb6">mongodb</a-checkbox>
                                     </div>
-                                    <a-button type="primary" @click="openSpEdit">批量修改</a-button>
+                                    <a-button @click="openSpEdit">批量修改</a-button>
                                 </div>
                                 <table class="table mt-10">
                                     <thead>
@@ -397,7 +397,14 @@
                         </a-form-item>
 
                         <a-form-item class="mt-20" label="安装依赖">
-                            <table class="table">
+                            <table class="table install-depend-table">
+                                <colgroup>
+                                    <col class="install-depend-name-col" />
+                                    <col class="install-depend-sub-col" />
+                                    <col class="install-depend-required-col" />
+                                    <col class="install-depend-identifie-col" />
+                                    <col class="install-depend-action-col" />
+                                </colgroup>
                                 <thead>
                                     <tr>
                                         <td>名称</td>
@@ -446,10 +453,8 @@
                     </div>
 
                     <div class="bg-white pb-24 mt-20 df ai-c">
-                        <a-button v-if="option.pureManifest" :loading="submiting" type="primary"
-                            @click="submit(otherData)" style="width:90px;">确定提交</a-button>
-                        <a-button v-else :loading="submiting" type="primary" @click="submit()"
-                            style="width:90px;">确定提交</a-button>
+                        <a-button v-if="option.pureManifest" :loading="submiting" type="primary" @click="submit(otherData)">确定提交</a-button>
+                        <a-button v-else :loading="submiting" type="primary" @click="submit()">确定提交</a-button>
                     </div>
                 </a-form>
             </div>
@@ -468,7 +473,7 @@
             @close="dependForm = { show: false, editIndex: -1, identifie_before: '', identifie_last: '', identifie: '', name: '', required: false, from: '' };">
             <a-form ref="depend" :rules="addRules" :model="dependForm"
                 :label-col-props="{ span: 5, flex: '0 0 80px' }"
-                :wrapper-col-props="{ span: 19, flex: '1' }">
+                :wrapper-col-props="{ span: 19, flex: '1' }" class="manifest-dialog-form">
                 <a-form-item label="标识" field="identifie">
                     <w7-identifie v-model:author="dependForm.identifie_before"
                         v-model:identifie="dependForm.identifie_last" @change="onChange" :author-disabled="true" />
@@ -480,10 +485,11 @@
                 <a-form-item label="可选安装" field="from">
                     <a-switch v-model="dependForm.required" :checked-value="false" :unchecked-value="true" />
                 </a-form-item>
-                <a-form-item label="" class="mt-20">
-                    <a-button type="primary" size="large" @click="addDepend">确定</a-button>
-                </a-form-item>
             </a-form>
+            <div class="dialog-footer">
+                <a-button size="large" @click="dependForm.show = false">取消</a-button>
+                <a-button type="primary" size="large" @click="addDepend">确定</a-button>
+            </div>
         </a-modal>
 
         <a-modal v-model:visible="spEdit.show" title="启动参数" :width="700" modal-class="envdialog" :footer="false">
@@ -491,7 +497,7 @@
             <a-textarea v-model="spEdit.values" class="mt-10" :spellcheck="false"
                 placeholder="格式：键=值 #标题 : 描述 : 必填(1或0) : 依赖组件标识" :rows="12"
                 :auto-size="false"></a-textarea>
-            <div class="df ai-c jc-c mt-20">
+            <div class="dialog-footer">
                 <a-button @click="spEdit.show = false;">取消</a-button>
                 <a-button @click="submitSpEdit" type="primary">确定</a-button>
             </div>
@@ -858,7 +864,7 @@ export default {
             }
         },
         'option.app_ports'(v) {
-            this.computedAppPort(this.json.platform?.['container-v2']);
+            this.computedAppPort();
         }
     },
     beforeUnmount() {
@@ -878,6 +884,15 @@ export default {
         computedSpDisabled(item) {
             return ((this.disabledDomainStartParams || this.form.type == 'tradition') && item.mark === 'domain')
                 || (this.json?.platform?.['volumeClaimTemplates']?.length && item.mark === 'storage');
+        },
+        formatIngressRoutes(routes = []) {
+            return routes.filter(r => r.path && r.backend?.port).map(r => ({
+                ...r,
+                backend: {
+                    ...r.backend,
+                    port: Number(r.backend.port),
+                },
+            }));
         },
         openAppset() {
             let volumes = this.json?.platform?.volumes;
@@ -913,10 +928,7 @@ export default {
 
                 this.json.platform.ingress = (this.form.ingress || []).map(i => ({
                     name: i.name,
-                    routes: i.routes.filter(r => {
-                        if (r.backend.port) r.backend.port = Number(r.backend.port);
-                        return r.path && r.backend?.port;
-                    }),
+                    routes: this.formatIngressRoutes(i.routes),
                 }));
 
                 this.yaml = jsyaml.dump(this.json);
@@ -1061,20 +1073,41 @@ export default {
             })
         },
 
-        async computedAppPort(containers) {
+        async computedAppPort(containers = this.form.containers) {
+            const normalizePorts = (ports) => {
+                if (!Array.isArray(ports)) { ports = ports ? [ports] : [] }
+                return [...new Set(ports.map(i => {
+                    if (typeof i === 'object' && i !== null) {
+                        return i.port ?? i.containerPort ?? '';
+                    }
+                    return i;
+                }).filter(i => i !== '' && i !== undefined && i !== null).map(i => String(i)))]
+            };
             let ports = {};
             let arr = [];
             if (containers) {
                 containers?.map?.(i => {
-                    arr = arr.concat(i?.ports?.map?.(j => j.containerPort) || [])
+                    arr = arr.concat(normalizePorts(i?.ports || []));
+                    if (i?.port || i?.containerPort) {
+                        arr = arr.concat(normalizePorts([i.port ?? i.containerPort]));
+                    }
                 })
             }
+            let legacyContainer = this.json?.platform?.container;
+            if (legacyContainer) {
+                arr = arr.concat(normalizePorts(legacyContainer?.ports || []));
+                if (legacyContainer?.port || legacyContainer?.containerPort) {
+                    arr = arr.concat(normalizePorts([legacyContainer.port ?? legacyContainer.containerPort]));
+                }
+            }
+            arr = arr.concat(normalizePorts(this.json?.platform?.port || []));
             arr = [...new Set(arr)];
             ports[this.identifie] = arr;
 
             if (this.option?.app_ports?.length) {
                 this.option.app_ports.map(i => {
-                    ports[i.name] = i.port;
+                    if (i.name == this.identifie) { return; }
+                    ports[i.name] = normalizePorts(i.port || i.ports || []);
                 })
             }
             this.app_ports = ports;
@@ -1086,7 +1119,7 @@ export default {
             }];
 
             if (this.option?.app_ports?.length) {
-                names = names.concat(this.option.app_ports.map(i => {
+                names = names.concat(this.option.app_ports.filter(i => i.name != this.identifie).map(i => {
                     return {
                         id: i.name,
                         name: i.name,
@@ -1215,10 +1248,7 @@ platform:
 
                         this.json.platform.ingress = (this.form.ingress || []).map(i => ({
                             name: i.name,
-                            routes: i.routes.filter(r => {
-                                if (r.backend.port) r.backend.port = Number(r.backend.port);
-                                return r.path && r.backend?.port;
-                            }),
+                            routes: this.formatIngressRoutes(i.routes),
                         }));
                     }
 
@@ -1367,7 +1397,7 @@ platform:
             this.vtitle = this.json?.application?.name;
             this.initJSON();
             this.changeForm();
-            this.computedAppPort(this.json.platform?.['container-v2']);
+            this.computedAppPort();
         },
 
         initJSON() {
@@ -1539,10 +1569,7 @@ platform:
 
                     this.json.platform.ingress = (this.form.ingress || []).map(i => ({
                         name: i.name,
-                        routes: i.routes.filter(r => {
-                            if (r.backend.port) r.backend.port = Number(r.backend.port);
-                            return r.path && r.backend?.port;
-                        }),
+                        routes: this.formatIngressRoutes(i.routes),
                     }));
                 }
 
@@ -1685,10 +1712,7 @@ platform:
 
                     this.json.platform.ingress = (this.form.ingress || []).map(i => ({
                         name: i.name,
-                        routes: i.routes.filter(r => {
-                            if (r.backend.port) { r.backend.port = Number(r.backend.port); }
-                            return r.path && r.backend?.port;
-                        }),
+                        routes: this.formatIngressRoutes(i.routes),
                     }));
                 }
             }
@@ -1799,6 +1823,45 @@ platform:
 
 .start-param-services :deep(.arco-checkbox) {
     margin-right: 0;
+}
+
+.install-depend-table {
+    width: 100%;
+    table-layout: fixed;
+}
+
+.install-depend-name-col {
+    width: 36%;
+}
+
+.install-depend-sub-col {
+    width: 34%;
+}
+
+.install-depend-required-col {
+    width: 10%;
+}
+
+.install-depend-identifie-col {
+    width: 12%;
+}
+
+.install-depend-action-col {
+    width: 8%;
+}
+
+.install-depend-table td {
+    box-sizing: border-box;
+}
+
+.install-depend-table :deep(.arco-select),
+.install-depend-table :deep(.arco-input-wrapper) {
+    width: 100%;
+}
+
+.install-depend-table td:nth-child(3),
+.install-depend-table td:last-child {
+    white-space: nowrap;
 }
 
 .upfilebox {
@@ -2173,7 +2236,4 @@ platform:
     min-width: 0;
 }
 
-.envdialog .arco-modal-body {
-    padding-top: 0;
-}
 </style>

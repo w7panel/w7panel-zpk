@@ -1,23 +1,26 @@
 <template>
     <div style="height:100vh;">
-        <div style="padding:20px; border-bottom:1px solid #E7E7E7;">
+        <div class="zpk-page-header">
+            <span class="backbtn df ai-c" @click="$router.go(-1)">
+                <icon-arrow-left class="backicon" />
+            </span>
             <a-breadcrumb>
-                <a-breadcrumb-item><router-link to="/zpk" class="c-99 fw-400">我的制品库</router-link></a-breadcrumb-item>
+                <a-breadcrumb-item><router-link to="/zpk" class="c-99 fw-400">制品管理</router-link></a-breadcrumb-item>
                 <a-breadcrumb-item>
                     <router-link :to="{ path: '/zpk-version', query: { id: identifie, title: vtitle } }"
-                        class="c-99 fw-400">版本管理</router-link>
+                        class="c-99 fw-400">{{ vtitle || identifie }}</router-link>
                 </a-breadcrumb-item>
                 <a-breadcrumb-item><span class="c-33 fw-400">编辑前端托管</span></a-breadcrumb-item>
             </a-breadcrumb>
         </div>
         <a-spin :loading="deleteLoading" class="edit-spin">
             <div v-if="manifest">
-                <div class="df jc-b" style="padding:20px 20px 0">
-                    <div class="df">
+                <div class="zpk-page-toolbar" style="padding:20px 20px 0">
+                    <div class="zpk-toolbar-left">
                         <a-button @click="dependsIndex = -1;"
                             :type="dependsIndex == -1 ? 'primary' : 'secondary'">主应用</a-button>
                         <div v-for="(item, index) in depends" :key="item.identifie"
-                            style="margin-left:10px;position:relative;">
+                            style="position:relative;">
                             <a-button :type="dependsIndex == index ? 'primary' : 'secondary'"
                                 @click="dependsIndex = index; edit({ stop: true })">{{ item.identifie }}</a-button>
                         </div>
@@ -37,11 +40,14 @@
 
     <a-modal v-model:visible="impt.show" title="导入制品库" :width="560" :footer="false"
         modal-class="zpk-version-dialog">
-        <div class="df" style="padding:10px;">
+        <div class="zpk-modal-content import-zpk-content">
             <a-auto-complete v-model="impt.title" ref="imptzpk" :data="impt.options" placeholder="请选择制品库"
                 style="width:400px;" size="large" allow-clear :filter-option="false" @search="addQuerySearch"
                 @change="handleImportTitleChange" @select="addSelect" :spellcheck="false" />
-            <a-button type="primary" @click="imptSubmit()" class="ml-10" size="large">确定</a-button>
+        </div>
+        <div class="dialog-footer">
+            <a-button @click="impt.show = false">取消</a-button>
+            <a-button type="primary" @click="imptSubmit()" size="large">确定</a-button>
         </div>
     </a-modal>
 </template>
@@ -51,6 +57,7 @@ import myAxios from '@/utils';
 import filesManifestfront from '@/components/files-manifestfront.vue';
 import jsyaml from "js-yaml";
 import { confirm, messageError, messageSuccess, messageWarning } from '@/utils/ui-feedback';
+import { IconArrowLeft } from '@arco-design/web-vue/es/icon';
 const defaultManifest = `application:
     name: ''
     identifie: ''
@@ -71,7 +78,7 @@ platform:
 
 export default {
     inheritAttrs: false,
-    components: { filesManifestfront },
+    components: { filesManifestfront, IconArrowLeft },
     data() {
         return {
             identifie: '',
@@ -143,8 +150,11 @@ export default {
                 ports: [...new Set(ports.filter(i => i !== '' && i !== undefined && i !== null))],
             };
         },
+        hasManifestDomainConfig(json) {
+            return Boolean(json?.domainEnabled || json?.platform?.domainEnabled);
+        },
         getManifestIdentifie(json, fallback) {
-            let identifie = json?.application?.identifie || fallback || '';
+            let identifie = json?.platform?.baseInfo?.identifie || json?.application?.identifie || fallback || '';
             let author = json?.application?.author || '';
             if (identifie && author && !/^[^-]+-.+$/.test(identifie)) {
                 return author + '-' + identifie;
@@ -157,7 +167,8 @@ export default {
             if (main.ports.length) {
                 arr.push({
                     name: this.getManifestIdentifie(main.json, this.identifie),
-                    title: main.json?.application?.name,
+                    title: main.json?.platform?.baseInfo?.name || main.json?.application?.name,
+                    domainEnabled: this.hasManifestDomainConfig(main.json),
                     port: main.ports,
                 });
             }
@@ -167,7 +178,8 @@ export default {
                 if (ports.length) {
                     arr.push({
                         name: this.getManifestIdentifie(json, this.depends[i].identifie),
-                        title: json?.application?.name,
+                        title: json?.platform?.baseInfo?.name || json?.application?.name || this.depends[i]?.name || '',
+                        domainEnabled: this.hasManifestDomainConfig(json),
                         port: ports
                     })
                 }
@@ -240,7 +252,7 @@ export default {
                 filename: 'manifest.yaml',
                 content: yaml,
                 version: this.version_id,
-            }).then(async (res) => {
+            }).then(async () => {
                 if (this.tree.find(i => i.label == data.file)) {
                     await this.getFile();
                     this.getManifest();
@@ -300,7 +312,7 @@ export default {
                 filename: 'manifest.yaml',
                 content: yaml,
                 version: this.version_id,
-            }).then((res) => {
+            }).then(() => {
                 if (otherData?.editfile) {
                     (typeof callback == 'function') && callback();
                     if (/\.yaml$/.test(otherData.editfile)) {
@@ -321,8 +333,6 @@ export default {
                         this.$router.push('/zpk-version?id=' + this.identifie + '&title=' + (json?.application?.name) || '')
                     });
                 });
-            }).then(res => {
-
             }).catch((error) => {
                 if (error?.response?.data?.error) {
                     messageError(error.response.data.error);
@@ -343,7 +353,7 @@ export default {
         },
         getInfo(id, callback, n) {
             n = n || 0;
-            myAxios.get('/respo/v2/info/' + id + '/' + this.version_id).then(res => {
+            myAxios.get('/respo/v2/info/' + id + '/' + this.version_id).then(() => {
                 callback && callback();
             }).catch(() => {
                 if (n > 10) { return }
@@ -386,7 +396,7 @@ export default {
                     filename: row.label,
                     content: '',
                     version: this.version_id,
-                }).then(res => {
+                }).then(() => {
                     messageSuccess('删除成功');
                     this.getInfo(this.identifie, () => {
                         this.publish(1);
@@ -439,15 +449,5 @@ export default {
 .table thead tr:first-child td {
     background: #f3f3f3;
     border-top: 0;
-}
-</style>
-<style>
-.zpk-version-dialog .arco-modal-header {
-    border-bottom: 1px solid #dcdcdc;
-}
-
-.zpk-version-dialog .arco-modal-footer {
-    text-align: center;
-    border-top: 1px solid #dcdcdc;
 }
 </style>

@@ -1,11 +1,14 @@
 <template>
     <div id="zpkfiltertree" class="bg-white" style="height:100%;">
-        <div style="padding:20px; border-bottom:1px solid #E7E7E7;">
+        <div class="zpk-page-header">
+            <span class="backbtn df ai-c" @click="$router.go(-1)">
+                <icon-arrow-left class="backicon" />
+            </span>
             <a-breadcrumb>
-                <a-breadcrumb-item><router-link to="/zpk" class="c-99 fw-400">我的制品库</router-link></a-breadcrumb-item>
+                <a-breadcrumb-item><router-link to="/zpk" class="c-99 fw-400">制品管理</router-link></a-breadcrumb-item>
                 <a-breadcrumb-item>
                     <router-link :to="{ path: '/zpk-version', query: { id: identifie, title: vtitle } }"
-                        class="c-99 fw-400">版本管理</router-link>
+                        class="c-99 fw-400">{{ vtitle || identifie }}</router-link>
                 </a-breadcrumb-item>
                 <a-breadcrumb-item>
                     <router-link :to="{ path: '/zpk-edit', query: { id: identifie, versionid } }"
@@ -17,7 +20,10 @@
         <div class="df box">
             <div class="treebox df-s0">
                 <div class="df jc-s ml-10" style="margin-bottom:10px;">
-                    <a-button class="create-file-btn" @click.stop="openCreatefile" size="small">+ 新建文件</a-button>
+                    <a-button type="primary" class="create-file-btn" @click.stop="openCreatefile" size="small">
+                        <template #icon><icon-plus /></template>
+                        新建文件
+                    </a-button>
                 </div>
                 <a-empty v-if="!tree.length" description="暂无数据" class="tree-empty" />
                 <a-tree v-else v-model:selected-keys="selectedKeys" v-model:expanded-keys="treeExpanded" :data="tree"
@@ -48,7 +54,7 @@
             <div style="width:70px;">文件名</div>
             <a-input v-model="addfile.filename" placeholder="请输入文件名" :spellcheck="false" style="width:400px;" />
         </div>
-        <div class="dialog-footer">
+        <div class="dialog-footer file-name-dialog-footer">
             <a-button @click="addfile.show = false;">取消</a-button>
             <a-button type="primary" @click="newFileName(addfile.filename)">确认添加</a-button>
         </div>
@@ -60,8 +66,13 @@ import myAxios from '@/utils'
 import { basicSetup } from "codemirror"
 import { indentWithTab } from "@codemirror/commands"
 import { EditorView, keymap } from "@codemirror/view"
+import { IconArrowLeft, IconPlus } from '@arco-design/web-vue/es/icon';
 import { confirm, messageSuccess, messageWarning } from '@/utils/ui-feedback';
 export default {
+    components: {
+        IconArrowLeft,
+        IconPlus,
+    },
     data() {
         return {
             vtitle: '',
@@ -376,18 +387,6 @@ export default {
     height: 56px;
 }
 
-.create-file-btn {
-    background: #ffffff;
-    border-color: #dcdfe6;
-    color: #606266;
-}
-
-.create-file-btn:hover {
-    background: #ffffff;
-    border-color: #3370ff;
-    color: #3370ff;
-}
-
 .right {
     box-sizing: border-box;
     max-height: 700px;
@@ -396,15 +395,6 @@ export default {
 }
 </style>
 <style>
-.dialog-footer {
-    border-top: 1px solid #E7E7E7;
-    display: flex;
-    justify-content: center;
-    gap: 8px;
-    margin: 20px -20px -4px;
-    padding: 16px 20px 0;
-}
-
 .treebox .arco-tree-node-children {
     overflow: visible !important;
 }

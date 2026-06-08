@@ -57,11 +57,6 @@ const routes = [
         component: () => import("../views/description.vue"),
     },
     {
-        path: '/zpk-access',
-        name: 'zpk-access',
-        component: () => import("../views/access.vue"),
-    },
-    {
         path: '/zpk-registry',
         name: 'zpk-registry',
         component: () => import("../views/registry.vue"),

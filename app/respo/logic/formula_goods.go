@@ -1,6 +1,7 @@
 package logic
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -55,6 +56,13 @@ func (l FormulaGoods) PublishGoods(formula *Formula, publishGoodsReq devcenter.P
 		publishGoodsReq.LabelIds = append(publishGoodsReq.LabelIds, goodsTagNameIdMap[tagName])
 	}
 
+	publishGoodsReq.Title = formula.Manifest.Application.Name
+	publishGoodsReq.Summary = formula.Manifest.Application.Description
+	if publishGoodsReq.Summary == "" {
+		publishGoodsReq.Summary = publishGoodsReq.Title
+	}
+	publishGoodsReq.Description = publishGoodsReq.Summary
+
 	servicePackages := make([]devcenter.NotAppServicePackage, 0)
 	if formula.ServicePackages != nil && formula.ServicePackages.List != nil {
 		for _, item := range formula.ServicePackages.List {
@@ -63,15 +71,17 @@ func (l FormulaGoods) PublishGoods(formula *Formula, publishGoodsReq devcenter.P
 			}
 		}
 	}
+	servicePackagesContent, err := json.Marshal(servicePackages)
+	if err != nil {
+		return err
+	}
 	versionPrices := make([]devcenter.NotAppBranchVersionPriceInfo, 0)
 	if formula.VersionPrices != nil && formula.VersionPrices.List != nil {
 		versionPrices = formula.VersionPrices.List
 	}
-
-	publishGoodsReq.Title = formula.Manifest.Application.Name
-	publishGoodsReq.Description = formula.Manifest.Application.Description
-	if publishGoodsReq.Description == "" {
-		publishGoodsReq.Description = publishGoodsReq.Title
+	versionPricesContent, err := json.Marshal(versionPrices)
+	if err != nil {
+		return err
 	}
 
 	if formula.GoodsId > 0 {
@@ -95,8 +105,8 @@ func (l FormulaGoods) PublishGoods(formula *Formula, publishGoodsReq devcenter.P
 	publishGoodsReq.Extra = map[string]interface{}{
 		"respo_identify":       formula.Name,
 		"respo_latest_version": formula.Version,
-		"service_packages":     servicePackages,
-		"version_prices":       versionPrices,
+		"service_packages":     string(servicePackagesContent),
+		"version_prices":       string(versionPricesContent),
 		"product_type":         formula.ProductType,
 		"is_free_upgrade":      formula.IsFreeUpgrade,
 	}

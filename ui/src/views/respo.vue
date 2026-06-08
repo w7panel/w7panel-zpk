@@ -3,17 +3,22 @@
     <div style="height:100vh;box-sizing:border-box;">
       <div>
         <div class="bg-white bg-padding pb-24" style="border-top:1px solid #EEEEEE;">
-          <div class="df jc-b">
-            <a-input v-model="search.keyword" style="width:256px;" placeholder="输入制品名称搜索" @keydown.enter="getData(1)">
-              <template #suffix>
-                <span class="respo-search-action" @click="getData(1)">
-                  <icon-search :size="16" />
-                </span>
-              </template>
-            </a-input>
-            <div>
+          <div class="zpk-page-toolbar">
+            <div class="zpk-toolbar-left">
+              <a-button type="primary" @click="add.show = true;">
+                <template #icon><icon-plus /></template>
+                添加制品
+              </a-button>
               <a-button v-if="is_register" @click="openCloudApps">云端找回</a-button>
-              <a-button type="primary" @click="add.show = true;">添加制品</a-button>
+            </div>
+            <div class="zpk-toolbar-right">
+              <a-input v-model="search.keyword" style="width:256px;" placeholder="输入制品名称搜索" @keydown.enter="getData(1)">
+                <template #suffix>
+                  <span class="respo-search-action" @click="getData(1)">
+                    <icon-search :size="16" />
+                  </span>
+                </template>
+              </a-input>
             </div>
           </div>
           <a-table :loading="loading" class="mt-20 table-header table-respo-list" :data="list" :pagination="false"
@@ -82,34 +87,36 @@
         </div>
       </div>
     </div>
-    <a-modal v-model:visible="add.show" title="添加应用" :width="540" :footer="false">
+    <a-modal v-model:visible="add.show" title="添加制品" :width="540" :footer="false">
       <a-spin :loading="add.loading">
       <a-form ref="form" :model="add" label-align="left" :label-col-props="{ span: 4, flex: '0 0 60px' }"
-        :wrapper-col-props="{ span: 20, flex: '1' }" class="respo-form">
+        :wrapper-col-props="{ span: 20, flex: '1' }" class="respo-form respo-add-form">
         <a-form-item label="标识" field="title" :rules="[{ required: true, message: '标识不能为空', trigger: 'manual' }]">
           <w7-identifie v-model="add.title" />
         </a-form-item>
-        <a-form-item>
-          <a-button type="primary" @click="addRespo">确定</a-button>
-        </a-form-item>
       </a-form>
+      <div class="dialog-footer">
+        <a-button @click="add.show = false">取消</a-button>
+        <a-button type="primary" @click="addRespo">确定</a-button>
+      </div>
       </a-spin>
     </a-modal>
 
     <a-modal v-model:visible="ipt.show" title="导入制品库" :width="600" :footer="false">
       <a-spin :loading="ipt.loading">
       <a-form :model="ipt" label-align="left" :label-col-props="{ span: 5, flex: '0 0 100px' }"
-        :wrapper-col-props="{ span: 19, flex: '1' }" class="respo-form">
+        :wrapper-col-props="{ span: 19, flex: '1' }" class="respo-form respo-import-form">
         <a-form-item label="制品库地址">
           <a-input v-model="ipt.link" placeholder="请输入地址" :spellcheck="false" @input="iptInputlink" />
         </a-form-item>
         <a-form-item label="标识">
           <a-input v-model="ipt.identifie" :spellcheck="false" placeholder="author_app" />
         </a-form-item>
-        <a-form-item>
-          <a-button type="primary" @click="iptSubmit">确定</a-button>
-        </a-form-item>
       </a-form>
+      <div class="dialog-footer">
+        <a-button @click="ipt.show = false">取消</a-button>
+        <a-button type="primary" @click="iptSubmit">确定</a-button>
+      </div>
       </a-spin>
     </a-modal>
 
@@ -138,7 +145,8 @@
         <a-pagination v-model:current="cloudApp.page" :page-size="10" :total="cloudApp.last_page * 10"
           @change='openCloudApps' />
       </div>
-      <div class="mt-20 df jc-c">
+      <div class="dialog-footer">
+        <a-button @click="cloudApp.show = false">取消</a-button>
         <a-button :loading="cloudApp.loading" type="primary" @click="cloudAppUnpack">确定</a-button>
       </div>
     </a-modal>
@@ -151,7 +159,7 @@ import myAxios from '@/utils';
 import dfimg from '@/assets/img/dfimg.png';
 import w7Identifie from "@/components/w7-identifie.vue";
 import { confirm, messageError, messageSuccess, messageWarning } from '@/utils/ui-feedback';
-import { IconSearch } from '@arco-design/web-vue/es/icon';
+import { IconPlus, IconSearch } from '@arco-design/web-vue/es/icon';
 
 export default {
   name: 'respo-index',
@@ -200,7 +208,7 @@ export default {
     this.is_register = window?.$wujie?.props?.isRegister;
     this.getData(1);
   },
-  components: { w7Identifie, IconSearch },
+  components: { w7Identifie, IconPlus, IconSearch },
   methods: {
     cloudAppUnpack() {
       if (!this.cloudApp?.selectId?.[0]) {
@@ -468,9 +476,9 @@ export default {
 }
 
 .table-header :deep(.arco-table-th) {
-  background: #F3F3F3;
-  color: #666666;
-  font-weight: 500;
+  background: #f2f3f5;
+  color: var(--color-text-1);
+  font-weight: 400;
 }
 
 .table-respo-list .respo-star-icon {

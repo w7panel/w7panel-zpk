@@ -1,15 +1,15 @@
 <template>
     <div>
-        <div class="top">
-            <div class="df ai-c cursor" @click="$router.go(-1);">
-                <span class="back-icon"></span>
-                <span class="c-66 fs-16" style="margin-left:4px;">返回</span>
-            </div>
+        <div class="top zpk-page-header">
+            <span class="backbtn df ai-c" @click="$router.go(-1)">
+                <icon-arrow-left class="backicon" />
+            </span>
         </div>
         <a-spin :loading="loading" class="create-spin">
-            <div class="df jc-e">
-                <a-button type="primary" @click="impt.show = true; impt.data = null;"
-                    style="margin-right:20px;">导入制品库</a-button>
+            <div class="zpk-toolbar-left" style="padding:0 20px;">
+                <a-button type="primary" @click="impt.show = true; impt.data = null;">
+                    导入制品库
+                </a-button>
             </div>
             <div v-if="noPlatform">
                 <a-empty :image-size="200" description="" class="manifest-empty">
@@ -25,24 +25,28 @@
         </a-spin>
     </div>
 
-    <a-modal v-model:visible="addfile.show" title="添加文件" :width="600" modal-class="zpk-version-dialog">
+    <a-modal v-model:visible="addfile.show" title="添加文件" :width="600" :footer="false"
+        modal-class="zpk-version-dialog">
         <div class="mt-20 df ai-c ml-20">
             <div style="width:70px;">文件名</div>
             <a-input v-model="addfile.filename" placeholder="请输入文件名" style="width:400px;"></a-input>
         </div>
-        <template #footer>
+        <div class="dialog-footer file-name-dialog-footer">
             <a-button @click="addfile.show = false;">取消</a-button>
             <a-button type="primary"
                 @click="$router.push('/zpk-fileadd?identifie=' + identifie + '&filename=' + addfile.filename)">确认添加</a-button>
-        </template>
+        </div>
     </a-modal>
 
     <a-modal v-model:visible="impt.show" title="导入制品库" :width="560" :footer="false">
-        <div class="df" style="padding:10px;">
+        <div class="zpk-modal-content import-zpk-content">
             <a-auto-complete v-model="impt.title" ref="imptzpk" :data="impt.options" placeholder="请选择制品库"
                 style="width:400px;" size="large" allow-clear :filter-option="false" @search="addQuerySearch"
                 @change="handleImportTitleChange" @select="addSelect" :spellcheck="false" />
-            <a-button type="primary" @click="imptSubmit()" class="ml-10" size="large">确定</a-button>
+        </div>
+        <div class="dialog-footer">
+            <a-button @click="impt.show = false">取消</a-button>
+            <a-button type="primary" @click="imptSubmit()" size="large">确定</a-button>
         </div>
     </a-modal>
 </template>
@@ -76,9 +80,10 @@ import JSZip from 'jszip';
 import JSZipUtils from "jszip-utils";
 import filesUpload from '@/components/files-upload.vue';
 import { messageError, messageSuccess, messageWarning } from '@/utils/ui-feedback';
+import { IconArrowLeft } from '@arco-design/web-vue/es/icon';
 
 export default {
-    components: { filesManifest, filesUpload },
+    components: { filesManifest, filesUpload, IconArrowLeft },
     data() {
         return {
             version_id: '',
@@ -347,19 +352,6 @@ export default {
 </script>
 
 <style scoped>
-.top {
-    padding: 20px;
-}
-
-.back-icon {
-    width: 8px;
-    height: 8px;
-    border-left: 1px solid #666666;
-    border-bottom: 1px solid #666666;
-    transform: rotate(45deg);
-    display: inline-block;
-}
-
 .create-spin {
     display: block;
     min-height: 240px;

@@ -1248,7 +1248,8 @@ export default {
             return this.backendAppOptions.find(i => i.id == identifie)?.ports || [];
         },
         hasManifestDomainConfig(json) {
-            return Boolean(json?.domainEnabled || json?.platform?.domainEnabled);
+            let startParams = json?.platform?.startParams || [];
+            return startParams.some(i => String(i?.name).toLocaleUpperCase() === 'DOMAIN_URL');
         },
         getBackendPortOptions(identifie, query) {
             let q = String(query || '');

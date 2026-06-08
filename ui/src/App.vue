@@ -419,4 +419,25 @@ export default {
 	-o-animation: rotation 2s linear infinite;
 }
 
+.registry-alert-item {
+  position: relative;
+  padding-left: 14px;
+}
+
+.registry-alert-item::before {
+  position: absolute;
+  top: 10px;
+  left: 0;
+  width: 4px;
+  height: 4px;
+  content: "";
+  background: var(--color-text-2);
+  border-radius: 50%;
+}
+
+.registry-alert-item .txt-line {
+  color: #165dff;
+  text-decoration-color: #165dff;
+}
+
 </style>

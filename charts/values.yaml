@@ -98,6 +98,7 @@ global:
       sourceClaimName: "w7-zpkv2"
       targetClaimName: ""
       skipIfSourceMissing: true
+      preserveSourceClaim: true
       markerFile: ".zpk-storage-migrated"
 
   DOMAIN:

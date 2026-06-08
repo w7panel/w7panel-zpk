@@ -59,7 +59,12 @@
                 <template #cell="{ record }">
                   <a-button type="text" @click="installEvent(record)">安装</a-button>
 
-                  <a-button type="text" @click="deleteItem(record)">删除</a-button>
+                  <a-popconfirm content="确认要删除吗" type="warning" ok-text="确定" cancel-text="取消"
+                    content-class="zpk-delete-popconfirm"
+                    :ok-button-props="{ status: 'danger' }" :cancel-button-props="{ type: 'secondary' }"
+                    @ok="deleteItem(record)">
+                    <a-button type="text">删除</a-button>
+                  </a-popconfirm>
                   <a-popover position="bottom">
                     <a-button type="text">分享</a-button>
                     <template #content>
@@ -158,7 +163,7 @@
 import myAxios from '@/utils';
 import dfimg from '@/assets/img/dfimg.png';
 import w7Identifie from "@/components/w7-identifie.vue";
-import { confirm, messageError, messageSuccess, messageWarning } from '@/utils/ui-feedback';
+import { messageError, messageSuccess, messageWarning } from '@/utils/ui-feedback';
 import { IconPlus, IconSearch } from '@arco-design/web-vue/es/icon';
 
 export default {
@@ -293,17 +298,11 @@ export default {
       });
     },
     deleteItem(row) {
-      confirm({
-        title: "提示",
-        content: '确定要删除该项吗',
-        confirmButtonText: "确定",
-        cancelButtonText: "取消",
-        onOk: () => myAxios.post('/respo/delete', { identifie: row.identifie }).then(res => {
-          if (!res.data) { return }
-          messageSuccess('删除成功');
-          this.getData();
-          this.$emit('delete');
-        })
+      return myAxios.post('/respo/delete', { identifie: row.identifie }).then(res => {
+        if (!res.data) { return }
+        messageSuccess('删除成功');
+        this.getData();
+        this.$emit('delete');
       });
     },
     getLogo(url) {

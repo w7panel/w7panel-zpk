@@ -33,7 +33,14 @@
                     </template>
                     <template #extra="data">
                         <span class="operation ml-10 c-blue" style="margin-right:6px;">
-                            <span v-if="!data.children" @click.stop="deleteFile(data)" class="cursor">删除</span>
+                            <span v-if="!data.children" @click.stop>
+                                <a-popconfirm content="确认要删除吗" type="warning" ok-text="确定"
+                                    cancel-text="取消" content-class="zpk-delete-popconfirm"
+                                    :ok-button-props="{ status: 'danger' }"
+                                    :cancel-button-props="{ type: 'secondary' }" @ok="deleteFile(data)">
+                                    <span class="cursor">删除</span>
+                                </a-popconfirm>
+                            </span>
                             <span v-else @click.stop="createFile(data)" class="c-blue cursor">新建文件</span>
                         </span>
                     </template>
@@ -67,7 +74,7 @@ import { basicSetup } from "codemirror"
 import { indentWithTab } from "@codemirror/commands"
 import { EditorView, keymap } from "@codemirror/view"
 import { IconArrowLeft, IconPlus } from '@arco-design/web-vue/es/icon';
-import { confirm, messageSuccess, messageWarning } from '@/utils/ui-feedback';
+import { messageSuccess, messageWarning } from '@/utils/ui-feedback';
 export default {
     components: {
         IconArrowLeft,
@@ -131,26 +138,20 @@ export default {
             this.addfile.filename = data.id || '';
         },
         deleteFile(data) {
-            confirm({
-                title: '提示',
-                content: '确定要删除"' + data.label + '"吗',
-                confirmButtonText: '确定',
-                cancelButtonText: '取消',
-                onOk: () => myAxios.post('/respo/file', {
-                    identifie: this.identifie,
-                    filename: data.id,
-                    content: '',
-                    version: this.versionid,
-                }).then(() => {
-                    this.getInfo(this.identifie, () => {
-                        messageSuccess('操作成功');
-                        this.activePath = '';
-                        this.selectedKeys = [];
-                        this.tree = [];
-                        this.inputContent();
-                        this.getZipFileList();
-                    });
-                })
+            return myAxios.post('/respo/file', {
+                identifie: this.identifie,
+                filename: data.id,
+                content: '',
+                version: this.versionid,
+            }).then(() => {
+                this.getInfo(this.identifie, () => {
+                    messageSuccess('操作成功');
+                    this.activePath = '';
+                    this.selectedKeys = [];
+                    this.tree = [];
+                    this.inputContent();
+                    this.getZipFileList();
+                });
             });
         },
         save() {

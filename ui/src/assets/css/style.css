@@ -624,3 +624,27 @@ a,
     padding: 5px;
     line-height: 1;
 }
+
+.zpk-delete-popconfirm .arco-popconfirm-footer {
+    display: flex;
+    flex-direction: row-reverse;
+    justify-content: flex-start;
+}
+
+.zpk-delete-popconfirm .arco-popconfirm-footer>button {
+    margin-left: 0;
+    margin-right: 8px;
+}
+
+.zpk-delete-popconfirm .arco-popconfirm-footer>.arco-btn.arco-btn-secondary.arco-btn-status-normal:not(.arco-btn-disabled):first-child {
+    margin-right: 0;
+    color: #4e5969 !important;
+    background: #f2f3f5 !important;
+    border-color: transparent !important;
+}
+
+.zpk-delete-popconfirm .arco-popconfirm-footer>.arco-btn.arco-btn-secondary.arco-btn-status-normal:not(.arco-btn-disabled):first-child:hover {
+    color: #4e5969 !important;
+    background: #e5e6eb !important;
+    border-color: transparent !important;
+}

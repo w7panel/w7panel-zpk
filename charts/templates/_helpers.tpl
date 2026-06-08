@@ -69,3 +69,11 @@ Create the name of the shared registry JWT secret.
 {{- $name := default $defaultName .Values.global.registryJwt.secretName -}}
 {{- tpl $name . | trunc 63 | trimSuffix "-" -}}
 {{- end }}
+
+{{/*
+Create the name of the zpk storage PVC.
+*/}}
+{{- define "zpk.storageClaimName" -}}
+{{- $name := default (include "zpk.fullname" .) .Values.global.zpk.storageClaimName -}}
+{{- tpl $name . | trunc 63 | trimSuffix "-" -}}
+{{- end }}

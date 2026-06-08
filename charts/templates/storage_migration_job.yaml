@@ -1,0 +1,93 @@
+{{- if .Values.global.zpk.storageMigration.enabled }}
+{{- $sourceClaimName := required "global.zpk.storageMigration.sourceClaimName is required" .Values.global.zpk.storageMigration.sourceClaimName -}}
+{{- $targetClaimName := default (include "zpk.storageClaimName" .) .Values.global.zpk.storageMigration.targetClaimName -}}
+{{- $markerFile := default ".zpk-storage-migrated" .Values.global.zpk.storageMigration.markerFile -}}
+{{- $skipIfSourceMissing := true -}}
+{{- if hasKey .Values.global.zpk.storageMigration "skipIfSourceMissing" -}}
+{{- $skipIfSourceMissing = .Values.global.zpk.storageMigration.skipIfSourceMissing -}}
+{{- end -}}
+{{- $sourceClaim := lookup "v1" "PersistentVolumeClaim" .Release.Namespace $sourceClaimName -}}
+{{- if or (not $skipIfSourceMissing) $sourceClaim }}
+{{- if ne $sourceClaimName $targetClaimName }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ printf "%s-storage-migration" (include "zpk.fullname" .) | trunc 63 | trimSuffix "-" }}
+  labels:
+    {{- include "zpk.labels" . | nindent 4 }}
+  annotations:
+    title: 存储迁移
+    w7.cc.app/title: 存储迁移
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "5"
+    "helm.sh/hook-delete-policy": before-hook-creation
+spec:
+  backoffLimit: 1
+  template:
+    metadata:
+      labels:
+        {{- include "zpk.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: storage-migration
+      annotations:
+        title: 存储迁移
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: storage-migration
+          image: {{ .Values.global.zpk.storageMigration.image | quote }}
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              marker="/new-storage/{{ $markerFile }}"
+              if [ -f "$marker" ]; then
+                echo "storage migration already completed"
+                exit 0
+              fi
+
+              migrated=0
+              mkdir -p /new-storage/sqlite_db /new-storage/zpk_helm
+
+              if [ -d /old-storage/sqlite_db ] && [ -n "$(ls -A /old-storage/sqlite_db 2>/dev/null)" ]; then
+                tar -C /old-storage/sqlite_db -cf - . | tar -C /new-storage/sqlite_db -xf -
+                migrated=1
+              fi
+
+              if [ -d /old-storage/zpk_helm ] && [ -n "$(ls -A /old-storage/zpk_helm 2>/dev/null)" ]; then
+                tar -C /old-storage/zpk_helm -cf - . | tar -C /new-storage/zpk_helm -xf -
+                migrated=1
+              fi
+
+              if [ "$migrated" -eq 0 ]; then
+                {
+                  echo "status=skipped"
+                  echo "reason=no sqlite_db or zpk_helm data found"
+                  date -u +"completed_at=%Y-%m-%dT%H:%M:%SZ"
+                } > "$marker"
+                echo "source storage has no sqlite_db or zpk_helm data, skip migration"
+                exit 0
+              fi
+              {
+                echo "status=completed"
+                echo "source={{ $sourceClaimName }}"
+                echo "target={{ $targetClaimName }}"
+                date -u +"completed_at=%Y-%m-%dT%H:%M:%SZ"
+              } > "$marker"
+              echo "storage migration completed"
+          volumeMounts:
+            - name: old-storage
+              mountPath: /old-storage
+              readOnly: true
+            - name: new-storage
+              mountPath: /new-storage
+      volumes:
+        - name: old-storage
+          persistentVolumeClaim:
+            claimName: {{ $sourceClaimName | quote }}
+        - name: new-storage
+          persistentVolumeClaim:
+            claimName: {{ $targetClaimName | quote }}
+{{- end }}
+{{- end }}
+{{- end }}

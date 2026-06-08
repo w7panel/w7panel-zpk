@@ -94,7 +94,7 @@ spec:
             secretName: {{ include "zpk.registryJwtSecretName" . }}
         - name: pvc-storage
           persistentVolumeClaim:
-            claimName: {{ include "zpk.fullname" . }}
+            claimName: {{ include "zpk.storageClaimName" . }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

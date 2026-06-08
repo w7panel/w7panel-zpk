@@ -154,8 +154,9 @@ func (l Deploy) deployK8sApp(rule *entity.RegistryRepositoryDeployRule, imgName 
 	}
 
 	err = dao.Q.Transaction(func(tx *dao.Query) error {
+		curTime := time.Now()
 		_, err = tx.RegistryRepositoryDeployRule.Where(tx.RegistryRepositoryDeployRule.ID.Eq(rule.ID)).Updates(entity.RegistryRepositoryDeployRule{
-			LatestTriggerAt: time.Now(),
+			LatestTriggerAt: &curTime,
 		})
 		if err != nil {
 			return err

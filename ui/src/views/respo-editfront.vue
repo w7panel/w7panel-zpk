@@ -150,8 +150,11 @@ export default {
                 ports: [...new Set(ports.filter(i => i !== '' && i !== undefined && i !== null))],
             };
         },
+        hasManifestDomainConfig(json) {
+            return Boolean(json?.domainEnabled || json?.platform?.domainEnabled);
+        },
         getManifestIdentifie(json, fallback) {
-            let identifie = json?.application?.identifie || fallback || '';
+            let identifie = json?.platform?.baseInfo?.identifie || json?.application?.identifie || fallback || '';
             let author = json?.application?.author || '';
             if (identifie && author && !/^[^-]+-.+$/.test(identifie)) {
                 return author + '-' + identifie;
@@ -164,7 +167,8 @@ export default {
             if (main.ports.length) {
                 arr.push({
                     name: this.getManifestIdentifie(main.json, this.identifie),
-                    title: main.json?.application?.name,
+                    title: main.json?.platform?.baseInfo?.name || main.json?.application?.name,
+                    domainEnabled: this.hasManifestDomainConfig(main.json),
                     port: main.ports,
                 });
             }
@@ -174,7 +178,8 @@ export default {
                 if (ports.length) {
                     arr.push({
                         name: this.getManifestIdentifie(json, this.depends[i].identifie),
-                        title: json?.application?.name,
+                        title: json?.platform?.baseInfo?.name || json?.application?.name || this.depends[i]?.name || '',
+                        domainEnabled: this.hasManifestDomainConfig(json),
                         port: ports
                     })
                 }
@@ -247,7 +252,7 @@ export default {
                 filename: 'manifest.yaml',
                 content: yaml,
                 version: this.version_id,
-            }).then(async (res) => {
+            }).then(async () => {
                 if (this.tree.find(i => i.label == data.file)) {
                     await this.getFile();
                     this.getManifest();
@@ -307,7 +312,7 @@ export default {
                 filename: 'manifest.yaml',
                 content: yaml,
                 version: this.version_id,
-            }).then((res) => {
+            }).then(() => {
                 if (otherData?.editfile) {
                     (typeof callback == 'function') && callback();
                     if (/\.yaml$/.test(otherData.editfile)) {
@@ -328,8 +333,6 @@ export default {
                         this.$router.push('/zpk-version?id=' + this.identifie + '&title=' + (json?.application?.name) || '')
                     });
                 });
-            }).then(res => {
-
             }).catch((error) => {
                 if (error?.response?.data?.error) {
                     messageError(error.response.data.error);
@@ -350,7 +353,7 @@ export default {
         },
         getInfo(id, callback, n) {
             n = n || 0;
-            myAxios.get('/respo/v2/info/' + id + '/' + this.version_id).then(res => {
+            myAxios.get('/respo/v2/info/' + id + '/' + this.version_id).then(() => {
                 callback && callback();
             }).catch(() => {
                 if (n > 10) { return }
@@ -393,7 +396,7 @@ export default {
                     filename: row.label,
                     content: '',
                     version: this.version_id,
-                }).then(res => {
+                }).then(() => {
                     messageSuccess('删除成功');
                     this.getInfo(this.identifie, () => {
                         this.publish(1);

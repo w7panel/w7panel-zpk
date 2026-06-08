@@ -172,6 +172,7 @@ export default {
 .arco-alert.zpk-primary-alert {
 	color: var(--color-text-2) !important;
 	background: #f2f7ff !important;
+	padding: 20px 15px;
 	border: 0 !important;
 	align-items: start;
 }
@@ -181,7 +182,7 @@ export default {
 }
 
 .zpk-primary-alert.no-title .arco-alert-icon {
-	margin-top: 5px;
+	margin-top: 0;
 }
 
 .zpk-primary-alert .arco-alert-title {

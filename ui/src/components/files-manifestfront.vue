@@ -163,7 +163,15 @@
 
                                             <div class="mt-16 greybox manifest-front-config">
                                                 <template v-if="r.load_mode === 'iframe'">
-                                                    <div class="greybox-title">iframe配置<a-tooltip content="iframe使用场景受到了严格的限制，如果需要对接授权登录，可将 {access_token} 传递给iframe，然后由后端服务请求授权接口地址（http://xxxx）获取用户信息。由于iframe受到了浏览器安全限制，生成cookies时必须设置 SameSite: None, Secure: true，并且header设置允许 * 跨域，才能正常传递。"><ArcoIcon name="icon-41" :size="16"/></a-tooltip></div>
+                                                    <div class="greybox-title">iframe配置</div>
+                                                    <a-alert type="info" show-icon class="zpk-primary-alert" title="提示" :closable="false">
+                                                            <div class="registry-alert-item">受到iframe使用场景的严格限制，如果需要对接授权登录，可将 {access_token} 传递给iframe，然后由后端服务请求授权接口地址（http://xxxx）获取用户信息。
+                                                            </div>
+                                                            <div class="registry-alert-item mt-6">由于iframe受到了浏览器安全限制，生成cookies时必须设置 SameSite: None, Secure: true，并且header设置允许 * 跨域，才能正常传递。
+                                                            </div>
+                                                            <div class="registry-alert-item mt-6">变量传递只支持query方式，会将GET参数固定拼接到地址后。
+                                                            </div>
+                                                    </a-alert>
                                                     <a-form-item label="地址类型" style="margin-bottom:20px;">
                                                         <a-radio-group v-model="r.type" @change="changeBackendType(r)">
                                                             <a-radio value="internal">应用地址</a-radio>
@@ -171,28 +179,93 @@
                                                         </a-radio-group>
                                                     </a-form-item>
                                                     <a-form-item label="页面地址" style="margin-bottom:20px;">
-                                                        <div v-if="r.type == 'internal'" class="backend-url-config df ai-c">
-                                                            <span class="backend-url-fixed">https://</span>
-                                                            <span class="backend-url-fixed backend-url-placeholder">{{ getIframeDomainPlaceholder() }}</span>
-                                                            <span class="backend-url-fixed">/</span>
-                                                            <a-input v-model="r.backend_path" @input="getMenu" @change="getMenu" placeholder="请输入目录"
-                                                                class="backend-url-control backend-url-input" />
-                                                        </div>
-                                                        <div v-else class="backend-url-config backend-url-config-external df ai-c">
-                                                            <a-select v-model="r.root_protocol"
-                                                                class="backend-url-control backend-url-protocol"
-                                                                @change="getMenu">
-                                                                <a-option label="http://" value="http://"></a-option>
-                                                                <a-option label="https://" value="https://"></a-option>
-                                                            </a-select>
-                                                            <a-input v-model="r.root_url" @change="getMenu"
-                                                                placeholder="请输入地址"
-                                                                class="backend-url-control backend-url-input" />
+                                                        <div class="backend-url-form-field">
+                                                            <div v-if="r.type == 'internal'" class="backend-url-config df ai-c">
+                                                                <span class="backend-url-fixed">https://</span>
+                                                                <span class="backend-url-fixed backend-url-placeholder">{{ getIframeDomainDisplayPlaceholder() }}</span>
+                                                                <span class="backend-url-fixed">/</span>
+                                                                <a-input v-model="r.backend_path" @input="getMenu" @change="getMenu" placeholder="请输入目录"
+                                                                    class="backend-url-control backend-url-input" />
+                                                            </div>
+                                                            <div v-else class="backend-url-config backend-url-config-external df ai-c">
+                                                                <a-select v-model="r.root_protocol"
+                                                                    class="backend-url-control backend-url-protocol"
+                                                                    @change="getMenu">
+                                                                    <a-option label="http://" value="http://"></a-option>
+                                                                    <a-option label="https://" value="https://"></a-option>
+                                                                </a-select>
+                                                                <a-input v-model="r.root_url" @change="getMenu"
+                                                                    placeholder="请输入地址"
+                                                                    class="backend-url-control backend-url-input" />
+                                                            </div>
+                                                            <div v-if="r.type == 'internal' && !hasBackendDomainConfig()" class="domain-warning">
+                                                                <icon-exclamation-circle-fill class="domain-warning-icon" :size="14" />
+                                                                <span>当前应用后端配置尚未启用域名设置，请前往后端包管理界面配置。</span>
+                                                            </div>
                                                         </div>
                                                     </a-form-item>
-                                                    <a-form-item label="变量传递" style="margin-bottom:20px;">
-                                                        只支持query方式，get方式拼接到页面地址后面
-                                                    </a-form-item>
+                                                    <div class="df ai-c manifest-front-section-title">变量传递配置</div>
+                                                    <div class="manifest-front-block">
+                                                        <div class="manifest-front-table-block">
+                                                            <div class="manifest-front-table-title">请求参数(Query)</div>
+                                                            <table v-if="hasParamRows(r.proxy_request_query)" class="table manifest-param-table config-variable-table">
+                                                                <thead>
+                                                                    <tr>
+                                                                        <td>key</td>
+                                                                        <td>value</td>
+                                                                        <td>描述</td>
+                                                                        <td>操作</td>
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody>
+                                                                    <tr v-for="(item, index) in r.proxy_request_query" :key="index">
+                                                                        <td>
+                                                                            <a-input v-model="item.key" placeholder="key"
+                                                                                @change="getMenu"
+                                                                                style="width:200px;margin-right:10px;"></a-input>
+                                                                        </td>
+                                                                        <td>
+                                                                            <div class="param-value-field">
+                                                                                <a-input v-model="item.value" placeholder="value" @change="changeConfigValue(item)">
+                                                                                    <template #suffix>
+                                                                                        <a-popover trigger="click" position="bottom" :content-style="{ width: '360px' }">
+                                                                                            <span class="config-value-suffix">选择系统配置</span>
+                                                                                            <template #content>
+                                                                                                <div class="var-picker">
+                                                                                                    <template v-for="group in variableGroups" :key="group.title">
+                                                                                                        <div class="var-picker-title">{{ group.title }}</div>
+                                                                                                        <div v-if="group.options.length">
+                                                                                                            <div v-for="param in group.options" :key="param.value"
+                                                                                                                class="var-picker-item" @click="selectConfigVariable(item, param)">
+                                                                                                                <div class="var-picker-name">{{ param.key || param.value }} <span>{{ param.displayValue }}</span></div>
+                                                                                                            </div>
+                                                                                                        </div>
+                                                                                                        <div v-else class="var-picker-empty">暂无可选配置</div>
+                                                                                                    </template>
+                                                                                                </div>
+                                                                                            </template>
+                                                                                        </a-popover>
+                                                                                    </template>
+                                                                                </a-input>
+                                                                            </div>
+                                                                        </td>
+                                                                        <td>{{ getConfigVariableLabel(item) }}</td>
+                                                                        <td><span class="c-blue cursor handle"
+                                                                                @click="removeParamRow(r.proxy_request_query, index)">删除</span></td>
+                                                                    </tr>
+                                                                    <tr>
+                                                                        <td colspan="4" class="cursor txt-c"
+                                                                            @click="addParamRow(r.proxy_request_query)">
+                                                                            <span class="addmenu"><icon-plus :size="14" />添加请求参数</span>
+                                                                        </td>
+                                                                    </tr>
+                                                                </tbody>
+                                                            </table>
+                                                            <div v-else class="empty-config-action cursor" @click="addParamRow(r.proxy_request_query)">
+                                                                <span class="addmenu"><icon-plus :size="14" />添加请求参数</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
                                                 </template>
                                                 <template v-else>
 
@@ -212,7 +285,12 @@
                                                             @change="changeBackendIdentifie(r)">
                                                             <a-option v-for="app in backendAppOptions" :key="app.id"
                                                                 :label="app.title && app.title != app.id ? `${app.id}（${app.title}）` : app.id"
-                                                                :value="app.id"></a-option>
+                                                                :value="app.id">
+                                                                <div class="backend-app-option">
+                                                                    <span>{{ app.id }}</span>
+                                                                    <span v-if="app.title && app.title != app.id">{{ app.title }}</span>
+                                                                </div>
+                                                            </a-option>
                                                         </a-select>
                                                         <span
                                                             class="backend-url-fixed">.default.svc.cluster.local:</span>
@@ -243,11 +321,12 @@
                                                     </div>
                                                     <div class="mb-20 manifest-front-table-block">
                                                         <div class="manifest-front-table-title">请求头(Header)</div>
-                                                        <table class="table manifest-param-table">
+                                                        <table v-if="hasParamRows(r.proxy_request_header)" class="table manifest-param-table config-variable-table">
                                                             <thead>
                                                                 <tr>
                                                                     <td>key</td>
                                                                     <td>value</td>
+                                                                    <td>描述</td>
                                                                     <td>操作</td>
                                                                 </tr>
                                                             </thead>
@@ -259,37 +338,54 @@
                                                                             style="width:200px;margin-right:10px;"></a-input>
                                                                     </td>
                                                                     <td>
-                                                                        <a-select v-model="item.value" allow-search allow-create
-                                                                            placeholder="value"
-                                                                            class="backend-url-control start-param-select"
-                                                                            @change="(value) => changeStartParamValue(item, value)">
-                                                                            <a-option v-for="param in systemVarOptions"
-                                                                                :key="param.value" :label="param.label"
-                                                                                :value="param.value">
-                                                                                <span>{{ param.label }}</span>
-                                                                                <span class="c-99 fs-12 ml-10">{{ param.value }}</span>
-                                                                            </a-option>
-                                                                        </a-select>
+                                                                        <div class="param-value-field">
+                                                                            <a-input v-model="item.value" placeholder="value" @change="changeConfigValue(item)">
+                                                                                <template #suffix>
+                                                                                    <a-popover trigger="click" position="bottom" :content-style="{ width: '360px' }">
+                                                                                        <span class="config-value-suffix">选择系统配置</span>
+                                                                                        <template #content>
+                                                                                            <div class="var-picker">
+                                                                                                <template v-for="group in variableGroups" :key="group.title">
+                                                                                                    <div class="var-picker-title">{{ group.title }}</div>
+                                                                                                    <div v-if="group.options.length">
+                                                                                                        <div v-for="param in group.options" :key="param.value"
+                                                                                                            class="var-picker-item" @click="selectConfigVariable(item, param)">
+                                                                                                            <div class="var-picker-name">{{ param.key || param.value }} <span>{{ param.displayValue }}</span></div>
+                                                                                                        </div>
+                                                                                                    </div>
+                                                                                                    <div v-else class="var-picker-empty">暂无可选配置</div>
+                                                                                                </template>
+                                                                                            </div>
+                                                                                        </template>
+                                                                                    </a-popover>
+                                                                                </template>
+                                                                            </a-input>
+                                                                        </div>
                                                                     </td>
+                                                                    <td>{{ getConfigVariableLabel(item) }}</td>
                                                                     <td><span class="c-blue cursor handle"
-                                                                            @click="r.proxy_request_header.length <= 1 ? r.proxy_request_header = [{ key: '', value: '', isSelect: false }] : r.proxy_request_header.splice(index, 1)">删除</span></td>
+                                                                            @click="removeParamRow(r.proxy_request_header, index)">删除</span></td>
                                                                 </tr>
                                                                 <tr>
-                                                                    <td colspan="5" class="cursor txt-c"
-                                                                        @click="r.proxy_request_header.push({ key: '', value: '' })">
+                                                                    <td colspan="4" class="cursor txt-c"
+                                                                        @click="addParamRow(r.proxy_request_header)">
                                                                         <span class="addmenu"><icon-plus :size="14" />添加请求头</span>
                                                                     </td>
                                                                 </tr>
                                                             </tbody>
                                                         </table>
+                                                        <div v-else class="empty-config-action cursor" @click="addParamRow(r.proxy_request_header)">
+                                                            <span class="addmenu"><icon-plus :size="14" />添加请求头</span>
+                                                        </div>
                                                     </div>
                                                     <div v-if="!(form.menu_type == 'thirdparty_cd' && r.name == 'normal')" class="manifest-front-table-block">
                                                         <div class="manifest-front-table-title">请求参数(Query)</div>
-                                                        <table class="table manifest-param-table">
+                                                        <table v-if="hasParamRows(r.proxy_request_query)" class="table manifest-param-table config-variable-table">
                                                             <thead>
                                                                 <tr>
                                                                     <td>key</td>
                                                                     <td>value</td>
+                                                                    <td>描述</td>
                                                                     <td>操作</td>
                                                                 </tr>
                                                             </thead>
@@ -301,56 +397,67 @@
                                                                             style="width:200px;margin-right:10px;"></a-input>
                                                                     </td>
                                                                     <td>
-                                                                        <a-select v-model="item.value" allow-search allow-create
-                                                                            placeholder="value"
-                                                                            class="backend-url-control start-param-select"
-                                                                            @change="(value) => changeStartParamValue(item, value)">
-                                                                            <a-option v-for="param in systemVarOptions"
-                                                                                :key="param.value" :label="param.label"
-                                                                                :value="param.value">
-                                                                                <span>{{ param.label }}</span>
-                                                                                <span class="c-99 fs-12 ml-10">{{ param.value }}</span>
-                                                                            </a-option>
-                                                                        </a-select>
+                                                                        <div class="param-value-field">
+                                                                            <a-input v-model="item.value" placeholder="value" @change="changeConfigValue(item)">
+                                                                                <template #suffix>
+                                                                                    <a-popover trigger="click" position="bottom" :content-style="{ width: '360px' }">
+                                                                                        <span class="config-value-suffix">选择系统配置</span>
+                                                                                        <template #content>
+                                                                                            <div class="var-picker">
+                                                                                                <template v-for="group in variableGroups" :key="group.title">
+                                                                                                    <div class="var-picker-title">{{ group.title }}</div>
+                                                                                                    <div v-if="group.options.length">
+                                                                                                        <div v-for="param in group.options" :key="param.value"
+                                                                                                            class="var-picker-item" @click="selectConfigVariable(item, param)">
+                                                                                                            <div class="var-picker-name">{{ param.key || param.value }} <span>{{ param.displayValue }}</span></div>
+                                                                                                        </div>
+                                                                                                    </div>
+                                                                                                    <div v-else class="var-picker-empty">暂无可选配置</div>
+                                                                                                </template>
+                                                                                            </div>
+                                                                                        </template>
+                                                                                    </a-popover>
+                                                                                </template>
+                                                                            </a-input>
+                                                                        </div>
                                                                     </td>
+                                                                    <td>{{ getConfigVariableLabel(item) }}</td>
                                                                     <td><span class="c-blue cursor handle"
-                                                                            @click="r.proxy_request_query.length <= 1 ? r.proxy_request_query = [{ key: '', value: '', isSelect: false }] : r.proxy_request_query.splice(index, 1)">删除</span></td>
+                                                                            @click="removeParamRow(r.proxy_request_query, index)">删除</span></td>
                                                                 </tr>
                                                                 <tr>
-                                                                    <td colspan="5" class="cursor txt-c"
-                                                                        @click="r.proxy_request_query.push({ key: '', value: '' })">
+                                                                    <td colspan="4" class="cursor txt-c"
+                                                                        @click="addParamRow(r.proxy_request_query)">
                                                                         <span class="addmenu"><icon-plus :size="14" />添加请求参数</span>
                                                                     </td>
                                                                 </tr>
                                                             </tbody>
                                                         </table>
+                                                        <div v-else class="empty-config-action cursor" @click="addParamRow(r.proxy_request_query)">
+                                                            <span class="addmenu"><icon-plus :size="14" />添加请求参数</span>
+                                                        </div>
                                                     </div>
                                                 </div>
                                                 <div v-if="!(form.menu_type == 'thirdparty_cd' && r.name == 'normal')"
                                                     class="df ai-c manifest-front-section-title">前端配置<a-tooltip content="面板提供microapp机制渲染前端包，可通过window.$wujie.props.frontend_props 从JS变量获取传递值"><ArcoIcon name="icon-41" :size="16"/></a-tooltip></div>
                                                 <div
                                                     v-if="!(form.menu_type == 'thirdparty_cd' && r.name == 'normal')" class="manifest-front-block">
-                                                    <div class="manifest-front-table-title">前端配置</div>
-                                                    <table class="table manifest-param-table">
+                                                    <table class="table manifest-param-table frontend-param-table">
                                                         <thead>
                                                             <tr>
                                                                 <td>key</td>
                                                                 <td>value</td>
+                                                                <td>描述</td>
                                                                 <td>操作</td>
                                                             </tr>
                                                         </thead>
                                                         <tbody>
-                                                            <!-- ["${system.group}", "${system.userid}", "${system.openid}", "${system.nickname}", "${system.role}", "${system.access_token}", "${system.group}", "${system.url}"] -->
-                                                            <tr v-for='item in ["${system.userid}", "${system.openid}", "${system.nickname}", "${system.role}", "${system.access_token}", "${system.group}", "${system.url}"]' :key="item">
-                                                                <td>
-                                                                    {{ item.match(/\${system.(.*)}/)[1] }}
-                                                                </td>
-                                                                <td>
-                                                                    {{ item }}
-                                                                </td>
+                                                            <tr v-for="item in frontendDefaultProps" :key="item.value" class="frontend-default-prop-row">
+                                                                <td>{{ item.key }}</td>
+                                                                <td>{{ item.value }}</td>
+                                                                <td>{{ item.description }}</td>
                                                                 <td></td>
                                                             </tr>
-                                                            
                                                             <tr v-for="(item, index) in r.frontend_props" :key="index">
                                                                 <td>
                                                                     <a-input v-model="item.key" placeholder="key"
@@ -358,24 +465,37 @@
                                                                         style="width:200px;margin-right:10px;"></a-input>
                                                                 </td>
                                                                 <td>
-                                                                    <a-select v-model="item.value" allow-search allow-create
-                                                                        placeholder="value"
-                                                                        class="backend-url-control start-param-select"
-                                                                        @change="(value) => changeStartParamValue(item, value)">
-                                                                        <a-option v-for="param in systemVarOptions"
-                                                                            :key="param.value" :label="param.label"
-                                                                            :value="param.value">
-                                                                            <span>{{ param.label }}</span>
-                                                                            <span class="c-99 fs-12 ml-10">{{ param.value }}</span>
-                                                                        </a-option>
-                                                                    </a-select>
+                                                                    <div class="param-value-field">
+                                                                        <a-input v-model="item.value" placeholder="value" @change="changeConfigValue(item)">
+                                                                            <template #suffix>
+                                                                                <a-popover trigger="click" position="bottom" :content-style="{ width: '360px' }">
+                                                                                    <span class="config-value-suffix">选择系统配置</span>
+                                                                                    <template #content>
+                                                                                        <div class="var-picker">
+                                                                                            <template v-for="group in variableGroups" :key="group.title">
+                                                                                                <div class="var-picker-title">{{ group.title }}</div>
+                                                                                                <div v-if="group.options.length">
+                                                                                                    <div v-for="param in group.options" :key="param.value"
+                                                                                                        class="var-picker-item" @click="selectConfigVariable(item, param)">
+                                                                                                        <div class="var-picker-name">{{ param.key || param.value }} <span>{{ param.displayValue }}</span></div>
+                                                                                                    </div>
+                                                                                                </div>
+                                                                                                <div v-else class="var-picker-empty">暂无可选配置</div>
+                                                                                            </template>
+                                                                                        </div>
+                                                                                    </template>
+                                                                                </a-popover>
+                                                                            </template>
+                                                                        </a-input>
+                                                                    </div>
                                                                 </td>
+                                                                <td>{{ getConfigVariableLabel(item) }}</td>
                                                                 <td><span class="c-blue cursor handle"
-                                                                        @click="r.frontend_props.length <= 1 ? r.frontend_props = [{ key: '', value: '', isSelect: false }] : r.frontend_props.splice(index, 1)">删除</span></td>
+                                                                        @click="removeParamRow(r.frontend_props, index)">删除</span></td>
                                                             </tr>
                                                             <tr>
-                                                                <td colspan="5" class="cursor txt-c"
-                                                                    @click="r.frontend_props.push({ key: '', value: '' })">
+                                                                <td colspan="4" class="cursor txt-c"
+                                                                    @click="addParamRow(r.frontend_props)">
                                                                     <span class="addmenu"><icon-plus :size="14" />添加前端配置</span>
                                                                 </td>
                                                             </tr>
@@ -386,168 +506,171 @@
 
                                             </div>
 
-                                            <table v-if="r.load_mode !== 'iframe'" class="menutable table mt-10">
-                                                <thead>
-                                                    <tr>
-                                                        <td>排序</td>
-                                                        <td>路由</td>
-                                                        <td>名称</td>
-                                                        <td>
-                                                            <div class="df ai-c jc-c">
-                                                                <span>欢迎页</span>
-                                                                <a-tooltip content="用户进入系统首页访问的页面">
-                                                                    <icon-question-circle-fill class="cursor ml-4 c-99" :size="16" />
-                                                                </a-tooltip>
-                                                            </div>
-                                                        </td>
-                                                        <td>图标</td>
-                                                        <td>操作</td>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    <tr v-for="(item, index) in r.menu" :key="index">
-                                                        <td>
-                                                            <div><a-input type="number"
-                                                                    :model-value="String(item.displayorder ?? '')"
-                                                                    @update:model-value="v => item.displayorder = v"
-                                                                    @change="getMenu"
-                                                                    style="width:60px; height:36px;"></a-input>
-                                                            </div>
-                                                            <div v-for="(sub, subid) in item.children" :key="subid"
-                                                                class="df mt-10">
-                                                                <div class="branch"
-                                                                    :class="{ last: subid == item.children.length - 1 }">
+                                            <div class="mt-10 greybox manifest-front-menu-config">
+                                                <div class="greybox-title">菜单配置</div>
+                                                <table class="menutable table mt-10">
+                                                    <thead>
+                                                        <tr>
+                                                            <td>排序</td>
+                                                            <td>路由</td>
+                                                            <td>名称</td>
+                                                            <td>
+                                                                <div class="df ai-c jc-c">
+                                                                    <span>欢迎页</span>
+                                                                    <a-tooltip content="用户进入系统首页访问的页面">
+                                                                        <icon-question-circle-fill class="cursor ml-4 c-99" :size="16" />
+                                                                    </a-tooltip>
                                                                 </div>
-                                                                <a-input type="number"
-                                                                    :model-value="String(sub.displayorder ?? '')"
-                                                                    @update:model-value="v => sub.displayorder = v"
-                                                                    @change="getMenu"
-                                                                    style="width:60px; height:36px;"></a-input>
-                                                            </div>
-                                                        </td>
-                                                        <td>
-                                                            <div><a-input v-model="item.do" @change="onMenuChanged(r.menu)"
-                                                                    style="width:150px; height:36px;"
-                                                                    placeholder="路由"></a-input>
-                                                            </div>
-                                                            <div v-for="(sub, subid) in item.children" :key="subid"
-                                                                class="mt-10">
-                                                                <a-input v-model="sub.do" @change="onMenuChanged(r.menu)"
-                                                                    style="width:150px; height:36px;"
-                                                                    placeholder="路由"></a-input>
-                                                            </div>
-                                                        </td>
-                                                        <td>
-                                                            <div><a-input v-model="item.title" @change="onMenuChanged(r.menu)"
-                                                                    style="width:150px; height:36px;"
-                                                                    placeholder="名称"></a-input>
-                                                            </div>
-                                                            <div v-for="(sub, subid) in item.children" :key="subid"
-                                                                class="mt-10">
-                                                                <a-input v-model="sub.title" @change="onMenuChanged(r.menu)"
-                                                                    style="width:150px; height:36px;"
-                                                                    placeholder="名称"></a-input>
-                                                            </div>
-                                                        </td>
-                                                        <td class="menu-default-cell">
-                                                            <div class="menu-default-check" :style="{visibility: item.children?.length > 0 ? 'hidden' : 'visible'}">
-                                                                <a-checkbox :model-value="Number(item.is_default) === 1"
-                                                                    :name="r.name"
-                                                                    @click.stop="setMenuDefault(r.menu, item)"></a-checkbox>
-                                                            </div>
-                                                            <div v-for="(sub, subid) in item.children" :key="subid"
-                                                                class="mt-10 menu-default-check">
-                                                                <a-checkbox :model-value="Number(sub.is_default) === 1"
-                                                                    :name="r.name"
-                                                                    @click.stop="setMenuDefault(r.menu, sub)"></a-checkbox>
-                                                            </div>
-                                                        </td>
-                                                        <td>
-                                                            <div class="selicon cursor df ai-c jc-c"
-                                                                v-if="item.icon_svg"
-                                                                @click="dialogVisible = true; activeItem = item;"
-                                                                v-html="elementsToSvg(item.icon_svg)"></div>
-                                                            <div class="selicon cursor df ai-c jc-c"
-                                                                v-else-if="item.icon"
-                                                                @click="dialogVisible = true; activeItem = item;"><i
-                                                                    class="fs-24 wi" :class="'wi-' + item.icon"></i>
-                                                            </div>
-                                                            <div class="selicon cursor df ai-c jc-c" v-else
-                                                                @click="dialogVisible = true; activeItem = item;">
-                                                                <svg class="default-menu-icon" xmlns="http://www.w3.org/2000/svg"
-                                                                    viewBox="0 0 1024 1024" aria-hidden="true">
-                                                                    <path fill="currentColor"
-                                                                        d="M160 448a32 32 0 0 1-32-32V160.064a32 32 0 0 1 32-32h256a32 32 0 0 1 32 32V416a32 32 0 0 1-32 32zm448 0a32 32 0 0 1-32-32V160.064a32 32 0 0 1 32-32h255.936a32 32 0 0 1 32 32V416a32 32 0 0 1-32 32zM160 896a32 32 0 0 1-32-32V608a32 32 0 0 1 32-32h256a32 32 0 0 1 32 32v256a32 32 0 0 1-32 32zm448 0a32 32 0 0 1-32-32V608a32 32 0 0 1 32-32h255.936a32 32 0 0 1 32 32v256a32 32 0 0 1-32 32z"></path>
-                                                                </svg>
-                                                            </div>
-                                                            <div v-for="(sub, subid) in item.children" :key="subid"
-                                                                class="df ai-c jc-c mt-10"
-                                                                style="width:36px; height:36px;">
-                                                            </div>
-                                                        </td>
-                                                        <td>
-                                                            <div class="df ai-c" style="height:36px;">
-                                                                <span class="handle c-blue cursor"
-                                                                    @click="addSub(r.menu, item)">添加子菜单</span>
-                                                                <a-popover position="top" :content-style="{ width: '240px' }">
-                                                                    <span class="handle c-blue cursor">设置位置</span>
-                                                                    <template #content>
-                                                                        <div>
-                                                                            <div class="df ai-c jc-b">
-                                                                                <div class="menu-single-location">单个菜单位置设置
+                                                            </td>
+                                                            <td>图标</td>
+                                                            <td>操作</td>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        <tr v-for="(item, index) in r.menu" :key="index">
+                                                            <td>
+                                                                <div><a-input type="number"
+                                                                        :model-value="String(item.displayorder ?? '')"
+                                                                        @update:model-value="v => item.displayorder = v"
+                                                                        @change="getMenu"
+                                                                        style="width:60px; height:36px;"></a-input>
+                                                                </div>
+                                                                <div v-for="(sub, subid) in item.children" :key="subid"
+                                                                    class="df mt-10">
+                                                                    <div class="branch"
+                                                                        :class="{ last: subid == item.children.length - 1 }">
+                                                                    </div>
+                                                                    <a-input type="number"
+                                                                        :model-value="String(sub.displayorder ?? '')"
+                                                                        @update:model-value="v => sub.displayorder = v"
+                                                                        @change="getMenu"
+                                                                        style="width:60px; height:36px;"></a-input>
+                                                                </div>
+                                                            </td>
+                                                            <td>
+                                                                <div><a-input v-model="item.do" @change="onMenuChanged(r.menu)"
+                                                                        style="width:150px; height:36px;"
+                                                                        placeholder="路由"></a-input>
+                                                                </div>
+                                                                <div v-for="(sub, subid) in item.children" :key="subid"
+                                                                    class="mt-10">
+                                                                    <a-input v-model="sub.do" @change="onMenuChanged(r.menu)"
+                                                                        style="width:150px; height:36px;"
+                                                                        placeholder="路由"></a-input>
+                                                                </div>
+                                                            </td>
+                                                            <td>
+                                                                <div><a-input v-model="item.title" @change="onMenuChanged(r.menu)"
+                                                                        style="width:150px; height:36px;"
+                                                                        placeholder="名称"></a-input>
+                                                                </div>
+                                                                <div v-for="(sub, subid) in item.children" :key="subid"
+                                                                    class="mt-10">
+                                                                    <a-input v-model="sub.title" @change="onMenuChanged(r.menu)"
+                                                                        style="width:150px; height:36px;"
+                                                                        placeholder="名称"></a-input>
+                                                                </div>
+                                                            </td>
+                                                            <td class="menu-default-cell">
+                                                                <div class="menu-default-check" :style="{visibility: item.children?.length > 0 ? 'hidden' : 'visible'}">
+                                                                    <a-checkbox :model-value="Number(item.is_default) === 1"
+                                                                        :name="r.name"
+                                                                        @click.stop="setMenuDefault(r.menu, item)"></a-checkbox>
+                                                                </div>
+                                                                <div v-for="(sub, subid) in item.children" :key="subid"
+                                                                    class="mt-10 menu-default-check">
+                                                                    <a-checkbox :model-value="Number(sub.is_default) === 1"
+                                                                        :name="r.name"
+                                                                        @click.stop="setMenuDefault(r.menu, sub)"></a-checkbox>
+                                                                </div>
+                                                            </td>
+                                                            <td>
+                                                                <div class="selicon cursor df ai-c jc-c"
+                                                                    v-if="item.icon_svg"
+                                                                    @click="dialogVisible = true; activeItem = item;"
+                                                                    v-html="elementsToSvg(item.icon_svg)"></div>
+                                                                <div class="selicon cursor df ai-c jc-c"
+                                                                    v-else-if="item.icon"
+                                                                    @click="dialogVisible = true; activeItem = item;"><i
+                                                                        class="fs-24 wi" :class="'wi-' + item.icon"></i>
+                                                                </div>
+                                                                <div class="selicon cursor df ai-c jc-c" v-else
+                                                                    @click="dialogVisible = true; activeItem = item;">
+                                                                    <svg class="default-menu-icon" xmlns="http://www.w3.org/2000/svg"
+                                                                        viewBox="0 0 1024 1024" aria-hidden="true">
+                                                                        <path fill="currentColor"
+                                                                            d="M160 448a32 32 0 0 1-32-32V160.064a32 32 0 0 1 32-32h256a32 32 0 0 1 32 32V416a32 32 0 0 1-32 32zm448 0a32 32 0 0 1-32-32V160.064a32 32 0 0 1 32-32h255.936a32 32 0 0 1 32 32V416a32 32 0 0 1-32 32zM160 896a32 32 0 0 1-32-32V608a32 32 0 0 1 32-32h256a32 32 0 0 1 32 32v256a32 32 0 0 1-32 32zm448 0a32 32 0 0 1-32-32V608a32 32 0 0 1 32-32h255.936a32 32 0 0 1 32 32v256a32 32 0 0 1-32 32z"></path>
+                                                                    </svg>
+                                                                </div>
+                                                                <div v-for="(sub, subid) in item.children" :key="subid"
+                                                                    class="df ai-c jc-c mt-10"
+                                                                    style="width:36px; height:36px;">
+                                                                </div>
+                                                            </td>
+                                                            <td>
+                                                                <div class="df ai-c" style="height:36px;">
+                                                                    <span class="handle c-blue cursor"
+                                                                        @click="addSub(r.menu, item)">添加子菜单</span>
+                                                                    <a-popover position="top" :content-style="{ width: '240px' }">
+                                                                        <span class="handle c-blue cursor">设置位置</span>
+                                                                        <template #content>
+                                                                            <div>
+                                                                                <div class="df ai-c jc-b">
+                                                                                    <div class="menu-single-location">单个菜单位置设置
+                                                                                    </div>
                                                                                 </div>
+                                                                                <a-radio-group v-model="item.location"
+                                                                                    class="df mt-10" @change="getMenu">
+                                                                                    <div class="fc df df-c ai-c menulocation cursor"
+                                                                                        @click="item.location = 'normal'; getMenu()">
+                                                                                        <img v-if="r.location == 'top'"
+                                                                                            src="@/assets/img/menu-t.png"
+                                                                                            alt="" />
+                                                                                        <img v-else
+                                                                                            src="@/assets/img/menu-l.png"
+                                                                                            alt="" />
+                                                                                        <a-radio value="normal"
+                                                                                            class="mt-10">默认位置</a-radio>
+                                                                                    </div>
+                                                                                    <div v-if="r.location == 'top'"
+                                                                                        class="fc df df-c ai-c menulocation cursor"
+                                                                                        @click="item.location = 'back'; getMenu()">
+                                                                                        <img src="@/assets/img/menu-r.png"
+                                                                                            alt="" />
+                                                                                        <a-radio value="back"
+                                                                                            class="mt-10">顶部右侧</a-radio>
+                                                                                    </div>
+                                                                                    <div v-else
+                                                                                        class="fc df df-c ai-c menulocation cursor"
+                                                                                        @click="item.location = 'back'; getMenu()">
+                                                                                        <img src="@/assets/img/menu-b.png"
+                                                                                            alt="" />
+                                                                                        <a-radio value="back"
+                                                                                            class="mt-10">左侧底部</a-radio>
+                                                                                    </div>
+                                                                                </a-radio-group>
                                                                             </div>
-                                                                            <a-radio-group v-model="item.location"
-                                                                                class="df mt-10" @change="getMenu">
-                                                                                <div class="fc df df-c ai-c menulocation cursor"
-                                                                                    @click="item.location = 'normal'; getMenu()">
-                                                                                    <img v-if="r.location == 'top'"
-                                                                                        src="@/assets/img/menu-t.png"
-                                                                                        alt="" />
-                                                                                    <img v-else
-                                                                                        src="@/assets/img/menu-l.png"
-                                                                                        alt="" />
-                                                                                    <a-radio value="normal"
-                                                                                        class="mt-10">默认位置</a-radio>
-                                                                                </div>
-                                                                                <div v-if="r.location == 'top'"
-                                                                                    class="fc df df-c ai-c menulocation cursor"
-                                                                                    @click="item.location = 'back'; getMenu()">
-                                                                                    <img src="@/assets/img/menu-r.png"
-                                                                                        alt="" />
-                                                                                    <a-radio value="back"
-                                                                                        class="mt-10">顶部右侧</a-radio>
-                                                                                </div>
-                                                                                <div v-else
-                                                                                    class="fc df df-c ai-c menulocation cursor"
-                                                                                    @click="item.location = 'back'; getMenu()">
-                                                                                    <img src="@/assets/img/menu-b.png"
-                                                                                        alt="" />
-                                                                                    <a-radio value="back"
-                                                                                        class="mt-10">左侧底部</a-radio>
-                                                                                </div>
-                                                                            </a-radio-group>
-                                                                        </div>
-                                                                    </template>
-                                                                </a-popover>
-                                                                <span class="handle c-blue cursor"
-                                                                    @click="removeMenu(r.menu, index)">删除</span>
-                                                            </div>
-                                                            <div v-for="(sub, subid) in item.children" :key="subid"
-                                                                class="mt-10 df ai-c" style="height:36px;">
-                                                                <span class="handle c-blue cursor"
-                                                                    @click="removeSubMenu(r.menu, item, subid)">删除</span>
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                    <tr>
-                                                        <td colspan="9" class="cursor txt-c"
-                                                            @click="addMenu(r.menu)">
-                                                            <span class="addmenu"><icon-plus :size="14" />添加一级菜单</span>
-                                                        </td>
-                                                    </tr>
-                                                </tbody>
-                                            </table>
+                                                                        </template>
+                                                                    </a-popover>
+                                                                    <span class="handle c-blue cursor"
+                                                                        @click="removeMenu(r.menu, index)">删除</span>
+                                                                </div>
+                                                                <div v-for="(sub, subid) in item.children" :key="subid"
+                                                                    class="mt-10 df ai-c" style="height:36px;">
+                                                                    <span class="handle c-blue cursor"
+                                                                        @click="removeSubMenu(r.menu, item, subid)">删除</span>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td colspan="9" class="cursor txt-c"
+                                                                @click="addMenu(r.menu)">
+                                                                <span class="addmenu"><icon-plus :size="14" />添加一级菜单</span>
+                                                            </td>
+                                                        </tr>
+                                                    </tbody>
+                                                </table>
+                                            </div>
                                         </div>
                                         <div v-if="form.menu_type == 'console'"
                                             class="mt-10 addrole df ai-c jc-c cursor" @click="showAddRole = true">添加管理端
@@ -624,6 +747,7 @@ import ArcoIcon from '@/components/arco-icon.vue';
 import {
     IconCheckCircleFill,
     IconEdit,
+    IconExclamationCircleFill,
     IconPlus,
     IconQuestionCircleFill,
     IconUpload,
@@ -649,6 +773,7 @@ export default {
         ArcoIcon,
         IconCheckCircleFill,
         IconEdit,
+        IconExclamationCircleFill,
         IconPlus,
         IconQuestionCircleFill,
         IconUpload,
@@ -902,8 +1027,76 @@ export default {
         systemVarOptions() {
             return (this.startParams || []).filter(item => item?.name).map(item => ({
                 label: item.title || item.name,
+                key: item.title || item.name,
                 value: item.name,
+                displayValue: item.name,
+                insertValue: this.wrapConfigVariable(item.name),
+                description: item.values_text || item.description || item.desc || item.name,
+                type: 'start',
             }))
+        },
+        systemBuiltinVarOptions() {
+            return [
+                { value: 'system.userid' },
+                { value: 'system.openid' },
+                { value: 'system.nickname' },
+                { value: 'system.role' },
+                { value: 'system.access_token' },
+                { value: 'system.group' },
+                { value: 'system.url' },
+            ].map(item => ({
+                ...item,
+                key: item.value.replace(/^system\./, ''),
+                label: item.value.replace(/^system\./, ''),
+                displayValue: this.wrapConfigVariable(item.value),
+                insertValue: this.wrapConfigVariable(item.value),
+                type: 'system',
+            }));
+        },
+        frontendDefaultProps() {
+            return [
+                {
+                    key: 'url',
+                    value: this.wrapConfigVariable('system.url'),
+                    description: '面板代理请求微应用后端服务的地址，可能会把相对 backendUrl 拼成当前 origin 下的绝对地址',
+                },
+                {
+                    key: 'group',
+                    value: this.wrapConfigVariable('system.group'),
+                    description: '应用标识分组；如果应用下有多个子应用，该值为主应用标识',
+                },
+                {
+                    key: 'userid',
+                    value: this.wrapConfigVariable('system.userid'),
+                    description: '面板登录用户 ID',
+                },
+                {
+                    key: 'openid',
+                    value: this.wrapConfigVariable('system.openid'),
+                    description: '面板登录用户 openid',
+                },
+                {
+                    key: 'nickname',
+                    value: this.wrapConfigVariable('system.nickname'),
+                    description: '面板登录用户昵称',
+                },
+                {
+                    key: 'role',
+                    value: this.wrapConfigVariable('system.role'),
+                    description: '面板用户角色，取值包括 founder、super、normal、technician',
+                },
+                {
+                    key: 'access_token',
+                    value: this.wrapConfigVariable('system.access_token'),
+                    description: '面板登录用户自身维护的 access token，只能用于获取用户信息，不能准确定位 appid',
+                },
+            ];
+        },
+        variableGroups() {
+            return [
+                { title: '启动参数变量', options: this.systemVarOptions },
+                { title: '系统内置变量', options: this.systemBuiltinVarOptions },
+            ];
         },
         currentBackendIdentifie() {
             if (this.form.author && this.form.identifie) {
@@ -922,6 +1115,7 @@ export default {
                 apps.set(id, {
                     id,
                     title: item.title || old.title || id,
+                    domainEnabled: Boolean(item.domainEnabled || old.domainEnabled),
                     ports: ports.length ? ports : (old.ports || []),
                 });
             };
@@ -929,6 +1123,7 @@ export default {
             addApp({
                 id: this.currentBackendIdentifie,
                 title: this.form.name || this.currentBackendIdentifie,
+                domainEnabled: this.hasManifestDomainConfig(this.json),
                 ports: this.form.port?.map?.(i => i.port) || [],
             });
             (this.app_ports || []).forEach(addApp);
@@ -939,8 +1134,72 @@ export default {
     methods: {
         onChange() { },
         changeStartParamValue(item, value) {
-            item.isSelect = this.systemVarOptions.some(i => i.value == value);
+            item.value = value;
+            this.changeConfigValue(item);
+        },
+        changeConfigValue(item) {
+            let name = this.unwrapConfigVariable(item.value);
+            item.isSelect = this.systemVarOptions.some(i => i.value == name);
+            item.variableType = item.isSelect ? 'start' : '';
             this.getMenu();
+        },
+        wrapConfigVariable(value) {
+            return value ? '${' + value + '}' : '';
+        },
+        unwrapConfigVariable(value) {
+            let match = String(value || '').trim().match(/^\$\{([^}]+)\}$/);
+            return match ? match[1] : String(value || '').trim();
+        },
+        selectConfigVariable(item, variable) {
+            item.value = variable.insertValue || variable.displayValue;
+            item.isSelect = variable.type == 'start';
+            item.variableType = variable.type;
+            this.getMenu();
+        },
+        getConfigVariableLabel(item) {
+            let name = this.unwrapConfigVariable(item?.value);
+            let variable = this.systemVarOptions.find(i => i.value == name)
+                || this.systemBuiltinVarOptions.find(i => i.value == name);
+            return variable?.label || '';
+        },
+        hasParamRows(rows) {
+            return Array.isArray(rows) && rows.length > 0;
+        },
+        addParamRow(rows) {
+            if (!Array.isArray(rows)) { return }
+            rows.push({ key: '', value: '', isSelect: false, variableType: '' });
+            this.getMenu();
+        },
+        removeParamRow(rows, index) {
+            if (!Array.isArray(rows)) { return }
+            rows.splice(index, 1);
+            this.getMenu();
+        },
+        serializeConfigValue(item) {
+            let value = item?.value;
+            let name = this.unwrapConfigVariable(value);
+            if (item?.isSelect || this.systemVarOptions.some(i => i.value == name)) {
+                return `"{{.Values.${name}}}"`;
+            }
+            return value;
+        },
+        serializeParamEntries(rows) {
+            return Object.fromEntries((rows || [])
+                .filter(i => i.key && i.value)
+                .map(item => [item.key, this.serializeConfigValue(item)]));
+        },
+        parseConfigValue(value) {
+            let raw = String(value || '');
+            let match = raw.match(/^"\{\{\s*\.Values\.([^}]+?)\s*\}\}"$/);
+            if (!match) {
+                match = raw.match(/^\{\{\s*\.Values\.([^}]+?)\s*\}\}$/);
+            }
+            if (match) {
+                let name = match[1].trim();
+                return { value: this.wrapConfigVariable(name), isSelect: true, variableType: 'start' };
+            }
+            let systemMatch = raw.match(/^\$\{system\.[^}]+\}$/);
+            return { value: raw, isSelect: false, variableType: systemMatch ? 'system' : '' };
         },
         normalizeBackendPorts(ports) {
             if (!Array.isArray(ports)) { ports = ports ? [ports] : [] }
@@ -988,6 +1247,9 @@ export default {
         getBackendPorts(identifie) {
             return this.backendAppOptions.find(i => i.id == identifie)?.ports || [];
         },
+        hasManifestDomainConfig(json) {
+            return Boolean(json?.domainEnabled || json?.platform?.domainEnabled);
+        },
         getBackendPortOptions(identifie, query) {
             let q = String(query || '');
             return this.getBackendPorts(identifie)
@@ -1034,12 +1296,17 @@ export default {
                 role.type = role.type || 'internal';
                 this.syncIframeBackendDefaults(role);
             } else {
-                if (role.type == 'internal' && role.backend_identifie == this.getIframeDomainPlaceholder()) {
+                if (role.type == 'internal' && [this.getIframeDomainPlaceholder(), this.getIframeDomainDisplayPlaceholder()].includes(role.backend_identifie)) {
                     role.backend_identifie = this.getDefaultBackendIdentifie();
                     role.backend_port = this.getDefaultBackendPort(role.backend_identifie);
                 }
             }
             this.getMenu();
+        },
+        hasBackendDomainConfig() {
+            let backend = this.backendAppOptions.find(item => item.id == this.currentBackendIdentifie);
+            if (backend) { return Boolean(backend.domainEnabled) }
+            return this.hasManifestDomainConfig(this.json) || this.hasManifestDomainConfig(this.manifestInfo);
         },
         syncRoleBackendDefaults() {
             let changed = false;
@@ -1063,11 +1330,14 @@ export default {
         getIframeDomainPlaceholder() {
             return '{{.Values.DOMAIN_URL}}';
         },
+        getIframeDomainDisplayPlaceholder() {
+            return '${DOMAIN_URL}';
+        },
         syncIframeBackendDefaults(role) {
             let changed = false;
             let placeholder = this.getIframeDomainPlaceholder();
             if (role.type == 'internal') {
-                if (role.backend_identifie != placeholder) {
+                if (role.backend_identifie != placeholder && role.backend_identifie != this.getIframeDomainDisplayPlaceholder()) {
                     role.backend_identifie = placeholder;
                     changed = true;
                 }
@@ -1090,8 +1360,10 @@ export default {
         parseIframeBackendUrl(url) {
             let value = String(url || '');
             let placeholder = this.getIframeDomainPlaceholder();
-            if (value.includes(placeholder)) {
-                let path = value.slice(value.indexOf(placeholder) + placeholder.length).replace(/^\/+/, '');
+            let displayPlaceholder = this.getIframeDomainDisplayPlaceholder();
+            let matchedPlaceholder = value.includes(placeholder) ? placeholder : (value.includes(displayPlaceholder) ? displayPlaceholder : '');
+            if (matchedPlaceholder) {
+                let path = value.slice(value.indexOf(matchedPlaceholder) + matchedPlaceholder.length).replace(/^\/+/, '');
                 return {
                     type: 'internal',
                     backend_identifie: placeholder,
@@ -1303,10 +1575,10 @@ export default {
                     root_protocol: 'http://',
                     root_url: '',
 
-                    proxy_request_header: [{ key: '', value: '' }],
-                    proxy_request_query: [{ key: '', value: '' }],
+                    proxy_request_header: [],
+                    proxy_request_query: [],
 
-                    frontend_props: [{ key: '', value: '' }],
+                    frontend_props: [],
                 })
                 this.getMenu();
                 this.showAddRole = false;
@@ -1330,8 +1602,10 @@ export default {
 
                 if (r.type == 'external') {
                     try {
-                        r.frontend_props?.map(i => i.isSelect = false)
-                    } catch { }
+                        r.frontend_props?.forEach(i => i.isSelect = false)
+                    } catch {
+                        // Keep legacy malformed frontend_props from blocking YAML generation.
+                    }
                 }
                 this.normalizeMenuDefault(r.menu, this.getMenuPreferredDefault(r.menu));
 
@@ -1355,24 +1629,18 @@ export default {
                     }
                 }
 
-                let proxy_request_header = Object.fromEntries(r.proxy_request_header.filter(i => i.key && i.value).map(({ key, value, isSelect }) => {
-                    value = isSelect ? `"{{.Values.${value}}}"` : value;
-                    return [key, value]
-                }))
-                let proxy_request_query = Object.fromEntries(r.proxy_request_query.filter(i => i.key && i.value).map(({ key, value, isSelect }) => {
-                    value = isSelect ? `"{{.Values.${value}}}"` : value;
-                    return [key, value]
-                }))
-                let frontend_props = Object.fromEntries(r.frontend_props.filter(i => i.key && i.value).map(({ key, value, isSelect }) => {
-                    value = isSelect ? `"{{.Values.${value}}}"` : value;
-                    return [key, value]
-                }))
+                let proxy_request_header = this.serializeParamEntries(r.proxy_request_header);
+                let proxy_request_query = this.serializeParamEntries(r.proxy_request_query);
+                let frontend_props = this.serializeParamEntries(r.frontend_props);
 
                 if (r.load_mode == 'iframe') {
                     this.syncIframeBackendDefaults(r);
                     itemObj.backend_config = {
                         type: r.type,
                         backend_identifie: this.getIframeBackendUrl(r),
+                        proxy_request: {
+                            query: proxy_request_query,
+                        },
                         ...((r.support != 'thirdparty_cd' || r.name != 'normal') ? {
                             frontend_props: frontend_props
                         } : {}),
@@ -1497,10 +1765,10 @@ export default {
                     root_protocol: 'http://',
                     root_url: '',
 
-                    proxy_request_header: [{ key: '', value: '' }],
-                    proxy_request_query: [{ key: '', value: '' }],
+                    proxy_request_header: [],
+                    proxy_request_query: [],
 
-                    frontend_props: [{ key: '', value: '' }],
+                    frontend_props: [],
                 });
             } else if (hasrole) {
                 this.form.role.splice(roleindex, 1);
@@ -1511,10 +1779,10 @@ export default {
 
         getCreateImg(v) { this.form.image = v; },
 
-        webUploadSuccess(data, filename) {
+        webUploadSuccess(data) {
             if (data?.url || data?.data?.url) {
                 let url = data?.url || data?.data?.url;
-                this.web.name = url.match(/[^\/]+$/)[0];
+                this.web.name = url.match(/[^/]+$/)[0];
                 if (!this.json.web) { this.json.web = {}; }
                 this.json.web.type = 'zip';
                 this.json.web.url = url;
@@ -1586,7 +1854,7 @@ export default {
             }
             this.form.description = j?.application?.description;
             this.form.role = j?.bindings?.length ? j.bindings : (this.form.role || []);
-            this.form.role.map((item, index) => {
+            this.form.role.forEach((item) => {
                 if (!item.support) {
                     item.support = 'console';
                     let thirdparty_cd = JSON.parse(JSON.stringify(item));
@@ -1622,21 +1890,18 @@ export default {
 
 
                 item.proxy_request_header = Object.entries(item?.backend_config?.proxy_request?.headers || {}).map(([k, v]) => {
-                    let match = v.match(/^\"\{\{\s*\.Values\.([^\.]+)\s*\}\}\"$/)
-                    return { key: k, value: match ? match[1] : v, isSelect: Boolean(match) }
+                    return { key: k, ...this.parseConfigValue(v) }
                 });
                 item.proxy_request_query = Object.entries(item?.backend_config?.proxy_request?.query || {}).map(([k, v]) => {
-                    let match = v.match(/^\"\{\{\s*\.Values\.([^\.]+)\s*\}\}\"$/)
-                    return { key: k, value: match ? match[1] : v, isSelect: Boolean(match) }
+                    return { key: k, ...this.parseConfigValue(v) }
                 });
-                item.proxy_request_header = item.proxy_request_header.length ? item.proxy_request_header : [{ key: '', value: '' }]
-                item.proxy_request_query = item.proxy_request_query.length ? item.proxy_request_query : [{ key: '', value: '' }]
+                item.proxy_request_header = item.proxy_request_header.length ? item.proxy_request_header : []
+                item.proxy_request_query = item.proxy_request_query.length ? item.proxy_request_query : []
 
                 item.frontend_props = Object.entries(item?.backend_config?.frontend_props || {}).map(([k, v]) => {
-                    let match = v.match(/^\"\{\{\s*\.Values\.([^\.]+)\s*\}\}\"$/)
-                    return { key: k, value: match ? match[1] : v, isSelect: Boolean(match) }
+                    return { key: k, ...this.parseConfigValue(v) }
                 });
-                item.frontend_props = item.frontend_props.length ? item.frontend_props : [{ key: '', value: '' }];
+                item.frontend_props = item.frontend_props.length ? item.frontend_props : [];
 
                 item.menu = this.transformMenu(item.menu);
             })
@@ -1698,7 +1963,8 @@ export default {
             this.downloadUrl = URL.createObjectURL(file);
         },
         onekeyCopy(text) {
-            if (0 && navigator.clipboard) {
+            let supportClipboard = Boolean(navigator.clipboard && window.isSecureContext);
+            if (supportClipboard) {
                 navigator.clipboard.writeText(text);
             } else {
                 var textarea = document.createElement('textarea');
@@ -2170,10 +2436,20 @@ export default {
 
 .manifest-front-config {
     padding: 22px 16px 24px;
+    background: var(--color-neutral-1);
+}
+
+.manifest-front-menu-config {
+    padding: 18px 16px 20px;
+    background: var(--color-neutral-1);
 }
 
 .manifest-front-config .greybox-title {
     margin-bottom: 22px;
+}
+
+.manifest-front-menu-config .greybox-title {
+    margin-bottom: 14px;
 }
 
 .manifest-front-config :deep(.arco-form-item) {
@@ -2199,6 +2475,10 @@ export default {
     margin-top: 24px;
 }
 
+.manifest-front-table-block:first-child {
+    margin-top: 0;
+}
+
 .manifest-front-table-title {
     margin-bottom: 10px;
     line-height: 22px;
@@ -2207,6 +2487,26 @@ export default {
 .manifest-param-table {
     width: 100%;
     table-layout: fixed;
+}
+
+.manifest-form .role .table .thead .td,
+.manifest-form .role .table thead tr:first-child td {
+    background: var(--color-neutral-2);
+    border-color: var(--color-border-1) !important;
+}
+
+.manifest-form .role .table td {
+    background: var(--color-neutral-1);
+    border-color: var(--color-border-1) !important;
+}
+
+.manifest-form .role .table tbody tr:hover td,
+.manifest-form .role .table tbody tr td.cursor.txt-c,
+.manifest-form .role .table tbody tr:hover td.cursor.txt-c,
+.manifest-form .role .table tr:last-child td.cursor.txt-c,
+.manifest-form .role .table.nolast tr:last-child td.cursor.txt-c,
+.manifest-form .role .table tr:last-child td {
+    background: var(--color-neutral-1);
 }
 
 .manifest-param-table td:nth-child(1) {
@@ -2221,9 +2521,160 @@ export default {
     width: 15%;
 }
 
+.config-variable-table td:nth-child(1) {
+    width: 20%;
+}
+
+.config-variable-table td:nth-child(2) {
+    width: 34%;
+}
+
+.config-variable-table td:nth-child(3) {
+    width: 31%;
+}
+
+.config-variable-table td:nth-child(4) {
+    width: 15%;
+}
+
+.frontend-param-table td:nth-child(1) {
+    width: 18%;
+}
+
+.frontend-param-table td:nth-child(2) {
+    width: 28%;
+}
+
+.frontend-param-table td:nth-child(3) {
+    width: 39%;
+}
+
+.frontend-param-table td:nth-child(4) {
+    width: 15%;
+}
+
+.frontend-default-prop-row td:nth-child(3) {
+    color: #4e5969;
+    line-height: 20px;
+}
+
 .proxy-address-row {
     margin-bottom: 22px;
     line-height: 22px;
+}
+
+.iframe-tip-alert {
+    margin-bottom: 22px;
+}
+
+.iframe-tip-list {
+    margin: 0;
+    padding-left: 18px;
+    line-height: 22px;
+}
+
+.backend-url-form-field {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.domain-warning {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 8px;
+    line-height: 20px;
+    color: #f53f3f;
+    font-size: 12px;
+}
+
+.domain-warning-icon {
+    flex: 0 0 auto;
+    color: currentColor;
+}
+
+.param-value-field {
+    width: 100%;
+}
+
+.empty-config-action {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 40px;
+    background: transparent;
+}
+
+.config-value-suffix {
+    display: inline-flex;
+    align-items: center;
+    height: 20px;
+    padding-left: 10px;
+    border-left: 1px solid #e5e6eb;
+    color: #165dff;
+    line-height: 20px;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.backend-app-option {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    width: 100%;
+}
+
+.backend-app-option span:last-child {
+    color: #86909c;
+    font-size: 12px;
+}
+
+.var-picker {
+    max-height: 360px;
+    overflow: auto;
+}
+
+.var-picker-title {
+    margin: 10px 0 6px;
+    color: #1d2129;
+    font-weight: 600;
+    line-height: 22px;
+}
+
+.var-picker-title:first-child {
+    margin-top: 0;
+}
+
+.var-picker-item {
+    padding: 8px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.var-picker-item:hover {
+    background: #f2f3f5;
+}
+
+.var-picker-name {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    color: #1d2129;
+    line-height: 20px;
+}
+
+.var-picker-name span {
+    flex-shrink: 0;
+    color: #86909c;
+}
+
+.var-picker-empty {
+    margin-top: 2px;
+    color: #86909c;
+    font-size: 12px;
+    line-height: 18px;
 }
 
 .manifest-submit-item {
@@ -2274,11 +2725,13 @@ export default {
 }
 
 .backend-url-identifie {
-    width: 190px;
+    flex: 0 0 190px !important;
+    width: 190px !important;
 }
 
 .backend-url-port {
-    width: 120px;
+    flex: 0 0 120px !important;
+    width: 120px !important;
 }
 
 .start-param-select {
@@ -2288,11 +2741,19 @@ export default {
 }
 
 .backend-url-protocol {
-    width: 110px;
+    flex: 0 0 110px !important;
+    width: 110px !important;
+}
+
+:deep(.backend-url-protocol) {
+    flex: 0 0 110px !important;
+    width: 110px !important;
 }
 
 .backend-url-input {
-    flex: 1;
+    flex: 1 1 0 !important;
+    width: auto !important;
+    min-width: 0;
 }
 
 .backend-url-config :deep(.arco-input-wrapper),

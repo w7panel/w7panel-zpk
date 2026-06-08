@@ -92,13 +92,6 @@ global:
   zpk:
     storageSize: "1Gi"
     storageClaimName: "w7-zpkv2-v2"
-    storageMigration:
-      enabled: true
-      image: alpine:3.20
-      sourceClaimName: "w7-zpkv2"
-      targetClaimName: ""
-      skipIfSourceMissing: true
-      markerFile: ".zpk-storage-migrated"
 
   DOMAIN:
   WEBHOOK_TOKEN: qW3eR9t

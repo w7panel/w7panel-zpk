@@ -116,7 +116,7 @@ func (provider *Provider) Register(httpServer *http_server.Server, console conso
 		//发布商品
 		group.Match([]string{"POST", "OPTIONS"}, "/goods/set-service-fee", middleware.DenyDomainReq{}.Process, middleware.W7PanelUser{}.Process, controller.FormulaGoods{}.SetServiceFee)
 		group.Match([]string{"POST", "OPTIONS"}, "/goods/publish", middleware.DenyDomainReq{}.Process, middleware.W7PanelUser{}.Process, middleware.ConsoleUser{}.Process, controller.FormulaGoods{}.PublishGoods)
-		group.Match([]string{"POST", "OPTIONS"}, "/goods/audit-status", middleware.DenyDomainReq{}.Process, middleware.W7PanelUser{}.Process, middleware.ConsoleUser{CanSkip: true}.Process, controller.FormulaGoods{}.GetGoodsAuditStatus)
+		group.Match([]string{"POST", "OPTIONS"}, "/goods/audit-status", middleware.DenyDomainReq{}.Process, middleware.W7PanelUser{}.Process, middleware.ConsoleUser{}.Process, controller.FormulaGoods{}.GetGoodsAuditStatus)
 		group.Match([]string{"POST", "OPTIONS"}, "/goods/labels", middleware.W7PanelUser{}.Process, middleware.ConsoleUser{}.Process, controller.FormulaGoods{}.GetGoodsLabels)
 		group.Match([]string{"POST", "OPTIONS"}, "/attach/upload-img", middleware.DenyDomainReq{}.Process, middleware.W7PanelUser{}.Process, middleware.ConsoleUser{}.Process, controller.CloudAttach{}.UploadImg)
 

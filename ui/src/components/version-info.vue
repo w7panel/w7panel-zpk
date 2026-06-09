@@ -85,33 +85,26 @@
 
 
         <a-modal v-model:visible="annotationEdit.show" title="注解" :width="1000" :footer="false">
-            <table class="table">
-                <thead>
-                    <tr>
-                        <td>键</td>
-                        <td>值</td>
-                        <td>操作</td>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr v-for="(item, index) in annotationEdit.list" :key="index">
-                        <td>
-                            <a-input v-model="item.key" placeholder="请输入" style="width:200px;" />
-                        </td>
-                        <td>
-                            <a-textarea v-model="item.value" placeholder="请输入" auto-size style="width: 600px;" />
-                        </td>
-                        <td>
+            <manifest-config-table :rows="annotationEdit.list" add-text="添加注解"
+                @add="annotationEdit.list.push({ key: '', value: '' })">
+                <template #columns>
+                    <manifest-config-table-column data-index="key" title="键">
+                        <template #cell="{ record }">
+                            <a-input v-model="record.key" placeholder="请输入" style="width:200px;" />
+                        </template>
+                    </manifest-config-table-column>
+                    <manifest-config-table-column data-index="value" title="值">
+                        <template #cell="{ record }">
+                            <a-textarea v-model="record.value" placeholder="请输入" auto-size style="width: 600px;" />
+                        </template>
+                    </manifest-config-table-column>
+                    <manifest-config-table-column title="操作">
+                        <template #cell="{ index }">
                             <span class="c-blue cursor" @click="annotationEdit.list.splice(index, 1)">删除</span>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td colspan="3" class="cursor txt-c" @click="annotationEdit.list.push({ key: '', value: '' })">
-                            <span class="addmenu"><icon-plus />添加注解</span>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
+                        </template>
+                    </manifest-config-table-column>
+                </template>
+            </manifest-config-table>
             <div class="dialog-footer df jc-c mt-20">
                 <a-button @click="annotationEdit.show = false;">取消</a-button>
                 <a-button @click="submitAnnotation" type="primary">确定</a-button>
@@ -122,8 +115,10 @@
 <script>
 import jsyaml from "js-yaml";
 import myAxios from '@/utils';
+import ManifestConfigTable from '@/components/manifest-config-table.vue';
+import ManifestConfigTableColumn from '@/components/manifest-config-table-column.vue';
 import { messageSuccess } from '@/utils/ui-feedback';
-import { IconEdit, IconPlus } from '@arco-design/web-vue/es/icon';
+import { IconEdit } from '@arco-design/web-vue/es/icon';
 
 const defaultManifest = `application:
     name: ''
@@ -136,8 +131,9 @@ v: 2
 
 export default {
     components: {
+        ManifestConfigTable,
+        ManifestConfigTableColumn,
         IconEdit,
-        IconPlus,
     },
     props: ['identifie', 'info'],
     data() {

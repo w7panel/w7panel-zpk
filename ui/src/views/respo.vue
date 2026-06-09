@@ -116,7 +116,7 @@
       <a-table :loading="cloudApp.loading" :data="cloudApp.list" :pagination="false" row-key="id"
         class="respo-cloudapp-table" @row-click="v => cloudApp.selectId = [v.id]">
         <template #columns>
-          <a-table-column title="选择应用" :width="80" align="center">
+          <a-table-column title="选择应用" :width="100" align="center">
             <template #cell="{ record }">
               <a-checkbox :model-value="cloudApp.selectId[0] === record.id"
                 @change="() => cloudApp.selectId = [record.id]" />

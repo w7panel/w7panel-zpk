@@ -61,39 +61,32 @@
           </a-radio-group>
         </a-form-item>
         <a-form-item v-if="userRole != 'normal'" label="用户权限">
-          <table class="table">
-            <thead>
-              <tr>
-                <td>用户</td>
-                <td>权限</td>
-                <td style="width:60px;">操作</td>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(item, index) in form.permissions" :key="index">
-                <td>
-                  <a-select v-model="item.user_id" placeholder="请选择" class="permission-select">
+          <manifest-config-table :rows="form.permissions" add-text="添加用户"
+            @add="form.permissions.push({ username: '', permission: 1 })">
+            <template #columns>
+              <manifest-config-table-column data-index="user_id" title="用户">
+                <template #cell="{ record }">
+                  <a-select v-model="record.user_id" placeholder="请选择" class="permission-select">
                     <a-option v-for="(item, index) in userList" :key="index" :label="item.username"
                       :value="item.id"></a-option>
                   </a-select>
-                </td>
-                <td>
-                  <a-radio-group v-model="item.permission">
+                </template>
+              </manifest-config-table-column>
+              <manifest-config-table-column data-index="permission" title="权限">
+                <template #cell="{ record }">
+                  <a-radio-group v-model="record.permission">
                     <a-radio :value="1">只读</a-radio>
                     <a-radio :value="2">读写</a-radio>
                   </a-radio-group>
-                </td>
-                <td>
+                </template>
+              </manifest-config-table-column>
+              <manifest-config-table-column title="操作" width="60px">
+                <template #cell="{ index }">
                   <span class="cursor c-blue" @click="form.permissions.splice(index, 1)">删除</span>
-                </td>
-              </tr>
-              <tr>
-                <td @click="form.permissions.push({ username: '', permission: 1 })" class="cursor txt-c" colspan="3">
-                  <span class="addmenu"><icon-plus />添加用户</span>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+                </template>
+              </manifest-config-table-column>
+            </template>
+          </manifest-config-table>
         </a-form-item>
       </a-form>
       <div class="dialog-footer">
@@ -106,6 +99,8 @@
 
 <script>
 import myAxios from "@/utils";
+import ManifestConfigTable from '@/components/manifest-config-table.vue';
+import ManifestConfigTableColumn from '@/components/manifest-config-table-column.vue';
 import { messageSuccess } from "@/utils/ui-feedback";
 import userMixin from "@/utils/user-mixin";
 import { IconPlus } from '@arco-design/web-vue/es/icon';
@@ -113,6 +108,8 @@ import { IconPlus } from '@arco-design/web-vue/es/icon';
 export default {
   name: "zpk_namespace",
   components: {
+    ManifestConfigTable,
+    ManifestConfigTableColumn,
     IconPlus,
   },
   data() {

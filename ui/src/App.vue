@@ -63,6 +63,14 @@ export default {
 	background: #ffffff;
 }
 
+.zpk-page-header-actions {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 10px;
+	margin-left: auto;
+}
+
 .zpk-toolbar-left,
 .zpk-toolbar-right {
 	display: flex;
@@ -422,6 +430,7 @@ export default {
 .registry-alert-item {
   position: relative;
   padding-left: 14px;
+  color: var(--color-text-1);
 }
 
 .registry-alert-item::before {
@@ -431,13 +440,21 @@ export default {
   width: 4px;
   height: 4px;
   content: "";
-  background: var(--color-text-2);
+  background: var(--color-text-1);
   border-radius: 50%;
 }
 
 .registry-alert-item .txt-line {
   color: #165dff;
   text-decoration-color: #165dff;
+}
+
+
+
+.manifest-front-config .table tbody tr td,
+.manifest-front-config .table tbody tr:last-child td,
+.manifest-front-config .table tbody tr td.cursor.txt-c {
+    background: #ffffff !important;
 }
 
 </style>

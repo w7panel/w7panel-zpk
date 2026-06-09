@@ -5,9 +5,6 @@
                 <a-form ref="formref" :model="form" :rules="rules" label-align="left"
                     :label-col-props="{ span: 5, flex: '0 0 120px' }"
                     :wrapper-col-props="{ span: 19, flex: '1' }" class="form manifest-form">
-                    <div class="df jc-e">
-                        <a-button v-if="!showYaml" type="primary" @click="showYaml = true;">预览yaml</a-button>
-                    </div>
                     <div class="bg-white com-line df">
                         <div class="fc">
                             <div class="c-00-6 df ai-c">基础配置</div>
@@ -100,42 +97,31 @@
                                         </a-form-item>
 
                                         <a-form-item v-if="form.type == 'helm'" label="安装配置">
-                                            <table class="table">
-                                                <thead>
-                                                    <tr class="thead">
-                                                        <td>键</td>
-                                                        <td>值</td>
-                                                        <td>操作</td>
-                                                    </tr>
-
-                                                </thead>
-                                                <tbody>
-                                                    <tr v-for="(item, index) in form.helm.kv" :key="index">
-                                                        <td>
-                                                            <a-input v-model="item.name" size="large"
+                                            <manifest-config-table :rows="form.helm.kv" add-text="添加配置"
+                                                @add="form.helm.kv.push({ name: '', value: '' }); changeForm();">
+                                                <template #columns>
+                                                    <manifest-config-table-column data-index="name" title="键">
+                                                        <template #cell="{ record }">
+                                                            <a-input v-model="record.name" size="large"
                                                                 style="width:200px;" @change="changeForm"
                                                                 placeholder="请输入" />
-                                                        </td>
-                                                        <td>
-                                                            <a-input v-model="item.value" size="large"
+                                                        </template>
+                                                    </manifest-config-table-column>
+                                                    <manifest-config-table-column data-index="value" title="值">
+                                                        <template #cell="{ record }">
+                                                            <a-input v-model="record.value" size="large"
                                                                 style="width:200px;" @change="changeForm"
                                                                 placeholder="请输入" />
-                                                        </td>
-                                                        <td>
-                                                            <span v-if="!item.disabled" class="c-blue cursor"
+                                                        </template>
+                                                    </manifest-config-table-column>
+                                                    <manifest-config-table-column title="操作">
+                                                        <template #cell="{ record, index }">
+                                                            <span v-if="!record.disabled" class="c-blue cursor"
                                                                 @click="form.helm.kv.splice(index, 1); changeForm();">删除</span>
-                                                        </td>
-                                                    </tr>
-                                                    <tr>
-                                                        <td colspan="3" style="box-sizing:border-box; cursor:pointer;"
-                                                            @click="form.helm.kv.push({ name: '', value: '' }); changeForm();">
-                                                            <div class="df ai-c jc-c">
-                                                                <span class="addmenu"><icon-plus />添加配置</span>
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                </tbody>
-                                            </table>
+                                                        </template>
+                                                    </manifest-config-table-column>
+                                                </template>
+                                            </manifest-config-table>
                                         </a-form-item>
 
                                     </div>
@@ -265,20 +251,12 @@
                             <a-form-item v-if="form.type != 'tradition' && form.type != 'helm' && form.type != 'light'"
                                 label="脚本配置" field="shell" class="mt-16">
                                 <div style="flex:1;">
-                                    <table class="table">
-                                        <thead>
-                                            <tr>
-                                                <td>类型</td>
-                                                <td>脚本</td>
-                                                <td>镜像</td>
-                                                <td>备注</td>
-                                                <td>操作</td>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr v-for="(item, index) in form.shell" :key="index">
-                                                <td>
-                                                    <a-select v-model="item.type" placeholder="请选择类型"
+                                    <manifest-config-table :rows="form.shell" add-text="添加脚本"
+                                        @add="form.shell.push({ title: '', type: '', shell: '' })">
+                                        <template #columns>
+                                            <manifest-config-table-column data-index="type" title="类型">
+                                                <template #cell="{ record }">
+                                                    <a-select v-model="record.type" placeholder="请选择类型"
                                                         style="width:160px;">
                                                         <a-option label="应用被安装时触发" value="requireinstall"></a-option>
                                                         <a-option label="应用安装时触发" value="install"></a-option>
@@ -287,29 +265,33 @@
                                                         <a-option label="应用卸载时触发" value="uninstall"></a-option>
                                                         <a-option label="手动触发" value="custom"></a-option>
                                                     </a-select>
-                                                </td>
-                                                <td>
-                                                    <a-textarea v-model="item.shell" :rows="2"
+                                                </template>
+                                            </manifest-config-table-column>
+                                            <manifest-config-table-column data-index="shell" title="脚本">
+                                                <template #cell="{ record }">
+                                                    <a-textarea v-model="record.shell" :rows="2"
                                                         :spellcheck="false" placeholder="请输入"></a-textarea>
-                                                </td>
-                                                <td>
-                                                    <a-input v-model="item.image" :spellcheck="false"
+                                                </template>
+                                            </manifest-config-table-column>
+                                            <manifest-config-table-column data-index="image" title="镜像">
+                                                <template #cell="{ record }">
+                                                    <a-input v-model="record.image" :spellcheck="false"
                                                         placeholder="不填默认当前应用镜像"></a-input>
-                                                </td>
-                                                <td>
-                                                    <a-input v-model="item.title" placeholder="请输入"></a-input>
-                                                </td>
-                                                <td><span class="c-blue cursor handle"
-                                                        @click="form.shell.splice(index, 1);">删除</span></td>
-                                            </tr>
-                                            <tr>
-                                                <td colspan="5" class="cursor txt-c"
-                                                    @click="form.shell.push({ title: '', type: '', shell: '' })">
-                                                    <span class="addmenu"><icon-plus />添加脚本</span>
-                                                </td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
+                                                </template>
+                                            </manifest-config-table-column>
+                                            <manifest-config-table-column data-index="title" title="备注">
+                                                <template #cell="{ record }">
+                                                    <a-input v-model="record.title" placeholder="请输入"></a-input>
+                                                </template>
+                                            </manifest-config-table-column>
+                                            <manifest-config-table-column title="操作">
+                                                <template #cell="{ index }">
+                                                    <span class="c-blue cursor handle"
+                                                        @click="form.shell.splice(index, 1);">删除</span>
+                                                </template>
+                                            </manifest-config-table-column>
+                                        </template>
+                                    </manifest-config-table>
                                 </div>
                             </a-form-item>
 
@@ -351,104 +333,95 @@
                                     </div>
                                     <a-button @click="openSpEdit">批量修改</a-button>
                                 </div>
-                                <table class="table mt-10">
-                                    <thead>
-                                        <tr>
-                                            <td>标识</td>
-                                            <td>名称</td>
-                                            <td>必填</td>
-                                            <td>默认值</td>
-                                            <td>依赖系统组件标识</td>
-                                            <td style="width:100px;">操作</td>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <tr v-for="(item, index) in form.startParams" :key="index">
-                                            <td><a-input v-model="item.name" @change="getStart"
-                                                    :disabled="computedSpDisabled(item)" :spellcheck="false"
-                                                    placeholder="配置标识"></a-input></td>
-                                            <td><a-input v-model="item.title" @change="getStart"
-                                                    :disabled="computedSpDisabled(item)" :spellcheck="false"
-                                                    placeholder="配置名称"></a-input></td>
-                                            <td><a-switch v-model="item.required" @change="getStart"
-                                                    :disabled="computedSpDisabled(item)" />
-                                            </td>
-                                            <td><a-input v-model="item.values_text" @change="getStart"
-                                                    :disabled="computedSpDisabled(item)" :spellcheck="false"
-                                                    placeholder="配置默认值"></a-input></td>
-                                            <td><a-input v-model="item.module_name" @change="getStart"
-                                                    :spellcheck="false" placeholder="依赖的系统组件标识名"></a-input></td>
-                                            <td>
-                                                <span class="c-blue cursor handle" @click="openSpDesc(item)">编辑描述</span>
+                                <manifest-config-table class="mt-10" :rows="form.startParams" add-text="添加启动参数"
+                                    @add="form.startParams.push({ name: '', title: '', required: true, values_text: '', module_name: '', description: '' })">
+                                    <template #columns>
+                                        <manifest-config-table-column data-index="name" title="标识">
+                                            <template #cell="{ record }">
+                                                <a-input v-model="record.name" @change="getStart"
+                                                    :disabled="computedSpDisabled(record)" :spellcheck="false"
+                                                    placeholder="配置标识"></a-input>
+                                            </template>
+                                        </manifest-config-table-column>
+                                        <manifest-config-table-column data-index="title" title="名称">
+                                            <template #cell="{ record }">
+                                                <a-input v-model="record.title" @change="getStart"
+                                                    :disabled="computedSpDisabled(record)" :spellcheck="false"
+                                                    placeholder="配置名称"></a-input>
+                                            </template>
+                                        </manifest-config-table-column>
+                                        <manifest-config-table-column data-index="required" title="必填">
+                                            <template #cell="{ record }">
+                                                <a-switch v-model="record.required" @change="getStart"
+                                                    :disabled="computedSpDisabled(record)" />
+                                            </template>
+                                        </manifest-config-table-column>
+                                        <manifest-config-table-column data-index="values_text" title="默认值">
+                                            <template #cell="{ record }">
+                                                <a-input v-model="record.values_text" @change="getStart"
+                                                    :disabled="computedSpDisabled(record)" :spellcheck="false"
+                                                    placeholder="配置默认值"></a-input>
+                                            </template>
+                                        </manifest-config-table-column>
+                                        <manifest-config-table-column data-index="module_name" title="依赖系统组件标识">
+                                            <template #cell="{ record }">
+                                                <a-input v-model="record.module_name" @change="getStart"
+                                                    :spellcheck="false" placeholder="依赖的系统组件标识名"></a-input>
+                                            </template>
+                                        </manifest-config-table-column>
+                                        <manifest-config-table-column title="操作" width="100px">
+                                            <template #cell="{ record, index }">
+                                                <span class="c-blue cursor handle" @click="openSpDesc(record)">编辑描述</span>
                                                 <span class="c-blue cursor handle"
                                                     @click="form.startParams.splice(index, 1); getStart();">删除</span>
-                                            </td>
-                                        </tr>
-                                        <tr>
-                                            <td colspan="6" class="cursor txt-c"
-                                                @click="form.startParams.push({ name: '', title: '', required: true, values_text: '', module_name: '', description: '' })">
-                                                <span class="addmenu"><icon-plus />添加启动参数</span>
-                                            </td>
-                                        </tr>
-                                    </tbody>
-
-                                </table>
+                                            </template>
+                                        </manifest-config-table-column>
+                                    </template>
+                                </manifest-config-table>
                             </div>
                         </a-form-item>
 
                         <a-form-item class="mt-20" label="安装依赖">
-                            <table class="table install-depend-table">
-                                <colgroup>
-                                    <col class="install-depend-name-col" />
-                                    <col class="install-depend-sub-col" />
-                                    <col class="install-depend-required-col" />
-                                    <col class="install-depend-identifie-col" />
-                                    <col class="install-depend-action-col" />
-                                </colgroup>
-                                <thead>
-                                    <tr>
-                                        <td>名称</td>
-                                        <td>子应用</td>
-                                        <td>必须安装</td>
-                                        <td>标识</td>
-                                        <td>操作</td>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr v-for="(item, index) in form.depends" :key="index">
-                                        <td>
-                                            <a-select v-model="item.identifie" size="large"
-                                                @change="getSubDepends(index); item.subidentifie = ''; item.subname = ''; item.name = dependsList[item.identifie]; changeForm()"
+                            <manifest-config-table :rows="form.depends" table-class="install-depend-table"
+                                add-text="添加安装依赖"
+                                @add="form.depends.push({ identifie: '', name: '', required: false, type: 'out' })">
+                                <template #columns>
+                                    <manifest-config-table-column data-index="identifie" title="名称" width="36%">
+                                        <template #cell="{ record, index }">
+                                            <a-select v-model="record.identifie" size="large"
+                                                @change="getSubDepends(index); record.subidentifie = ''; record.subname = ''; record.name = dependsList[record.identifie]; changeForm()"
                                                 placeholder="请选择">
                                                 <a-option v-for="(name, identifie) in dependsList" :key="identifie"
                                                     :label="name" :value="identifie"></a-option>
                                             </a-select>
-                                        </td>
-                                        <td>
-                                            <a-select v-model="item.subidentifie" size="large"
-                                                @change="item.subname = subDependsList[index][item.subidentifie]; changeForm()"
+                                        </template>
+                                    </manifest-config-table-column>
+                                    <manifest-config-table-column data-index="subidentifie" title="子应用" width="34%">
+                                        <template #cell="{ record, index }">
+                                            <a-select v-model="record.subidentifie" size="large"
+                                                @change="record.subname = subDependsList[index][record.subidentifie]; changeForm()"
                                                 placeholder="请选择">
                                                 <a-option v-for="(name, identifie) in subDependsList[index]"
                                                     :key="identifie" :label="name" :value="identifie"></a-option>
                                             </a-select>
-                                        </td>
-                                        <td>
-                                            <a-switch v-model="item.required" @change="changeForm" />
-                                        </td>
-                                        <td>{{ dependsList[item.identifie] }}</td>
-                                        <td>
+                                        </template>
+                                    </manifest-config-table-column>
+                                    <manifest-config-table-column data-index="required" title="必须安装" width="10%">
+                                        <template #cell="{ record }">
+                                            <a-switch v-model="record.required" @change="changeForm" />
+                                        </template>
+                                    </manifest-config-table-column>
+                                    <manifest-config-table-column data-index="name" title="标识" width="12%">
+                                        <template #cell="{ record }">{{ dependsList[record.identifie] }}</template>
+                                    </manifest-config-table-column>
+                                    <manifest-config-table-column title="操作" width="8%">
+                                        <template #cell="{ index }">
                                             <span class="c-blue cursor"
                                                 @click="form.depends.splice(index, 1); changeForm();">删除</span>
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td colspan="5" class="cursor txt-c"
-                                            @click="form.depends.push({ identifie: '', name: '', required: false, type: 'out' })">
-                                            <span class="addmenu"><icon-plus />添加安装依赖</span>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
+                                        </template>
+                                    </manifest-config-table-column>
+                                </template>
+                            </manifest-config-table>
                         </a-form-item>
                     </div>
 
@@ -459,14 +432,15 @@
                 </a-form>
             </div>
         </div>
-        <div v-show="showYaml" class="box" style="width:600px; position:relative; padding-right:0;">
-            <div style="height:100%;" v-html="yamlDom"></div>
-            <div class="df" style="position:absolute; right:20px; top:10px;">
-                <button class="copybtn" @click="showYaml = false;">收起预览</button>
-                <button class="copybtn" @click="onekeyCopy(yaml)">一键复制</button>
-                <a :href="downloadUrl" download="manifest.yaml" class="copybtn" style="right:110px;">下载</a>
+        <a-drawer v-model:visible="showYaml" :width="640" title="预览 YAML" :footer="false" unmount-on-close>
+            <div class="yaml-preview-panel">
+                <div class="yaml-preview-drawer" v-html="yamlDom"></div>
+                <div class="yaml-preview-actions">
+                    <button class="copybtn" @click="onekeyCopy(yaml)">一键复制</button>
+                    <a :href="downloadUrl" download="manifest.yaml" class="copybtn">下载</a>
+                </div>
             </div>
-        </div>
+        </a-drawer>
 
         <a-modal v-model:visible="dependForm.show" :title="dependForm.editIndex >= 0 ? '修改子应用' : '添加子应用'" :width="640"
             :footer="false"
@@ -520,6 +494,8 @@ import hljs from 'highlight.js';
 import filesUpload from './files-upload.vue';
 import formIngress from '@/components/form-ingress.vue';
 import w7Identifie from "@/components/w7-identifie.vue";
+import ManifestConfigTable from '@/components/manifest-config-table.vue';
+import ManifestConfigTableColumn from '@/components/manifest-config-table-column.vue';
 import myAxios from '../utils/index';
 import {
     IconCheckCircleFill,
@@ -546,6 +522,8 @@ export default {
         filesUpload,
         formIngress,
         w7Identifie,
+        ManifestConfigTable,
+        ManifestConfigTableColumn,
         IconCheckCircleFill,
         IconClose,
         IconExclamationCircleFill,
@@ -1730,6 +1708,12 @@ platform:
             this.$nextTick(() => {
                 window.hljs.highlightAll();
                 this.download();
+            });
+        },
+        openYamlPreview() {
+            this.showYaml = true;
+            this.$nextTick(() => {
+                this.setYaml();
             });
         },
         getStart() {

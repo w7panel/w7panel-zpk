@@ -11,6 +11,9 @@
                 </a-breadcrumb-item>
                 <a-breadcrumb-item>{{ title || identifie }}</a-breadcrumb-item>
             </a-breadcrumb>
+            <div class="zpk-page-header-actions">
+                <a-button type="outline" :disabled="!info.manifest" @click="openYamlPreview">预览 YAML</a-button>
+            </div>
         </div>
         <div class="content version-page-content pt-0">
         <a-tabs v-model:active-key="activeTab" @change="handleTabClick">
@@ -262,40 +265,31 @@
 
 
     <a-modal v-model:visible="versionPrices.show" :width="840" title="设置升级服务" :footer="false">
-        <table class="table">
-            <thead>
-                <tr>
-                    <td>版本</td>
-                    <td>价格</td>
-                    <td>操作</td>
-                </tr>
-            </thead>
-            <tbody>
-                <tr v-for="(item, index) in versionPrices.list" :key="index">
-                    <td>
-                        <a-select v-model="item.version" placeholder="请选择">
+        <manifest-config-table :rows="versionPrices.list" add-text="添加"
+            @add="versionPrices.list.push({ version: '', price: '' })">
+            <template #columns>
+                <manifest-config-table-column data-index="version" title="版本">
+                    <template #cell="{ record }">
+                        <a-select v-model="record.version" placeholder="请选择">
                             <a-option v-for="vl in instFee.can_upgrade_versions" :key="vl" :value="vl"
                                 :label="vl === 9999 ? '其他版本' : (vl + '.*.*')"></a-option>
                         </a-select>
-                    </td>
-                    <td style="width:300px;">
-                        <a-input v-model="item.price" type="number" placeholder="请输入">
+                    </template>
+                </manifest-config-table-column>
+                <manifest-config-table-column data-index="price" title="价格" width="300px">
+                    <template #cell="{ record }">
+                        <a-input v-model="record.price" type="number" placeholder="请输入">
                             <template #append>元</template>
                         </a-input>
-                    </td>
-                    <td>
+                    </template>
+                </manifest-config-table-column>
+                <manifest-config-table-column title="操作">
+                    <template #cell="{ index }">
                         <span class="c-blue cursor" @click="versionPrices.list.splice(index, 1)">删除</span>
-                    </td>
-                </tr>
-                <tr>
-                    <td colspan="3">
-                        <div class="df ai-c jc-c cursor" @click="versionPrices.list.push({ version: '', price: '' })">
-                            <span class="addmenu"><icon-plus />添加</span>
-                        </div>
-                    </td>
-                </tr>
-            </tbody>
-        </table>
+                    </template>
+                </manifest-config-table-column>
+            </template>
+        </manifest-config-table>
         <div class="dialog-footer" style="justify-content: center;margin-top: 20px;">
             <a-button @click="versionPrices.show = false;">取消</a-button>
             <a-button type="primary" @click="submitVersionPrices">确定</a-button>
@@ -341,6 +335,15 @@
     <a-modal v-model:visible="dialogVisible" :footer="false">
         <img w-full :src="dialogImageUrl" alt="Preview Image" />
     </a-modal>
+    <a-drawer v-model:visible="yamlPreview.show" :width="640" title="预览 YAML" :footer="false" unmount-on-close>
+        <div class="yaml-preview-panel">
+            <div class="yaml-preview-drawer" v-html="yamlPreview.html"></div>
+            <div class="yaml-preview-actions">
+                <button class="copybtn" @click="copyYamlPreview">一键复制</button>
+                <a :href="yamlPreview.downloadUrl" download="manifest.yaml" class="copybtn">下载</a>
+            </div>
+        </div>
+    </a-drawer>
 </template>
 
 <script>
@@ -349,6 +352,8 @@ import versionInfo from '@/components/version-info.vue';
 import jsyaml from "js-yaml";
 import description from './description.vue';
 import publishSettings from './publish-settings.vue';
+import ManifestConfigTable from '@/components/manifest-config-table.vue';
+import ManifestConfigTableColumn from '@/components/manifest-config-table-column.vue';
 import userMixin from "@/utils/user-mixin";
 import { messageError, messageSuccess } from '@/utils/ui-feedback';
 import { IconArrowLeft, IconPlus, IconCloud } from '@arco-design/web-vue/es/icon';
@@ -358,6 +363,8 @@ export default {
         versionInfo,
         description,
         publishSettings,
+        ManifestConfigTable,
+        ManifestConfigTableColumn,
         IconArrowLeft,
         IconPlus,
         IconCloud,
@@ -452,6 +459,12 @@ export default {
             total: 0,
             dialogVisible: false,
             dialogImageUrl: '',
+            yamlPreview: {
+                show: false,
+                yaml: '',
+                html: '',
+                downloadUrl: '',
+            },
         }
     },
     created() {
@@ -470,6 +483,45 @@ export default {
             } else if (key == 'publish') {
                 this.getPublishInfo();
             }
+        },
+        openYamlPreview() {
+            let yaml = this.info?.manifest || '';
+            if (!yaml) { return }
+            this.yamlPreview.show = true;
+            this.$nextTick(() => {
+                this.yamlPreview.yaml = yaml;
+                this.yamlPreview.html = `<pre class='pre'><code class='language-yaml'>${this.escapeHtml(yaml)}</code></pre>`;
+                let file = new File([yaml], 'manifest.yaml', { type: 'text/plain' });
+                this.yamlPreview.downloadUrl = URL.createObjectURL(file);
+                this.$nextTick(() => {
+                    window.hljs.highlightAll();
+                });
+            });
+        },
+        escapeHtml(text) {
+            return String(text || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        },
+        copyYamlPreview() {
+            let text = this.yamlPreview.yaml || '';
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(text);
+            } else {
+                let textarea = document.createElement('textarea');
+                document.body.appendChild(textarea);
+                textarea.style.position = 'fixed';
+                textarea.style.clip = 'rect(0 0 0 0)';
+                textarea.style.top = '10px';
+                textarea.value = text;
+                textarea.select();
+                document.execCommand('copy', true);
+                document.body.removeChild(textarea);
+            }
+            messageSuccess('复制成功');
         },
         getCuv() {
             myAxios.post('/respo/goods/can-upgrade-versions', {

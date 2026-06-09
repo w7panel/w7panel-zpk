@@ -28,12 +28,20 @@
                                             <template #icon><icon-edit /></template>
                                         </a-button>
                                     </a-tooltip>
-                                    <a-tooltip v-if="!item.isReadme" content="删除文件" position="top">
-                                        <a-button class="sidebar-action sidebar-delete" :class="{ 'is-disabled': saving }"
-                                            type="text" size="mini" :disabled="saving" @click.stop="deleteDoc(item.path)">
-                                            <template #icon><icon-delete /></template>
-                                        </a-button>
-                                    </a-tooltip>
+                                    <span v-if="!item.isReadme" @click.stop>
+                                        <a-popconfirm content="确认要删除吗" type="warning" ok-text="确定"
+                                            cancel-text="取消" content-class="zpk-delete-popconfirm"
+                                            :ok-button-props="{ status: 'danger' }"
+                                            :cancel-button-props="{ type: 'secondary' }" @ok="deleteDoc(item.path)">
+                                            <a-tooltip content="删除文件" position="top">
+                                                <a-button class="sidebar-action sidebar-delete"
+                                                    :class="{ 'is-disabled': saving }" type="text" size="mini"
+                                                    :disabled="saving">
+                                                    <template #icon><icon-delete /></template>
+                                                </a-button>
+                                            </a-tooltip>
+                                        </a-popconfirm>
+                                    </span>
                                 </div>
                             </div>
                         </div>
@@ -102,7 +110,7 @@ import MarkdownIt from 'markdown-it';
 import markdownItTaskLists from 'markdown-it-task-lists';
 import myAxios from '@/utils';
 import { IconDelete, IconEdit, IconPlus } from '@arco-design/web-vue/es/icon';
-import { confirm, messageError, messageSuccess, messageWarning } from '@/utils/ui-feedback';
+import { messageError, messageSuccess, messageWarning } from '@/utils/ui-feedback';
 
 const README_PATH = 'readme.md';
 const DOCS_DIR = 'docs';
@@ -721,29 +729,21 @@ export default {
             this.persistEditorContent();
             let current = this.docsFiles.find(item => item.path === path);
             if (!current) { return }
-            confirm({
-                title: '提示',
-                content: '确定要删除“' + current.title + '”吗',
-                confirmButtonText: '确定',
-                cancelButtonText: '取消',
-                onOk: async () => {
-                    if (this.saving) { return }
-                    let currentIndex = this.docsFiles.findIndex(item => item.path === path);
-                    if (currentIndex < 0) { return }
-                    this.docsFiles.splice(currentIndex, 1);
-                    this.docsFiles = [...this.docsFiles];
-                    let nextDoc = this.docsFiles[currentIndex] || this.docsFiles[currentIndex - 1] || null;
-                    this.isEditing = true;
-                    if (this.docsFiles.length) {
-                        this.activeDocPath = nextDoc?.path || '';
-                        this.inputContent(nextDoc?.content || '');
-                    } else {
-                        this.activeDocPath = README_PATH;
-                        this.inputContent(this.readmeContent);
-                    }
-                    await this.saveMultipleDocs('', [path], '删除成功');
-                },
-            });
+            if (this.saving) { return }
+            let currentIndex = this.docsFiles.findIndex(item => item.path === path);
+            if (currentIndex < 0) { return }
+            this.docsFiles.splice(currentIndex, 1);
+            this.docsFiles = [...this.docsFiles];
+            let nextDoc = this.docsFiles[currentIndex] || this.docsFiles[currentIndex - 1] || null;
+            this.isEditing = true;
+            if (this.docsFiles.length) {
+                this.activeDocPath = nextDoc?.path || '';
+                this.inputContent(nextDoc?.content || '');
+            } else {
+                this.activeDocPath = README_PATH;
+                this.inputContent(this.readmeContent);
+            }
+            await this.saveMultipleDocs('', [path], '删除成功');
         },
         persistEditorContent(activeDocPath = this.activeDocPath) {
             let content = this.mdtxt;

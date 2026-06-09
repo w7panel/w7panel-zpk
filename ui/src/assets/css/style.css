@@ -399,6 +399,14 @@ a,
 	margin-left: 40px;
 }
 
+.mr-4 {
+	margin-right: 4px;
+}
+
+.mr-8 {
+	margin-right: 8px;
+}
+
 .mr-20 {
 	margin-right: 20px;
 }
@@ -623,4 +631,87 @@ a,
 .greybox .yaml-delete {
     padding: 5px;
     line-height: 1;
+}
+
+.yaml-preview-panel {
+    height: calc(100vh - 218px);
+    position: relative;
+}
+
+.yaml-preview-drawer {
+    height: 100%;
+    overflow: auto;
+}
+
+.yaml-preview-drawer .pre {
+    min-height: 100%;
+    margin: 0;
+    box-sizing: border-box;
+    color: #abb2bf;
+    background: #282c34;
+    border-radius: 4px;
+    font-size: 16px;
+    line-height: 1.5;
+    max-width: 100%;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.yaml-preview-drawer .pre code,
+.yaml-preview-drawer .pre .hljs {
+    min-height: 100%;
+    box-sizing: border-box;
+}
+
+.yaml-preview-actions {
+    display: flex;
+    position: absolute;
+    top: 10px;
+    right: 20px;
+    z-index: 2;
+    gap: 8px;
+}
+
+.yaml-preview-actions .copybtn {
+    display: block;
+    padding: 8px 15px;
+    color: #1d2129;
+    border-radius: 4px;
+    background: #ffffff;
+    border: 0;
+    outline: 0;
+    font-size: 14px;
+    line-height: 20px;
+    cursor: pointer;
+    margin-left: 0;
+    text-decoration: none;
+}
+
+.yaml-preview-actions .copybtn:hover {
+    color: #165dff;
+}
+
+.zpk-delete-popconfirm .arco-popconfirm-footer {
+    display: flex;
+    flex-direction: row-reverse;
+    justify-content: flex-start;
+}
+
+.zpk-delete-popconfirm .arco-popconfirm-footer>button {
+    margin-left: 0;
+    margin-right: 8px;
+}
+
+.zpk-delete-popconfirm .arco-popconfirm-footer>.arco-btn.arco-btn-secondary.arco-btn-status-normal:not(.arco-btn-disabled):first-child {
+    margin-right: 0;
+    color: #4e5969 !important;
+    background: #f2f3f5 !important;
+    border-color: transparent !important;
+}
+
+.zpk-delete-popconfirm .arco-popconfirm-footer>.arco-btn.arco-btn-secondary.arco-btn-status-normal:not(.arco-btn-disabled):first-child:hover {
+    color: #4e5969 !important;
+    background: #e5e6eb !important;
+    border-color: transparent !important;
 }

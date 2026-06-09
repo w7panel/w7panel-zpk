@@ -19,66 +19,53 @@
                 </div>
             </div>
 
-            <table class="table ingress-table mt-10">
-                <colgroup>
-                    <col class="ingress-match-col" />
-                    <col class="ingress-path-col" />
-                    <col class="ingress-app-col" />
-                    <col class="ingress-port-col" />
-                    <col class="ingress-action-col" />
-                </colgroup>
-                <thead>
-                    <tr>
-                        <td>匹配模式</td>
-                        <td>目录</td>
-                        <td>应用</td>
-                        <td>端口</td>
-                        <td>操作</td>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr v-for="(route, ridx) in item.routes" :key="ridx">
-                        <td>
-                            <a-select v-if="route.backend" v-model="route.backend.match" placeholder="请选择">
+            <manifest-config-table class="mt-10" :rows="item.routes" table-class="ingress-table"
+                add-text="添加配置" @add="addRoute(item)">
+                <template #columns>
+                    <manifest-config-table-column data-index="match" title="匹配模式" width="16%">
+                        <template #cell="{ record }">
+                            <a-select v-if="record.backend" v-model="record.backend.match" placeholder="请选择">
                                 <a-option label="前缀匹配" value="Prefix" />
                                 <a-option label="精准匹配" value="Exact" />
                                 <a-option label="正则匹配" value="ImplementationSpecific" />
                             </a-select>
-                        </td>
-                        <td>
-                            <a-input v-model="route.path" placeholder="请输入路径"></a-input>
-                        </td>
-                        <td>
-                            <a-select v-if="route.backend && mainapp" v-model="route.backend.name"
-                                @change="value => changeBackendName(route, value)" placeholder="请选择应用">
+                        </template>
+                    </manifest-config-table-column>
+                    <manifest-config-table-column data-index="path" title="目录" width="22%">
+                        <template #cell="{ record }">
+                            <a-input v-model="record.path" placeholder="请输入路径"></a-input>
+                        </template>
+                    </manifest-config-table-column>
+                    <manifest-config-table-column data-index="name" title="应用" width="22%">
+                        <template #cell="{ record }">
+                            <a-select v-if="record.backend && mainapp" v-model="record.backend.name"
+                                @change="value => changeBackendName(record, value)" placeholder="请选择应用">
                                 <a-option v-for="p in appNames" :key="p.id" :label="p.title" :value="p.id"></a-option>
                             </a-select>
-                            <a-select v-if="route.backend && !mainapp" v-model="route.backend.name"
-                                @change="value => changeBackendName(route, value)" placeholder="请选择应用">
+                            <a-select v-if="record.backend && !mainapp" v-model="record.backend.name"
+                                @change="value => changeBackendName(record, value)" placeholder="请选择应用">
                                 <a-option v-for="p in appNamesFilter" :key="p.id" :label="p.title"
                                     :value="p.id"></a-option>
                             </a-select>
-                        </td>
-                        <td>
-                            <a-select v-if="route.backend" v-model="route.backend.port" placeholder="请选择端口">
-                                <a-option v-for="p in getBackendPorts(route.backend.name)" :key="p" :label="p"
+                        </template>
+                    </manifest-config-table-column>
+                    <manifest-config-table-column data-index="port" title="端口" width="16%">
+                        <template #cell="{ record }">
+                            <a-select v-if="record.backend" v-model="record.backend.port" placeholder="请选择端口">
+                                <a-option v-for="p in getBackendPorts(record.backend.name)" :key="p" :label="p"
                                     :value="p"></a-option>
                             </a-select>
-                        </td>
-                        <td>
-                            <span class="c-blue cursor handle" @click="openEdit(route, index, ridx)">修改</span>
-                            <span class="c-blue cursor handle" @click="openStrategy(route, index, ridx)">策略</span>
+                        </template>
+                    </manifest-config-table-column>
+                    <manifest-config-table-column title="操作" width="24%">
+                        <template #cell="{ record, index: ridx }">
+                            <span class="c-blue cursor handle" @click="openEdit(record, index, ridx)">修改</span>
+                            <span class="c-blue cursor handle" @click="openStrategy(record, index, ridx)">策略</span>
                             <span class="c-blue cursor handle" @click="item.routes.splice(ridx, 1);">删除</span>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td colspan="8" class="cursor txt-c" @click="addRoute(item)">
-                            <span class="addmenu"><icon-plus />添加配置</span>
-                        </td>
-                    </tr>
-                </tbody>
-
-            </table>
+                        </template>
+                    </manifest-config-table-column>
+                </template>
+            </manifest-config-table>
 
 
         </div>
@@ -92,10 +79,12 @@
 </template>
 
 <script>
+import ManifestConfigTable from '@/components/manifest-config-table.vue';
+import ManifestConfigTableColumn from '@/components/manifest-config-table-column.vue';
 import { IconEdit, IconPlus } from '@arco-design/web-vue/es/icon';
 
 export default {
-    components: { IconEdit, IconPlus },
+    components: { ManifestConfigTable, ManifestConfigTableColumn, IconEdit, IconPlus },
     props: {
         modelValue: {
             type: Array,

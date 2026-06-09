@@ -70,7 +70,12 @@
                 <template #cell="{ record }">
                   <template v-if="hasAccess(record.user_id)">
                     <a-button type="text" @click="edit(record)" style="padding-left: 0">修改</a-button>
-                    <a-button type="text" status="danger" @click="del(record)">删除</a-button>
+                    <a-popconfirm content="确认要删除吗" type="warning" ok-text="确定" cancel-text="取消"
+                      content-class="zpk-delete-popconfirm"
+                      :ok-button-props="{ status: 'danger' }" :cancel-button-props="{ type: 'secondary' }"
+                      @ok="del(record)">
+                      <a-button type="text" status="danger">删除</a-button>
+                    </a-popconfirm>
                   </template>
                   <a-button type="text" @click="shortcut(record)">快捷指令</a-button>
                 </template>
@@ -172,7 +177,7 @@
 
 <script>
 import myAxios from "@/utils";
-import { confirm, messageSuccess } from "@/utils/ui-feedback";
+import { messageSuccess } from "@/utils/ui-feedback";
 import userMixin from "@/utils/user-mixin";
 import Access from '@/views/access.vue';
 import ArcoIcon from "@/components/arco-icon.vue";
@@ -343,18 +348,10 @@ export default {
       this.visible = true
     },
     del(row) {
-      confirm({
-        title: "提示",
-        content: '请确认删除',
-        confirmButtonText: "确定",
-        cancelButtonText: "取消",
-        onOk: () => {
-          return myAxios.post("/v2/api/repository/del", { id: row.id }).then(res => {
-            if (!res) { return }
-            messageSuccess('删除成功')
-            this.getData(1, true);
-          });
-        }
+      return myAxios.post("/v2/api/repository/del", { id: row.id }).then(res => {
+        if (!res) { return }
+        messageSuccess('删除成功')
+        this.getData(1, true);
       });
     },
     goDetail(row) {

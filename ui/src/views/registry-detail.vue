@@ -66,7 +66,12 @@
                             </a-table-column>
                             <a-table-column title="操作">
                                 <template #cell="{ record }">
-                                    <a-button type="text" @click="del(record)">删除</a-button>
+                                    <a-popconfirm content="确认要删除吗" type="warning" ok-text="确定"
+                                        cancel-text="取消" content-class="zpk-delete-popconfirm"
+                                        :ok-button-props="{ status: 'danger' }"
+                                        :cancel-button-props="{ type: 'secondary' }" @ok="del(record)">
+                                        <a-button type="text">删除</a-button>
+                                    </a-popconfirm>
                                 </template>
                             </a-table-column>
                         </template>
@@ -144,7 +149,12 @@
                                 <template #cell="{ record }">
                                     <a-button type="text" @click="getBuildDetail(record)">详情</a-button>
                                     <a-button type="text" @click="openBuildForm(record)">修改</a-button>
-                                    <a-button type="text" @click="delBuild(record)">删除</a-button>
+                                    <a-popconfirm content="确认要删除吗" type="warning" ok-text="确定"
+                                        cancel-text="取消" content-class="zpk-delete-popconfirm"
+                                        :ok-button-props="{ status: 'danger' }"
+                                        :cancel-button-props="{ type: 'secondary' }" @ok="delBuild(record)">
+                                        <a-button type="text">删除</a-button>
+                                    </a-popconfirm>
                                 </template>
                             </a-table-column>
                         </template>
@@ -177,7 +187,7 @@
         </a-modal>
 
         <a-modal v-model:visible="buildForm.show" :title="buildForm.id ? '修改自动部署任务' : '新增自动部署任务'"
-            :width="800" :footer="false">
+            :width="850" :footer="false">
             <a-form ref="buildForm" :model="buildForm" :rules="rules" label-align="left"
                 :label-col-props="{ span: 5, flex: '0 0 120px' }" :wrapper-col-props="{ span: 19, flex: '1' }"
                 class="registry-detail-form registry-build-form">
@@ -276,12 +286,13 @@
                 </a-form-item>
                 <a-form-item v-if="buildForm.deploy_type == 2" label="匹配方式" field="repository_tag">
 
-                    <div class="df ai-c" style="width:600px;">
-                        <a-select v-model="buildForm.match_type" size="large" placeholder="请选择匹配方式">
+                    <div class="build-match-rule-row">
+                        <a-select v-model="buildForm.match_type" size="large" placeholder="请选择匹配方式"
+                            class="build-match-type-select">
                             <a-option label="前缀匹配" :value="1" />
                             <a-option label="正则匹配" :value="2" />
                         </a-select>
-                        <div class="tag-cpn df df-ww ml-20" style="flex:1;">
+                        <div class="tag-cpn build-match-rule-tags df df-ww">
                             <a-tag v-for="(tag, index) in buildForm.repository_tag_arr" :key="index" class="tag"
                                 closable @close="deleteTag(index)">{{ tag }}</a-tag>
                             <div class="input fc">
@@ -327,8 +338,11 @@
         </a-modal>
 
         <a-modal v-model:visible="logls.show" :width="1000" title="执行记录" :footer="false">
-            <a-spin :loading="logls.loading">
-                <div class="df">
+            <a-spin :loading="logls.loading" class="registry-log-spin">
+                <div v-if="!logls.list.length" class="registry-log-empty">
+                    <a-empty description="暂无执行记录" />
+                </div>
+                <div v-else class="df">
                     <div>
                         <div class="df jc-e" style="height:400px; overflow:auto; max-width:300px;">
                             <a-tabs v-model:active-key="logls.act" position="left" class="logtabs" @change="termInit">
@@ -352,7 +366,7 @@ import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
 import userMixin from "@/utils/user-mixin";
-import { confirm, messageSuccess } from "@/utils/ui-feedback";
+import { messageSuccess } from "@/utils/ui-feedback";
 import { IconArrowLeft, IconCopy, IconEdit, IconPlus } from '@arco-design/web-vue/es/icon';
 
 export default {
@@ -485,6 +499,7 @@ export default {
                 act: '0',
                 loading: true,
                 opened: false,
+                list: [],
             }
             myAxios.post('/v2/api/repository/deploy_rule/deploy-log', {
                 id: row.id,
@@ -779,33 +794,21 @@ export default {
             }).catch(() => { });
         },
         del(tag) {
-            confirm({
-                title: '提示',
-                content: '此操作将永久删除该版本, 是否继续?',
-                confirmButtonText: '确定',
-                cancelButtonText: '取消',
-                onOk: () => myAxios.post("/v2/api/repository/tags/del", {
-                    id: parseInt(this.$route.params.id),
-                    tag: tag.TagName
-                }).then(res => {
-                    messageSuccess("删除成功");
-                    this.getData();
-                }).catch(() => { })
-            });
+            return myAxios.post("/v2/api/repository/tags/del", {
+                id: parseInt(this.$route.params.id),
+                tag: tag.TagName
+            }).then(() => {
+                messageSuccess("删除成功");
+                this.getData();
+            }).catch(() => { })
         },
         delBuild(row) {
-            confirm({
-                title: '提示',
-                content: '确定要删除吗, 是否继续?',
-                confirmButtonText: '确定',
-                cancelButtonText: '取消',
-                onOk: () => myAxios.post('/v2/api/repository/deploy_rule/del', {
-                    id: row.id
-                }).then(res => {
-                    messageSuccess('操作成功');
-                    this.getBuild();
-                }).catch(() => { })
-            });
+            return myAxios.post('/v2/api/repository/deploy_rule/del', {
+                id: row.id
+            }).then(() => {
+                messageSuccess('操作成功');
+                this.getBuild();
+            }).catch(() => { })
         },
         onSubmit() {
             myAxios.post('/v2/api/repository/edit', { id: parseInt(this.$route.params.id), ...this.form }).then(() => {
@@ -906,14 +909,20 @@ export default {
         },
         termInit() {
             if (this.logls.loading || !this.logls.opened) { return }
-            document.getElementById("term").innerHTML = "";
+            if (!this.logls.list.length) {
+                this.term = null;
+                return;
+            }
+            let termEl = document.getElementById("term");
+            if (!termEl) { return }
+            termEl.innerHTML = "";
             this.term = null;
             this.term = new Terminal({
                 rendererType: 'dom',
                 cursorBlink: false,
 
             });
-            this.term.open(document.getElementById("term"));
+            this.term.open(termEl);
             this.fitAddon = new FitAddon()
             this.term.loadAddon(this.fitAddon);
             this.fitAddon.fit();
@@ -1067,6 +1076,21 @@ export default {
     line-height: 28px;
 }
 
+.registry-log-empty {
+    height: 400px;
+    width: 100%;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.registry-log-spin,
+.registry-log-spin :deep(.arco-spin-children) {
+    display: block;
+    width: 100%;
+}
+
 .build-inline-form-row {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -1094,6 +1118,24 @@ export default {
 
 .build-inline-form-row :deep(.arco-select) {
     width: 100%;
+}
+
+.build-match-rule-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    width: 600px;
+}
+
+.build-match-type-select {
+    flex: 0 0 128px;
+    width: 128px;
+}
+
+.build-match-rule-tags {
+    flex: 1 1 auto;
+    min-width: 0;
+    width: auto;
 }
 
 .pd-20 {

@@ -626,7 +626,7 @@ a,
 }
 
 .yaml-preview-panel {
-    height: calc(100vh - 96px);
+    height: calc(100vh - 218px);
     position: relative;
 }
 

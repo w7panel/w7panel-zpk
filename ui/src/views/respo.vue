@@ -26,18 +26,30 @@
             <template #columns>
               <a-table-column data-index="name" title="制品名称">
                 <template #cell="{ record }">
-                  <div style="display: flex;gap: 4px;align-items: center">
-                    <img :src="getLogo(record.icon)" style="width: 20px;height: 20px"
+                  <div class="respo-name-cell">
+                    <img :src="getLogo(record.icon)" class="respo-name-icon"
                       @error="(e) => { e.target.src = dfimg; }" alt="">
-                    <span v-if="record.remote_formula_info_url" class="c-99">{{ record.name }}</span>
-                    <span v-else class="c-blue cursor"
-                      @click="$router.push('/zpk-version?id=' + record.identifie + '&title=' + record.name)">{{
-                        record.name }}</span>
-                    <span v-if="record.goods_id" style="color: red;margin: 0 4px;">[付费]</span>
-                    <span :class="{ 'star-show': record.status === 99 }" class="respo-star-icon"
-                      @click="changeStatus(record.status === 99 ? 2 : 99, record.identifie)">
-                      {{ record.status === 99 ? '★' : '☆' }}
-                    </span>
+                    <div class="respo-name-main">
+                      <div class="respo-name-line">
+                        <span v-if="record.remote_formula_info_url" class="c-99">{{ record.name }}</span>
+                        <span v-else class="c-blue cursor"
+                          @click="$router.push('/zpk-version?id=' + record.identifie + '&title=' + record.name)">{{
+                            record.name }}</span>
+                        <span v-if="record.goods_id" style="color: red;margin: 0 4px;">[付费]</span>
+                        <span :class="{ 'star-show': record.status === 99 }" class="respo-star-icon"
+                          @click="changeStatus(record.status === 99 ? 2 : 99, record.identifie)">
+                          {{ record.status === 99 ? '★' : '☆' }}
+                        </span>
+                      </div>
+                      <div class="respo-url-line">
+                        <span class="respo-url-text">{{ getArtifactInfoUrl(record) }}</span>
+                        <a-tooltip content="复制地址" position="top">
+                          <a-button type="text" size="mini" @click.stop="copyArtifactInfoUrl(record)">
+                            <template #icon><icon-copy /></template>
+                          </a-button>
+                        </a-tooltip>
+                      </div>
+                    </div>
                   </div>
                 </template>
               </a-table-column>
@@ -49,12 +61,16 @@
               </a-table-column>
               <a-table-column data-index="audit_status" title="审核状态">
                 <template #cell="{ record }">
-                  <span v-if="record.audit_status == 1" class="c-99">待审核</span>
-                  <span v-if="record.audit_status == 2" class="c-red">不通过</span>
-                  <span v-if="record.audit_status == 3" class="c-green">通过</span>
+                  <span v-if="getAuditStatus(record) === 0" class="c-99">-</span>
+                  <span v-else-if="getAuditStatus(record) === 1" class="c-99">待审核</span>
+                  <a-tooltip v-else-if="getAuditStatus(record) === 3 && record.audit_remark"
+                    :content="record.audit_remark" position="top">
+                    <span class="c-red respo-audit-fail">不通过 <icon-exclamation-circle-fill class="respo-audit-fail-icon" /></span>
+                  </a-tooltip>
+                  <span v-else-if="getAuditStatus(record) === 4" class="c-green">通过</span>
+                  <span v-else class="c-99">-</span>
                 </template>
               </a-table-column>
-              <a-table-column data-index="audit_remark" title="理由" />
               <a-table-column title="操作">
                 <template #cell="{ record }">
                   <a-button type="text" @click="installEvent(record)">安装</a-button>
@@ -65,17 +81,6 @@
                     @ok="deleteItem(record)">
                     <a-button type="text">删除</a-button>
                   </a-popconfirm>
-                  <a-popover position="bottom">
-                    <a-button type="text">分享</a-button>
-                    <template #content>
-                    <div class="df" style="padding:6px 0;">
-                      <a-button type="primary"
-                        @click.stop="toinstall(false, record.version?.name, record.identifie)">复制安装地址</a-button>
-                      <a-button type="primary"
-                        @click.stop="toinstall(true, record.version?.name, record.identifie)">复制发布地址</a-button>
-                    </div>
-                    </template>
-                  </a-popover>
                   <a-button type="text" @click="changeStatus(2, record.identifie)"
                     v-if="record.status === 1">上架</a-button>
                   <a-button type="text" @click="changeStatus(1, record.identifie)" v-else>下架</a-button>
@@ -106,25 +111,6 @@
       </div>
       </a-spin>
     </a-modal>
-
-    <a-modal v-model:visible="ipt.show" title="导入制品库" :width="600" :footer="false">
-      <a-spin :loading="ipt.loading">
-      <a-form :model="ipt" label-align="left" :label-col-props="{ span: 5, flex: '0 0 100px' }"
-        :wrapper-col-props="{ span: 19, flex: '1' }" class="respo-form respo-import-form">
-        <a-form-item label="制品库地址">
-          <a-input v-model="ipt.link" placeholder="请输入地址" :spellcheck="false" @input="iptInputlink" />
-        </a-form-item>
-        <a-form-item label="标识">
-          <a-input v-model="ipt.identifie" :spellcheck="false" placeholder="author_app" />
-        </a-form-item>
-      </a-form>
-      <div class="dialog-footer">
-        <a-button @click="ipt.show = false">取消</a-button>
-        <a-button type="primary" @click="iptSubmit">确定</a-button>
-      </div>
-      </a-spin>
-    </a-modal>
-
 
     <a-modal v-model:visible="cloudApp.show" title="选择云端应用" :width="640" :footer="false">
       <a-table :loading="cloudApp.loading" :data="cloudApp.list" :pagination="false" row-key="id"
@@ -164,7 +150,7 @@ import myAxios from '@/utils';
 import dfimg from '@/assets/img/dfimg.png';
 import w7Identifie from "@/components/w7-identifie.vue";
 import { messageError, messageSuccess, messageWarning } from '@/utils/ui-feedback';
-import { IconPlus, IconSearch } from '@arco-design/web-vue/es/icon';
+import { IconPlus, IconSearch, IconCopy, IconExclamationCircleFill } from '@arco-design/web-vue/es/icon';
 
 export default {
   name: 'respo-index',
@@ -184,12 +170,6 @@ export default {
         loading: false,
         show: false,
         title: '',
-      },
-      ipt: {
-        loading: false,
-        show: false,
-        link: "",
-        identifie: "",
       },
       search: {
         keyword: '',
@@ -213,7 +193,7 @@ export default {
     this.is_register = window?.$wujie?.props?.isRegister;
     this.getData(1);
   },
-  components: { w7Identifie, IconPlus, IconSearch },
+  components: { w7Identifie, IconCopy, IconExclamationCircleFill, IconPlus, IconSearch },
   methods: {
     cloudAppUnpack() {
       if (!this.cloudApp?.selectId?.[0]) {
@@ -284,18 +264,16 @@ export default {
         }
       });
     },
-    toinstall(pure, version, identifie) {
-      let url = this.webUrl + '/respo/v2/info/' + identifie + '/' + (version || '1.0.0');
-      if (pure) {
-        this.onekeyCopy(url, () => {
-          messageSuccess('复制成功', { duration: 4000 });
-        });
-        return;
-      }
-      url = 'https://console.w7.cc/api/deploy/thirdparty_cd/redirect?route=/zpk-install?path=' + encodeURIComponent(url);
-      this.onekeyCopy(url, () => {
-        messageSuccess('复制成功，访问此链接或是转发他人完成安装操作。', { duration: 4000 });
+    getArtifactInfoUrl(record) {
+      return 'https://zpk.w7.cc/zpk/respo/info/' + record.identifie;
+    },
+    copyArtifactInfoUrl(record) {
+      this.onekeyCopy(this.getArtifactInfoUrl(record), () => {
+        messageSuccess('复制成功', { duration: 4000 });
       });
+    },
+    getAuditStatus(record) {
+      return Number(record?.audit_status || 0);
     },
     deleteItem(row) {
       return myAxios.post('/respo/delete', { identifie: row.identifie }).then(res => {
@@ -323,39 +301,6 @@ export default {
     getTags() {
       myAxios.post('/respo/tag/list', { limit: 999 }).then(res => {
         this.tags = res.data?.data?.list || [];
-      });
-    },
-    iptInputlink() {
-      if (!this.ipt.link) { return }
-      this.ipt.loading = true;
-      myAxios().get(this.ipt.link).then(res => {
-        this.ipt.loading = false;
-        this.ipt.identifie = this.ipt.link.replace(/^.+\/([^/]+)$/, '$1');
-      }).catch(e => {
-        messageError("制品库请链接求失败");
-        this.ipt.loading = false;
-      });
-    },
-    iptSubmit() {
-      let f = this.list.filter(i => i.identifie == this.ipt.identifie);
-      if (f.length) {
-        messageWarning('标识重复,请修改标识');
-        return;
-      }
-      if (!/^[a-zA-Z0-9]+-[a-zA-Z0-9]+$/.test(this.ipt.identifie)) {
-        messageWarning('标识中间必须用"-"分隔');
-        return;
-      }
-      this.ipt.loading = true;
-      myAxios.post('/respo/add', { identifie: this.ipt.identifie }).then(res => {
-        let id = this.ipt.identifie;
-        let link = this.ipt.link;
-        this.getInfo(id, () => {
-          this.ipt = { loading: false, show: true, link: "", identifie: "" };
-          this.$router.push('/zpk-manifest?id=' + id + '&link=' + encodeURIComponent(link));
-        });
-      }).catch(() => {
-        this.ipt.loading = false;
       });
     },
     getData(page) {
@@ -491,6 +436,62 @@ export default {
 
 .table-respo-list .respo-star-icon.star-show {
   visibility: visible;
+}
+
+.table-respo-list .respo-name-cell {
+  align-items: flex-start;
+  display: flex;
+  gap: 10px;
+  min-width: 0;
+}
+
+.table-respo-list .respo-name-icon {
+  border-radius: 6px;
+  flex: 0 0 auto;
+  height: 42px;
+  object-fit: cover;
+  width: 42px;
+}
+
+.table-respo-list .respo-name-main {
+  min-width: 0;
+}
+
+.table-respo-list .respo-name-line {
+  align-items: center;
+  display: flex;
+  gap: 4px;
+  line-height: 20px;
+  min-width: 0;
+}
+
+.table-respo-list .respo-url-line {
+  align-items: center;
+  display: flex;
+  line-height: 20px;
+  margin-top: 4px;
+  min-width: 0;
+}
+
+.table-respo-list .respo-url-text {
+  color: #86909c;
+  font-size: 12px;
+  max-width: 360px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.table-respo-list .respo-audit-fail {
+  align-items: center;
+  display: inline-flex;
+  gap: 4px;
+}
+
+.table-respo-list .respo-audit-fail-icon {
+  color: #D00805;
+  font-size: 14px;
+  line-height: 1;
 }
 
 .table-respo-list :deep(.arco-table-tr:hover) .respo-star-icon {

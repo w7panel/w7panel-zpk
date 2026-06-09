@@ -10,9 +10,6 @@
             <div v-else>
                 <a-form ref="formref" :model="form" :rules="rules" label-align="left"
                     :label-col-props="{ span: 3 }" :wrapper-col-props="{ span: 21 }" class="form manifest-form">
-                    <div class="df jc-e">
-                        <a-button v-if="!showYaml" type="primary" @click="showYaml = true;">预览yaml</a-button>
-                    </div>
                     <div class="bg-white com-line df" style="margin-bottom:20px;">
                         <div class="fc">
                             <div class="c-00-6 df ai-c">基础配置</div>
@@ -86,10 +83,11 @@
                                         </div>
                                         <div v-show="form.menu_type == 'thirdparty_cd'" class="df ai-c mt-10">
                                             <div style="">
-                                                <a-checkbox v-model="cdrole.founder">创始人</a-checkbox>
-                                                <a-checkbox v-model="cdrole.super">管理员</a-checkbox>
-                                                <a-checkbox v-model="cdrole.tech">技术人员</a-checkbox>
-                                                <a-checkbox v-model="cdrole.normal">普通用户</a-checkbox>
+                                                <a-checkbox v-for="role in panelRoleOptions" :key="role.name"
+                                                    :model-value="Boolean(cdrole[role.name])"
+                                                    @change="checked => togglePanelRole(checked, role)">
+                                                    {{ role.title }}
+                                                </a-checkbox>
                                             </div>
                                         </div>
                                         <div v-for="(r, rindex) in form.role.filter(i => i.support == form.menu_type)"
@@ -692,14 +690,15 @@
                 </a-form>
             </div>
         </div>
-        <div v-show="showYaml" class="box" style="width:600px; position:relative; padding-right:0;">
-            <div style="height:100%;" v-html="yamlDom"></div>
-            <div class="df" style="position:absolute; right:20px; top:10px;">
-                <button class="copybtn" @click="showYaml = false;">收起预览</button>
-                <button class="copybtn" @click="onekeyCopy(yaml)">一键复制</button>
-                <a :href="downloadUrl" download="manifest.yaml" class="copybtn" style="right:110px;">下载</a>
+        <a-drawer v-model:visible="showYaml" :width="640" title="预览 YAML" :footer="false" unmount-on-close>
+            <div class="yaml-preview-panel">
+                <div class="yaml-preview-drawer" v-html="yamlDom"></div>
+                <div class="yaml-preview-actions">
+                    <button class="copybtn" @click="onekeyCopy(yaml)">一键复制</button>
+                    <a :href="downloadUrl" download="manifest.yaml" class="copybtn">下载</a>
+                </div>
             </div>
-        </div>
+        </a-drawer>
         <a-modal v-model:visible="dialogVisible" title="选择图标" :width="820" :footer="false">
             <sel-svg @submit="selectIcon"></sel-svg>
         </a-modal>
@@ -864,11 +863,12 @@ export default {
                 frontend_props: [{ key: '', value: '' }],
             },
 
-            cdrole: {
-                founder: false,
-                super: false,
-                tech: false,
-                normal: false,
+            cdrole: {},
+            panelRoles: {
+                founder: '创始人',
+                super: '管理员',
+                tech: '技术人员',
+                normal: '普通用户',
             },
 
             roleEdit: {
@@ -978,6 +978,7 @@ export default {
     created() {
         this.baseurl = window?.$wujie?.props?.url || '';
         hljs.configure({ ignoreUnescapedHTML: true });
+        this.initPanelRoles();
         this.init(this.data);
 
 
@@ -1002,19 +1003,6 @@ export default {
         'form.role_super'(v) {
             this.switchRole(v, 'super', '超级管理端', 'console');
         },
-        'cdrole.founder'(v) {
-            this.switchRole(v, 'founder', '创始人', 'thirdparty_cd');
-        },
-        'cdrole.super'(v) {
-            this.switchRole(v, 'super', '管理员', 'thirdparty_cd');
-        },
-        'cdrole.tech'(v) {
-            this.switchRole(v, 'tech', '技术人员', 'thirdparty_cd');
-        },
-        'cdrole.normal'(v) {
-            this.switchRole(v, 'normal', '普通用户', 'thirdparty_cd');
-        },
-
         data() { this.init(this.data) },
         app_ports() {
             if (this.syncRoleBackendDefaults()) { this.getMenu(); }
@@ -1024,6 +1012,12 @@ export default {
         },
     },
     computed: {
+        panelRoleOptions() {
+            return Object.entries(this.panelRoles || {}).map(([name, title]) => ({
+                name,
+                title: title || name,
+            }));
+        },
         systemVarOptions() {
             return (this.startParams || []).filter(item => item?.name).map(item => ({
                 label: item.title || item.name,
@@ -1555,6 +1549,56 @@ export default {
             this.dialogVisible = false;
             this.getMenu();
         },
+        getDefaultPanelRoles() {
+            return {
+                founder: '创始人',
+                super: '管理员',
+                tech: '技术人员',
+                normal: '普通用户',
+            };
+        },
+        normalizePanelRoles(roles) {
+            let source = roles && typeof roles == 'object' ? roles : this.getDefaultPanelRoles();
+            let normalized = {};
+            Object.entries(source).forEach(([name, title]) => {
+                if (!name) { return }
+                normalized[name] = title || name;
+            });
+            if (!Object.keys(normalized).length) {
+                normalized = this.getDefaultPanelRoles();
+            }
+            this.form.role.filter(item => item.support == 'thirdparty_cd').forEach(item => {
+                if (!normalized[item.name]) {
+                    normalized[item.name] = item.title || item.name;
+                }
+            });
+            return normalized;
+        },
+        setPanelRoles(roles) {
+            this.panelRoles = this.normalizePanelRoles(roles);
+            let nextRoleState = {};
+            Object.keys(this.panelRoles).forEach(name => {
+                nextRoleState[name] = Boolean(this.form.role.find(item => item.support == 'thirdparty_cd' && item.name == name));
+            });
+            this.cdrole = nextRoleState;
+        },
+        initPanelRoles() {
+            let roles = window?.$wujie?.getUsers?.();
+            if (roles && typeof roles.then == 'function') {
+                roles.then(data => this.setPanelRoles(data)).catch(() => {
+                    this.setPanelRoles(this.panelRoles);
+                });
+                return;
+            }
+            this.setPanelRoles(roles || this.panelRoles);
+        },
+        togglePanelRole(checked, role) {
+            this.cdrole = {
+                ...this.cdrole,
+                [role.name]: checked,
+            };
+            this.switchRole(checked, role.name, role.title, 'thirdparty_cd');
+        },
         addRole() {
             this.$refs.role.validate((errors) => {
                 if (errors) { return }
@@ -1593,12 +1637,10 @@ export default {
                 founder: false,
                 super: false,
             }
-            let cdRole = {
-                founder: false,
-                super: false,
-                tech: false,
-                normal: false,
-            }
+            let cdRole = {};
+            this.panelRoleOptions.forEach(role => {
+                cdRole[role.name] = false;
+            });
             this.form.role.forEach(r => {
 
                 if (r.type == 'external') {
@@ -1621,13 +1663,11 @@ export default {
                     load_mode: r.load_mode,
                 };
 
-                if (['super', 'founder', 'tech', 'normal'].includes(r.name)) {
-                    if (r.support == 'console' && ['super', 'founder'].includes(r.name)) {
-                        consoleRole[r.name] = true;
-                    }
-                    if (r.support == 'thirdparty_cd') {
-                        cdRole[r.name] = true;
-                    }
+                if (r.support == 'console' && ['super', 'founder'].includes(r.name)) {
+                    consoleRole[r.name] = true;
+                }
+                if (r.support == 'thirdparty_cd') {
+                    cdRole[r.name] = true;
                 }
 
                 let proxy_request_header = this.serializeParamEntries(r.proxy_request_header);
@@ -1925,6 +1965,7 @@ export default {
                     chartName: 'default',
                 };
             }
+            this.setPanelRoles(this.panelRoles);
             this.syncRoleBackendDefaults();
         },
         submit(otherData, callback) {
@@ -1962,6 +2003,12 @@ export default {
         download() {
             let file = new File([this.yaml], 'manifest.yaml', { type: 'text/plain' });
             this.downloadUrl = URL.createObjectURL(file);
+        },
+        openYamlPreview() {
+            this.showYaml = true;
+            this.$nextTick(() => {
+                this.setYaml();
+            });
         },
         onekeyCopy(text) {
             let supportClipboard = Boolean(navigator.clipboard && window.isSecureContext);

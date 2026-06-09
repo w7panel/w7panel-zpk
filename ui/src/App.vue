@@ -63,6 +63,14 @@ export default {
 	background: #ffffff;
 }
 
+.zpk-page-header-actions {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 10px;
+	margin-left: auto;
+}
+
 .zpk-toolbar-left,
 .zpk-toolbar-right {
 	display: flex;

@@ -11,6 +11,9 @@
                 </a-breadcrumb-item>
                 <a-breadcrumb-item>{{ title || identifie }}</a-breadcrumb-item>
             </a-breadcrumb>
+            <div class="zpk-page-header-actions">
+                <a-button type="outline" :disabled="!info.manifest" @click="openYamlPreview">预览 YAML</a-button>
+            </div>
         </div>
         <div class="content version-page-content pt-0">
         <a-tabs v-model:active-key="activeTab" @change="handleTabClick">
@@ -341,6 +344,15 @@
     <a-modal v-model:visible="dialogVisible" :footer="false">
         <img w-full :src="dialogImageUrl" alt="Preview Image" />
     </a-modal>
+    <a-drawer v-model:visible="yamlPreview.show" :width="640" title="预览 YAML" :footer="false" unmount-on-close>
+        <div class="yaml-preview-panel">
+            <div class="yaml-preview-drawer" v-html="yamlPreview.html"></div>
+            <div class="yaml-preview-actions">
+                <button class="copybtn" @click="copyYamlPreview">一键复制</button>
+                <a :href="yamlPreview.downloadUrl" download="manifest.yaml" class="copybtn">下载</a>
+            </div>
+        </div>
+    </a-drawer>
 </template>
 
 <script>
@@ -452,6 +464,12 @@ export default {
             total: 0,
             dialogVisible: false,
             dialogImageUrl: '',
+            yamlPreview: {
+                show: false,
+                yaml: '',
+                html: '',
+                downloadUrl: '',
+            },
         }
     },
     created() {
@@ -470,6 +488,45 @@ export default {
             } else if (key == 'publish') {
                 this.getPublishInfo();
             }
+        },
+        openYamlPreview() {
+            let yaml = this.info?.manifest || '';
+            if (!yaml) { return }
+            this.yamlPreview.show = true;
+            this.$nextTick(() => {
+                this.yamlPreview.yaml = yaml;
+                this.yamlPreview.html = `<pre class='pre'><code class='language-yaml'>${this.escapeHtml(yaml)}</code></pre>`;
+                let file = new File([yaml], 'manifest.yaml', { type: 'text/plain' });
+                this.yamlPreview.downloadUrl = URL.createObjectURL(file);
+                this.$nextTick(() => {
+                    window.hljs.highlightAll();
+                });
+            });
+        },
+        escapeHtml(text) {
+            return String(text || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        },
+        copyYamlPreview() {
+            let text = this.yamlPreview.yaml || '';
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(text);
+            } else {
+                let textarea = document.createElement('textarea');
+                document.body.appendChild(textarea);
+                textarea.style.position = 'fixed';
+                textarea.style.clip = 'rect(0 0 0 0)';
+                textarea.style.top = '10px';
+                textarea.value = text;
+                textarea.select();
+                document.execCommand('copy', true);
+                document.body.removeChild(textarea);
+            }
+            messageSuccess('复制成功');
         },
         getCuv() {
             myAxios.post('/respo/goods/can-upgrade-versions', {

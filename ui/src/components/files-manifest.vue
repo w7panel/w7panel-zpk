@@ -5,9 +5,6 @@
                 <a-form ref="formref" :model="form" :rules="rules" label-align="left"
                     :label-col-props="{ span: 5, flex: '0 0 120px' }"
                     :wrapper-col-props="{ span: 19, flex: '1' }" class="form manifest-form">
-                    <div class="df jc-e">
-                        <a-button v-if="!showYaml" type="primary" @click="showYaml = true;">预览yaml</a-button>
-                    </div>
                     <div class="bg-white com-line df">
                         <div class="fc">
                             <div class="c-00-6 df ai-c">基础配置</div>
@@ -459,14 +456,15 @@
                 </a-form>
             </div>
         </div>
-        <div v-show="showYaml" class="box" style="width:600px; position:relative; padding-right:0;">
-            <div style="height:100%;" v-html="yamlDom"></div>
-            <div class="df" style="position:absolute; right:20px; top:10px;">
-                <button class="copybtn" @click="showYaml = false;">收起预览</button>
-                <button class="copybtn" @click="onekeyCopy(yaml)">一键复制</button>
-                <a :href="downloadUrl" download="manifest.yaml" class="copybtn" style="right:110px;">下载</a>
+        <a-drawer v-model:visible="showYaml" :width="640" title="预览 YAML" :footer="false" unmount-on-close>
+            <div class="yaml-preview-panel">
+                <div class="yaml-preview-drawer" v-html="yamlDom"></div>
+                <div class="yaml-preview-actions">
+                    <button class="copybtn" @click="onekeyCopy(yaml)">一键复制</button>
+                    <a :href="downloadUrl" download="manifest.yaml" class="copybtn">下载</a>
+                </div>
             </div>
-        </div>
+        </a-drawer>
 
         <a-modal v-model:visible="dependForm.show" :title="dependForm.editIndex >= 0 ? '修改子应用' : '添加子应用'" :width="640"
             :footer="false"
@@ -1730,6 +1728,12 @@ platform:
             this.$nextTick(() => {
                 window.hljs.highlightAll();
                 this.download();
+            });
+        },
+        openYamlPreview() {
+            this.showYaml = true;
+            this.$nextTick(() => {
+                this.setYaml();
             });
         },
         getStart() {

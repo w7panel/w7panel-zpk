@@ -4,13 +4,11 @@
             <span class="backbtn df ai-c" @click="$router.go(-1)">
                 <icon-arrow-left class="backicon" />
             </span>
+            <div class="zpk-page-header-actions" v-if="manifest && !noPlatform">
+                <a-button type="outline" @click="openYamlPreview">预览 YAML</a-button>
+            </div>
         </div>
         <a-spin :loading="loading" class="create-spin">
-            <div class="zpk-toolbar-left" style="padding:0 20px;">
-                <a-button type="primary" @click="impt.show = true; impt.data = null;">
-                    导入制品库
-                </a-button>
-            </div>
             <div v-if="noPlatform">
                 <a-empty :image-size="200" description="" class="manifest-empty">
                     <span class="c-99">暂无数据，点击</span>
@@ -20,8 +18,6 @@
             <files-manifest v-if="manifest && !noPlatform" :data="manifest" ref="form" :version_id="version_id"
                 :identifie="identifie" :option="{ create: true }" @addfile="addfileInside" @complete="complete">
             </files-manifest>
-            <files-upload v-if="uploadzipfile" :file="uploadzipfile" @error="loading = false;"
-                @success="uploadSuccess"></files-upload>
         </a-spin>
     </div>
 
@@ -35,18 +31,6 @@
             <a-button @click="addfile.show = false;">取消</a-button>
             <a-button type="primary"
                 @click="$router.push('/zpk-fileadd?identifie=' + identifie + '&filename=' + addfile.filename)">确认添加</a-button>
-        </div>
-    </a-modal>
-
-    <a-modal v-model:visible="impt.show" title="导入制品库" :width="560" :footer="false">
-        <div class="zpk-modal-content import-zpk-content">
-            <a-auto-complete v-model="impt.title" ref="imptzpk" :data="impt.options" placeholder="请选择制品库"
-                style="width:400px;" size="large" allow-clear :filter-option="false" @search="addQuerySearch"
-                @change="handleImportTitleChange" @select="addSelect" :spellcheck="false" />
-        </div>
-        <div class="dialog-footer">
-            <a-button @click="impt.show = false">取消</a-button>
-            <a-button type="primary" @click="imptSubmit()" size="large">确定</a-button>
         </div>
     </a-modal>
 </template>
@@ -75,34 +59,21 @@ platform:
 import jsyaml from "js-yaml";
 import filesManifest from '@/components/files-manifest.vue';
 import myAxios from '@/utils';
-import axios from 'axios';
-import JSZip from 'jszip';
-import JSZipUtils from "jszip-utils";
-import filesUpload from '@/components/files-upload.vue';
-import { messageError, messageSuccess, messageWarning } from '@/utils/ui-feedback';
+import { messageError, messageSuccess } from '@/utils/ui-feedback';
 import { IconArrowLeft } from '@arco-design/web-vue/es/icon';
 
 export default {
-    components: { filesManifest, filesUpload, IconArrowLeft },
+    components: { filesManifest, IconArrowLeft },
     data() {
         return {
             version_id: '',
             identifie: '',
             manifest: '',
-            iptmanifest: '',
-            link: '',
             loading: false,
-            uploadzipfile: null,
             tree: [],
             addfile: {
                 show: false,
                 filename: '',
-            },
-            impt: {
-                show: false,
-                title: '',
-                data: null,
-                options: [],
             },
             noPlatform: false,
             noManifest: false,
@@ -114,10 +85,6 @@ export default {
             this.version_id = res?.data?.data?.list[0]?.name || '';
         })
         await this.next();
-        if (this.$route.query.link) {
-            this.link = decodeURIComponent(this.$route.query.link);
-            this.iptzpk();
-        }
         this.getFile();
     },
     methods: {
@@ -144,41 +111,9 @@ export default {
                 this.noPlatform = false;
             }
         },
-        imptSubmit() {
-            if (!this.impt.data) { messageWarning('请选择制品库'); return; }
-            this.jsonp('https://console.w7.cc/zpk?path=/respo/v2/info/' + this.impt.data.identifie + '/' + this.version_id, 'getimportmanifest', data => {
-                let manifest = data?.data?.manifest || defaultManifest;
-                let json = jsyaml.load(manifest);
-                let ref = this.$refs.form;
-                ref?.replaceZpk(json);
-                this.impt.show = false;
-            })
+        openYamlPreview() {
+            this.$refs.form?.openYamlPreview?.();
         },
-
-        addQuerySearch(query = '') {
-            this.jsonp('https://console.w7.cc/zpk?status=2&page=1&limit=999&keyword=' + encodeURIComponent(query) + '&path=/respo/list', 'getimport', (data) => {
-                let list = data?.data?.list || [];
-                list = list.splice(0, 20);
-                this.impt.options = list.map(item => ({
-                    label: item.name,
-                    value: item.name,
-                    raw: item,
-                }));
-            });
-        },
-
-        handleImportTitleChange(value) {
-            if (this.impt.data?.name == value) { return; }
-            let option = this.impt.options.find(item => item.value == value);
-            this.impt.data = option?.raw || null;
-        },
-
-        addSelect(value) {
-            let option = this.impt.options.find(item => item.value == value);
-            this.impt.data = option?.raw || null;
-            this.$refs.imptzpk?.blur?.();
-        },
-
         addfileInside(json, yaml, data) {
 
             myAxios.post('/respo/file', {
@@ -213,50 +148,6 @@ export default {
                     tree.push({ label: i })
                 }
                 this.tree = tree;
-            })
-        },
-        uploadSuccess(data) {
-            if (data?.url || data?.data?.url) {
-                let url = data?.url || data?.data?.url;
-
-                this.json = jsyaml.load(this.iptmanifest);
-                if (!this.json.application) { this.json.application = {}; }
-                this.json.application.identifie = this.identifie;
-                if (!this.json.source) { this.json.source = {}; }
-                this.json.source.type = 'zip';
-                this.json.source.url = url;
-                this.manifest = jsyaml.dump(this.json);
-
-                this.loading = false;
-            }
-        },
-        getOnlineZip(url, callback) {
-            var promise = new JSZip.external.Promise((resolve, reject) => {
-                JSZipUtils.getBinaryContent(url, function (err, data) {
-                    err ? reject(err) : resolve(data);
-                });
-            });
-            promise.then(JSZip.loadAsync).then(zip => {
-                callback && callback(zip);
-            }).catch(() => {
-                this.loading = false;
-            });
-        },
-        iptzpk() {
-            this.loading = true;
-            axios.get(this.link).then(res => {
-                this.iptmanifest = res.data.manifest;
-                this.getOnlineZip(res.data?.data?.zip_url, (zip) => {
-                    zip.generateAsync({ type: "blob" }).then((content) => {
-                        let file = new File([content], this.identifie + '_' + Date.now() + '.zip', { type: "application/x-zip-compressed" });
-                        this.uploadzipfile = file;
-                    }).catch(() => {
-                        this.loading = false;
-                    });
-                });
-            }).catch(() => {
-                this.loading = false;
-                messageError('制品库链接请求失败');
             })
         },
         complete(json, yaml, otherData) {
@@ -329,24 +220,6 @@ export default {
                 this.manifest = jsyaml.dump(this.json);
             });
         },
-        jsonp(url, name, callback) {
-            var win = window?.rawWindow || window;
-            win[name] = (data) => {
-                callback(data);
-                win[name] = null;
-            };
-            let u = new URL(url);
-            u.searchParams.append('callback', name);
-            let script = document.createElement("script");
-            script.type = "text/javascript";
-            script.setAttribute('ignore', 'true')
-            script.async = true;
-            script.src = u.href;
-            script.onload = function () { document.body.removeChild(this); };
-            script.onerror = function () { document.body.removeChild(this); };
-            document.body.append(script);
-        },
-
     },
 }
 </script>

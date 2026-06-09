@@ -95,8 +95,8 @@ global:
 
   DOMAIN:
   WEBHOOK_TOKEN: qW3eR9t
-  REGISTRY_NATIVE_USERNAME: w7_zpk
-  REGISTRY_NATIVE_PASSWORD: w7_zpk_Gted
+  REGISTRY_NATIVE_USERNAME:
+  REGISTRY_NATIVE_PASSWORD:
   registryJwt:
     secretName: "w7-zpkv2-registry"
     rotateNonce: "20260509"

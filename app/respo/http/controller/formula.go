@@ -14,6 +14,7 @@ import (
 	logic2 "github.com/w7panel/w7panel-zpk/common/logic"
 	"github.com/w7panel/w7panel-zpk/common/service/w7"
 	"github.com/w7panel/w7panel-zpk/common/service/w7/devcenter"
+	"github.com/w7panel/w7panel-zpk/common/service/w7/ip"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/core/err_handler"
 	"gorm.io/gen/field"
@@ -90,18 +91,12 @@ func (c Formula) Info(ctx *gin.Context) {
 		return
 	}
 
-	user := logic2.User{}.GetUser(ctx)
 	consoleUid := logic2.User{}.GetConsoleUid(ctx)
 	if consoleUid == 0 && ctx.GetString("appid") != "" {
 		consoleUid = params.ConsoleUid
 	}
 	if params.UidToken != "" {
 		if params.UidToken != (logic.GetFormulaFounderToken(formula.UserId)) {
-			c.JsonResponseWithServerError(ctx, errors.New("非法请求"))
-			return
-		}
-	} else {
-		if formula.AuditStatus != logic.FORMULA_AUDIT_SUCCESS && (user == nil || (!(logic2.User{}.IsAdminUser(user)) && user.ID != formula.UserId)) {
 			c.JsonResponseWithServerError(ctx, errors.New("非法请求"))
 			return
 		}
@@ -496,10 +491,46 @@ func (c Formula) List(ctx *gin.Context) {
 	}
 
 	formulaList, total, _ := query.FindByPage((params.Page-1)*params.Limit, params.Limit)
+	goodsMap := make(map[int]ip.GoodsListItem)
+	if params.Owner && formulaList != nil {
+		goodsIds := make([]int, 0)
+		goodsIdExists := make(map[int]struct{})
+		for _, item := range formulaList {
+			goodsId := int(item.GoodsID)
+			if goodsId <= 0 {
+				continue
+			}
+			if _, ok := goodsIdExists[goodsId]; ok {
+				continue
+			}
+			goodsIds = append(goodsIds, goodsId)
+			goodsIdExists[goodsId] = struct{}{}
+		}
+		if len(goodsIds) > 0 {
+			goodsList, err := w7.IpGoodsSdk.GoodsBatchList(ip.GoodsBatchListReq{
+				GoodsIds: goodsIds,
+			})
+			if err != nil {
+				c.JsonResponseWithError(ctx, err, 500)
+				return
+			}
+			for _, item := range goodsList {
+				if item.Id > 0 {
+					goodsMap[item.Id] = item
+				}
+			}
+		}
+	}
 	if formulaList != nil {
 		for _, item := range formulaList {
 			formula, err := depotLogin.GetFormula(item.Name, "", user)
 			if err == nil {
+				auditStatus := int32(0)
+				auditMessage := ""
+				if goodsInfo, ok := goodsMap[int(item.GoodsID)]; ok {
+					auditStatus = int32(goodsInfo.AuditStatus)
+					auditMessage = goodsInfo.AuditMessage
+				}
 				resultItem := ResultNode{
 					Name:                 item.Title,
 					Description:          formula.Manifest.Application.Description,
@@ -510,9 +541,9 @@ func (c Formula) List(ctx *gin.Context) {
 					Status:               item.Status,
 					ProductType:          formula.ProductType,
 					InstallOnlyOnce:      formula.Manifest.Application.InstallOnlyOnce,
-					AuditStatus:          item.AuditStatus,
-					AuditRemark:          item.AuditRemark,
-					RemoteFormulaInfoURL: item.RemoteFormulaInfoURL,
+					AuditStatus:          auditStatus,
+					AuditRemark:          auditMessage,
+					RemoteFormulaInfoURL: "",
 					Annotation:           formula.Manifest.Application.Annotation,
 					GoodsId:              item.GoodsID,
 				}

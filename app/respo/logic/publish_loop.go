@@ -188,9 +188,6 @@ func updateVersionPublishState(formula *Formula, versionID int32, status int32, 
 			updateFormula := entity.Formula{
 				VersionLatestID: versionID,
 			}
-			if formula.AuditStatus == FORMULA_AUDIT_FAIL {
-				updateFormula.AuditStatus = FOEMULA_AUDIT_ING
-			}
 			_, err := tx.Formula.Where(tx.Formula.ID.Eq(formula.ID)).Updates(updateFormula)
 			if err != nil {
 				return err

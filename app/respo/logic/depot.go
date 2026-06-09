@@ -133,7 +133,6 @@ func (self *Depot) AddFormula(name string, version string, user *entity.Registry
 				VersionLatestID: versionData.ID,
 				UserID:          user.ID,
 				Title:           name,
-				AuditStatus:     FOEMULA_AUDIT_ING,
 			}
 			versionId = versionData.ID
 			newCreate = true
@@ -200,28 +199,26 @@ func (self *Depot) GetFormula(name string, version string, user *entity.Registry
 		row.ProductType = 0
 	}
 	result := &Formula{
-		ID:                   row.ID,
-		UserId:               row.UserID,
-		Name:                 row.Name,
-		Title:                row.Title,
-		VersionId:            row.VersionLatestID,
-		LatestVersionId:      row.VersionLatestID,
-		Manifest:             &logic.Manifest{},
-		ZipPath:              "",
-		WebZipPaths:          map[string]string{},
-		HelmPaths:            map[string]string{},
-		Icon:                 "/zpk/zip/icon/" + row.Name,
-		Tags:                 row.Tag,
-		ConsoleUid:           row.RemoteUID,
-		GoodsId:              row.GoodsID,
-		GoodsProductId:       row.GoodsProductID,
-		InstallServiceFee:    row.InstallServiceFee,
-		ServicePackages:      row.ServicePackages,
-		VersionPrices:        row.VersionPrices,
-		IsFreeUpgrade:        row.IsFreeUpgrade,
-		ProductType:          row.ProductType,
-		RemoteFormulaInfoUrl: row.RemoteFormulaInfoURL,
-		AuditStatus:          row.AuditStatus,
+		ID:                row.ID,
+		UserId:            row.UserID,
+		Name:              row.Name,
+		Title:             row.Title,
+		VersionId:         row.VersionLatestID,
+		LatestVersionId:   row.VersionLatestID,
+		Manifest:          &logic.Manifest{},
+		ZipPath:           "",
+		WebZipPaths:       map[string]string{},
+		HelmPaths:         map[string]string{},
+		Icon:              "/zpk/zip/icon/" + row.Name,
+		Tags:              row.Tag,
+		ConsoleUid:        row.RemoteUID,
+		GoodsId:           row.GoodsID,
+		GoodsProductId:    row.GoodsProductID,
+		InstallServiceFee: row.InstallServiceFee,
+		ServicePackages:   row.ServicePackages,
+		VersionPrices:     row.VersionPrices,
+		IsFreeUpgrade:     row.IsFreeUpgrade,
+		ProductType:       row.ProductType,
 	}
 
 	if version != "" {
@@ -237,12 +234,10 @@ func (self *Depot) GetFormula(name string, version string, user *entity.Registry
 		}
 	}
 
-	if result.RemoteFormulaInfoUrl == "" {
-		err := self.unPackFilesFromOci(result)
-		if err != nil {
-			slog.Error("unPackFilesFromOci err", "formula_name", result.Name, "version", result.Version, "err", err)
-			return nil, err
-		}
+	err := self.unPackFilesFromOci(result)
+	if err != nil {
+		slog.Error("unPackFilesFromOci err", "formula_name", result.Name, "version", result.Version, "err", err)
+		return nil, err
 	}
 
 	//load all manifest
@@ -282,19 +277,17 @@ func (self *Depot) GetFormula(name string, version string, user *entity.Registry
 		}
 	}
 
-	if result.RemoteFormulaInfoUrl == "" {
-		err := self.unPackSourceCodeFromOCI(result)
-		if err != nil {
-			slog.Error("unPackSourceCodeFromOCI err", "formula_name", result.Name, "version", result.Version, "err", err)
-			return nil, err
-		}
-		go func() {
-			err = self.unPackIconFromOCI(result)
-			if err != nil {
-				slog.Error("unPackIconFromOCI faile", "formula_name", result.Name, "version", result.Version, "err", err)
-			}
-		}()
+	err = self.unPackSourceCodeFromOCI(result)
+	if err != nil {
+		slog.Error("unPackSourceCodeFromOCI err", "formula_name", result.Name, "version", result.Version, "err", err)
+		return nil, err
 	}
+	go func() {
+		err = self.unPackIconFromOCI(result)
+		if err != nil {
+			slog.Error("unPackIconFromOCI faile", "formula_name", result.Name, "version", result.Version, "err", err)
+		}
+	}()
 
 	return result, nil
 }

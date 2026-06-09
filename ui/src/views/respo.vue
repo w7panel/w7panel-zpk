@@ -62,7 +62,7 @@
               <a-table-column data-index="audit_status" title="审核状态">
                 <template #cell="{ record }">
                   <span v-if="getAuditStatus(record) === 0" class="c-99">-</span>
-                  <span v-else-if="getAuditStatus(record) === 1" class="c-99">待审核</span>
+                  <span v-else-if="getAuditStatus(record) === 2" class="c-99">待审核</span>
                   <a-tooltip v-else-if="getAuditStatus(record) === 3 && record.audit_remark"
                     :content="record.audit_remark" position="top">
                     <span class="c-red respo-audit-fail">不通过 <icon-exclamation-circle-fill class="respo-audit-fail-icon" /></span>

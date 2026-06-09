@@ -1583,14 +1583,13 @@ export default {
             this.cdrole = nextRoleState;
         },
         initPanelRoles() {
-            let roles = window?.$wujie?.getUsers?.();
-            if (roles && typeof roles.then == 'function') {
-                roles.then(data => this.setPanelRoles(data)).catch(() => {
-                    this.setPanelRoles(this.panelRoles);
-                });
-                return;
-            }
-            this.setPanelRoles(roles || this.panelRoles);
+            window.$wujie?.bus.$emit("getRole", (roles) => {
+                const result = {}
+                for (let role of roles) {
+                    result[role.name] = role.title;
+                }
+                this.setPanelRoles(result);
+            })
         },
         togglePanelRole(checked, role) {
             this.cdrole = {

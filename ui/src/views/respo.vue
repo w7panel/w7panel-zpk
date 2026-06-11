@@ -265,7 +265,7 @@ export default {
       });
     },
     getArtifactInfoUrl(record) {
-      return 'https://zpk.w7.cc/zpk/respo/info/' + record.identifie;
+      return this.webUrl + '/respo/info/' + record.identifie;
     },
     copyArtifactInfoUrl(record) {
       this.onekeyCopy(this.getArtifactInfoUrl(record), () => {

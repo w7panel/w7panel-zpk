@@ -18,6 +18,7 @@ type GoodsService struct {
 
 type SetGoodsSettingReq struct {
 	GoodsId         int    `json:"goods_id"`
+	Appid           string `json:"app_id"`
 	PayNotifyUrl    string `json:"pay_notify_url"`
 	RefundNotifyUrl string `json:"refund_notify_url"`
 }

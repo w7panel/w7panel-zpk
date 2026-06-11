@@ -718,7 +718,7 @@ export default {
                 let goodsid = res?.data?.data?.goods_id;
                 if (!goodsid) { return }
                 this.goods_id = goodsid;
-                myAxios.post('/respo/goods/info', { identifie: this.identifie }).then(res => {
+                myAxios.post('/respo/goods/audit-status', { identifie: this.identifie }).then(res => {
                     let audit_status = res?.data?.data?.audit_status;
                     this.audit_status = audit_status;
                 })

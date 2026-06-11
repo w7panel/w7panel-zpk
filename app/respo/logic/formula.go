@@ -4,12 +4,10 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/w7panel/w7panel-zpk/common/accessor"
 	"github.com/w7panel/w7panel-zpk/common/dao"
 	"github.com/w7panel/w7panel-zpk/common/entity"
-	"github.com/w7panel/w7panel-zpk/common/function"
 	logic2 "github.com/w7panel/w7panel-zpk/common/logic"
 )
 
@@ -36,12 +34,6 @@ const (
 	FORMULA_PRODUCT_LOCAL_APP   = int32(2)
 )
 const FORMULA_FREE_UPGRADE = 0
-
-func GetFormulaFounderToken(uid int32) string {
-	now := time.Now()
-	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
-	return function.GetMd5(today.String() + "-" + strconv.Itoa(int(uid)))
-}
 
 func GetFormulaByName(formulaName string) *entity.Formula {
 	formulaName = strings.ReplaceAll(formulaName, "_", "-")

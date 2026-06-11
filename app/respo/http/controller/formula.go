@@ -75,7 +75,7 @@ func (c Formula) Info(ctx *gin.Context) {
 		IsUpgrade    int32  `form:"is_upgrade" json:"is_upgrade"`
 		CheckUpgrade int32  `form:"check_upgrade" json:"check_upgrade"`
 		CurVersion   string `form:"cur_version" json:"cur_version"`
-		UidToken     string `form:"utoken" json:"utoken"`
+		Token        string `form:"token" json:"token"`
 		OrderSn      string `form:"order_sn" json:"order_sn"`
 		ConsoleUid   int32  `form:"console_uid" json:"console_uid"`
 	}
@@ -95,23 +95,25 @@ func (c Formula) Info(ctx *gin.Context) {
 	if consoleUid == 0 && ctx.GetString("appid") != "" {
 		consoleUid = params.ConsoleUid
 	}
-	if params.UidToken != "" {
-		if params.UidToken != (logic.GetFormulaFounderToken(formula.UserId)) {
-			c.JsonResponseWithServerError(ctx, errors.New("非法请求"))
+	canUpgradeVersion := ""
+	formulaExpire := false
+	if params.Token != "" {
+		if err := w7.ZpkMarketSdk.CheckToken(params.Token, formula.Name); err != nil {
+			c.JsonResponseWithServerError(ctx, err)
 			return
 		}
-	}
-
-	ok := logic.Order{}.CheckFormulaCanInstallOrUpgrade(*formula, consoleUid, params.OrderSn, params.IsUpgrade > 0)
-	if !ok {
-		c.JsonResponseWithError(ctx, errors.New("请先购买后再安装"), 500)
-		return
-	}
-	canUpgradeVersion, formulaExpire, err := logic.Order{}.GetFormulaCanUpgradeVersion(*formula, consoleUid, params.OrderSn)
-	slog.Info("formula can upgrade version", "formula", formula.Name, "consoleUid", consoleUid, "version", canUpgradeVersion, "err", err)
-	if err != nil {
-		c.JsonResponseWithError(ctx, err, 500)
-		return
+	} else {
+		ok := logic.Order{}.CheckFormulaCanInstallOrUpgrade(*formula, consoleUid, params.OrderSn, params.IsUpgrade > 0)
+		if !ok {
+			c.JsonResponseWithError(ctx, errors.New("请先购买后再安装"), 500)
+			return
+		}
+		canUpgradeVersion, formulaExpire, err = logic.Order{}.GetFormulaCanUpgradeVersion(*formula, consoleUid, params.OrderSn)
+		slog.Info("formula can upgrade version", "formula", formula.Name, "consoleUid", consoleUid, "version", canUpgradeVersion, "err", err)
+		if err != nil {
+			c.JsonResponseWithError(ctx, err, 500)
+			return
+		}
 	}
 
 	var version *entity.Version
@@ -430,7 +432,6 @@ func (c Formula) List(ctx *gin.Context) {
 		RemoteFormulaInfoURL string                 `json:"remote_formula_info_url"`
 		AuditStatus          int32                  `json:"audit_status"`
 		AuditRemark          string                 `json:"audit_remark"`
-		Utoken               string                 `json:"utoken"`
 		Annotation           map[string]interface{} `yaml:"annotation" json:"annotation"`
 		InstallUsersAvatar   []string               `json:"install_users_avatar"`
 		GoodsId              int32                  `json:"goods_id"`
@@ -446,9 +447,7 @@ func (c Formula) List(ctx *gin.Context) {
 
 	var result []ResultNode
 	query := dao.Q.Formula.Preload(dao.Formula.Tag, dao.Formula.Version)
-	if !params.Owner {
-		query = query.Where(dao.Q.Formula.AuditStatus.Eq(logic.FORMULA_AUDIT_SUCCESS))
-	} else {
+	if params.Owner {
 		query = query.Where(
 			field.Or(
 				dao.Q.Formula.RemoteFormulaInfoURL.Eq(""),
@@ -546,9 +545,6 @@ func (c Formula) List(ctx *gin.Context) {
 					RemoteFormulaInfoURL: "",
 					Annotation:           formula.Manifest.Application.Annotation,
 					GoodsId:              item.GoodsID,
-				}
-				if !isAdminUser {
-					resultItem.Utoken = logic.GetFormulaFounderToken(item.UserID)
 				}
 				result = append(result, resultItem)
 			}

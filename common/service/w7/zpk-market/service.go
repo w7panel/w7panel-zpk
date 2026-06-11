@@ -22,6 +22,13 @@ type apiResponse[T any] struct {
 	Err  string `json:"error"`
 }
 
+func (s ZpkMarketService) CheckToken(token, formulaIdentify string) error {
+	return postSigned[any](s, "/zpk-market/formula/check-token", map[string]string{
+		"token":            token,
+		"formula_identify": formulaIdentify,
+	}, nil)
+}
+
 func (s ZpkMarketService) UseOrder(orderSn, formulaVersion string, isUpgrade bool) error {
 	return postSigned[any](s, "/zpk-market/order/use-order", map[string]string{
 		"order_sn":        orderSn,

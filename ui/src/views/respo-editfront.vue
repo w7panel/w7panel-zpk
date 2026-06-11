@@ -12,6 +12,9 @@
                 </a-breadcrumb-item>
                 <a-breadcrumb-item><span class="c-33 fw-400">编辑前端托管</span></a-breadcrumb-item>
             </a-breadcrumb>
+            <div class="zpk-page-header-actions">
+                <a-button type="outline" @click="openYamlPreview">预览 YAML</a-button>
+            </div>
         </div>
         <a-spin :loading="deleteLoading" class="edit-spin">
             <div v-if="manifest">
@@ -37,26 +40,13 @@
             </div>
         </a-spin>
     </div>
-
-    <a-modal v-model:visible="impt.show" title="导入制品库" :width="560" :footer="false"
-        modal-class="zpk-version-dialog">
-        <div class="zpk-modal-content import-zpk-content">
-            <a-auto-complete v-model="impt.title" ref="imptzpk" :data="impt.options" placeholder="请选择制品库"
-                style="width:400px;" size="large" allow-clear :filter-option="false" @search="addQuerySearch"
-                @change="handleImportTitleChange" @select="addSelect" :spellcheck="false" />
-        </div>
-        <div class="dialog-footer">
-            <a-button @click="impt.show = false">取消</a-button>
-            <a-button type="primary" @click="imptSubmit()" size="large">确定</a-button>
-        </div>
-    </a-modal>
 </template>
 
 <script>
 import myAxios from '@/utils';
 import filesManifestfront from '@/components/files-manifestfront.vue';
 import jsyaml from "js-yaml";
-import { confirm, messageError, messageSuccess, messageWarning } from '@/utils/ui-feedback';
+import { confirm, messageError, messageSuccess } from '@/utils/ui-feedback';
 import { IconArrowLeft } from '@arco-design/web-vue/es/icon';
 const defaultManifest = `application:
     name: ''
@@ -96,13 +86,6 @@ export default {
             depends: [],
             dependsIndex: -1,
             deleteLoading: false,
-
-            impt: {
-                show: false,
-                title: '',
-                data: null,
-                options: [],
-            },
 
             app_ports: []
 
@@ -211,40 +194,14 @@ export default {
                 window.parent.postMessage({ type: "getImgval" }, "*");
             }
         },
-        imptSubmit() {
-            if (!this.impt.data) { messageWarning('请选择制品库'); return; }
-            this.jsonp('https://console.w7.cc/zpk?path=/respo/v2/info/' + this.impt.data.identifie + '/' + this.version_id, 'getimportmanifest', data => {
-                let manifest = data?.data?.manifest || defaultManifest;
-                let json = jsyaml.load(manifest);
-                let ref = this.$refs.form;
-                if (this.dependsIndex > -1) { ref = this.$refs['depends' + this.dependsIndex][0]; }
-                ref?.replaceZpk(json);
-                this.impt.show = false;
-            })
+        getActiveManifestRef() {
+            if (this.dependsIndex > -1) {
+                return this.$refs['depends' + this.dependsIndex]?.[0];
+            }
+            return this.$refs.form;
         },
-
-        addQuerySearch(query = '') {
-            this.jsonp('https://console.w7.cc/zpk?status=2&page=1&limit=999&keyword=' + encodeURIComponent(query) + '&path=/respo/list', 'getimport', (data) => {
-                let list = data?.data?.list || [];
-                list = list.splice(0, 20);
-                this.impt.options = list.map(item => ({
-                    label: item.name,
-                    value: item.name,
-                    raw: item,
-                }));
-            })
-        },
-
-        handleImportTitleChange(value) {
-            if (this.impt.data?.name == value) { return; }
-            let option = this.impt.options.find(item => item.value == value);
-            this.impt.data = option?.raw || null;
-        },
-
-        addSelect(value) {
-            let option = this.impt.options.find(item => item.value == value);
-            this.impt.data = option?.raw || null;
-            this.$refs.imptzpk?.blur?.();
+        openYamlPreview() {
+            this.getActiveManifestRef()?.openYamlPreview?.();
         },
         addfileInside(json, yaml, data) {
             myAxios.post('/respo/file', {

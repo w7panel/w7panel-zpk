@@ -17,8 +17,11 @@
                     </a-breadcrumb-item>
                     <a-breadcrumb-item><span class="c-33 fw-400">{{ title }}</span></a-breadcrumb-item>
                 </a-breadcrumb>
+                <div class="zpk-page-header-actions">
+                    <a-button type="outline" @click="openYamlPreview">预览 YAML</a-button>
+                </div>
             </div>
-            <files-manifest :data="manifest" :option="{ pureManifest: true }" @complete="complete"></files-manifest>
+            <files-manifest ref="form" :data="manifest" :option="{ pureManifest: true }" @complete="complete"></files-manifest>
         </div>
     </div>
 </template>
@@ -96,6 +99,9 @@ export default {
                     }, 500);
                 })
             });
+        },
+        openYamlPreview() {
+            this.$refs.form?.openYamlPreview?.();
         },
         getInfo(id, callback, n) {
             n = n || 0;

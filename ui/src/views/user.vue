@@ -33,7 +33,13 @@
                                 <template #cell="{ record }">
                                     <template v-if="record.type !== 1">
                                         <a-button type="text" @click="editProp = ''; edit(record)">修改</a-button>
-                                        <a-button type="text" status="danger" @click="del(record)">删除</a-button>
+                                        <a-popconfirm content="确认要删除吗" type="warning" ok-text="确定" cancel-text="取消"
+                                            content-class="zpk-delete-popconfirm"
+                                            :ok-button-props="{ status: 'danger' }"
+                                            :cancel-button-props="{ type: 'secondary' }"
+                                            @ok="del(record)">
+                                            <a-button type="text" status="danger">删除</a-button>
+                                        </a-popconfirm>
                                     </template>
                                 </template>
                             </a-table-column>
@@ -86,7 +92,7 @@
 
 <script>
 import myAxios from "@/utils";
-import { confirm, messageSuccess } from "@/utils/ui-feedback";
+import { messageSuccess } from "@/utils/ui-feedback";
 import { IconEdit, IconLock, IconPlus } from '@arco-design/web-vue/es/icon';
 
 export default {
@@ -202,18 +208,10 @@ export default {
             this.visible = true
         },
         del(row) {
-            confirm({
-                title: "提示",
-                content: '请确认删除',
-                confirmButtonText: "确定",
-                cancelButtonText: "取消",
-                onOk: () => {
-                    return myAxios.post("/v2/api/user/del", { id: row.id }).then(res => {
-                        if (!res) { return }
-                        messageSuccess('删除成功')
-                        this.getData(1);
-                    });
-                }
+            return myAxios.post("/v2/api/user/del", { id: row.id }).then(res => {
+                if (!res) { return }
+                messageSuccess('删除成功')
+                this.getData(1);
             });
         },
     }

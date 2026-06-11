@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"math/rand"
 	"net/http"
 	"net/url"
@@ -33,6 +34,7 @@ type Base struct {
 }
 
 func (s Base) ConvertRequestSignByJson(params map[string]string, targetServerUrl string) ([]byte, error) {
+	slog.Info("ConvertRequestSignByJson", "params", params, "targetServerUrl", targetServerUrl)
 	url, err := url.Parse(targetServerUrl)
 	if err != nil {
 		return nil, err
@@ -85,6 +87,8 @@ func (s Base) ConvertRequestSignByJson(params map[string]string, targetServerUrl
 }
 
 func (s Base) ConvertRequestSign(params map[string]string, targetServerUrl string) ([]byte, error) {
+	slog.Info("ConvertRequestSign", "params", params, "targetServerUrl", targetServerUrl)
+
 	url, err := url.Parse(targetServerUrl)
 	if err != nil {
 		return nil, err

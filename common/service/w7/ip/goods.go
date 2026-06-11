@@ -25,8 +25,8 @@ type SetGoodsSettingReq struct {
 
 func (s GoodsService) SetOrderSetting(setGoodsSettingReq SetGoodsSettingReq) error {
 	convertSign, err := s.ConvertRequestSign(map[string]string{
-		"notify_appid":      s.Appid,
 		"goods_id":          strconv.Itoa(setGoodsSettingReq.GoodsId),
+		"app_id":            setGoodsSettingReq.Appid,
 		"pay_notify_url":    setGoodsSettingReq.PayNotifyUrl,
 		"refund_notify_url": setGoodsSettingReq.RefundNotifyUrl,
 	}, s.BaseUrl)

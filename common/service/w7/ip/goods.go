@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
@@ -31,6 +32,8 @@ func (s GoodsService) SetOrderSetting(setGoodsSettingReq SetGoodsSettingReq) err
 	if err != nil {
 		return err
 	}
+
+	slog.Info("SetOrderSetting sign", "convertSign", convertSign, "setGoodsSettingReq", setGoodsSettingReq)
 
 	client := &http.Client{
 		Timeout: 30 * time.Second,

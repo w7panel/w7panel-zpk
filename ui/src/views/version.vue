@@ -40,11 +40,11 @@
                                         <span class="c-66 version-detail-label">发布状态</span>
                                         <span class="version-detail-value">已发布</span>
 
-                                        <a-tooltip v-if="goods_id" content="应用已发布至微擎云市场" position="top">
+                                        <a-tooltip v-if="audit_status > 1" content="应用已发布至制品市场" position="top">
                                             <a class="ml-10 cursor c-blue" target="_blank"
-                                                :href="'https://dev.w7.cc/publishgoods/' + goods_id">
+                                                :href="'https://zm.idc.w7.com/#/site-detail/' + goods_id">
                                                 <IconCloud />
-                                                <span class="ml-4">微擎云市场</span>
+                                                <span class="ml-4">{{ {2: '待审核', 3: '审核失败', 4: '审核通过'} }}</span>
                                             </a>
                                         </a-tooltip>
                                     </div>
@@ -647,8 +647,7 @@ export default {
                 if (!goodsid) { return }
                 this.goods_id = goodsid;
                 myAxios.post('/respo/goods/audit-status', { identifie: this.identifie }).then(res => {
-                    let audit_status = res?.data?.data?.audit_status;
-                    this.audit_status = audit_status;
+                    this.audit_status = res?.data?.data?.audit_status;
                 })
             })
         },

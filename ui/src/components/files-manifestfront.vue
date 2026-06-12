@@ -775,7 +775,7 @@ export default {
 
                 front_type: ['thirdparty_cd'],
                 menu_type: 'console',
-                type: 'docker',
+                type: 'front',
                 name: "",
                 author: "",
                 description: "",
@@ -1823,7 +1823,7 @@ export default {
                 } else if (j.application.identifie && j.application.author) {
                     j.application.identifie = j.application.author + '-' + j.application.identifie;
                 }
-                this.form.type = j.application.type || 'docker';
+                this.form.type = j.application.type || 'front';
 
                 this.form.name = j?.application?.name;
                 if (/^[^-]+-.+$/.test(j.application.identifie)) {

@@ -135,7 +135,7 @@
                         class="version-paid-form"
                         :label-col-props="{ flex: '0 0 72px' }" :wrapper-col-props="{ flex: '1' }">
                         <a-form-item label="">
-                            <div class="df df-c" style="flex:1;">
+                            <div class="df df-c" style="flex:1;margin-bottom: 10px;">
                                 <a-radio-group v-model="instFee.product_type">
                                     <a-radio value="1">按授权付费</a-radio>
                                     <a-radio value="2">按安装付费</a-radio>
@@ -147,34 +147,40 @@
                         </a-form-item>
 
                         <a-form-item label="售价" field="service_fee">
-                            <a-input v-model="instFee.service_fee" type="number" placeholder="请输入服务费">
+                            <a-input style="width: 200px;" v-model="instFee.service_fee" type="number" placeholder="请输入服务费">
                                 <template #append>元</template>
                             </a-input>
                         </a-form-item>
 
                         <a-form-item v-if="instFee.product_type == '1'" label="升级服务">
                             <div class="version-setting-block">
-                                <table class="table mt-10">
-                                    <thead>
-                                        <tr>
-                                            <td>版本号</td>
-                                            <td>价格</td>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <tr v-for="(item, index) in instFee.version_prices" :key="index">
-                                            <td>{{ item.version === 9999 ? '其他版本' : item.version ? (item.version +
-                                                '.*.*')
-                                                : '' }}</td>
-                                            <td>￥{{ item.price }}</td>
-                                        </tr>
-                                        <tr v-if="!instFee.version_prices.length">
-                                            <td colspan="3" class="c-99 txt-c">暂无数据</td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                                <a-button style="width:100%;margin-top:8px;" type="primary"
-                                    @click="openVersionPrices(instFee.version_prices)">设置升级服务</a-button>
+                                <manifest-config-table :rows="instFee.version_prices" add-text="添加升级服务"
+                                    @add="addVersionPrice">
+                                    <template #columns>
+                                        <manifest-config-table-column data-index="version" title="版本">
+                                            <template #cell="{ record }">
+                                                <a-select v-model="record.version" placeholder="请选择">
+                                                    <a-option v-for="vl in instFee.can_upgrade_versions" :key="vl"
+                                                        :value="vl"
+                                                        :label="vl === 9999 ? '其他版本' : (vl + '.*.*')"></a-option>
+                                                </a-select>
+                                            </template>
+                                        </manifest-config-table-column>
+                                        <manifest-config-table-column data-index="price" title="价格" width="260px">
+                                            <template #cell="{ record }">
+                                                <a-input v-model="record.price" type="number" placeholder="请输入">
+                                                    <template #append>元</template>
+                                                </a-input>
+                                            </template>
+                                        </manifest-config-table-column>
+                                        <manifest-config-table-column title="操作" width="100px">
+                                            <template #cell="{ index }">
+                                                <span class="c-blue cursor"
+                                                    @click="instFee.version_prices.splice(index, 1)">删除</span>
+                                            </template>
+                                        </manifest-config-table-column>
+                                    </template>
+                                </manifest-config-table>
                             </div>
                         </a-form-item>
                         <a-form-item v-if="instFee.product_type == '2'" label="付费升级">
@@ -191,27 +197,48 @@
                                     <span class="c-99"
                                         style="margin-left:4px; vertical-align:middle;">到期后无法维护更新,需要再次购买服务周期套餐才可以维护更新</span>
                                 </div>
-                                <table class="table mt-10">
-                                    <thead>
-                                        <tr>
-                                            <td>价格</td>
-                                            <td>时间</td>
-                                            <td>生效</td>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <tr v-for="(item, index) in instFee.service_packages" :key="index">
-                                            <td>￥{{ item.price }}</td>
-                                            <td>{{ item.month / 12 }}年</td>
-                                            <td>{{ item.enabled == 2 ? '是' : '否' }}</td>
-                                        </tr>
-                                        <tr v-if="!instFee.service_packages.length">
-                                            <td colspan="3" class="c-99 txt-c">暂无数据</td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                                <a-button style="width:100%;margin-top:8px;" type="primary"
-                                    @click="openServicePackages(instFee.service_packages)">设置服务周期</a-button>
+                                <manifest-config-table class="mt-10" :rows="instFee.service_packages"
+                                    add-text="添加服务周期" @add="addServicePackage">
+                                    <template #columns>
+                                        <manifest-config-table-column data-index="price" title="价格">
+                                            <template #cell="{ record }">
+                                                <a-input v-model="record.price" type="number" placeholder="请输入">
+                                                    <template #append>元</template>
+                                                </a-input>
+                                            </template>
+                                        </manifest-config-table-column>
+                                        <manifest-config-table-column data-index="month" title="时长" width="200px">
+                                            <template #cell="{ record }">
+                                                <a-select v-model="record.month" placeholder="请选择">
+                                                    <a-option label="1年" :value="12"></a-option>
+                                                    <a-option label="2年" :value="24"></a-option>
+                                                    <a-option label="3年" :value="36"></a-option>
+                                                    <a-option label="4年" :value="48"></a-option>
+                                                    <a-option label="5年" :value="60"></a-option>
+                                                </a-select>
+                                            </template>
+                                        </manifest-config-table-column>
+                                        <manifest-config-table-column title="赠送" width="90px">
+                                            <template #cell="{ record, index }">
+                                                <a-tooltip content="勾选后选择当前套餐赠送，自动取消别套餐。">
+                                                    <a-checkbox v-model="record.is_gift"
+                                                        @change="() => setGiftServicePackage(index)"></a-checkbox>
+                                                </a-tooltip>
+                                            </template>
+                                        </manifest-config-table-column>
+                                        <manifest-config-table-column title="生效" width="90px">
+                                            <template #cell="{ record }">
+                                                <a-checkbox v-model="record.enabled"></a-checkbox>
+                                            </template>
+                                        </manifest-config-table-column>
+                                        <manifest-config-table-column title="操作" width="100px">
+                                            <template #cell="{ index }">
+                                                <span class="c-blue cursor"
+                                                    @click="instFee.service_packages.splice(index, 1)">删除</span>
+                                            </template>
+                                        </manifest-config-table-column>
+                                    </template>
+                                </manifest-config-table>
                             </div>
                         </a-form-item>
 
@@ -260,76 +287,6 @@
         <div class="dialog-footer version-create-footer">
             <a-button @click="form.show = false;">取消</a-button>
             <a-button type="primary" @click="addVersion">确定</a-button>
-        </div>
-    </a-modal>
-
-
-    <a-modal v-model:visible="versionPrices.show" :width="840" title="设置升级服务" :footer="false">
-        <manifest-config-table :rows="versionPrices.list" add-text="添加"
-            @add="versionPrices.list.push({ version: '', price: '' })">
-            <template #columns>
-                <manifest-config-table-column data-index="version" title="版本">
-                    <template #cell="{ record }">
-                        <a-select v-model="record.version" placeholder="请选择">
-                            <a-option v-for="vl in instFee.can_upgrade_versions" :key="vl" :value="vl"
-                                :label="vl === 9999 ? '其他版本' : (vl + '.*.*')"></a-option>
-                        </a-select>
-                    </template>
-                </manifest-config-table-column>
-                <manifest-config-table-column data-index="price" title="价格" width="300px">
-                    <template #cell="{ record }">
-                        <a-input v-model="record.price" type="number" placeholder="请输入">
-                            <template #append>元</template>
-                        </a-input>
-                    </template>
-                </manifest-config-table-column>
-                <manifest-config-table-column title="操作">
-                    <template #cell="{ index }">
-                        <span class="c-blue cursor" @click="versionPrices.list.splice(index, 1)">删除</span>
-                    </template>
-                </manifest-config-table-column>
-            </template>
-        </manifest-config-table>
-        <div class="dialog-footer" style="justify-content: center;margin-top: 20px;">
-            <a-button @click="versionPrices.show = false;">取消</a-button>
-            <a-button type="primary" @click="submitVersionPrices">确定</a-button>
-        </div>
-    </a-modal>
-
-
-    <a-modal v-model:visible="service_packages.show" :width="840" title="设置服务周期" :footer="false">
-
-        <div class="df service_packages">
-            <a-form v-for="(item, index) in service_packages.list" :model="item" label-align="left"
-                :label-col-props="{ span: 6, flex: '0 0 60px' }" :wrapper-col-props="{ span: 18, flex: '1' }"
-                class="fc" :key="index">
-                <a-form-item label="" style="margin-bottom:10px;"><span class="fs-16">套餐{{ index + 1
-                        }}</span></a-form-item>
-                <a-form-item label="价格" style="margin-bottom:10px;">
-                    <a-input v-model="item.price" type="number" placeholder="请输入" />
-                </a-form-item>
-                <a-form-item label="时长" style="margin-bottom:10px;">
-
-                    <a-select v-model="item.month" placeholder="请选择">
-                        <a-option label="1年" :value="12"></a-option>
-                        <a-option label="2年" :value="24"></a-option>
-                        <a-option label="3年" :value="36"></a-option>
-                        <a-option label="4年" :value="48"></a-option>
-                        <a-option label="5年" :value="60"></a-option>
-                    </a-select>
-                </a-form-item>
-                <a-form-item label="" style="margin-bottom:0;">
-                    <a-tooltip content="勾选后选择当前套餐赠送，自动取消别套餐。">
-                        <a-checkbox v-model="item.is_gift"
-                            @change="() => service_packages.list.map((i, id) => { (id != index) ? (i.is_gift = false) : null })">赠送</a-checkbox>
-                    </a-tooltip>
-                    <a-checkbox v-model="item.enabled">生效</a-checkbox>
-                </a-form-item>
-            </a-form>
-        </div>
-        <div class="dialog-footer" style="justify-content: center;margin-top: 20px;">
-            <a-button @click="service_packages.show = false;">取消</a-button>
-            <a-button type="primary" @click="submitServicePackages">确定</a-button>
         </div>
     </a-modal>
     <a-modal v-model:visible="dialogVisible" :footer="false">
@@ -415,24 +372,6 @@ export default {
                 version_prices: [],
                 can_upgrade_versions: [],
             },
-            versionPrices: {
-                show: false,
-                list: [],
-            },
-            service_packages: {
-                show: false,
-                list: [
-                    { price: '', month: '', is_gift: false, enabled: false },
-                    { price: '', month: '', is_gift: false, enabled: false },
-                    { price: '', month: '', is_gift: false, enabled: false },
-                ],
-            },
-
-
-
-
-
-
 
             publishGoods: {
                 show: false,
@@ -576,21 +515,23 @@ export default {
         },
 
 
-        openVersionPrices(data) {
-            let list = [];
-            if (data) {
-                data = JSON.parse(JSON.stringify(data));
-                list = data || [];
-            }
-            this.versionPrices = {
-                show: true,
-                list: list,
-            };
+        addVersionPrice() {
+            this.instFee.version_prices.push({ version: '', price: '' });
         },
-        submitVersionPrices() {
+        addServicePackage() {
+            this.instFee.service_packages.push({ price: '', month: '', is_gift: false, enabled: false });
+        },
+        setGiftServicePackage(index) {
+            this.instFee.service_packages.map((item, id) => {
+                if (id != index) {
+                    item.is_gift = false;
+                }
+            });
+        },
+        normalizeVersionPrices() {
             let o = {};
             let arr = [];
-            this.versionPrices.list.map(i => {
+            this.instFee.version_prices.map(i => {
                 if (!i.version || !i.price) { return }
                 o[i.version] = {
                     version: Number(i.version),
@@ -601,46 +542,28 @@ export default {
             for (let i in o) {
                 arr.push(o[i]);
             }
-            this.instFee.version_prices = arr;
-            this.versionPrices.show = false;
+            return arr;
         },
-
-
-        openServicePackages(data) {
-            let list = [
-                { price: '', month: '', enabled: false },
-                { price: '', month: '', enabled: false },
-                { price: '', month: '', enabled: false },
-            ]
-            if (data) {
-                data = JSON.parse(JSON.stringify(data));
-                data?.map((item, index) => {
-                    list[index] = {
-                        ...item,
-                        enabled: Boolean(item.enabled == 2),
-                    }
-                });
-            }
-            this.service_packages = {
-                show: true,
-                list: list,
-            }
+        normalizeServicePackageRows(list) {
+            return (list || []).map(item => ({
+                ...item,
+                enabled: item.enabled === true || item.enabled == 2,
+                is_gift: item.is_gift === true || item.is_gift == 1,
+            }));
         },
-        submitServicePackages() {
-            let list = this.service_packages?.list?.filter(i => i.price !== '' && i.month)?.map(i => ({
+        normalizeServicePackages() {
+            return this.instFee.service_packages?.filter(i => i.price !== '' && i.month)?.map(i => ({
                 ...i,
                 price: Number(i.price),
                 month: Number(i.month),
                 enabled: i.enabled ? 2 : 1,
-            }));
-            this.instFee.service_packages = list;
-            this.service_packages.show = false;
+            })) || [];
         },
 
 
 
         getInstFee() {
-            let version_prices = this.info?.version_prices || [];
+            let version_prices = (this.info?.version_prices || []).map(item => ({ ...item }));
             version_prices.map(i => {
                 i.versionName = this.versionsKV[i.version];
             })
@@ -653,7 +576,7 @@ export default {
                 product_type: String(product_type),
                 old_fee: this.info?.install_service_fee,
                 service_fee: this.info?.install_service_fee || '',
-                service_packages: this.info?.service_packages || [],
+                service_packages: this.normalizeServicePackageRows(this.info?.service_packages || []),
                 is_free_upgrade: this.info?.is_free_upgrade || false,
                 version_prices: version_prices,
             }
@@ -661,6 +584,8 @@ export default {
         submitInstFee() {
             this.$refs.instFee.validate((errors) => {
                 if (errors) { return }
+                let service_packages = this.normalizeServicePackages();
+                let version_prices = this.normalizeVersionPrices();
 
                 myAxios.post('/respo/goods/set-service-fee', {
                     identifie: this.identifie,
@@ -669,8 +594,8 @@ export default {
                     is_free_upgrade: this.instFee.is_free_upgrade ? 1 : 0,
 
                     ...(this.instFee.product_type == '1' ? {
-                        service_packages: this.instFee.service_packages,
-                        version_prices: this.instFee.version_prices,
+                        service_packages,
+                        version_prices,
                     } : {
                         version_prices: [],
                     })
@@ -1052,14 +977,6 @@ export default {
 .table thead tr:first-child td {
     background: #f3f3f3;
     border-top: 0;
-}
-
-.service_packages .fc {
-    padding: 0 16px;
-}
-
-.service_packages .fc+.fc {
-    border-left: 1px solid #f1f1f1;
 }
 
 .publish-status {

@@ -185,7 +185,6 @@ export default {
         selectId: [],
         last_page: 1,
       },
-      utoken: '',
       webUrl: '',
     }
   },
@@ -241,9 +240,6 @@ export default {
     },
     installEvent(data) {
       let url = this.webUrl + '/respo/info/' + data.identifie;
-      if (data.audit_status !== 3) {
-        url = url + '?utoken=' + data.utoken;
-      }
       window.$wujie?.bus?.$emit?.('toStoreInstall', encodeURIComponent(url))
     },
     onekeyCopy(text, callback) {

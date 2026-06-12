@@ -65,7 +65,9 @@
             </a-form-item>
 
             <a-form-item label="注解" style="margin-bottom:10px;">
-                {{ annotationKeys }}
+                <span style="word-break: break-all;">
+                    {{ annotationKeys }}
+                </span>
                 <a-tooltip content="编辑">
                     <a-button class="inline-icon-action" type="text" shape="circle" size="mini"
                         @click="openAnnotationEdit">

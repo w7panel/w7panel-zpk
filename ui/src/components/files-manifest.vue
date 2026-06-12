@@ -1387,7 +1387,7 @@ platform:
                     j.application.author = i.match(/^([^-]+)-(.+)$/)[1];
                 }
                 this.form.once = j.application?.once || false;
-                this.form.type = j.application.type || 'docker';
+                this.form.type = j.application.type === 'front' ? 'docker' : (j.application.type || 'docker');
             }
             for (let i in j.bindings) {
                 let o = j.bindings[i];

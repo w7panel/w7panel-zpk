@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
@@ -17,20 +18,24 @@ type GoodsService struct {
 
 type SetGoodsSettingReq struct {
 	GoodsId         int    `json:"goods_id"`
+	Appid           string `json:"app_id"`
 	PayNotifyUrl    string `json:"pay_notify_url"`
 	RefundNotifyUrl string `json:"refund_notify_url"`
 }
 
 func (s GoodsService) SetOrderSetting(setGoodsSettingReq SetGoodsSettingReq) error {
 	convertSign, err := s.ConvertRequestSign(map[string]string{
-		"notify_appid":      s.Appid,
+		"notify_appid":      setGoodsSettingReq.Appid,
 		"goods_id":          strconv.Itoa(setGoodsSettingReq.GoodsId),
+		"app_id":            setGoodsSettingReq.Appid,
 		"pay_notify_url":    setGoodsSettingReq.PayNotifyUrl,
 		"refund_notify_url": setGoodsSettingReq.RefundNotifyUrl,
 	}, s.BaseUrl)
 	if err != nil {
 		return err
 	}
+
+	slog.Info("SetOrderSetting sign", "convertSign", convertSign, "setGoodsSettingReq", setGoodsSettingReq)
 
 	client := &http.Client{
 		Timeout: 30 * time.Second,
@@ -44,7 +49,7 @@ func (s GoodsService) SetOrderSetting(setGoodsSettingReq SetGoodsSettingReq) err
 		req.Header.Set("User-Agent", base.DefaultUserAgent)
 	}
 	req.Header.Set("x-requested-with", "XMLHttpRequest")
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Content-Type", "application/json")
 	resp, err := client.Do(req)
 	if err != nil {
 		return err

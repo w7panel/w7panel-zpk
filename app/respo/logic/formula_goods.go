@@ -120,6 +120,7 @@ func (l FormulaGoods) PublishGoods(formula *Formula, publishGoodsReq devcenter.P
 	marketBaseUrl := facade.GetConfig().GetString("setting.depot_market.base_url")
 	err = w7.IpGoodsSdk.SetOrderSetting(ip.SetGoodsSettingReq{
 		GoodsId:         goods.Id,
+		Appid:           facade.GetConfig().GetString("setting.depot_market.appid"),
 		PayNotifyUrl:    fmt.Sprintf("%s/%s", marketBaseUrl, "zpk-market/order/pay-notify"),
 		RefundNotifyUrl: fmt.Sprintf("%s/%s", marketBaseUrl, "zpk-market/order/refund-notify"),
 	})

@@ -75,24 +75,24 @@
                                             </a-tabs>
                                         </div>
 
-                                        <div v-show="form.menu_type == 'console'" class="df ai-c mt-10">
-                                            <div style="">
+                                        <div v-show="form.menu_type == 'console'" class="roles-box">
+                                            <a-form-item label="开启管理端" style="margin:0;">
                                                 <a-checkbox class="mr-8" v-model="form.role_founder">创始人端</a-checkbox>
                                                 <a-checkbox v-model="form.role_super">超级管理端</a-checkbox>
-                                            </div>
+                                            </a-form-item>
                                         </div>
-                                        <div v-show="form.menu_type == 'thirdparty_cd'" class="df ai-c mt-10">
-                                            <div style="">
+                                        <div v-show="form.menu_type == 'thirdparty_cd'" class="roles-box">
+                                            <a-form-item label="开启管理端" style="margin:0;">
                                                 <a-checkbox v-for="role in panelRoleOptions" class="mr-8" :key="role.name"
                                                     :model-value="Boolean(cdrole[role.name])"
                                                     @change="checked => togglePanelRole(checked, role)">
                                                     {{ role.title }}
                                                 </a-checkbox>
-                                            </div>
+                                            </a-form-item>
                                         </div>
                                         <div v-for="(r, rindex) in form.role.filter(i => i.support == form.menu_type)"
                                             :key="rindex" class="role" style="margin:16px 0 30px 0;">
-                                            <div class="df ai-c jc-b">
+                                            <div class="df ai-c jc-b greybox-header">
                                                 <div class="df ai-c">
                                                     <div v-if="roleEdit.index == rindex" class="df">
                                                         <span>名称：</span>
@@ -159,7 +159,7 @@
                                                 </div>
                                             </div>
 
-                                            <div class="mt-16 greybox manifest-front-config">
+                                            <div class="greybox manifest-front-config">
                                                 <template v-if="r.load_mode === 'iframe'">
                                                     <div class="greybox-title">iframe配置</div>
                                                     <a-alert type="info" show-icon class="zpk-primary-alert mb-20" title="提示" :closable="false">
@@ -303,11 +303,11 @@
                                                 </a-form-item>
 
                                                 <div class="df ai-c manifest-front-section-title">代理配置<a-tooltip content="面板提供转发服务到接口地址，接口后端可通过HTTP变量获取传递值"><ArcoIcon name="icon-41" :size="16"/></a-tooltip></div>
-                                                <div class="mb-20 manifest-front-block">
+                                                <div class="manifest-front-block">
                                                     <a-form-item label="代理地址">
                                                         <a-input readonly :default-value="`/panel-api/v1/microapp/${identifie}/proxy`" style="width: 400px"></a-input>
                                                     </a-form-item>
-                                                    <manifest-config-table class="mb-20" title="请求头(Header)" :rows="r.proxy_request_header"
+                                                    <manifest-config-table title="请求头(Header)" :rows="r.proxy_request_header"
                                                         table-class="manifest-param-table config-variable-table"
                                                         add-text="添加请求头"
                                                         @add="addParamRow(r.proxy_request_header)">
@@ -357,7 +357,7 @@
                                                             </manifest-config-table-column>
                                                         </template>
                                                     </manifest-config-table>
-                                                    <manifest-config-table v-if="!(form.menu_type == 'thirdparty_cd' && r.name == 'normal')"
+                                                    <manifest-config-table class="mt-20" v-if="!(form.menu_type == 'thirdparty_cd' && r.name == 'normal')"
                                                         title="请求参数(Query)" :rows="r.proxy_request_query"
                                                         table-class="manifest-param-table config-variable-table"
                                                         add-text="添加请求参数"
@@ -410,9 +410,9 @@
                                                     </manifest-config-table>
                                                 </div>
                                                 <div v-if="!(form.menu_type == 'thirdparty_cd' && r.name == 'normal')"
-                                                    class="df ai-c manifest-front-section-title">前端配置<a-tooltip content="面板提供microapp机制渲染前端包，可通过window.$wujie.props.frontend_props 从JS变量获取传递值"><ArcoIcon name="icon-41" :size="16"/></a-tooltip></div>
+                                                    class="df ai-c manifest-front-section-title mt-20">前端配置<a-tooltip content="面板提供microapp机制渲染前端包，可通过window.$wujie.props.frontend_props 从JS变量获取传递值"><ArcoIcon name="icon-41" :size="16"/></a-tooltip></div>
                                                 <div
-                                                    v-if="!(form.menu_type == 'thirdparty_cd' && r.name == 'normal')" class="manifest-front-block">
+                                                    v-if="!(form.menu_type == 'thirdparty_cd' && r.name == 'normal')" class="manifest-front-block mt-20">
                                                     <manifest-config-table :rows="r.frontend_props"
                                                         table-class="manifest-param-table frontend-param-table"
                                                         add-text="添加前端配置" always-show

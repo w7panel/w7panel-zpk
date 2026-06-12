@@ -606,11 +606,28 @@ a,
     background: transparent;
 }
 
+.roles-box {
+	border: 1px solid var(--color-border-1);
+	border-radius: 4px;
+	padding: 12px 16px;
+}
+
 
 .greybox {
     padding: 16px;
     background-color: #f7f8fa;
     border-radius: 2px;
+}
+
+.greybox-header {
+	color: var(--color-text-1, #1d2129);
+	background: var(--color-neutral-2);
+    font-weight: 400;
+	font-size: 14px;
+	font-family: Inter, "-apple-system", BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "noto sans", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif;
+	padding: 20px 16px;
+    border-top-left-radius: 4px;
+    border-top-right-radius: 4px;
 }
 
 .greybox .greybox-title {

@@ -6,7 +6,6 @@ import (
 	"errors"
 	"io"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/w7panel/w7panel-zpk/common/service/w7/base"
@@ -23,22 +22,22 @@ type apiResponse[T any] struct {
 }
 
 func (s ZpkMarketService) CheckToken(token, formulaIdentify string) error {
-	return postSigned[any](s, "/zpk-market/formula/check-token", map[string]string{
+	return postSigned[any](s, "/zpk-market/formula/check-token", map[string]interface{}{
 		"token":            token,
 		"formula_identify": formulaIdentify,
 	}, nil)
 }
 
 func (s ZpkMarketService) UseOrder(orderSn, formulaVersion string, isUpgrade bool) error {
-	return postSigned[any](s, "/zpk-market/order/use-order", map[string]string{
+	return postSigned[any](s, "/zpk-market/order/use-order", map[string]interface{}{
 		"order_sn":        orderSn,
 		"formula_version": formulaVersion,
-		"is_upgrade":      strconv.FormatBool(isUpgrade),
+		"is_upgrade":      isUpgrade,
 	}, nil)
 }
 
 func (s ZpkMarketService) DiscardUsedOrder(orderSn string) error {
-	return postSigned[any](s, "/zpk-market/order/discard-used-order", map[string]string{
+	return postSigned[any](s, "/zpk-market/order/discard-used-order", map[string]interface{}{
 		"order_sn": orderSn,
 	}, nil)
 }
@@ -49,11 +48,11 @@ func (s ZpkMarketService) CheckFormulaCanInstallOrUpgrade(goodsId, consoleUid in
 	}
 
 	ret := result{}
-	err := postSigned(s, "/zpk-market/order/check-formula-can-install-or-upgrade", map[string]string{
-		"goods_id":    strconv.Itoa(int(goodsId)),
-		"console_uid": strconv.Itoa(int(consoleUid)),
+	err := postSigned(s, "/zpk-market/order/check-formula-can-install-or-upgrade", map[string]interface{}{
+		"goods_id":    goodsId,
+		"console_uid": consoleUid,
 		"order_sn":    orderSn,
-		"is_upgrade":  strconv.FormatBool(isUpgrade),
+		"is_upgrade":  isUpgrade,
 	}, &ret)
 	if err != nil {
 		return false, err
@@ -69,9 +68,9 @@ func (s ZpkMarketService) GetFormulaCanUpgradeVersion(goodsId, consoleUid int32,
 	}
 
 	ret := result{}
-	err := postSigned(s, "/zpk-market/order/get-formula-can-upgrade-version", map[string]string{
-		"goods_id":    strconv.Itoa(int(goodsId)),
-		"console_uid": strconv.Itoa(int(consoleUid)),
+	err := postSigned(s, "/zpk-market/order/get-formula-can-upgrade-version", map[string]interface{}{
+		"goods_id":    goodsId,
+		"console_uid": consoleUid,
 		"order_sn":    orderSn,
 	}, &ret)
 	if err != nil {
@@ -81,9 +80,15 @@ func (s ZpkMarketService) GetFormulaCanUpgradeVersion(goodsId, consoleUid int32,
 	return ret.FormulaVersion, ret.IsUpgrade, nil
 }
 
-func postSigned[T any](s ZpkMarketService, path string, params map[string]string, result *T) error {
+func postSigned[T any](s ZpkMarketService, path string, params map[string]interface{}, result *T) error {
 	targetUrl := s.BaseUrl + path
-	convertSign, err := s.ConvertRequestSign(params, targetUrl)
+	payload, err := json.Marshal(params)
+	if err != nil {
+		return err
+	}
+	convertSign, err := s.ConvertRequestSign(map[string]string{
+		"body": string(payload),
+	}, targetUrl)
 	if err != nil {
 		return err
 	}

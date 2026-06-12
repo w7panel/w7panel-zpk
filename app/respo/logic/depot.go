@@ -122,7 +122,7 @@ func (self *Depot) AddFormula(name string, version string, user *entity.Registry
 			Description:   "",
 			PublishStatus: -1,
 		}
-		err := dao.Q.Version.Create(versionData)
+		err := tx.Version.Create(versionData)
 		if err != nil {
 			return err
 		}
@@ -136,23 +136,24 @@ func (self *Depot) AddFormula(name string, version string, user *entity.Registry
 			}
 			versionId = versionData.ID
 			newCreate = true
-			err = dao.Q.Formula.Create(formulaData)
+			err = tx.Formula.Create(formulaData)
 			if err != nil {
 				return err
 			}
 		}
 
-		_, err = dao.Q.Version.Where(dao.Q.Version.ID.Eq(versionData.ID)).Update(dao.Version.FormulaID, formulaData.ID)
+		_, err = tx.Version.Where(tx.Version.ID.Eq(versionData.ID)).Update(tx.Version.FormulaID, formulaData.ID)
 		if err != nil {
 			return err
 		}
 
-		function.CreateDirIfNotExist(filepath.Join(self.basePath, GetFormulaRelativeDir(name, formulaData.VersionLatestID)), os.ModePerm)
 		return nil
 	})
 	if err != nil {
 		return err
 	}
+
+	function.CreateDirIfNotExist(filepath.Join(self.basePath, GetFormulaRelativeDir(name, versionId)), os.ModePerm)
 
 	if newCreate {
 		type DefaultManifest struct {
@@ -333,7 +334,9 @@ func (self *Depot) GetFormulaHelmDownloadUrl(formula *Formula) string {
 }
 
 func (self *Depot) DeleteFormula(formula *Formula) error {
-	_, err := dao.Q.Formula.Where(dao.Q.Formula.ID.Eq(formula.ID)).Delete()
+	err := dao.Q.Transaction(func(tx *dao.Query) error {
+		return deleteFormulaData(tx, formula.ID)
+	})
 	if err != nil {
 		return err
 	}

@@ -93,13 +93,6 @@ type GoodsBatchListReq struct {
 	GoodsIds []int `json:"goods_ids"`
 }
 
-type GoodsBatchListResp struct {
-	CurrentPage int             `json:"current_page"`
-	List        []GoodsListItem `json:"data"`
-	LastPage    int             `json:"last_page"`
-	Total       int             `json:"total"`
-}
-
 func (s GoodsService) GoodsBatchList(listReq GoodsBatchListReq) ([]GoodsListItem, error) {
 	reqBody, err := json.Marshal(listReq)
 	if err != nil {

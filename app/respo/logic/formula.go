@@ -48,7 +48,26 @@ func GetFormulaByName(formulaName string) *entity.Formula {
 func DeleteFormulaByName(formulaName string) {
 	formulaName = strings.ReplaceAll(formulaName, "_", "-")
 
-	_, _ = dao.Q.Formula.Where(dao.Formula.Name.Eq(formulaName)).Delete()
+	formula, _ := dao.Q.Formula.Where(dao.Formula.Name.Eq(formulaName)).First()
+	if formula == nil {
+		return
+	}
+
+	_ = dao.Q.Transaction(func(tx *dao.Query) error {
+		return deleteFormulaData(tx, formula.ID)
+	})
+}
+
+func deleteFormulaData(tx *dao.Query, formulaID int32) error {
+	if _, err := tx.TagFormula.Where(tx.TagFormula.FormulaID.Eq(formulaID)).Delete(); err != nil {
+		return err
+	}
+	if _, err := tx.Version.Where(tx.Version.FormulaID.Eq(formulaID)).Delete(); err != nil {
+		return err
+	}
+
+	_, err := tx.Formula.Where(tx.Formula.ID.Eq(formulaID)).Delete()
+	return err
 }
 
 type Formula struct {

@@ -427,6 +427,10 @@ a,
 	padding-top: 0;
 }
 
+.pt-10 {
+	padding-top: 10px;
+}
+
 .fs-0 {
 	font-size: 0;
 }

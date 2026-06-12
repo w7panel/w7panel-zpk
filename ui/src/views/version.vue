@@ -134,15 +134,18 @@
                     <a-form :model="instFee" ref="instFee" :rules="rules" label-align="left"
                         class="version-paid-form"
                         :label-col-props="{ flex: '0 0 72px' }" :wrapper-col-props="{ flex: '1' }">
-                        <a-form-item label="">
-                            <div class="df df-c" style="flex:1;margin-bottom: 10px;">
+                        <a-form-item label="付费类型">
+                            <div class="pt-10">
                                 <a-radio-group v-model="instFee.product_type">
                                     <a-radio value="1">按授权付费</a-radio>
                                     <a-radio value="2">按安装付费</a-radio>
                                 </a-radio-group>
-                                <span v-if="instFee.product_type == '1'" class="c-99">仅针对项目拥有所有权的商家，可按项目授权出售</span>
-                                <span v-if="instFee.product_type == '2'"
-                                    class="c-99">对该项目熟悉并打包成可用安装包的技术人员，可按安装付费出售</span>
+                                <div class="mt-8">
+
+                                    <span v-if="instFee.product_type == '1'" class="c-99">仅针对项目拥有所有权的商家，可按项目授权出售</span>
+                                    <span v-if="instFee.product_type == '2'"
+                                        class="c-99">对该项目熟悉并打包成可用安装包的技术人员，可按安装付费出售</span>
+                                </div>
                             </div>
                         </a-form-item>
 

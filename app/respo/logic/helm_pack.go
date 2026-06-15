@@ -1654,7 +1654,7 @@ metadata:
     group: {{ .Release.Name }}
     w7.cc/job-source: appgroup
   annotations:
-    helm.sh/hook: pre-install
+    helm.sh/hook: pre-install,pre-upgrade
     helm.sh/hook-weight: "1"
     helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
 spec:
@@ -1674,7 +1674,7 @@ spec:
           command:
             - sh
             - -c
-            - /home/rangine create:site --w7panel-domain={{ .Values.global.panel.innerUrl }} --w7panel-token={{ .Values.global.panel.panelRealToken }} --title=%s --name=%s --language=%s --version=%s --domain={{ .Values.DOMAIN_URL }} --ssl={{ .Values.ingressForceHttps }} --cmd=%s --code-download-url=%s --app_name=%s -f /home/config.yaml
+            - /home/rangine create:site --operation={{ ternary "upgrade" "install" .Release.IsUpgrade }} --w7panel-domain={{ .Values.global.panel.innerUrl }} --w7panel-token={{ .Values.global.panel.panelRealToken }} --title=%s --name=%s --language=%s --version=%s --domain={{ .Values.DOMAIN_URL }} --ssl={{ .Values.ingressForceHttps }} --cmd=%s --code-download-url=%s --app_name=%s -f /home/config.yaml
 `, application.Identifie+"-"+tradition.EnvironmentVersion+"-副本", tradition.EnvironmentName, tradition.EnvironmentLanguage, tradition.EnvironmentVersion, cmd, zipUrl, application.Identifie)
 
 	filePath := filepath.Join(rootDir, "create-site-job.yaml")

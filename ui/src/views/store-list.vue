@@ -80,6 +80,8 @@
                                     <a-button type="text"
                                         v-if="record.formula_latest_version > record.formula_version && record.is_free_upgrade > 0"
                                         @click="handleUpgrade(record)">升级</a-button>
+                                    <a-button type="text" v-if="hasCrossUpgrade(record)"
+                                        @click="handleCrossUpgrade(record)">跨应用升级</a-button>
                                 </template>
                                 <a-tooltip v-if="record.used_time" content="授权已被使用" position="top">
                                     <a-button type="text" disabled>安装</a-button>
@@ -94,6 +96,8 @@
                                     <a-button type="text"
                                         v-if="record.service_packages && record.service_packages.length > 0"
                                         @click="handleRenew(record)">续费</a-button>
+                                    <a-button type="text" v-if="hasCrossUpgrade(record)"
+                                        @click="handleCrossUpgrade(record)">跨应用升级</a-button>
                                 </template>
 
                                 <a-tooltip v-if="record.used_time" content="授权已被使用" position="top">
@@ -162,6 +166,27 @@
                 <a-button type="primary" @click="submitUpgrade">确认升级</a-button>
             </div>
         </a-modal>
+        <a-modal v-model:visible="crossUpgradeDialogVisible" title="跨应用升级" :width="520" :footer="false"
+            unmount-on-close>
+            <div v-if="crossUpgradeSite">
+                <a-form :model="crossUpgradeSite" label-align="left" :label-col-props="{ span: 5, flex: '0 0 90px' }"
+                    :wrapper-col-props="{ span: 19, flex: '1' }" class="store-modal-form">
+                    <a-form-item label="目标应用">
+                        <a-radio-group v-model="crossUpgradeTargetIdentifie" @change="handleCrossUpgradeTargetChange">
+                            <a-radio v-for="item in crossUpgradeTargets" :key="item.identifie" class="store-radio-card"
+                                :value="item.identifie">{{ item.title || item.identifie }}</a-radio>
+                        </a-radio-group>
+                    </a-form-item>
+                    <a-form-item label="补差价">
+                        <span style="color: #2d5fff;font-size:24px;font-weight:500;">¥{{ crossUpgradePrice }}</span>
+                    </a-form-item>
+                </a-form>
+            </div>
+            <div class="store-modal-footer">
+                <a-button @click="crossUpgradeDialogVisible = false">取消</a-button>
+                <a-button type="primary" @click="submitCrossUpgrade">确认升级</a-button>
+            </div>
+        </a-modal>
     </div>
 </template>
 
@@ -205,6 +230,11 @@ export default {
             developerId: null,
             availableUpgradeVersions: [],
             upgradePrice: 0,
+            crossUpgradeDialogVisible: false,
+            crossUpgradeSite: null,
+            crossUpgradeTargets: [],
+            crossUpgradeTargetIdentifie: null,
+            crossUpgradePrice: 0,
             payDialogVisible: false,
             panelToken: ''
         }
@@ -247,6 +277,31 @@ export default {
             const targetVersion = this.availableUpgradeVersions.find(item => item.id === v)
             this.upgradePrice = targetVersion?.price || 0
         },
+        hasCrossUpgrade(row) {
+            return Array.isArray(row.cross_upgrade_formulas) && row.cross_upgrade_formulas.length > 0
+        },
+        normalizeCrossUpgradeFormulas(value) {
+            if (Array.isArray(value)) return value
+            if (!value || typeof value !== 'string') return []
+            try {
+                const parsed = JSON.parse(value)
+                return Array.isArray(parsed) ? parsed : []
+            } catch {
+                return []
+            }
+        },
+        handleCrossUpgrade(row) {
+            this.crossUpgradeSite = row
+            this.crossUpgradeTargets = row.cross_upgrade_formulas || []
+            this.crossUpgradeTargetIdentifie = this.crossUpgradeTargets[0]?.identifie || null
+            this.handleCrossUpgradeTargetChange(this.crossUpgradeTargetIdentifie)
+            this.crossUpgradeDialogVisible = true
+        },
+        handleCrossUpgradeTargetChange(v) {
+            const target = this.crossUpgradeTargets.find(item => item.identifie === v)
+            const currentPrice = Number(this.crossUpgradeSite?.install_service_fee || this.crossUpgradeSite?.price || 0)
+            this.crossUpgradePrice = Math.max(0, Number(target?.price || 0) - currentPrice)
+        },
         handleRenew(row) {
             this.renewSite = row
             this.renewServicePackageId = row.service_packages?.[0]?.id || null
@@ -285,12 +340,15 @@ export default {
                 service_package_id: this.renewServicePackageId
             })
         },
-        getTicket({ identifie, order_sn, service_package_id, version_upgrade_id }) {
+        getTicket({ identifie, order_sn, service_package_id, version_upgrade_id, cross_upgrade_identifie, cross_upgrade_goods_id, cross_upgrade_goods_product_id }) {
             myAxios.post(`${this.webUrl}/respo/order/pay`, {
                 identifie,
                 order_sn,
                 service_package_id,
-                version_upgrade_id
+                version_upgrade_id,
+                cross_upgrade_identifie,
+                cross_upgrade_goods_id,
+                cross_upgrade_goods_product_id
             }).then(res => {
                 const data = res.data.data || {}
                 this.ticket = data.ticket || ''
@@ -325,6 +383,21 @@ export default {
                 identifie: this.upgradeSite.formula_identifie,
                 order_sn: this.upgradeSite.order_sn,
                 version_upgrade_id: this.upgradeTargetVersionId
+            })
+        },
+        submitCrossUpgrade() {
+            const target = this.crossUpgradeTargets.find(item => item.identifie === this.crossUpgradeTargetIdentifie)
+            if (!target) {
+                messageWarning('请选择目标应用')
+                return
+            }
+            this.crossUpgradeDialogVisible = false
+            this.getTicket({
+                identifie: this.crossUpgradeSite.formula_identifie,
+                order_sn: this.crossUpgradeSite.order_sn,
+                cross_upgrade_identifie: target.identifie,
+                cross_upgrade_goods_id: target.goods_id,
+                cross_upgrade_goods_product_id: target.goods_product_id
             })
         },
         switchTab(tab) {
@@ -407,6 +480,7 @@ export default {
             }).then(res => {
                 const list = res.data?.data?.list || []
                 list.forEach(item => {
+                    item.cross_upgrade_formulas = this.normalizeCrossUpgradeFormulas(item.cross_upgrade_formulas)
                     if (item.version_prices?.length) {
                         const version = item.formula_version.split('.')[0]
                         const maxPayVersion = item.version_prices?.sort((a, b) => b.version - a.version)?.[0]?.version || 0

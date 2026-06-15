@@ -12,29 +12,30 @@ const TableNameFormula = "ims_formula"
 
 // Formula mapped from table <ims_formula>
 type Formula struct {
-	ID                         int32                           `gorm:"column:id;primaryKey;autoIncrement:true" json:"id"`
-	UserID                     int32                           `gorm:"column:user_id" json:"user_id"`
-	RemoteUID                  int32                           `gorm:"column:remote_uid" json:"remote_uid"`
-	Name                       string                          `gorm:"column:name;not null" json:"name"`
-	Title                      string                          `gorm:"column:title;not null" json:"title"`
-	RemoteFormulaInfoURL       string                          `gorm:"column:remote_formula_info_url" json:"remote_formula_info_url"`
-	VersionLatestID            int32                           `gorm:"column:version_latest_id" json:"version_latest_id"`
-	InstallTotal               int32                           `gorm:"column:install_total" json:"install_total"`
-	InstallServiceFee          float64                         `gorm:"column:install_service_fee;default:0.00" json:"install_service_fee"`
-	IsFreeUpgrade              int32                           `gorm:"column:is_free_upgrade" json:"is_free_upgrade"`
-	Status                     int32                           `gorm:"column:status;not null;default:2" json:"status"`
-	GoodsID                    int32                           `gorm:"column:goods_id" json:"goods_id"`
-	GoodsProductID             int32                           `gorm:"column:goods_product_id" json:"goods_product_id"`
-	ProductType                int32                           `gorm:"column:product_type" json:"product_type"`
-	ServicePackages            *accessor.ServicePackagesOption `gorm:"column:service_packages;serializer:json" json:"service_packages"`
-	VersionPrices              *accessor.VersionPricesOption   `gorm:"column:version_prices;serializer:json" json:"version_prices"`
-	AuditStatus                int32                           `gorm:"column:audit_status;default:3" json:"audit_status"`
-	AuditRemark                string                          `gorm:"column:audit_remark" json:"audit_remark"`
-	PublishOfficialStoreStatus int32                           `gorm:"column:publish_official_store_status" json:"publish_official_store_status"`
-	CreatedAt                  int32                           `gorm:"column:created_at;not null" json:"created_at"`
-	UpdatedAt                  int32                           `gorm:"column:updated_at;not null" json:"updated_at"`
-	Version                    *Version                        `gorm:"foreignKey:id;references:version_latest_id" json:"version"`
-	Tag                        []Tag                           `gorm:"foreignKey:id;joinForeignKey:formula_id;joinReferences:tag_id;many2many:tag_formula;references:id" json:"tag"`
+	ID                         int32                                `gorm:"column:id;primaryKey;autoIncrement:true" json:"id"`
+	UserID                     int32                                `gorm:"column:user_id" json:"user_id"`
+	RemoteUID                  int32                                `gorm:"column:remote_uid" json:"remote_uid"`
+	Name                       string                               `gorm:"column:name;not null" json:"name"`
+	Title                      string                               `gorm:"column:title;not null" json:"title"`
+	RemoteFormulaInfoURL       string                               `gorm:"column:remote_formula_info_url" json:"remote_formula_info_url"`
+	VersionLatestID            int32                                `gorm:"column:version_latest_id" json:"version_latest_id"`
+	InstallTotal               int32                                `gorm:"column:install_total" json:"install_total"`
+	InstallServiceFee          float64                              `gorm:"column:install_service_fee;default:0.00" json:"install_service_fee"`
+	IsFreeUpgrade              int32                                `gorm:"column:is_free_upgrade" json:"is_free_upgrade"`
+	Status                     int32                                `gorm:"column:status;not null;default:2" json:"status"`
+	GoodsID                    int32                                `gorm:"column:goods_id" json:"goods_id"`
+	GoodsProductID             int32                                `gorm:"column:goods_product_id" json:"goods_product_id"`
+	ProductType                int32                                `gorm:"column:product_type" json:"product_type"`
+	ServicePackages            *accessor.ServicePackagesOption      `gorm:"column:service_packages;serializer:json" json:"service_packages"`
+	VersionPrices              *accessor.VersionPricesOption        `gorm:"column:version_prices;serializer:json" json:"version_prices"`
+	CrossUpgradeFormulas       *accessor.CrossUpgradeFormulasOption `gorm:"column:cross_upgrade_formulas;serializer:json" json:"cross_upgrade_formulas"`
+	AuditStatus                int32                                `gorm:"column:audit_status;default:3" json:"audit_status"`
+	AuditRemark                string                               `gorm:"column:audit_remark" json:"audit_remark"`
+	PublishOfficialStoreStatus int32                                `gorm:"column:publish_official_store_status" json:"publish_official_store_status"`
+	CreatedAt                  int32                                `gorm:"column:created_at;not null" json:"created_at"`
+	UpdatedAt                  int32                                `gorm:"column:updated_at;not null" json:"updated_at"`
+	Version                    *Version                             `gorm:"foreignKey:id;references:version_latest_id" json:"version"`
+	Tag                        []Tag                                `gorm:"foreignKey:id;joinForeignKey:formula_id;joinReferences:tag_id;many2many:tag_formula;references:id" json:"tag"`
 }
 
 // TableName Formula's table name

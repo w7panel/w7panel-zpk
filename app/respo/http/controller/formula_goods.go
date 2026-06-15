@@ -126,6 +126,121 @@ func (c FormulaGoods) SetServiceFee(ctx *gin.Context) {
 	c.JsonSuccessResponse(ctx)
 }
 
+func (c FormulaGoods) SetCrossUpgradeFormulas(ctx *gin.Context) {
+	type ParamsValidate struct {
+		Identifie            string   `form:"identifie" json:"identifie" binding:"required"`
+		CrossUpgradeFormulas []string `form:"cross_upgrade_formulas" json:"cross_upgrade_formulas"`
+	}
+	params := ParamsValidate{}
+	if !c.Validate(ctx, &params) {
+		return
+	}
+
+	depotLogin := c.getDepot()
+	formula, err := depotLogin.GetFormula(params.Identifie, "", logic2.User{}.GetUser(ctx))
+	if err != nil {
+		c.JsonResponseWithError(ctx, errors.New("制品不存在"), 500)
+		return
+	}
+
+	crossUpgradeFormulas, err := c.getCrossUpgradeFormulasByIdentifies(formula.ID, params.CrossUpgradeFormulas, logic2.User{}.GetUser(ctx))
+	if err != nil {
+		c.JsonResponseWithError(ctx, err, 500)
+		return
+	}
+
+	_, err = dao.Q.Formula.Where(dao.Formula.ID.Eq(formula.ID)).Updates(entity.Formula{
+		CrossUpgradeFormulas: &accessor.CrossUpgradeFormulasOption{
+			List: crossUpgradeFormulas,
+		},
+	})
+	if err != nil {
+		c.JsonResponseWithError(ctx, err, 500)
+		return
+	}
+	c.JsonSuccessResponse(ctx)
+}
+
+func (c FormulaGoods) getCrossUpgradeFormulasByIdentifies(formulaID int32, identifies []string, user *entity.RegistryUser) ([]accessor.CrossUpgradeFormula, error) {
+	if len(identifies) == 0 {
+		return []accessor.CrossUpgradeFormula{}, nil
+	}
+
+	query := dao.Q.Formula.Where(dao.Q.Formula.ID.Neq(formulaID)).
+		Where(dao.Q.Formula.Name.In(identifies...)).
+		Where(dao.Q.Formula.GoodsID.Gt(0))
+	if user != nil && !(logic2.User{}).IsAdminUser(user) {
+		query = query.Where(dao.Q.Formula.UserID.Eq(user.ID))
+	}
+	rows, err := query.Find()
+	if err != nil {
+		return nil, err
+	}
+
+	formulaMap := make(map[string]*entity.Formula, len(rows))
+	for _, row := range rows {
+		formulaMap[row.Name] = row
+	}
+	list := make([]accessor.CrossUpgradeFormula, 0, len(rows))
+	for _, identifie := range identifies {
+		row, ok := formulaMap[identifie]
+		if !ok {
+			continue
+		}
+		list = append(list, accessor.CrossUpgradeFormula{
+			Identifie:      row.Name,
+			Title:          row.Title,
+			GoodsID:        row.GoodsID,
+			GoodsProductID: row.GoodsProductID,
+			Price:          row.InstallServiceFee,
+		})
+	}
+	return list, nil
+}
+
+func (c FormulaGoods) GetCrossUpgradeFormulaCandidates(ctx *gin.Context) {
+	type ParamsValidate struct {
+		Identifie string `form:"identifie" json:"identifie" binding:"required"`
+	}
+	params := ParamsValidate{}
+	if !c.Validate(ctx, &params) {
+		return
+	}
+
+	depotLogin := c.getDepot()
+	formula, err := depotLogin.GetFormula(params.Identifie, "", logic2.User{}.GetUser(ctx))
+	if err != nil {
+		c.JsonResponseWithError(ctx, errors.New("制品不存在"), 500)
+		return
+	}
+
+	query := dao.Q.Formula.Where(dao.Q.Formula.ID.Neq(formula.ID)).
+		Where(dao.Q.Formula.GoodsID.Gt(0)).
+		Where(dao.Q.Formula.Status.In(logic.FORMULA_DISPLAY, logic.FORMULA_RECOMMEND)).
+		Order(dao.Q.Formula.ID.Desc())
+	user := logic2.User{}.GetUser(ctx)
+	if user != nil && !(logic2.User{}).IsAdminUser(user) {
+		query = query.Where(dao.Q.Formula.UserID.Eq(user.ID))
+	}
+	rows, err := query.Find()
+	if err != nil {
+		c.JsonResponseWithError(ctx, err, 500)
+		return
+	}
+
+	list := make([]accessor.CrossUpgradeFormula, 0, len(rows))
+	for _, row := range rows {
+		list = append(list, accessor.CrossUpgradeFormula{
+			Identifie:      row.Name,
+			Title:          row.Title,
+			GoodsID:        row.GoodsID,
+			GoodsProductID: row.GoodsProductID,
+			Price:          row.InstallServiceFee,
+		})
+	}
+	c.JsonResponseWithoutError(ctx, list)
+}
+
 func (c FormulaGoods) GetGoodsLabels(ctx *gin.Context) {
 	type ParamsValidate struct {
 		Title    string `form:"title"`

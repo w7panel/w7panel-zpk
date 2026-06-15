@@ -115,6 +115,8 @@ func (provider *Provider) Register(httpServer *http_server.Server, console conso
 		group.Match([]string{"POST", "OPTIONS"}, "/goods/can-upgrade-versions", middleware.DenyDomainReq{}.Process, middleware.W7PanelUser{}.Process, controller.FormulaGoods{}.GetCanFeeUpgradeVersions)
 		//发布商品
 		group.Match([]string{"POST", "OPTIONS"}, "/goods/set-service-fee", middleware.DenyDomainReq{}.Process, middleware.W7PanelUser{}.Process, controller.FormulaGoods{}.SetServiceFee)
+		group.Match([]string{"POST", "OPTIONS"}, "/goods/cross-upgrade-formulas", middleware.DenyDomainReq{}.Process, middleware.W7PanelUser{}.Process, controller.FormulaGoods{}.GetCrossUpgradeFormulaCandidates)
+		group.Match([]string{"POST", "OPTIONS"}, "/goods/set-cross-upgrade-formulas", middleware.DenyDomainReq{}.Process, middleware.W7PanelUser{}.Process, controller.FormulaGoods{}.SetCrossUpgradeFormulas)
 		group.Match([]string{"POST", "OPTIONS"}, "/goods/publish", middleware.DenyDomainReq{}.Process, middleware.W7PanelUser{}.Process, middleware.ConsoleUser{}.Process, controller.FormulaGoods{}.PublishGoods)
 		group.Match([]string{"POST", "OPTIONS"}, "/goods/audit-status", middleware.DenyDomainReq{}.Process, middleware.W7PanelUser{}.Process, middleware.ConsoleUser{}.Process, controller.FormulaGoods{}.GetGoodsAuditStatus)
 		group.Match([]string{"POST", "OPTIONS"}, "/goods/labels", middleware.W7PanelUser{}.Process, middleware.ConsoleUser{}.Process, controller.FormulaGoods{}.GetGoodsLabels)

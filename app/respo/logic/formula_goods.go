@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/w7panel/w7panel-zpk/common/accessor"
 	"github.com/w7panel/w7panel-zpk/common/dao"
 	"github.com/w7panel/w7panel-zpk/common/entity"
 	"github.com/w7panel/w7panel-zpk/common/service/w7"
@@ -83,6 +84,14 @@ func (l FormulaGoods) PublishGoods(formula *Formula, publishGoodsReq devcenter.P
 	if err != nil {
 		return err
 	}
+	crossUpgradeFormulas := make([]accessor.CrossUpgradeFormula, 0)
+	if formula.CrossUpgradeFormulas != nil && formula.CrossUpgradeFormulas.List != nil {
+		crossUpgradeFormulas = formula.CrossUpgradeFormulas.List
+	}
+	crossUpgradeFormulaContent, err := json.Marshal(crossUpgradeFormulas)
+	if err != nil {
+		return err
+	}
 
 	if formula.GoodsId > 0 {
 		info, err := w7.DevCenterGoodsSdk.PublishGoodsInfo(devcenter.PublishGoodsInfoReq{
@@ -103,12 +112,13 @@ func (l FormulaGoods) PublishGoods(formula *Formula, publishGoodsReq devcenter.P
 	publishGoodsReq.Enable = 1
 	publishGoodsReq.Water = 2
 	publishGoodsReq.Extra = map[string]interface{}{
-		"respo_identify":       formula.Name,
-		"respo_latest_version": formula.Version,
-		"service_packages":     string(servicePackagesContent),
-		"version_prices":       string(versionPricesContent),
-		"product_type":         formula.ProductType,
-		"is_free_upgrade":      formula.IsFreeUpgrade,
+		"respo_identify":         formula.Name,
+		"respo_latest_version":   formula.Version,
+		"service_packages":       string(servicePackagesContent),
+		"version_prices":         string(versionPricesContent),
+		"cross_upgrade_formulas": string(crossUpgradeFormulaContent),
+		"product_type":           formula.ProductType,
+		"is_free_upgrade":        formula.IsFreeUpgrade,
 	}
 	publishGoodsReq.RespoUrl = fmt.Sprintf("https://%s/zpk/respo/info/%s", facade.GetConfig().GetString("setting.depot.external_domain"), formula.Name)
 

@@ -155,6 +155,19 @@
                             </a-input>
                         </a-form-item>
 
+                        <a-form-item label="跨应用升级">
+                            <div>
+                                <a-select v-model="instFee.cross_upgrade_identifies" multiple allow-clear
+                                    placeholder="请选择可补差价升级到的应用" style="width: 420px;">
+                                    <a-option v-for="item in instFee.cross_upgrade_candidates" :key="item.identifie"
+                                        :value="item.identifie"
+                                        :label="`${item.title || item.identifie}（¥${item.price || 0}）`"></a-option>
+                                </a-select>
+                                <a-button type="primary" style="margin-left: 10px;"
+                                    @click="submitCrossUpgradeFormulas">保存</a-button>
+                            </div>
+                        </a-form-item>
+
                         <a-form-item v-if="instFee.product_type == '1'" label="升级服务">
                             <div class="version-setting-block">
                                 <manifest-config-table :rows="instFee.version_prices" add-text="添加升级服务"
@@ -374,6 +387,9 @@ export default {
                 service_packages: [],
                 version_prices: [],
                 can_upgrade_versions: [],
+                cross_upgrade_formulas: [],
+                cross_upgrade_candidates: [],
+                cross_upgrade_identifies: [],
             },
 
             publishGoods: {
@@ -471,6 +487,22 @@ export default {
             }).then(res => {
                 this.instFee.can_upgrade_versions = res?.data?.data || [];
             })
+        },
+        getCrossUpgradeFormulaCandidates() {
+            myAxios.post('/respo/goods/cross-upgrade-formulas', {
+                identifie: this.identifie,
+            }).then(res => {
+                this.instFee.cross_upgrade_candidates = res?.data?.data || [];
+            })
+        },
+        submitCrossUpgradeFormulas() {
+            myAxios.post('/respo/goods/set-cross-upgrade-formulas', {
+                identifie: this.identifie,
+                cross_upgrade_formulas: this.instFee.cross_upgrade_identifies,
+            }).then(() => {
+                messageSuccess('操作成功');
+                this.getInfo();
+            });
         },
 
 
@@ -582,7 +614,10 @@ export default {
                 service_packages: this.normalizeServicePackageRows(this.info?.service_packages || []),
                 is_free_upgrade: this.info?.is_free_upgrade || false,
                 version_prices: version_prices,
+                cross_upgrade_formulas: this.info?.cross_upgrade_formulas || [],
+                cross_upgrade_identifies: this.info?.cross_upgrade_formulas || [],
             }
+            this.getCrossUpgradeFormulaCandidates();
         },
         submitInstFee() {
             this.$refs.instFee.validate((errors) => {

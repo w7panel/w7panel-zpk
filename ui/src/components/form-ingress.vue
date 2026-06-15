@@ -24,37 +24,23 @@
                 <template #columns>
                     <manifest-config-table-column data-index="match" title="匹配模式" width="16%">
                         <template #cell="{ record }">
-                            <a-select v-if="record.backend" v-model="record.backend.match" placeholder="请选择">
-                                <a-option label="前缀匹配" value="Prefix" />
-                                <a-option label="精准匹配" value="Exact" />
-                                <a-option label="正则匹配" value="ImplementationSpecific" />
-                            </a-select>
+                            {{ {Prefix: '前缀匹配', Exact: '精准匹配', ImplementationSpecific: '正则匹配'}[record.backend.match] || '-' }}
                         </template>
                     </manifest-config-table-column>
-                    <manifest-config-table-column data-index="path" title="目录" width="22%">
+                    <manifest-config-table-column data-index="path" title="目录" width="22%" />
+                    <manifest-config-table-column data-index="backend.name" title="应用" width="22%" >
                         <template #cell="{ record }">
-                            <a-input v-model="record.path" placeholder="请输入路径"></a-input>
+                            <div v-if="record.backend && mainapp">
+                                {{ appNames.find(v => v.id == record.backend.name)?.title }}
+                            </div>
+                            <div v-else-if="record.backend && !mainapp">
+                                {{ appNamesFilter.find(v => v.id == record.backend.name)?.title }}
+                            </div>
                         </template>
                     </manifest-config-table-column>
-                    <manifest-config-table-column data-index="name" title="应用" width="22%">
+                    <manifest-config-table-column data-index="backend.port" title="端口" width="16%">
                         <template #cell="{ record }">
-                            <a-select v-if="record.backend && mainapp" v-model="record.backend.name"
-                                @change="value => changeBackendName(record, value)" placeholder="请选择应用">
-                                <a-option v-for="p in appNames" :key="p.id" :label="p.title" :value="p.id"></a-option>
-                            </a-select>
-                            <a-select v-if="record.backend && !mainapp" v-model="record.backend.name"
-                                @change="value => changeBackendName(record, value)" placeholder="请选择应用">
-                                <a-option v-for="p in appNamesFilter" :key="p.id" :label="p.title"
-                                    :value="p.id"></a-option>
-                            </a-select>
-                        </template>
-                    </manifest-config-table-column>
-                    <manifest-config-table-column data-index="port" title="端口" width="16%">
-                        <template #cell="{ record }">
-                            <a-select v-if="record.backend" v-model="record.backend.port" placeholder="请选择端口">
-                                <a-option v-for="p in getBackendPorts(record.backend.name)" :key="p" :label="p"
-                                    :value="p"></a-option>
-                            </a-select>
+                            {{ record.backend.port }}
                         </template>
                     </manifest-config-table-column>
                     <manifest-config-table-column title="操作" width="24%">
@@ -177,9 +163,17 @@ export default {
             };
         },
         addRoute(item) {
-            item.routes = item.routes || [];
-            item.routes.push(this.createRoute());
-            this.emitUpdate();
+            window.$wujie?.bus.$emit("ingressEdit", {
+                ingress: this.createRoute(),
+                appList: this.appNames,
+                appPorts: this.appPorts,
+                callback: (data) => {
+                    item.routes = item.routes || [];
+                    item.routes.push(data);
+                    this.emitUpdate();
+                },
+            })
+
         },
         changeBackendName(route, name) {
             route.backend.name = name;

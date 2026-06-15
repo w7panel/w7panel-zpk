@@ -366,7 +366,8 @@
                                         <manifest-config-table-column data-index="module_name" title="依赖系统组件标识">
                                             <template #cell="{ record }">
                                                 <a-input v-model="record.module_name" @change="getStart"
-                                                    :spellcheck="false" placeholder="依赖的系统组件标识名"></a-input>
+                                                    :disabled="computedSpDisabled(record)" :spellcheck="false"
+                                                    placeholder="依赖的系统组件标识名"></a-input>
                                             </template>
                                         </manifest-config-table-column>
                                         <manifest-config-table-column title="操作" width="100px">
@@ -859,10 +860,41 @@ export default {
             return source.map(item => ({ label: item, value: item }));
         },
         onChange() { },
+        createDomainStartParam() {
+            return {
+                mark: 'domain',
+                name: 'DOMAIN_URL',
+                values_text: '%DOMAIN_SSL_URL%',
+                title: '域名',
+                required: true,
+                module_name: '',
+            };
+        },
+        isDomainStartParam(item) {
+            return item?.mark === 'domain'
+                || (item?.name === 'DOMAIN_URL' && ['%DOMAIN_URL%', '%DOMAIN_SSL_URL%'].includes(item?.values_text));
+        },
         computedSpDisabled(item) {
-            return ((this.disabledDomainStartParams || this.form.type == 'tradition') && item.mark === 'domain')
+            return ((this.disabledDomainStartParams || this.form.type == 'tradition') && this.isDomainStartParam(item))
                 || (this.json?.platform?.['volumeClaimTemplates']?.length && item.mark === 'storage')
-                || this.form.type == 'tradition' && item.name === 'DOMAIN_URL' && item.values_text === '%DOMAIN_URL%'
+        },
+        serializeStartParams() {
+            let start = [];
+            for (let i in this.form.startParams) {
+                let o = this.form.startParams[i];
+                if (o.name) {
+                    start.push({
+                        type: 'text',
+                        name: o.name,
+                        title: o.title,
+                        required: o.required,
+                        values_text: o.values_text,
+                        module_name: o.module_name,
+                        description: o.description || '',
+                    })
+                }
+            }
+            return start;
         },
         formatIngressRoutes(routes = []) {
             return routes.filter(r => r.path && r.backend?.port).map(r => ({
@@ -938,14 +970,12 @@ export default {
             }
 
             if (!this.form.startParams?.find?.(i => i.values_text == '%DOMAIN_SSL_URL%' || i.values_text == '%DOMAIN_URL%')) {
-                this.form.startParams.push({
-                    name: 'DOMAIN_URL',
-                    values_text: '%DOMAIN_SSL_URL%',
-                    title: '域名',
-                    required: true,
-                    module_name: '',
-                })
+                this.form.startParams.push(this.createDomainStartParam())
                 this.getStart();
+            } else {
+                this.form.startParams.forEach(i => {
+                    if (this.isDomainStartParam(i)) { i.mark = 'domain'; }
+                });
             }
 
             this.form.environmentName = item.identifie;
@@ -1552,6 +1582,7 @@ platform:
                     }));
                 }
 
+                this.json.platform.startParams = this.serializeStartParams();
                 this.yaml = jsyaml.dump(this.json);
 
                 this.$emit('complete', this.json, this.yaml, otherData, callback);
@@ -1576,14 +1607,13 @@ platform:
             if (this.form.type == 'tradition') {
 
                 if (!this.form.startParams?.find?.(i => i.values_text == '%DOMAIN_SSL_URL%' || i.values_text == '%DOMAIN_URL%')) {
-                    this.form.startParams.push({
-                        name: 'DOMAIN_URL',
-                        values_text: '%DOMAIN_SSL_URL%',
-                        title: '域名',
-                        required: true,
-                        module_name: ''
-                    })
+                    this.form.startParams.push(this.createDomainStartParam())
+                } else {
+                    this.form.startParams.forEach(i => {
+                        if (this.isDomainStartParam(i)) { i.mark = 'domain'; }
+                    });
                 }
+                this.getStart();
 
                 if (this.json.web) { delete this.json.web; }
             }
@@ -1650,6 +1680,7 @@ platform:
 
 
                 j.platform.depends = this.form.dependsIn.concat(this.form.depends);
+                j.platform.startParams = this.serializeStartParams();
 
                 if (this.form.type == 'helm') {
 
@@ -1718,22 +1749,7 @@ platform:
             });
         },
         getStart() {
-            let start = [];
-            for (let i in this.form.startParams) {
-                let o = this.form.startParams[i];
-                if (o.name) {
-                    start.push({
-                        type: 'text',
-                        name: o.name,
-                        title: o.title,
-                        required: o.required,
-                        values_text: o.values_text,
-                        module_name: o.module_name,
-                        description: o.description || '',
-                    })
-                }
-            }
-            this.json.platform.startParams = start;
+            this.json.platform.startParams = this.serializeStartParams();
             this.setYaml();
         },
         download() {

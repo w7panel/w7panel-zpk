@@ -43,6 +43,7 @@ func newFormula(db *gorm.DB, opts ...gen.DOOption) formula {
 	_formula.ProductType = field.NewInt32(tableName, "product_type")
 	_formula.ServicePackages = field.NewField(tableName, "service_packages")
 	_formula.VersionPrices = field.NewField(tableName, "version_prices")
+	_formula.CrossUpgradeFormulas = field.NewField(tableName, "cross_upgrade_formulas")
 	_formula.AuditStatus = field.NewInt32(tableName, "audit_status")
 	_formula.AuditRemark = field.NewString(tableName, "audit_remark")
 	_formula.PublishOfficialStoreStatus = field.NewInt32(tableName, "publish_official_store_status")
@@ -106,6 +107,7 @@ type formula struct {
 	ProductType                field.Int32
 	ServicePackages            field.Field
 	VersionPrices              field.Field
+	CrossUpgradeFormulas       field.Field
 	AuditStatus                field.Int32
 	AuditRemark                field.String
 	PublishOfficialStoreStatus field.Int32
@@ -146,6 +148,7 @@ func (f *formula) updateTableName(table string) *formula {
 	f.ProductType = field.NewInt32(table, "product_type")
 	f.ServicePackages = field.NewField(table, "service_packages")
 	f.VersionPrices = field.NewField(table, "version_prices")
+	f.CrossUpgradeFormulas = field.NewField(table, "cross_upgrade_formulas")
 	f.AuditStatus = field.NewInt32(table, "audit_status")
 	f.AuditRemark = field.NewString(table, "audit_remark")
 	f.PublishOfficialStoreStatus = field.NewInt32(table, "publish_official_store_status")
@@ -167,7 +170,7 @@ func (f *formula) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 }
 
 func (f *formula) fillFieldMap() {
-	f.fieldMap = make(map[string]field.Expr, 23)
+	f.fieldMap = make(map[string]field.Expr, 24)
 	f.fieldMap["id"] = f.ID
 	f.fieldMap["user_id"] = f.UserID
 	f.fieldMap["remote_uid"] = f.RemoteUID
@@ -184,6 +187,7 @@ func (f *formula) fillFieldMap() {
 	f.fieldMap["product_type"] = f.ProductType
 	f.fieldMap["service_packages"] = f.ServicePackages
 	f.fieldMap["version_prices"] = f.VersionPrices
+	f.fieldMap["cross_upgrade_formulas"] = f.CrossUpgradeFormulas
 	f.fieldMap["audit_status"] = f.AuditStatus
 	f.fieldMap["audit_remark"] = f.AuditRemark
 	f.fieldMap["publish_official_store_status"] = f.PublishOfficialStoreStatus

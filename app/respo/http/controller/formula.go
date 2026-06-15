@@ -237,6 +237,12 @@ func (c Formula) Info(ctx *gin.Context) {
 	if formula.VersionPrices != nil && formula.VersionPrices.List != nil {
 		versionPrices = formula.VersionPrices.List
 	}
+	crossUpgradeFormulas := make([]string, 0)
+	if formula.CrossUpgradeFormulas != nil && formula.CrossUpgradeFormulas.List != nil {
+		for _, item := range formula.CrossUpgradeFormulas.List {
+			crossUpgradeFormulas = append(crossUpgradeFormulas, item.Identifie)
+		}
+	}
 	ticket, _ := logic.Ticket{}.GetTicket(logic.TicketInfo{
 		FormulaId:      formula.ID,
 		ConsoleUid:     consoleUid,
@@ -260,23 +266,24 @@ func (c Formula) Info(ctx *gin.Context) {
 	manifestContent := string(tmpContent)
 
 	c.JsonResponseWithoutError(ctx, gin.H{
-		"zip_url":             zipUrl,
-		"manifest":            manifestContent,
-		"version":             version,
-		"webzip_url":          webzipUrl,
-		"icon_url":            fmt.Sprintf("%s%s%s", schemaHttp, domain, formula.Icon),
-		"install_service_fee": formula.InstallServiceFee,
-		"service_packages":    servicePackages,
-		"version_prices":      versionPrices,
-		"is_free_upgrade":     formula.IsFreeUpgrade,
-		"product_type":        formula.ProductType,
-		"ticket":              ticket,
-		"service_expire":      formulaExpire,
-		"goods_id":            formula.GoodsId,
-		"helm_url":            helmPackageUrl,
-		"tags":                formula.Tags,
-		"install_formulas":    installFormulas,
-		"formula_type":        formula.Manifest.Application.Type,
+		"zip_url":                zipUrl,
+		"manifest":               manifestContent,
+		"version":                version,
+		"webzip_url":             webzipUrl,
+		"icon_url":               fmt.Sprintf("%s%s%s", schemaHttp, domain, formula.Icon),
+		"install_service_fee":    formula.InstallServiceFee,
+		"service_packages":       servicePackages,
+		"version_prices":         versionPrices,
+		"cross_upgrade_formulas": crossUpgradeFormulas,
+		"is_free_upgrade":        formula.IsFreeUpgrade,
+		"product_type":           formula.ProductType,
+		"ticket":                 ticket,
+		"service_expire":         formulaExpire,
+		"goods_id":               formula.GoodsId,
+		"helm_url":               helmPackageUrl,
+		"tags":                   formula.Tags,
+		"install_formulas":       installFormulas,
+		"formula_type":           formula.Manifest.Application.Type,
 	})
 }
 

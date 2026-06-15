@@ -7,6 +7,9 @@ relation:
       version_prices:
         type: VersionPricesOption
         serializer: json
+      cross_upgrade_formulas:
+        type: CrossUpgradeFormulasOption
+        serializer: json
     relate:
       - table: version
         foreign_key: id

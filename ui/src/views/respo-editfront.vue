@@ -232,7 +232,8 @@ export default {
         },
         getManifest() {
             return myAxios.get('/respo/v2/info/' + this.identifie + '/' + this.version_id).then(res => {
-                this.manifest = res?.data?.manifest || res?.data?.data?.manifest || defaultManifest;
+                const manifest = res?.data?.manifest || res?.data?.data?.manifest || defaultManifest;
+                this.manifest = manifest?.replace(/backend_port: 0/g, 'backend_port:');
                 this.json = jsyaml.load(this.manifest);
                 this.vtitle = this.json?.application?.name || '';
 
@@ -333,7 +334,7 @@ export default {
                 this.tree = tree;
                 this.depends = this.json?.platform?.depends || [];
                 this.depends.forEach(i => {
-                    i.manifest = this.list[i.identifie + '/manifest.yaml'] || defaultManifest;
+                    i.manifest = (this.list[i.identifie + '/manifest.yaml'] || defaultManifest)?.replace(/backend_port: 0/g, 'backend_port:');
                     i.title = i.identifie + '/manifest.yaml';
                 });
                 this.depends = JSON.parse(JSON.stringify(this.depends));

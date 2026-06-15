@@ -862,7 +862,7 @@ export default {
         computedSpDisabled(item) {
             return ((this.disabledDomainStartParams || this.form.type == 'tradition') && item.mark === 'domain')
                 || (this.json?.platform?.['volumeClaimTemplates']?.length && item.mark === 'storage')
-                || this.form.type == 'tradition' && item.name === 'DOMAIN_URL'
+                || this.form.type == 'tradition' && item.name === 'DOMAIN_URL' && item.values_text === '%DOMAIN_URL%'
         },
         formatIngressRoutes(routes = []) {
             return routes.filter(r => r.path && r.backend?.port).map(r => ({

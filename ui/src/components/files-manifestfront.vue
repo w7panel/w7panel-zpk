@@ -8,8 +8,8 @@
                 </a-empty>
             </div>
             <div v-else>
-                <a-form ref="formref" :model="form" :rules="rules" label-align="left"
-                    :label-col-props="{ span: 3 }" :wrapper-col-props="{ span: 21 }" class="form manifest-form">
+                <a-form ref="formref" :model="form" :rules="rules" label-align="left" :label-col-props="{ span: 3 }"
+                    :wrapper-col-props="{ span: 21 }" class="form manifest-form">
                     <div class="bg-white com-line df" style="margin-bottom:20px;">
                         <div class="fc">
                             <div class="c-00-6 df ai-c">基础配置</div>
@@ -32,631 +32,684 @@
                         </div>
                     </div>
 
-                    <div class="bg-white">
-                        <div>
-                            <a-form-item v-if="form.type != 'tradition'" label="前端配置">
-                                <div class="f1">
-
-                                    <files-upload @success="webUploadSuccess">
-                                        <div v-if="web.name" class="upfilebox df df-c ai-c jc-c">
-                                            <img src="@/assets/img/zip.png" alt=""
-                                                style="width:60px;height:60px;display:block;" />
-                                            <div class="df ai-c mt-20">
-                                                <icon-check-circle-fill class="c-green file-status-icon" />
-                                                <div class="fs-14 c-33"
-                                                    style="vertical-align:middle;max-width:200px;overflow:hidden;text-overflow:ellipsis;">
-                                                    {{ web.name }}</div>
-                                            </div>
-                                            <div class="mask df df-c ai-c jc-c">
-                                                <a-button type="primary">重新上传</a-button>
-                                            </div>
-                                        </div>
-                                        <div v-else class="upfilebox df df-c ai-c jc-c">
-                                            <div class="df df-c ai-c">
-                                                <svg class="uploadicon upload-cloud-icon c-99" xmlns="http://www.w3.org/2000/svg"
-                                                    viewBox="0 0 1024 1024" aria-hidden="true">
-                                                    <path fill="currentColor"
-                                                        d="M544 864V672h128L512 480 352 672h128v192H320v-1.6c-5.376.32-10.496 1.6-16 1.6A240 240 0 0 1 64 624c0-123.136 93.12-223.488 212.608-237.248A239.81 239.81 0 0 1 512 192a239.87 239.87 0 0 1 235.456 194.752c119.488 13.76 212.48 114.112 212.48 237.248a240 240 0 0 1-240 240c-5.376 0-10.56-1.28-16-1.6v1.6z"></path>
-                                                </svg>
-                                                <span class="uploadbtn df ai-c">
-                                                    <icon-upload class="uploadicon c-33" />
-                                                    <span class="lh-1 c-33">上传代码包</span>
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </files-upload>
-
-                                    <div>
-                                        <div class="df ai-c mt-16">
-                                            <a-tabs v-model:active-key="form.menu_type" class="fc"
-                                                @change="() => { roleEdit.index = -1 }">
-                                                <a-tab-pane key="console" title="微擎云端控制台"></a-tab-pane>
-                                                <a-tab-pane key="thirdparty_cd" title="微擎面板控制台"></a-tab-pane>
-                                            </a-tabs>
-                                        </div>
-
-                                        <div v-show="form.menu_type == 'console'" class="roles-box">
-                                            <a-form-item label="开启管理端" style="margin:0;">
-                                                <a-checkbox class="mr-8" v-model="form.role_founder">创始人端</a-checkbox>
-                                                <a-checkbox v-model="form.role_super">超级管理端</a-checkbox>
-                                            </a-form-item>
-                                        </div>
-                                        <div v-show="form.menu_type == 'thirdparty_cd'" class="roles-box">
-                                            <a-form-item label="开启管理端" style="margin:0;">
-                                                <a-checkbox v-for="role in panelRoleOptions" class="mr-8" :key="role.name"
-                                                    :model-value="Boolean(cdrole[role.name])"
-                                                    @change="checked => togglePanelRole(checked, role)">
-                                                    {{ role.title }}
-                                                </a-checkbox>
-                                            </a-form-item>
-                                        </div>
-                                        <div v-for="(r, rindex) in form.role.filter(i => i.support == form.menu_type)"
-                                            :key="rindex" class="role" style="margin:16px 0 30px 0;">
-                                            <div class="df ai-c jc-b greybox-header">
-                                                <div class="df ai-c">
-                                                    <div v-if="roleEdit.index == rindex" class="df">
-                                                        <span>名称：</span>
-                                                        <a-input v-model="roleEdit.title" style="width:140px;"
-                                                            placeholder="请输入名称"></a-input>
-                                                        <span class="ml-20">标识：</span>
-                                                        <a-input v-model="roleEdit.name" style="width:140px;"
-                                                            :disabled="r.name == 'founder' || r.name == 'super'"
-                                                            placeholder="请输入标识"></a-input>
-                                                    </div>
-                                                    <div v-else-if="r.support === 'thirdparty_cd'"
-                                                        class="df ai-c">
-                                                        <span class="lh-1 mr-20">{{ r.title }}</span>
-                                                        <a-checkbox :model-value="r.load_mode === 'iframe'"
-                                                            @change="v => { r.load_mode = v ? 'iframe' : 'static_hosting'; changeLoadMode(r); }">
-                                                            <span class="c-66">支持iframe</span></a-checkbox>
-                                                    </div>
-                                                    <div v-else
-                                                        class="df ai-c cursor">
-                                                        <div @click="roleEdit = { index: rindex, title: r.title, name: r.name }" class="mr-20">
-                                                            <span class="lh-1">{{ r.title }}</span>
-                                                            <icon-edit v-if="r.support != 'thirdparty_cd'"
-                                                                class="role-edit-icon" />
-                                                        </div>
-                                                        <a-checkbox :model-value="r.load_mode === 'iframe'"
-                                                            @change="v => { r.load_mode = v ? 'iframe' : 'static_hosting'; changeLoadMode(r); }"><span
-                                                            class="c-66">支持iframe</span></a-checkbox>
-                                                    </div>
-
-                                                    <div v-if="roleEdit.index == rindex"
-                                                        class="ml-40 c-blue cursor lh-1" style="text-wrap: nowrap;"
-                                                        @click="submitRoleEdit">确定</div>
-                                                    <div v-if="roleEdit.index == rindex"
-                                                        class="ml-20 c-blue cursor lh-1" style="text-wrap:nowrap;"
-                                                        @click="deleteRoleEdit(rindex)">删除
-                                                    </div>
+                    <div class="bg-white manifest-front-panel">
+                        <div class="c-00-6 df ai-c">前端配置</div>
+                        <div class="manifest-front-panel-body">
+                            <div class="roles-box">
+                                <a-form-item label="前端包上传">
+                                    <div class="manifest-front-upload-section">
+                                        <files-upload @success="webUploadSuccess">
+                                            <div v-if="web.name" class="upfilebox df df-c ai-c jc-c">
+                                                <img src="@/assets/img/zip.png" alt=""
+                                                    style="width:60px;height:60px;display:block;" />
+                                                <div class="df ai-c mt-20">
+                                                    <icon-check-circle-fill class="c-green file-status-icon" />
+                                                    <div class="fs-14 c-33"
+                                                        style="vertical-align:middle;max-width:200px;overflow:hidden;text-overflow:ellipsis;">
+                                                        {{ web.name }}</div>
                                                 </div>
-                                                <div class="df ai-c">
-                                                    <a-popover position="top" :content-style="{ width: '240px' }">
-                                                        <div class="df ai-c cursor" style="margin-right:30px;">
-                                                            <img src="@/assets/img/micon.png" alt=""
-                                                                style="width:20px;margin-right:5px;" />
-                                                            <span class="c-66 lh-1">菜单布局</span>
-                                                        </div>
-                                                        <template #content>
-                                                            <a-radio-group v-model="r.location" class="df"
-                                                                @change="getMenu">
-                                                                <div class="fc df df-c ai-c menulocation cursor"
-                                                                    @click="r.location = 'top'; getMenu()">
-                                                                    <img src="@/assets/img/menu-t.png" alt="" />
-                                                                    <a-radio value="top" class="mt-10">顶部菜单布局</a-radio>
-                                                                </div>
-                                                                <div class="fc df df-c ai-c menulocation cursor"
-                                                                    @click="r.location = 'left'; getMenu()">
-                                                                    <img src="@/assets/img/menu-l.png" alt="" />
-                                                                    <a-radio value="left" class="mt-10">左侧菜单布局</a-radio>
-                                                                </div>
-                                                            </a-radio-group>
-                                                        </template>
-                                                    </a-popover>
-                                                    <a-checkbox v-if="r.name != 'founder' && r.name != 'super'"
-                                                        :model-value="r.is_default_register == 2"
-                                                        @change="v => { r.is_default_register = v ? 2 : 1; chengeRegister(r, r.is_default_register); }">默认邀请端</a-checkbox>
+                                                <div class="mask df df-c ai-c jc-c">
+                                                    <a-button type="primary">重新上传</a-button>
                                                 </div>
                                             </div>
-
-                                            <div class="greybox manifest-front-config">
-                                                <template v-if="r.load_mode === 'iframe'">
-                                                    <div class="greybox-title">iframe配置</div>
-                                                    <a-alert type="info" show-icon class="zpk-primary-alert mb-20" title="提示" :closable="false">
-                                                            <div class="registry-alert-item">受到iframe使用场景的严格限制，如果需要对接授权登录，可将 {access_token} 传递给iframe，然后由后端服务请求授权接口地址（http://xxxx）获取用户信息。
-                                                            </div>
-                                                            <div class="registry-alert-item mt-6">由于iframe受到了浏览器安全限制，生成cookies时必须设置 SameSite: None, Secure: true，并且header设置允许 * 跨域，才能正常传递。
-                                                            </div>
-                                                            <div class="registry-alert-item mt-6">变量传递只支持query方式，会将GET参数固定拼接到地址后。
-                                                            </div>
-                                                    </a-alert>
-                                                    <a-form-item label="地址类型" style="margin-bottom:20px;">
-                                                        <a-radio-group v-model="r.type" @change="changeBackendType(r)">
-                                                            <a-radio value="internal">应用地址</a-radio>
-                                                            <a-radio value="external">远程地址</a-radio>
-                                                        </a-radio-group>
-                                                    </a-form-item>
-                                                    <a-form-item label="页面地址" style="margin-bottom:20px;">
-                                                        <div class="backend-url-form-field">
-                                                            <div v-if="r.type == 'internal'" class="backend-url-config df ai-c">
-                                                                <span class="backend-url-fixed">https://</span>
-                                                                <span class="backend-url-fixed backend-url-placeholder">{{ getIframeDomainDisplayPlaceholder() }}</span>
-                                                                <span class="backend-url-fixed">/</span>
-                                                                <a-input v-model="r.backend_path" @input="getMenu" @change="getMenu" placeholder="请输入目录"
-                                                                    class="backend-url-control backend-url-input" />
-                                                            </div>
-                                                            <div v-else class="backend-url-config backend-url-config-external df ai-c">
-                                                                <a-select v-model="r.root_protocol"
-                                                                    class="backend-url-control backend-url-protocol"
-                                                                    @change="getMenu">
-                                                                    <a-option label="http://" value="http://"></a-option>
-                                                                    <a-option label="https://" value="https://"></a-option>
-                                                                </a-select>
-                                                                <a-input v-model="r.root_url" @change="getMenu"
-                                                                    placeholder="请输入地址"
-                                                                    class="backend-url-control backend-url-input" />
-                                                            </div>
-                                                            <div v-if="r.type == 'internal' && !hasBackendDomainConfig()" class="domain-warning">
-                                                                <icon-exclamation-circle-fill class="domain-warning-icon" :size="14" />
-                                                                <span>当前应用后端配置尚未启用域名设置，请前往后端包管理界面配置。</span>
-                                                            </div>
-                                                        </div>
-                                                    </a-form-item>
-                                                    <div class="df ai-c manifest-front-section-title">变量传递配置</div>
-                                                    <div class="manifest-front-block">
-                                                        <manifest-config-table title="请求参数(Query)" :rows="r.proxy_request_query"
-                                                            table-class="manifest-param-table config-variable-table"
-                                                            add-text="添加请求参数"
-                                                            @add="addParamRow(r.proxy_request_query)">
-                                                            <template #columns>
-                                                                <manifest-config-table-column data-index="key" title="key">
-                                                                    <template #cell="{ record }">
-                                                                        <a-input v-model="record.key" placeholder="key"
-                                                                            @change="getMenu"
-                                                                            style="width:200px;margin-right:10px;"></a-input>
-                                                                    </template>
-                                                                </manifest-config-table-column>
-                                                                <manifest-config-table-column data-index="value" title="value">
-                                                                    <template #cell="{ record }">
-                                                                        <div class="param-value-field">
-                                                                            <a-input v-model="record.value" placeholder="value" @change="changeConfigValue(record)">
-                                                                                <template #suffix>
-                                                                                    <a-popover trigger="click" position="bottom" :content-style="{ width: '360px' }">
-                                                                                        <span class="config-value-suffix">选择系统配置</span>
-                                                                                        <template #content>
-                                                                                            <div class="var-picker">
-                                                                                                <template v-for="group in variableGroups" :key="group.title">
-                                                                                                    <div class="var-picker-title">{{ group.title }}</div>
-                                                                                                    <div v-if="group.options.length">
-                                                                                                        <div v-for="param in group.options" :key="param.value"
-                                                                                                            class="var-picker-item" @click="selectConfigVariable(record, param)">
-                                                                                                            <div class="var-picker-name">{{ param.key || param.value }} <span>{{ param.displayValue }}</span></div>
-                                                                                                        </div>
-                                                                                                    </div>
-                                                                                                    <div v-else class="var-picker-empty">暂无可选配置</div>
-                                                                                                </template>
-                                                                                            </div>
-                                                                                        </template>
-                                                                                    </a-popover>
-                                                                                </template>
-                                                                            </a-input>
-                                                                        </div>
-                                                                    </template>
-                                                                </manifest-config-table-column>
-                                                                <manifest-config-table-column title="描述">
-                                                                    <template #cell="{ record }">{{ getConfigVariableLabel(record) }}</template>
-                                                                </manifest-config-table-column>
-                                                                <manifest-config-table-column title="操作">
-                                                                    <template #cell="{ index }">
-                                                                        <span class="c-blue cursor handle"
-                                                                            @click="removeParamRow(r.proxy_request_query, index)">删除</span>
-                                                                    </template>
-                                                                </manifest-config-table-column>
-                                                            </template>
-                                                        </manifest-config-table>
-                                                    </div>
-                                                </template>
-                                                <template v-else>
-
-                                                <div class="greybox-title">变量传递配置<a-tooltip content="将开发者设置的变量值传递给后端接口和前端JS变量中"><ArcoIcon name="icon-41" :size="16"/></a-tooltip></div>
-                                                <a-form-item label="接口类型" style="margin-bottom:20px;">
-                                                    <a-radio-group v-model="r.type" @change="changeBackendType(r)">
-                                                        <a-radio value="internal">应用内网地址（internal）</a-radio>
-                                                        <a-radio value="external">应用外网地址（external）</a-radio>
-                                                    </a-radio-group>
-                                                </a-form-item>
-                                                <a-form-item label="接口地址" style="margin-bottom:20px;">
-                                                    <div v-if="r.type == 'internal'" class="backend-url-config df ai-c">
-                                                        <span class="backend-url-fixed">http://</span>
-                                                        <a-select v-model="r.backend_identifie" allow-search
-                                                            placeholder="选择应用标识"
-                                                            class="backend-url-control backend-url-identifie"
-                                                            @change="changeBackendIdentifie(r)">
-                                                            <a-option v-for="app in backendAppOptions" :key="app.id"
-                                                                :label="app.id"
-                                                                :value="app.id">
-                                                                <div class="backend-app-option">
-                                                                    <span>{{ app.id }}</span>
-                                                                    <span v-if="app.title && app.title != app.id">{{ app.title }}</span>
-                                                                </div>
-                                                            </a-option>
-                                                        </a-select>
-                                                        <span
-                                                            class="backend-url-fixed">.default.svc.cluster.local:</span>
-                                                        <a-auto-complete v-model="r.backend_port"
-                                                            :data="getBackendPortOptions(r.backend_identifie, r.backend_port)"
-                                                            :filter-option="false" placeholder="端口"
-                                                            class="backend-url-control backend-url-port" @input="getMenu"
-                                                            @change="getMenu" @select="getMenu"></a-auto-complete>
-                                                    </div>
-                                                    <div v-else class="backend-url-config backend-url-config-external df ai-c">
-                                                        <a-select v-model="r.root_protocol"
-                                                            class="backend-url-control backend-url-protocol"
-                                                            @change="getMenu">
-                                                            <a-option label="http://" value="http://"></a-option>
-                                                            <a-option label="https://" value="https://"></a-option>
-                                                        </a-select>
-                                                        <a-input v-model="r.root_url" @change="getMenu"
-                                                            placeholder="请输入地址"
-                                                            class="backend-url-control backend-url-input" />
-                                                    </div>
-                                                </a-form-item>
-
-                                                <div class="df ai-c manifest-front-section-title">代理配置<a-tooltip content="面板提供转发服务到接口地址，接口后端可通过HTTP变量获取传递值"><ArcoIcon name="icon-41" :size="16"/></a-tooltip></div>
-                                                <div class="manifest-front-block">
-                                                    <a-form-item label="代理地址">
-                                                        <a-input readonly :default-value="`/panel-api/v1/microapp/${identifie}/proxy`" style="width: 400px"></a-input>
-                                                    </a-form-item>
-                                                    <manifest-config-table title="请求头(Header)" :rows="r.proxy_request_header"
-                                                        table-class="manifest-param-table config-variable-table"
-                                                        add-text="添加请求头"
-                                                        @add="addParamRow(r.proxy_request_header)">
-                                                        <template #columns>
-                                                            <manifest-config-table-column data-index="key" title="key">
-                                                                <template #cell="{ record }">
-                                                                    <a-input v-model="record.key" placeholder="key"
-                                                                        @change="getMenu"
-                                                                        style="width:200px;margin-right:10px;"></a-input>
-                                                                </template>
-                                                            </manifest-config-table-column>
-                                                            <manifest-config-table-column data-index="value" title="value">
-                                                                <template #cell="{ record }">
-                                                                    <div class="param-value-field">
-                                                                        <a-input v-model="record.value" placeholder="value" @change="changeConfigValue(record)">
-                                                                            <template #suffix>
-                                                                                <a-popover trigger="click" position="bottom" :content-style="{ width: '360px' }">
-                                                                                    <span class="config-value-suffix">选择系统配置</span>
-                                                                                    <template #content>
-                                                                                        <div class="var-picker">
-                                                                                            <template v-for="group in variableGroups" :key="group.title">
-                                                                                                <div class="var-picker-title">{{ group.title }}</div>
-                                                                                                <div v-if="group.options.length">
-                                                                                                    <div v-for="param in group.options" :key="param.value"
-                                                                                                        class="var-picker-item" @click="selectConfigVariable(record, param)">
-                                                                                                        <div class="var-picker-name">{{ param.key || param.value }} <span>{{ param.displayValue }}</span></div>
-                                                                                                    </div>
-                                                                                                </div>
-                                                                                                <div v-else class="var-picker-empty">暂无可选配置</div>
-                                                                                            </template>
-                                                                                        </div>
-                                                                                    </template>
-                                                                                </a-popover>
-                                                                            </template>
-                                                                        </a-input>
-                                                                    </div>
-                                                                </template>
-                                                            </manifest-config-table-column>
-                                                            <manifest-config-table-column title="描述">
-                                                                <template #cell="{ record }">{{ getConfigVariableLabel(record) }}</template>
-                                                            </manifest-config-table-column>
-                                                            <manifest-config-table-column title="操作">
-                                                                <template #cell="{ index }">
-                                                                    <span class="c-blue cursor handle"
-                                                                        @click="removeParamRow(r.proxy_request_header, index)">删除</span>
-                                                                </template>
-                                                            </manifest-config-table-column>
-                                                        </template>
-                                                    </manifest-config-table>
-                                                    <manifest-config-table class="mt-20" v-if="!(form.menu_type == 'thirdparty_cd' && r.name == 'normal')"
-                                                        title="请求参数(Query)" :rows="r.proxy_request_query"
-                                                        table-class="manifest-param-table config-variable-table"
-                                                        add-text="添加请求参数"
-                                                        @add="addParamRow(r.proxy_request_query)">
-                                                        <template #columns>
-                                                            <manifest-config-table-column data-index="key" title="key">
-                                                                <template #cell="{ record }">
-                                                                    <a-input v-model="record.key" placeholder="key"
-                                                                        @change="getMenu"
-                                                                        style="width:200px;margin-right:10px;"></a-input>
-                                                                </template>
-                                                            </manifest-config-table-column>
-                                                            <manifest-config-table-column data-index="value" title="value">
-                                                                <template #cell="{ record }">
-                                                                    <div class="param-value-field">
-                                                                        <a-input v-model="record.value" placeholder="value" @change="changeConfigValue(record)">
-                                                                            <template #suffix>
-                                                                                <a-popover trigger="click" position="bottom" :content-style="{ width: '360px' }">
-                                                                                    <span class="config-value-suffix">选择系统配置</span>
-                                                                                    <template #content>
-                                                                                        <div class="var-picker">
-                                                                                            <template v-for="group in variableGroups" :key="group.title">
-                                                                                                <div class="var-picker-title">{{ group.title }}</div>
-                                                                                                <div v-if="group.options.length">
-                                                                                                    <div v-for="param in group.options" :key="param.value"
-                                                                                                        class="var-picker-item" @click="selectConfigVariable(record, param)">
-                                                                                                        <div class="var-picker-name">{{ param.key || param.value }} <span>{{ param.displayValue }}</span></div>
-                                                                                                    </div>
-                                                                                                </div>
-                                                                                                <div v-else class="var-picker-empty">暂无可选配置</div>
-                                                                                            </template>
-                                                                                        </div>
-                                                                                    </template>
-                                                                                </a-popover>
-                                                                            </template>
-                                                                        </a-input>
-                                                                    </div>
-                                                                </template>
-                                                            </manifest-config-table-column>
-                                                            <manifest-config-table-column title="描述">
-                                                                <template #cell="{ record }">{{ getConfigVariableLabel(record) }}</template>
-                                                            </manifest-config-table-column>
-                                                            <manifest-config-table-column title="操作">
-                                                                <template #cell="{ index }">
-                                                                    <span class="c-blue cursor handle"
-                                                                        @click="removeParamRow(r.proxy_request_query, index)">删除</span>
-                                                                </template>
-                                                            </manifest-config-table-column>
-                                                        </template>
-                                                    </manifest-config-table>
+                                            <div v-else class="upfilebox df df-c ai-c jc-c">
+                                                <div class="df df-c ai-c">
+                                                    <svg class="uploadicon upload-cloud-icon c-99"
+                                                        xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"
+                                                        aria-hidden="true">
+                                                        <path fill="currentColor"
+                                                            d="M544 864V672h128L512 480 352 672h128v192H320v-1.6c-5.376.32-10.496 1.6-16 1.6A240 240 0 0 1 64 624c0-123.136 93.12-223.488 212.608-237.248A239.81 239.81 0 0 1 512 192a239.87 239.87 0 0 1 235.456 194.752c119.488 13.76 212.48 114.112 212.48 237.248a240 240 0 0 1-240 240c-5.376 0-10.56-1.28-16-1.6v1.6z">
+                                                        </path>
+                                                    </svg>
+                                                    <span class="uploadbtn df ai-c">
+                                                        <icon-upload class="uploadicon c-33" />
+                                                        <span class="lh-1 c-33">上传代码包</span>
+                                                    </span>
                                                 </div>
-                                                <div v-if="!(form.menu_type == 'thirdparty_cd' && r.name == 'normal')"
-                                                    class="df ai-c manifest-front-section-title mt-20">前端配置<a-tooltip content="面板提供microapp机制渲染前端包，可通过window.$wujie.props.frontend_props 从JS变量获取传递值"><ArcoIcon name="icon-41" :size="16"/></a-tooltip></div>
-                                                <div
-                                                    v-if="!(form.menu_type == 'thirdparty_cd' && r.name == 'normal')" class="manifest-front-block mt-20">
-                                                    <manifest-config-table :rows="r.frontend_props"
-                                                        table-class="manifest-param-table frontend-param-table"
-                                                        add-text="添加前端配置" always-show
-                                                        @add="addParamRow(r.frontend_props)">
-                                                        <template #columns>
-                                                            <manifest-config-table-column data-index="key" title="key">
-                                                                <template #cell="{ record }">
-                                                                    <a-input v-model="record.key" placeholder="key"
-                                                                        @change="getMenu"
-                                                                        style="width:200px;margin-right:10px;"></a-input>
-                                                                </template>
-                                                            </manifest-config-table-column>
-                                                            <manifest-config-table-column data-index="value" title="value">
-                                                                <template #cell="{ record }">
-                                                                    <div class="param-value-field">
-                                                                        <a-input v-model="record.value" placeholder="value" @change="changeConfigValue(record)">
-                                                                            <template #suffix>
-                                                                                <a-popover trigger="click" position="bottom" :content-style="{ width: '360px' }">
-                                                                                    <span class="config-value-suffix">选择系统配置</span>
-                                                                                    <template #content>
-                                                                                        <div class="var-picker">
-                                                                                            <template v-for="group in variableGroups" :key="group.title">
-                                                                                                <div class="var-picker-title">{{ group.title }}</div>
-                                                                                                <div v-if="group.options.length">
-                                                                                                    <div v-for="param in group.options" :key="param.value"
-                                                                                                        class="var-picker-item" @click="selectConfigVariable(record, param)">
-                                                                                                        <div class="var-picker-name">{{ param.key || param.value }} <span>{{ param.displayValue }}</span></div>
-                                                                                                    </div>
-                                                                                                </div>
-                                                                                                <div v-else class="var-picker-empty">暂无可选配置</div>
-                                                                                            </template>
-                                                                                        </div>
-                                                                                    </template>
-                                                                                </a-popover>
-                                                                            </template>
-                                                                        </a-input>
-                                                                    </div>
-                                                                </template>
-                                                            </manifest-config-table-column>
-                                                            <manifest-config-table-column title="描述">
-                                                                <template #cell="{ record }">{{ getConfigVariableLabel(record) }}</template>
-                                                            </manifest-config-table-column>
-                                                            <manifest-config-table-column title="操作">
-                                                                <template #cell="{ index }">
-                                                                    <span class="c-blue cursor handle"
-                                                                        @click="removeParamRow(r.frontend_props, index)">删除</span>
-                                                                </template>
-                                                            </manifest-config-table-column>
-                                                        </template>
-                                                        <template #prepend>
-                                                            <tr v-for="item in frontendDefaultProps" :key="item.value" class="frontend-default-prop-row">
-                                                                <td>{{ item.key }}</td>
-                                                                <td>{{ item.value }}</td>
-                                                                <td>{{ item.description }}</td>
-                                                                <td></td>
-                                                            </tr>
-                                                        </template>
-                                                    </manifest-config-table>
-                                                </div>
-                                                </template>
-
                                             </div>
+                                        </files-upload>
+                                    </div>
+                                </a-form-item>
+                                <a-form-item label="开启管理端" style="margin:0;">
+                                    <a-checkbox v-for="role in panelRoleOptions" class="mr-8" :key="role.name"
+                                        :model-value="Boolean(cdrole[role.name])"
+                                        @change="checked => togglePanelRole(checked, role)">
+                                        {{ role.title }}
+                                    </a-checkbox>
+                                </a-form-item>
+                            </div>
 
-                                            <div class="mt-10 greybox manifest-front-config">
-                                                <div class="greybox-title">菜单配置</div>
-                                                <manifest-config-table :rows="r.menu"
-                                                    table-class="menutable mt-10" add-text="添加一级菜单" always-show
-                                                    @add="addMenu(r.menu)">
-                                                    <template #columns>
-                                                        <manifest-config-table-column data-index="displayorder" title="排序">
-                                                            <template #cell="{ record }">
-                                                                <div><a-input type="number"
-                                                                        :model-value="String(record.displayorder ?? '')"
-                                                                        @update:model-value="v => record.displayorder = v"
-                                                                        @change="getMenu"
-                                                                        style="width:60px; height:36px;"></a-input>
-                                                                </div>
-                                                                <div v-for="(sub, subid) in record.children" :key="subid"
-                                                                    class="df mt-10">
-                                                                    <div class="branch"
-                                                                        :class="{ last: subid == record.children.length - 1 }">
-                                                                    </div>
-                                                                    <a-input type="number"
-                                                                        :model-value="String(sub.displayorder ?? '')"
-                                                                        @update:model-value="v => sub.displayorder = v"
-                                                                        @change="getMenu"
-                                                                        style="width:60px; height:36px;"></a-input>
-                                                                </div>
-                                                            </template>
-                                                        </manifest-config-table-column>
-                                                        <manifest-config-table-column data-index="do" title="路由">
-                                                            <template #cell="{ record }">
-                                                                <div><a-input v-model="record.do" @change="onMenuChanged(r.menu)"
-                                                                        style="width:150px; height:36px;"
-                                                                        placeholder="路由"></a-input>
-                                                                </div>
-                                                                <div v-for="(sub, subid) in record.children" :key="subid"
-                                                                    class="mt-10">
-                                                                    <a-input v-model="sub.do" @change="onMenuChanged(r.menu)"
-                                                                        style="width:150px; height:36px;"
-                                                                        placeholder="路由"></a-input>
-                                                                </div>
-                                                            </template>
-                                                        </manifest-config-table-column>
-                                                        <manifest-config-table-column data-index="title" title="名称">
-                                                            <template #cell="{ record }">
-                                                                <div><a-input v-model="record.title" @change="onMenuChanged(r.menu)"
-                                                                        style="width:150px; height:36px;"
-                                                                        placeholder="名称"></a-input>
-                                                                </div>
-                                                                <div v-for="(sub, subid) in record.children" :key="subid"
-                                                                    class="mt-10">
-                                                                    <a-input v-model="sub.title" @change="onMenuChanged(r.menu)"
-                                                                        style="width:150px; height:36px;"
-                                                                        placeholder="名称"></a-input>
-                                                                </div>
-                                                            </template>
-                                                        </manifest-config-table-column>
-                                                        <manifest-config-table-column data-index="default">
-                                                            <template #title>
-                                                                <div class="df ai-c jc-c">
-                                                                    <span>欢迎页</span>
-                                                                    <a-tooltip content="用户进入系统首页访问的页面">
-                                                                        <icon-question-circle-fill class="cursor ml-4 c-99" :size="16" />
-                                                                    </a-tooltip>
-                                                                </div>
-                                                            </template>
-                                                            <template #cell="{ record }">
-                                                                <div class="menu-default-cell">
-                                                                    <div class="menu-default-check" :style="{visibility: record.children?.length > 0 ? 'hidden' : 'visible'}">
-                                                                        <a-checkbox :model-value="Number(record.is_default) === 1"
-                                                                            :name="r.name"
-                                                                            @click.stop="setMenuDefault(r.menu, record)"></a-checkbox>
-                                                                    </div>
-                                                                    <div v-for="(sub, subid) in record.children" :key="subid"
-                                                                        class="mt-10 menu-default-check">
-                                                                        <a-checkbox :model-value="Number(sub.is_default) === 1"
-                                                                            :name="r.name"
-                                                                            @click.stop="setMenuDefault(r.menu, sub)"></a-checkbox>
-                                                                    </div>
-                                                                </div>
-                                                            </template>
-                                                        </manifest-config-table-column>
-                                                        <manifest-config-table-column data-index="icon" title="图标">
-                                                            <template #cell="{ record }">
-                                                                <div class="selicon cursor df ai-c jc-c"
-                                                                    v-if="record.icon_svg"
-                                                                    @click="dialogVisible = true; activeItem = record;"
-                                                                    v-html="elementsToSvg(record.icon_svg)"></div>
-                                                                <div class="selicon cursor df ai-c jc-c"
-                                                                    v-else-if="record.icon"
-                                                                    @click="dialogVisible = true; activeItem = record;"><i
-                                                                        class="fs-24 wi" :class="'wi-' + record.icon"></i>
-                                                                </div>
-                                                                <div class="selicon cursor df ai-c jc-c" v-else
-                                                                    @click="dialogVisible = true; activeItem = record;">
-                                                                    <svg class="default-menu-icon" xmlns="http://www.w3.org/2000/svg"
-                                                                        viewBox="0 0 1024 1024" aria-hidden="true">
-                                                                        <path fill="currentColor"
-                                                                            d="M160 448a32 32 0 0 1-32-32V160.064a32 32 0 0 1 32-32h256a32 32 0 0 1 32 32V416a32 32 0 0 1-32 32zm448 0a32 32 0 0 1-32-32V160.064a32 32 0 0 1 32-32h255.936a32 32 0 0 1 32 32V416a32 32 0 0 1-32 32zM160 896a32 32 0 0 1-32-32V608a32 32 0 0 1 32-32h256a32 32 0 0 1 32 32v256a32 32 0 0 1-32 32zm448 0a32 32 0 0 1-32-32V608a32 32 0 0 1 32-32h255.936a32 32 0 0 1 32 32v256a32 32 0 0 1-32 32z"></path>
-                                                                    </svg>
-                                                                </div>
-                                                                <div v-for="(sub, subid) in record.children" :key="subid"
-                                                                    class="df ai-c jc-c mt-10"
-                                                                    style="width:36px; height:36px;">
-                                                                </div>
-                                                            </template>
-                                                        </manifest-config-table-column>
-                                                        <manifest-config-table-column title="操作">
-                                                            <template #cell="{ record, index }">
-                                                                <div class="df ai-c" style="height:36px;">
-                                                                    <span class="handle c-blue cursor"
-                                                                        @click="addSub(r.menu, record)">添加子菜单</span>
-                                                                    <a-popover position="top" :content-style="{ width: '240px' }">
-                                                                        <span class="handle c-blue cursor">设置位置</span>
-                                                                        <template #content>
-                                                                            <div>
-                                                                                <div class="df ai-c jc-b">
-                                                                                    <div class="menu-single-location">单个菜单位置设置
-                                                                                    </div>
-                                                                                </div>
-                                                                                <a-radio-group v-model="record.location"
-                                                                                    class="df mt-10" @change="getMenu">
-                                                                                    <div class="fc df df-c ai-c menulocation cursor"
-                                                                                        @click="record.location = 'normal'; getMenu()">
-                                                                                        <img v-if="r.location == 'top'"
-                                                                                            src="@/assets/img/menu-t.png"
-                                                                                            alt="" />
-                                                                                        <img v-else
-                                                                                            src="@/assets/img/menu-l.png"
-                                                                                            alt="" />
-                                                                                        <a-radio value="normal"
-                                                                                            class="mt-10">默认位置</a-radio>
-                                                                                    </div>
-                                                                                    <div v-if="r.location == 'top'"
-                                                                                        class="fc df df-c ai-c menulocation cursor"
-                                                                                        @click="record.location = 'back'; getMenu()">
-                                                                                        <img src="@/assets/img/menu-r.png"
-                                                                                            alt="" />
-                                                                                        <a-radio value="back"
-                                                                                            class="mt-10">顶部右侧</a-radio>
-                                                                                    </div>
-                                                                                    <div v-else
-                                                                                        class="fc df df-c ai-c menulocation cursor"
-                                                                                        @click="record.location = 'back'; getMenu()">
-                                                                                        <img src="@/assets/img/menu-b.png"
-                                                                                            alt="" />
-                                                                                        <a-radio value="back"
-                                                                                            class="mt-10">左侧底部</a-radio>
-                                                                                    </div>
-                                                                                </a-radio-group>
-                                                                            </div>
-                                                                        </template>
-                                                                    </a-popover>
-                                                                    <span class="handle c-blue cursor"
-                                                                        @click="removeMenu(r.menu, index)">删除</span>
-                                                                </div>
-                                                                <div v-for="(sub, subid) in record.children" :key="subid"
-                                                                    class="mt-10 df ai-c" style="height:36px;">
-                                                                    <span class="handle c-blue cursor"
-                                                                        @click="removeSubMenu(r.menu, record, subid)">删除</span>
-                                                                </div>
-                                                            </template>
-                                                        </manifest-config-table-column>
-                                                    </template>
-                                                </manifest-config-table>
+                            <div v-for="(r, rindex) in form.role.filter(i => i.support == form.menu_type)" :key="rindex"
+                                class="role mt-16">
+                                <div class="df ai-c jc-b greybox-header">
+                                    <div class="df ai-c">
+                                        <div v-if="roleEdit.index == rindex" class="df">
+                                            <span>名称：</span>
+                                            <a-input v-model="roleEdit.title" style="width:140px;"
+                                                placeholder="请输入名称"></a-input>
+                                            <span class="ml-20">标识：</span>
+                                            <a-input v-model="roleEdit.name" style="width:140px;"
+                                                :disabled="r.name == 'founder' || r.name == 'super'"
+                                                placeholder="请输入标识"></a-input>
+                                        </div>
+                                        <div v-else-if="r.support === 'thirdparty_cd'" class="df ai-c">
+                                            <span class="lh-1 mr-20">{{ r.title }}</span>
+                                            <a-checkbox :model-value="r.load_mode === 'iframe'"
+                                                @change="v => { r.load_mode = v ? 'iframe' : 'static_hosting'; changeLoadMode(r); }">
+                                                <span class="c-66">支持iframe</span></a-checkbox>
+                                        </div>
+                                        <div v-else class="df ai-c cursor">
+                                            <div @click="roleEdit = { index: rindex, title: r.title, name: r.name }"
+                                                class="mr-20">
+                                                <span class="lh-1">{{ r.title }}</span>
+                                                <icon-edit v-if="r.support != 'thirdparty_cd'" class="role-edit-icon" />
                                             </div>
+                                            <a-checkbox :model-value="r.load_mode === 'iframe'"
+                                                @change="v => { r.load_mode = v ? 'iframe' : 'static_hosting'; changeLoadMode(r); }"><span
+                                                    class="c-66">支持iframe</span></a-checkbox>
                                         </div>
-                                        <div v-if="form.menu_type == 'console'"
-                                            class="mt-10 addrole df ai-c jc-c cursor" @click="showAddRole = true">添加管理端
-                                        </div>
-                                        <div class="mt-16 ml-20 c-red fs-12">注：上传后端代码包的前提下，如果未添加管理端配置，默认类型为系统组件，否则为原生应用
+
+                                        <div v-if="roleEdit.index == rindex" class="ml-40 c-blue cursor lh-1"
+                                            style="text-wrap: nowrap;" @click="submitRoleEdit">确定</div>
+                                        <div v-if="roleEdit.index == rindex" class="ml-20 c-blue cursor lh-1"
+                                            style="text-wrap:nowrap;" @click="deleteRoleEdit(rindex)">删除
                                         </div>
                                     </div>
+                                    <div class="df ai-c">
+                                        <a-popover position="top" :content-style="{ width: '240px' }">
+                                            <div class="df ai-c cursor" style="margin-right:30px;">
+                                                <img src="@/assets/img/micon.png" alt=""
+                                                    style="width:20px;margin-right:5px;" />
+                                                <span class="c-66 lh-1">菜单布局</span>
+                                            </div>
+                                            <template #content>
+                                                <a-radio-group v-model="r.location" class="df" @change="getMenu">
+                                                    <div class="fc df df-c ai-c menulocation cursor"
+                                                        @click="r.location = 'top'; getMenu()">
+                                                        <img src="@/assets/img/menu-t.png" alt="" />
+                                                        <a-radio value="top" class="mt-10">顶部菜单布局</a-radio>
+                                                    </div>
+                                                    <div class="fc df df-c ai-c menulocation cursor"
+                                                        @click="r.location = 'left'; getMenu()">
+                                                        <img src="@/assets/img/menu-l.png" alt="" />
+                                                        <a-radio value="left" class="mt-10">左侧菜单布局</a-radio>
+                                                    </div>
+                                                </a-radio-group>
+                                            </template>
+                                        </a-popover>
+                                        <a-checkbox v-if="r.name != 'founder' && r.name != 'super'"
+                                            :model-value="r.is_default_register == 2"
+                                            @change="v => { r.is_default_register = v ? 2 : 1; chengeRegister(r, r.is_default_register); }">默认邀请端</a-checkbox>
+                                    </div>
                                 </div>
-                            </a-form-item>
+
+                                <div class="greybox manifest-front-config">
+                                    <template v-if="r.load_mode === 'iframe'">
+                                        <div class="greybox-title">iframe配置</div>
+                                        <a-alert type="info" show-icon class="zpk-primary-alert mb-20" title="提示"
+                                            :closable="false">
+                                            <div class="registry-alert-item">受到iframe使用场景的严格限制，如果需要对接授权登录，可将
+                                                {access_token} 传递给iframe，然后由后端服务请求授权接口地址（http://xxxx）获取用户信息。
+                                            </div>
+                                            <div class="registry-alert-item mt-6">由于iframe受到了浏览器安全限制，生成cookies时必须设置
+                                                SameSite: None, Secure: true，并且header设置允许 * 跨域，才能正常传递。
+                                            </div>
+                                            <div class="registry-alert-item mt-6">变量传递只支持query方式，会将GET参数固定拼接到地址后。
+                                            </div>
+                                        </a-alert>
+                                        <a-form-item label="地址类型" style="margin-bottom:20px;">
+                                            <a-radio-group v-model="r.type" @change="changeBackendType(r)">
+                                                <a-radio value="internal">应用地址</a-radio>
+                                                <a-radio value="external">远程地址</a-radio>
+                                            </a-radio-group>
+                                        </a-form-item>
+                                        <a-form-item label="页面地址" style="margin-bottom:20px;">
+                                            <div class="backend-url-form-field">
+                                                <div v-if="r.type == 'internal'" class="backend-url-config df ai-c">
+                                                    <span class="backend-url-fixed">https://</span>
+                                                    <span class="backend-url-fixed backend-url-placeholder">{{
+                                                        getIframeDomainDisplayPlaceholder() }}</span>
+                                                    <span class="backend-url-fixed">/</span>
+                                                    <a-input v-model="r.backend_path" @input="getMenu" @change="getMenu"
+                                                        placeholder="请输入目录"
+                                                        class="backend-url-control backend-url-input" />
+                                                </div>
+                                                <div v-else
+                                                    class="backend-url-config backend-url-config-external df ai-c">
+                                                    <a-select v-model="r.root_protocol"
+                                                        class="backend-url-control backend-url-protocol"
+                                                        @change="getMenu">
+                                                        <a-option label="http://" value="http://"></a-option>
+                                                        <a-option label="https://" value="https://"></a-option>
+                                                    </a-select>
+                                                    <a-input v-model="r.root_url" @change="getMenu" placeholder="请输入地址"
+                                                        class="backend-url-control backend-url-input" />
+                                                </div>
+                                                <div v-if="r.type == 'internal' && !hasBackendDomainConfig()"
+                                                    class="domain-warning">
+                                                    <icon-exclamation-circle-fill class="domain-warning-icon"
+                                                        :size="14" />
+                                                    <span>当前应用后端配置尚未启用域名设置，请前往后端包管理界面配置。</span>
+                                                </div>
+                                            </div>
+                                        </a-form-item>
+                                        <div class="df ai-c manifest-front-section-title">变量传递配置</div>
+                                        <div class="manifest-front-block">
+                                            <manifest-config-table title="请求参数(Query)" :rows="r.proxy_request_query"
+                                                table-class="manifest-param-table config-variable-table"
+                                                add-text="添加请求参数" @add="addParamRow(r.proxy_request_query)">
+                                                <template #columns>
+                                                    <manifest-config-table-column data-index="key" title="key">
+                                                        <template #cell="{ record }">
+                                                            <a-input v-model="record.key" placeholder="key"
+                                                                @change="getMenu"
+                                                                style="width:200px;margin-right:10px;"></a-input>
+                                                        </template>
+                                                    </manifest-config-table-column>
+                                                    <manifest-config-table-column data-index="value" title="value">
+                                                        <template #cell="{ record }">
+                                                            <div class="param-value-field">
+                                                                <a-input v-model="record.value" placeholder="value"
+                                                                    @change="changeConfigValue(record)">
+                                                                    <template #suffix>
+                                                                        <a-popover trigger="click" position="bottom"
+                                                                            :content-style="{ width: '360px' }">
+                                                                            <span
+                                                                                class="config-value-suffix">选择系统配置</span>
+                                                                            <template #content>
+                                                                                <div class="var-picker">
+                                                                                    <template
+                                                                                        v-for="group in variableGroups"
+                                                                                        :key="group.title">
+                                                                                        <div class="var-picker-title">{{
+                                                                                            group.title }}</div>
+                                                                                        <div
+                                                                                            v-if="group.options.length">
+                                                                                            <div v-for="param in group.options"
+                                                                                                :key="param.value"
+                                                                                                class="var-picker-item"
+                                                                                                @click="selectConfigVariable(record, param)">
+                                                                                                <div
+                                                                                                    class="var-picker-name">
+                                                                                                    {{ param.key ||
+                                                                                                    param.value }}
+                                                                                                    <span>{{
+                                                                                                        param.displayValue
+                                                                                                        }}</span></div>
+                                                                                            </div>
+                                                                                        </div>
+                                                                                        <div v-else
+                                                                                            class="var-picker-empty">
+                                                                                            暂无可选配置</div>
+                                                                                    </template>
+                                                                                </div>
+                                                                            </template>
+                                                                        </a-popover>
+                                                                    </template>
+                                                                </a-input>
+                                                            </div>
+                                                        </template>
+                                                    </manifest-config-table-column>
+                                                    <manifest-config-table-column title="描述">
+                                                        <template #cell="{ record }">{{ getConfigVariableLabel(record)
+                                                            }}</template>
+                                                    </manifest-config-table-column>
+                                                    <manifest-config-table-column title="操作">
+                                                        <template #cell="{ index }">
+                                                            <span class="c-blue cursor handle"
+                                                                @click="removeParamRow(r.proxy_request_query, index)">删除</span>
+                                                        </template>
+                                                    </manifest-config-table-column>
+                                                </template>
+                                            </manifest-config-table>
+                                        </div>
+                                    </template>
+                                    <template v-else>
+
+                                        <div class="greybox-title">变量传递配置<a-tooltip content="将开发者设置的变量值传递给后端接口和前端JS变量中">
+                                                <ArcoIcon name="icon-41" :size="16" />
+                                            </a-tooltip></div>
+                                        <a-form-item label="接口类型" style="margin-bottom:20px;">
+                                            <a-radio-group v-model="r.type" @change="changeBackendType(r)">
+                                                <a-radio value="internal">应用内网地址（internal）</a-radio>
+                                                <a-radio value="external">应用外网地址（external）</a-radio>
+                                            </a-radio-group>
+                                        </a-form-item>
+                                        <a-form-item label="接口地址" style="margin-bottom:20px;">
+                                            <div v-if="r.type == 'internal'" class="backend-url-config df ai-c">
+                                                <span class="backend-url-fixed">http://</span>
+                                                <a-select v-model="r.backend_identifie" allow-search
+                                                    placeholder="选择应用标识"
+                                                    class="backend-url-control backend-url-identifie"
+                                                    @change="changeBackendIdentifie(r)">
+                                                    <a-option v-for="app in backendAppOptions" :key="app.id"
+                                                        :label="app.id" :value="app.id">
+                                                        <div class="backend-app-option">
+                                                            <span>{{ app.id }}</span>
+                                                            <span v-if="app.title && app.title != app.id">{{ app.title
+                                                                }}</span>
+                                                        </div>
+                                                    </a-option>
+                                                </a-select>
+                                                <span class="backend-url-fixed">.default.svc.cluster.local:</span>
+                                                <a-auto-complete v-model="r.backend_port"
+                                                    :data="getBackendPortOptions(r.backend_identifie, r.backend_port)"
+                                                    :filter-option="false" placeholder="端口"
+                                                    class="backend-url-control backend-url-port" @input="getMenu"
+                                                    @change="getMenu" @select="getMenu"></a-auto-complete>
+                                            </div>
+                                            <div v-else class="backend-url-config backend-url-config-external df ai-c">
+                                                <a-select v-model="r.root_protocol"
+                                                    class="backend-url-control backend-url-protocol" @change="getMenu">
+                                                    <a-option label="http://" value="http://"></a-option>
+                                                    <a-option label="https://" value="https://"></a-option>
+                                                </a-select>
+                                                <a-input v-model="r.root_url" @change="getMenu" placeholder="请输入地址"
+                                                    class="backend-url-control backend-url-input" />
+                                            </div>
+                                        </a-form-item>
+
+                                        <div class="df ai-c manifest-front-section-title">代理配置<a-tooltip
+                                                content="面板提供转发服务到接口地址，接口后端可通过HTTP变量获取传递值">
+                                                <ArcoIcon name="icon-41" :size="16" />
+                                            </a-tooltip></div>
+                                        <div class="manifest-front-block">
+                                            <a-form-item label="代理地址">
+                                                <a-input readonly
+                                                    :default-value="`/panel-api/v1/microapp/${identifie}/proxy`"
+                                                    style="width: 400px"></a-input>
+                                            </a-form-item>
+                                            <manifest-config-table title="请求头(Header)" :rows="r.proxy_request_header"
+                                                table-class="manifest-param-table config-variable-table"
+                                                add-text="添加请求头" @add="addParamRow(r.proxy_request_header)">
+                                                <template #columns>
+                                                    <manifest-config-table-column data-index="key" title="key">
+                                                        <template #cell="{ record }">
+                                                            <a-input v-model="record.key" placeholder="key"
+                                                                @change="getMenu"
+                                                                style="width:200px;margin-right:10px;"></a-input>
+                                                        </template>
+                                                    </manifest-config-table-column>
+                                                    <manifest-config-table-column data-index="value" title="value">
+                                                        <template #cell="{ record }">
+                                                            <div class="param-value-field">
+                                                                <a-input v-model="record.value" placeholder="value"
+                                                                    @change="changeConfigValue(record)">
+                                                                    <template #suffix>
+                                                                        <a-popover trigger="click" position="bottom"
+                                                                            :content-style="{ width: '360px' }">
+                                                                            <span
+                                                                                class="config-value-suffix">选择系统配置</span>
+                                                                            <template #content>
+                                                                                <div class="var-picker">
+                                                                                    <template
+                                                                                        v-for="group in variableGroups"
+                                                                                        :key="group.title">
+                                                                                        <div class="var-picker-title">{{
+                                                                                            group.title }}</div>
+                                                                                        <div
+                                                                                            v-if="group.options.length">
+                                                                                            <div v-for="param in group.options"
+                                                                                                :key="param.value"
+                                                                                                class="var-picker-item"
+                                                                                                @click="selectConfigVariable(record, param)">
+                                                                                                <div
+                                                                                                    class="var-picker-name">
+                                                                                                    {{ param.key ||
+                                                                                                    param.value }}
+                                                                                                    <span>{{
+                                                                                                        param.displayValue
+                                                                                                        }}</span></div>
+                                                                                            </div>
+                                                                                        </div>
+                                                                                        <div v-else
+                                                                                            class="var-picker-empty">
+                                                                                            暂无可选配置</div>
+                                                                                    </template>
+                                                                                </div>
+                                                                            </template>
+                                                                        </a-popover>
+                                                                    </template>
+                                                                </a-input>
+                                                            </div>
+                                                        </template>
+                                                    </manifest-config-table-column>
+                                                    <manifest-config-table-column title="描述">
+                                                        <template #cell="{ record }">{{ getConfigVariableLabel(record)
+                                                            }}</template>
+                                                    </manifest-config-table-column>
+                                                    <manifest-config-table-column title="操作">
+                                                        <template #cell="{ index }">
+                                                            <span class="c-blue cursor handle"
+                                                                @click="removeParamRow(r.proxy_request_header, index)">删除</span>
+                                                        </template>
+                                                    </manifest-config-table-column>
+                                                </template>
+                                            </manifest-config-table>
+                                            <manifest-config-table class="mt-20"
+                                                v-if="!(form.menu_type == 'thirdparty_cd' && r.name == 'normal')"
+                                                title="请求参数(Query)" :rows="r.proxy_request_query"
+                                                table-class="manifest-param-table config-variable-table"
+                                                add-text="添加请求参数" @add="addParamRow(r.proxy_request_query)">
+                                                <template #columns>
+                                                    <manifest-config-table-column data-index="key" title="key">
+                                                        <template #cell="{ record }">
+                                                            <a-input v-model="record.key" placeholder="key"
+                                                                @change="getMenu"
+                                                                style="width:200px;margin-right:10px;"></a-input>
+                                                        </template>
+                                                    </manifest-config-table-column>
+                                                    <manifest-config-table-column data-index="value" title="value">
+                                                        <template #cell="{ record }">
+                                                            <div class="param-value-field">
+                                                                <a-input v-model="record.value" placeholder="value"
+                                                                    @change="changeConfigValue(record)">
+                                                                    <template #suffix>
+                                                                        <a-popover trigger="click" position="bottom"
+                                                                            :content-style="{ width: '360px' }">
+                                                                            <span
+                                                                                class="config-value-suffix">选择系统配置</span>
+                                                                            <template #content>
+                                                                                <div class="var-picker">
+                                                                                    <template
+                                                                                        v-for="group in variableGroups"
+                                                                                        :key="group.title">
+                                                                                        <div class="var-picker-title">{{
+                                                                                            group.title }}</div>
+                                                                                        <div
+                                                                                            v-if="group.options.length">
+                                                                                            <div v-for="param in group.options"
+                                                                                                :key="param.value"
+                                                                                                class="var-picker-item"
+                                                                                                @click="selectConfigVariable(record, param)">
+                                                                                                <div
+                                                                                                    class="var-picker-name">
+                                                                                                    {{ param.key ||
+                                                                                                    param.value }}
+                                                                                                    <span>{{
+                                                                                                        param.displayValue
+                                                                                                        }}</span></div>
+                                                                                            </div>
+                                                                                        </div>
+                                                                                        <div v-else
+                                                                                            class="var-picker-empty">
+                                                                                            暂无可选配置</div>
+                                                                                    </template>
+                                                                                </div>
+                                                                            </template>
+                                                                        </a-popover>
+                                                                    </template>
+                                                                </a-input>
+                                                            </div>
+                                                        </template>
+                                                    </manifest-config-table-column>
+                                                    <manifest-config-table-column title="描述">
+                                                        <template #cell="{ record }">{{ getConfigVariableLabel(record)
+                                                            }}</template>
+                                                    </manifest-config-table-column>
+                                                    <manifest-config-table-column title="操作">
+                                                        <template #cell="{ index }">
+                                                            <span class="c-blue cursor handle"
+                                                                @click="removeParamRow(r.proxy_request_query, index)">删除</span>
+                                                        </template>
+                                                    </manifest-config-table-column>
+                                                </template>
+                                            </manifest-config-table>
+                                        </div>
+                                        <div v-if="!(form.menu_type == 'thirdparty_cd' && r.name == 'normal')"
+                                            class="df ai-c manifest-front-section-title mt-20">前端配置<a-tooltip
+                                                content="面板提供microapp机制渲染前端包，可通过window.$wujie.props.frontend_props 从JS变量获取传递值">
+                                                <ArcoIcon name="icon-41" :size="16" />
+                                            </a-tooltip></div>
+                                        <div v-if="!(form.menu_type == 'thirdparty_cd' && r.name == 'normal')"
+                                            class="manifest-front-block mt-20">
+                                            <manifest-config-table :rows="r.frontend_props"
+                                                table-class="manifest-param-table frontend-param-table"
+                                                add-text="添加前端配置" always-show @add="addParamRow(r.frontend_props)">
+                                                <template #columns>
+                                                    <manifest-config-table-column data-index="key" title="key">
+                                                        <template #cell="{ record }">
+                                                            <a-input v-model="record.key" placeholder="key"
+                                                                @change="getMenu"
+                                                                style="width:200px;margin-right:10px;"></a-input>
+                                                        </template>
+                                                    </manifest-config-table-column>
+                                                    <manifest-config-table-column data-index="value" title="value">
+                                                        <template #cell="{ record }">
+                                                            <div class="param-value-field">
+                                                                <a-input v-model="record.value" placeholder="value"
+                                                                    @change="changeConfigValue(record)">
+                                                                    <template #suffix>
+                                                                        <a-popover trigger="click" position="bottom"
+                                                                            :content-style="{ width: '360px' }">
+                                                                            <span
+                                                                                class="config-value-suffix">选择系统配置</span>
+                                                                            <template #content>
+                                                                                <div class="var-picker">
+                                                                                    <template
+                                                                                        v-for="group in variableGroups"
+                                                                                        :key="group.title">
+                                                                                        <div class="var-picker-title">{{
+                                                                                            group.title }}</div>
+                                                                                        <div
+                                                                                            v-if="group.options.length">
+                                                                                            <div v-for="param in group.options"
+                                                                                                :key="param.value"
+                                                                                                class="var-picker-item"
+                                                                                                @click="selectConfigVariable(record, param)">
+                                                                                                <div
+                                                                                                    class="var-picker-name">
+                                                                                                    {{ param.key ||
+                                                                                                    param.value }}
+                                                                                                    <span>{{
+                                                                                                        param.displayValue
+                                                                                                        }}</span></div>
+                                                                                            </div>
+                                                                                        </div>
+                                                                                        <div v-else
+                                                                                            class="var-picker-empty">
+                                                                                            暂无可选配置</div>
+                                                                                    </template>
+                                                                                </div>
+                                                                            </template>
+                                                                        </a-popover>
+                                                                    </template>
+                                                                </a-input>
+                                                            </div>
+                                                        </template>
+                                                    </manifest-config-table-column>
+                                                    <manifest-config-table-column title="描述">
+                                                        <template #cell="{ record }">{{ getConfigVariableLabel(record)
+                                                            }}</template>
+                                                    </manifest-config-table-column>
+                                                    <manifest-config-table-column title="操作">
+                                                        <template #cell="{ index }">
+                                                            <span class="c-blue cursor handle"
+                                                                @click="removeParamRow(r.frontend_props, index)">删除</span>
+                                                        </template>
+                                                    </manifest-config-table-column>
+                                                </template>
+                                                <template #prepend>
+                                                    <tr v-for="item in frontendDefaultProps" :key="item.value"
+                                                        class="frontend-default-prop-row">
+                                                        <td>{{ item.key }}</td>
+                                                        <td>{{ item.value }}</td>
+                                                        <td>{{ item.description }}</td>
+                                                        <td></td>
+                                                    </tr>
+                                                </template>
+                                            </manifest-config-table>
+                                        </div>
+                                    </template>
+
+                                </div>
+
+                                <div class="mt-10 greybox manifest-front-config">
+                                    <div class="greybox-title">菜单配置</div>
+                                    <manifest-config-table :rows="r.menu" table-class="menutable mt-10"
+                                        add-text="添加一级菜单" always-show @add="addMenu(r.menu)">
+                                        <template #columns>
+                                            <manifest-config-table-column data-index="displayorder" title="排序">
+                                                <template #cell="{ record }">
+                                                    <div><a-input type="number"
+                                                            :model-value="String(record.displayorder ?? '')"
+                                                            @update:model-value="v => record.displayorder = v"
+                                                            @change="getMenu"
+                                                            style="width:60px; height:36px;"></a-input>
+                                                    </div>
+                                                    <div v-for="(sub, subid) in record.children" :key="subid"
+                                                        class="df mt-10">
+                                                        <div class="branch"
+                                                            :class="{ last: subid == record.children.length - 1 }">
+                                                        </div>
+                                                        <a-input type="number"
+                                                            :model-value="String(sub.displayorder ?? '')"
+                                                            @update:model-value="v => sub.displayorder = v"
+                                                            @change="getMenu"
+                                                            style="width:60px; height:36px;"></a-input>
+                                                    </div>
+                                                </template>
+                                            </manifest-config-table-column>
+                                            <manifest-config-table-column data-index="do" title="路由">
+                                                <template #cell="{ record }">
+                                                    <div><a-input v-model="record.do" @change="onMenuChanged(r.menu)"
+                                                            style="width:150px; height:36px;"
+                                                            placeholder="路由"></a-input>
+                                                    </div>
+                                                    <div v-for="(sub, subid) in record.children" :key="subid"
+                                                        class="mt-10">
+                                                        <a-input v-model="sub.do" @change="onMenuChanged(r.menu)"
+                                                            style="width:150px; height:36px;"
+                                                            placeholder="路由"></a-input>
+                                                    </div>
+                                                </template>
+                                            </manifest-config-table-column>
+                                            <manifest-config-table-column data-index="title" title="名称">
+                                                <template #cell="{ record }">
+                                                    <div><a-input v-model="record.title" @change="onMenuChanged(r.menu)"
+                                                            style="width:150px; height:36px;"
+                                                            placeholder="名称"></a-input>
+                                                    </div>
+                                                    <div v-for="(sub, subid) in record.children" :key="subid"
+                                                        class="mt-10">
+                                                        <a-input v-model="sub.title" @change="onMenuChanged(r.menu)"
+                                                            style="width:150px; height:36px;"
+                                                            placeholder="名称"></a-input>
+                                                    </div>
+                                                </template>
+                                            </manifest-config-table-column>
+                                            <manifest-config-table-column data-index="default">
+                                                <template #title>
+                                                    <div class="df ai-c jc-c">
+                                                        <span>欢迎页</span>
+                                                        <a-tooltip content="用户进入系统首页访问的页面">
+                                                            <icon-question-circle-fill class="cursor ml-4 c-99"
+                                                                :size="16" />
+                                                        </a-tooltip>
+                                                    </div>
+                                                </template>
+                                                <template #cell="{ record }">
+                                                    <div class="menu-default-cell">
+                                                        <div class="menu-default-check"
+                                                            :style="{ visibility: record.children?.length > 0 ? 'hidden' : 'visible' }">
+                                                            <a-checkbox :model-value="Number(record.is_default) === 1"
+                                                                :name="r.name"
+                                                                @click.stop="setMenuDefault(r.menu, record)"></a-checkbox>
+                                                        </div>
+                                                        <div v-for="(sub, subid) in record.children" :key="subid"
+                                                            class="mt-10 menu-default-check">
+                                                            <a-checkbox :model-value="Number(sub.is_default) === 1"
+                                                                :name="r.name"
+                                                                @click.stop="setMenuDefault(r.menu, sub)"></a-checkbox>
+                                                        </div>
+                                                    </div>
+                                                </template>
+                                            </manifest-config-table-column>
+                                            <manifest-config-table-column data-index="icon" title="图标">
+                                                <template #cell="{ record }">
+                                                    <div class="selicon cursor df ai-c jc-c" v-if="record.icon_svg"
+                                                        @click="dialogVisible = true; activeItem = record;"
+                                                        v-html="elementsToSvg(record.icon_svg)"></div>
+                                                    <div class="selicon cursor df ai-c jc-c" v-else-if="record.icon"
+                                                        @click="dialogVisible = true; activeItem = record;"><i
+                                                            class="fs-24 wi" :class="'wi-' + record.icon"></i>
+                                                    </div>
+                                                    <div class="selicon cursor df ai-c jc-c" v-else
+                                                        @click="dialogVisible = true; activeItem = record;">
+                                                        <svg class="default-menu-icon"
+                                                            xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"
+                                                            aria-hidden="true">
+                                                            <path fill="currentColor"
+                                                                d="M160 448a32 32 0 0 1-32-32V160.064a32 32 0 0 1 32-32h256a32 32 0 0 1 32 32V416a32 32 0 0 1-32 32zm448 0a32 32 0 0 1-32-32V160.064a32 32 0 0 1 32-32h255.936a32 32 0 0 1 32 32V416a32 32 0 0 1-32 32zM160 896a32 32 0 0 1-32-32V608a32 32 0 0 1 32-32h256a32 32 0 0 1 32 32v256a32 32 0 0 1-32 32zm448 0a32 32 0 0 1-32-32V608a32 32 0 0 1 32-32h255.936a32 32 0 0 1 32 32v256a32 32 0 0 1-32 32z">
+                                                            </path>
+                                                        </svg>
+                                                    </div>
+                                                    <div v-for="(sub, subid) in record.children" :key="subid"
+                                                        class="df ai-c jc-c mt-10" style="width:36px; height:36px;">
+                                                    </div>
+                                                </template>
+                                            </manifest-config-table-column>
+                                            <manifest-config-table-column title="操作">
+                                                <template #cell="{ record, index }">
+                                                    <div class="df ai-c" style="height:36px;">
+                                                        <span class="handle c-blue cursor"
+                                                            @click="addSub(r.menu, record)">添加子菜单</span>
+                                                        <a-popover position="top" :content-style="{ width: '240px' }">
+                                                            <span class="handle c-blue cursor">设置位置</span>
+                                                            <template #content>
+                                                                <div>
+                                                                    <div class="df ai-c jc-b">
+                                                                        <div class="menu-single-location">单个菜单位置设置
+                                                                        </div>
+                                                                    </div>
+                                                                    <a-radio-group v-model="record.location"
+                                                                        class="df mt-10" @change="getMenu">
+                                                                        <div class="fc df df-c ai-c menulocation cursor"
+                                                                            @click="record.location = 'normal'; getMenu()">
+                                                                            <img v-if="r.location == 'top'"
+                                                                                src="@/assets/img/menu-t.png" alt="" />
+                                                                            <img v-else src="@/assets/img/menu-l.png"
+                                                                                alt="" />
+                                                                            <a-radio value="normal"
+                                                                                class="mt-10">默认位置</a-radio>
+                                                                        </div>
+                                                                        <div v-if="r.location == 'top'"
+                                                                            class="fc df df-c ai-c menulocation cursor"
+                                                                            @click="record.location = 'back'; getMenu()">
+                                                                            <img src="@/assets/img/menu-r.png" alt="" />
+                                                                            <a-radio value="back"
+                                                                                class="mt-10">顶部右侧</a-radio>
+                                                                        </div>
+                                                                        <div v-else
+                                                                            class="fc df df-c ai-c menulocation cursor"
+                                                                            @click="record.location = 'back'; getMenu()">
+                                                                            <img src="@/assets/img/menu-b.png" alt="" />
+                                                                            <a-radio value="back"
+                                                                                class="mt-10">左侧底部</a-radio>
+                                                                        </div>
+                                                                    </a-radio-group>
+                                                                </div>
+                                                            </template>
+                                                        </a-popover>
+                                                        <span class="handle c-blue cursor"
+                                                            @click="removeMenu(r.menu, index)">删除</span>
+                                                    </div>
+                                                    <div v-for="(sub, subid) in record.children" :key="subid"
+                                                        class="mt-10 df ai-c" style="height:36px;">
+                                                        <span class="handle c-blue cursor"
+                                                            @click="removeSubMenu(r.menu, record, subid)">删除</span>
+                                                    </div>
+                                                </template>
+                                            </manifest-config-table-column>
+                                        </template>
+                                    </manifest-config-table>
+                                </div>
+                            </div>
                         </div>
-                        <span v-if="form.type == 'tradition'">传统应用</span>
                     </div>
-                    <div class="bg-white pb-24 mt-20 manifest-submit-bar">
-                        <a-form-item label=" " class="manifest-submit-item">
+                    <div class="bg-white pb-24 manifest-submit-bar">
                             <a-button :loading="submiting" type="primary" @click="submit()"
                                 style="width:90px;">确定提交</a-button>
-                        </a-form-item>
                     </div>
                 </a-form>
             </div>
@@ -691,12 +744,10 @@
             <a-form ref="role" :model="newRole" label-align="left" class="manifest-dialog-form"
                 :label-col-props="{ flex: '0 0 80px' }" :wrapper-col-props="{ flex: '1' }">
                 <a-form-item label="名称" field="title" :rules="[{ required: true, message: '内容不能为空', trigger: 'blur' }]">
-                    <a-input placeholder="请输入管理端名称" v-model="newRole.title" size="large"
-                        style="width:100%;"></a-input>
+                    <a-input placeholder="请输入管理端名称" v-model="newRole.title" size="large" style="width:100%;"></a-input>
                 </a-form-item>
                 <a-form-item label="标识" field="name" :rules="[{ required: true, message: '内容不能为空', trigger: 'blur' }]">
-                    <a-input placeholder="请输入管理端标识" v-model="newRole.name" size="large"
-                        style="width:100%;"></a-input>
+                    <a-input placeholder="请输入管理端标识" v-model="newRole.name" size="large" style="width:100%;"></a-input>
                 </a-form-item>
             </a-form>
             <div class="dialog-footer">
@@ -774,7 +825,7 @@ export default {
             form: {
 
                 front_type: ['thirdparty_cd'],
-                menu_type: 'console',
+                menu_type: 'thirdparty_cd',
                 type: 'front',
                 name: "",
                 author: "",
@@ -1232,7 +1283,11 @@ export default {
             return this.currentBackendIdentifie || this.backendAppOptions[0]?.id || '';
         },
         getDefaultBackendPort(identifie) {
-            return this.getBackendPorts(identifie)[0] || '';
+            return this.normalizeBackendPortValue(this.getBackendPorts(identifie)[0]);
+        },
+        normalizeBackendPortValue(port) {
+            let value = port === undefined || port === null ? '' : String(port).trim();
+            return value === '0' ? '' : value;
         },
         changeBackendIdentifie(role) {
             role.backend_port = this.getDefaultBackendPort(role.backend_identifie);
@@ -1367,7 +1422,8 @@ export default {
             return (role.root_protocol || 'http://') + role.root_url;
         },
         formatBackendPort(port) {
-            if (port === '' || port === undefined || port === null) { return '' }
+            port = this.normalizeBackendPortValue(port);
+            if (port === '') { return '' }
             return /^\d+$/.test(String(port)) ? Number(port) : port;
         },
         deleteRoleEdit() {
@@ -1610,7 +1666,7 @@ export default {
             this.panelRoleOptions.forEach(role => {
                 cdRole[role.name] = false;
             });
-            this.form.role.forEach(r => {
+            this.form.role.filter(r => r.support == 'thirdparty_cd').forEach(r => {
 
                 if (r.type == 'external') {
                     try {
@@ -1866,10 +1922,7 @@ export default {
             this.form.role = j?.bindings?.length ? j.bindings : (this.form.role || []);
             this.form.role.forEach((item) => {
                 if (!item.support) {
-                    item.support = 'console';
-                    let thirdparty_cd = JSON.parse(JSON.stringify(item));
-                    thirdparty_cd.support = 'thirdparty_cd';
-                    this.form.role.push(thirdparty_cd);
+                    item.support = 'thirdparty_cd';
                 }
 
                 if (item.load_mode == 'iframe') {
@@ -1894,7 +1947,7 @@ export default {
                         item.root_url = '';
                         item.backend_identifie = item?.backend_config?.backend_identifie;
                         item.backend_identifie = item.backend_identifie || this.getDefaultBackendIdentifie();
-                        item.backend_port = String(item?.backend_config?.backend_port ?? '');
+                        item.backend_port = this.normalizeBackendPortValue(item?.backend_config?.backend_port);
                     }
                 }
 
@@ -2141,6 +2194,15 @@ export default {
 .com-line {
     padding-bottom: 20px;
     border-bottom: 1px solid #E7E7E7;
+}
+
+.manifest-front-panel {
+    padding-bottom: 20px;
+}
+
+.manifest-front-panel-body {
+    width: 100%;
+    margin-top: 16px;
 }
 
 .upfilebox {
@@ -2475,6 +2537,14 @@ export default {
     font-weight: 600;
 }
 
+.manifest-front-section-title-first {
+    margin-top: 0;
+}
+
+.manifest-front-upload-section+.greybox-title {
+    margin-top: 4px;
+}
+
 .manifest-front-block {
     padding-bottom: 4px;
 }
@@ -2773,5 +2843,4 @@ export default {
     width: 100%;
     min-width: 0;
 }
-
 </style>

@@ -861,7 +861,8 @@ export default {
         onChange() { },
         computedSpDisabled(item) {
             return ((this.disabledDomainStartParams || this.form.type == 'tradition') && item.mark === 'domain')
-                || (this.json?.platform?.['volumeClaimTemplates']?.length && item.mark === 'storage');
+                || (this.json?.platform?.['volumeClaimTemplates']?.length && item.mark === 'storage')
+                || this.form.type == 'tradition' && item.name === 'DOMAIN_URL'
         },
         formatIngressRoutes(routes = []) {
             return routes.filter(r => r.path && r.backend?.port).map(r => ({
@@ -1580,7 +1581,7 @@ platform:
                         values_text: '%DOMAIN_SSL_URL%',
                         title: '域名',
                         required: true,
-                        module_name: '',
+                        module_name: ''
                     })
                 }
 

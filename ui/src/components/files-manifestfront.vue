@@ -276,7 +276,18 @@
                                             </a-radio-group>
                                         </a-form-item>
                                         <a-form-item label="接口地址" style="margin-bottom:20px;">
-                                            <div v-if="r.type == 'internal'" class="backend-url-config df ai-c">
+                                            <div class="backend-url-form-field" v-if="r.type == 'internal' && form.type === 'tradition'">
+                                                <div class="backend-url-config df ai-c">
+                                                    <span class="backend-url-fixed">https://</span>
+                                                    <span class="backend-url-fixed backend-url-placeholder">{{
+                                                        getIframeDomainDisplayPlaceholder() }}</span>
+                                                    <span class="backend-url-fixed">/</span>
+                                                    <a-input v-model="r.backend_path" @input="getMenu" @change="getMenu"
+                                                        placeholder="请输入目录"
+                                                        class="backend-url-control backend-url-input" />
+                                                </div>
+                                            </div>
+                                            <div v-else-if="r.type == 'internal'" class="backend-url-config df ai-c">
                                                 <span class="backend-url-fixed">http://</span>
                                                 <a-select v-model="r.backend_identifie" allow-search
                                                     placeholder="选择应用标识"
@@ -1289,12 +1300,15 @@ export default {
             let value = port === undefined || port === null ? '' : String(port).trim();
             return value === '0' ? '' : value;
         },
+        usesDomainBackendAddress(role) {
+            return role?.type == 'internal' && (role.load_mode == 'iframe' || this.form.type == 'tradition');
+        },
         changeBackendIdentifie(role) {
             role.backend_port = this.getDefaultBackendPort(role.backend_identifie);
             this.getMenu();
         },
         changeBackendType(role) {
-            if (role.load_mode == 'iframe') {
+            if (this.usesDomainBackendAddress(role)) {
                 this.syncIframeBackendDefaults(role);
                 this.getMenu();
                 return;
@@ -1316,7 +1330,7 @@ export default {
                 role.type = role.type || 'internal';
                 this.syncIframeBackendDefaults(role);
             } else {
-                if (role.type == 'internal' && [this.getIframeDomainPlaceholder(), this.getIframeDomainDisplayPlaceholder()].includes(role.backend_identifie)) {
+                if (this.form.type != 'tradition' && role.type == 'internal' && [this.getIframeDomainPlaceholder(), this.getIframeDomainDisplayPlaceholder()].includes(role.backend_identifie)) {
                     role.backend_identifie = this.getDefaultBackendIdentifie();
                     role.backend_port = this.getDefaultBackendPort(role.backend_identifie);
                 }
@@ -1331,7 +1345,7 @@ export default {
         syncRoleBackendDefaults() {
             let changed = false;
             this.form.role.forEach(role => {
-                if (role.load_mode == 'iframe') {
+                if (this.usesDomainBackendAddress(role)) {
                     changed = this.syncIframeBackendDefaults(role) || changed;
                     return;
                 }
@@ -1712,9 +1726,19 @@ export default {
                         } : {}),
                     };
                 } else {
+                    let usesDomainBackendAddress = this.usesDomainBackendAddress(r);
+                    if (usesDomainBackendAddress) {
+                        this.syncIframeBackendDefaults(r);
+                    }
                     itemObj.backend_config = {
                         type: r.type,
-                        ...(r.type == 'internal' ? {
+                        ...(usesDomainBackendAddress ? {
+                            backend_identifie: this.getIframeBackendUrl(r),
+                            proxy_request: {
+                                headers: proxy_request_header,
+                                query: proxy_request_query,
+                            },
+                        } : r.type == 'internal' ? {
                             backend_identifie: r.backend_identifie,
                             backend_port: this.formatBackendPort(r.backend_port),
                             proxy_request: {
@@ -1948,6 +1972,12 @@ export default {
                         item.backend_identifie = item?.backend_config?.backend_identifie;
                         item.backend_identifie = item.backend_identifie || this.getDefaultBackendIdentifie();
                         item.backend_port = this.normalizeBackendPortValue(item?.backend_config?.backend_port);
+                        if (this.form.type == 'tradition') {
+                            let iframeBackend = this.parseIframeBackendUrl(item?.backend_config?.backend_identifie || '');
+                            item.backend_identifie = iframeBackend.backend_identifie;
+                            item.backend_path = iframeBackend.type == 'internal' ? iframeBackend.backend_path : '';
+                            item.backend_port = '';
+                        }
                     }
                 }
 

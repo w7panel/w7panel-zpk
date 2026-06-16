@@ -1797,6 +1797,7 @@ func (hc *HelmPack) generateMicroAppTemplate(rootDir string, manifest logic2.Man
 {{- $defaultPort = .Values.service.port -}}
 {{- end -}}
 {{- $releaseName := .Release.Name -}}
+{{- $applicationType := "%s" -}}
 
 {{- define "__cur__.fullname" -}}
 {{- if .Values.fullnameOverride }}
@@ -1835,9 +1836,13 @@ spec:
         {{- range .Values.backend_config }}
         {{ .role }}:
           {{- if eq .load_mode "iframe" }}
-          serverUrl: "https://{{ $.Values.DOMAIN_URL }}"
+          serverUrl: {{ tpl .backend_identifier $ | quote }}
           {{- else if eq .type "internal" }}
+          {{- if eq $applicationType "tradition" }}
+          serverUrl: {{ tpl .backend_identifier $ | quote }}
+          {{- else }}
           serverUrl: "http://{{ $fullName }}.{{ $releaseNamespace }}.svc.cluster.local:{{ default $defaultPort .backend_port }}"
+          {{- end }}
           {{- else if eq .type "external" }}
           serverUrl: {{ .backend_identifier }}
           {{- end }}
@@ -1888,7 +1893,7 @@ spec:
           parent: "{{ .parent }}"
           {{- end }}
       {{- end }}
-`, manifest.Application.Identifie, manifest.Application.Version, manifest.Application.Version, appName, manifest.Application.Identifie, manifest.Application.Version)
+`, manifest.Application.Type, manifest.Application.Identifie, manifest.Application.Version, manifest.Application.Version, appName, manifest.Application.Identifie, manifest.Application.Version)
 
 	return writeFile(microAppFilePath, microAppTemplate)
 }

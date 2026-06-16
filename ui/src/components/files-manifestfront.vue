@@ -148,14 +148,9 @@
                                         <div class="greybox-title">iframe配置</div>
                                         <a-alert type="info" show-icon class="zpk-primary-alert mb-20" title="提示"
                                             :closable="false">
-                                            <div class="registry-alert-item">受到iframe使用场景的严格限制，如果需要对接授权登录，可将
-                                                {access_token} 传递给iframe，然后由后端服务请求授权接口地址（http://xxxx）获取用户信息。
-                                            </div>
-                                            <div class="registry-alert-item mt-6">由于iframe受到了浏览器安全限制，生成cookies时必须设置
-                                                SameSite: None, Secure: true，并且header设置允许 * 跨域，才能正常传递。
-                                            </div>
-                                            <div class="registry-alert-item mt-6">变量传递只支持query方式，会将GET参数固定拼接到地址后。
-                                            </div>
+                                            <div class="registry-alert-item">由于iframe受到了浏览器安全限制，后端地址必须支持https协议访问。</div>
+                                            <div class="registry-alert-item mt-6">由于iframe受到了浏览器安全限制，生成cookies时必须设置 SameSite: None, Secure: true，并且header设置允许 * 跨域，才能正常传递。</div>
+                                            <div class="registry-alert-item mt-6">变量传递的请求参数只支持query方式，会将GET参数固定拼接到地址后。</div>
                                         </a-alert>
                                         <a-form-item label="地址类型" style="margin-bottom:20px;">
                                             <a-radio-group v-model="r.type" @change="changeBackendType(r)">
@@ -176,14 +171,8 @@
                                                 </div>
                                                 <div v-else
                                                     class="backend-url-config backend-url-config-external df ai-c">
-                                                    <a-select v-model="r.root_protocol"
-                                                        class="backend-url-control backend-url-protocol"
-                                                        @change="getMenu">
-                                                        <a-option label="http://" value="http://"></a-option>
-                                                        <a-option label="https://" value="https://"></a-option>
-                                                    </a-select>
                                                     <a-input v-model="r.root_url" @change="getMenu" placeholder="请输入地址"
-                                                        class="backend-url-control backend-url-input" />
+                                                        class="backend-url-control backend-url-input" addBefore='https://'/>
                                                 </div>
                                                 <div v-if="r.type == 'internal' && !hasBackendDomainConfig()"
                                                     class="domain-warning">
@@ -263,10 +252,98 @@
                                                 </template>
                                             </manifest-config-table>
                                         </div>
+                                        <div class="manifest-front-block mt-10">
+                                            <manifest-config-table :rows="r.frontend_props"
+                                                table-class="manifest-param-table frontend-param-table"
+                                                add-text="添加前端配置" always-show @add="addParamRow(r.frontend_props)">
+                                                <template #title>
+                                                    <div class="df ai-c">
+                                                        前端配置
+                                                        <a-tooltip
+                                                            position="tl"
+                                                            content="面板提供microapp机制渲染前端包，可通过window.$wujie.props.frontend_props 从JS变量获取传递值">
+                                                            <ArcoIcon name="icon-41" :size="16" />
+                                                        </a-tooltip>
+                                                    </div>
+                                                </template>
+                                                <template #columns>
+                                                    <manifest-config-table-column data-index="key" title="key">
+                                                        <template #cell="{ record }">
+                                                            <a-input v-model="record.key" placeholder="key"
+                                                                @change="getMenu"
+                                                                style="width:200px;margin-right:10px;"></a-input>
+                                                        </template>
+                                                    </manifest-config-table-column>
+                                                    <manifest-config-table-column data-index="value" title="value">
+                                                        <template #cell="{ record }">
+                                                            <div class="param-value-field">
+                                                                <a-input v-model="record.value" placeholder="value"
+                                                                    @change="changeConfigValue(record)">
+                                                                    <template #suffix>
+                                                                        <a-popover trigger="click" position="bottom"
+                                                                            :content-style="{ width: '360px' }">
+                                                                            <span
+                                                                                class="config-value-suffix">选择系统配置</span>
+                                                                            <template #content>
+                                                                                <div class="var-picker">
+                                                                                    <template
+                                                                                        v-for="group in variableGroups"
+                                                                                        :key="group.title">
+                                                                                        <div class="var-picker-title">{{
+                                                                                            group.title }}</div>
+                                                                                        <div
+                                                                                            v-if="group.options.length">
+                                                                                            <div v-for="param in group.options"
+                                                                                                :key="param.value"
+                                                                                                class="var-picker-item"
+                                                                                                @click="selectConfigVariable(record, param)">
+                                                                                                <div
+                                                                                                    class="var-picker-name">
+                                                                                                    {{ param.key ||
+                                                                                                    param.value }}
+                                                                                                    <span>{{
+                                                                                                        param.displayValue
+                                                                                                        }}</span></div>
+                                                                                            </div>
+                                                                                        </div>
+                                                                                        <div v-else
+                                                                                            class="var-picker-empty">
+                                                                                            暂无可选配置</div>
+                                                                                    </template>
+                                                                                </div>
+                                                                            </template>
+                                                                        </a-popover>
+                                                                    </template>
+                                                                </a-input>
+                                                            </div>
+                                                        </template>
+                                                    </manifest-config-table-column>
+                                                    <manifest-config-table-column title="描述">
+                                                        <template #cell="{ record }">{{ getConfigVariableLabel(record)
+                                                            }}</template>
+                                                    </manifest-config-table-column>
+                                                    <manifest-config-table-column title="操作">
+                                                        <template #cell="{ index }">
+                                                            <span class="c-blue cursor handle"
+                                                                @click="removeParamRow(r.frontend_props, index)">删除</span>
+                                                        </template>
+                                                    </manifest-config-table-column>
+                                                </template>
+                                                <template #prepend>
+                                                    <tr v-for="item in frontendDefaultProps" :key="item.value"
+                                                        class="frontend-default-prop-row">
+                                                        <td>{{ item.key }}</td>
+                                                        <td>{{ item.value }}</td>
+                                                        <td>{{ item.description }}</td>
+                                                        <td></td>
+                                                    </tr>
+                                                </template>
+                                            </manifest-config-table>
+                                        </div>
                                     </template>
                                     <template v-else>
 
-                                        <div class="greybox-title">变量传递配置<a-tooltip content="将开发者设置的变量值传递给后端接口和前端JS变量中">
+                                        <div class="greybox-title">变量传递配置<a-tooltip position="tl" content="将开发者设置的变量值传递给后端接口和前端JS变量中">
                                                 <ArcoIcon name="icon-41" :size="16" />
                                             </a-tooltip></div>
                                         <a-form-item label="接口类型" style="margin-bottom:20px;">
@@ -320,7 +397,7 @@
                                             </div>
                                         </a-form-item>
 
-                                        <div class="df ai-c manifest-front-section-title">代理配置<a-tooltip
+                                        <div class="df ai-c manifest-front-section-title">代理配置<a-tooltip position="tl"
                                                 content="面板提供转发服务到接口地址，接口后端可通过HTTP变量获取传递值">
                                                 <ArcoIcon name="icon-41" :size="16" />
                                             </a-tooltip></div>
@@ -398,7 +475,6 @@
                                                 </template>
                                             </manifest-config-table>
                                             <manifest-config-table class="mt-20"
-                                                v-if="!(form.menu_type == 'thirdparty_cd' && r.name == 'normal')"
                                                 title="请求参数(Query)" :rows="r.proxy_request_query"
                                                 table-class="manifest-param-table config-variable-table"
                                                 add-text="添加请求参数" @add="addParamRow(r.proxy_request_query)">
@@ -467,12 +543,12 @@
                                                 </template>
                                             </manifest-config-table>
                                         </div>
-                                        <div v-if="!(form.menu_type == 'thirdparty_cd' && r.name == 'normal')"
-                                            class="df ai-c manifest-front-section-title mt-20">前端配置<a-tooltip
+                                        <div
+                                            class="df ai-c manifest-front-section-title mt-20">前端配置<a-tooltip position="tl"
                                                 content="面板提供microapp机制渲染前端包，可通过window.$wujie.props.frontend_props 从JS变量获取传递值">
                                                 <ArcoIcon name="icon-41" :size="16" />
                                             </a-tooltip></div>
-                                        <div v-if="!(form.menu_type == 'thirdparty_cd' && r.name == 'normal')"
+                                        <div
                                             class="manifest-front-block mt-20">
                                             <manifest-config-table :rows="r.frontend_props"
                                                 table-class="manifest-param-table frontend-param-table"
@@ -613,7 +689,7 @@
                                                 <template #title>
                                                     <div class="df ai-c jc-c">
                                                         <span>欢迎页</span>
-                                                        <a-tooltip content="用户进入系统首页访问的页面">
+                                                        <a-tooltip position="tl" content="用户进入系统首页访问的页面">
                                                             <icon-question-circle-fill class="cursor ml-4 c-99"
                                                                 :size="16" />
                                                         </a-tooltip>
@@ -1308,7 +1384,7 @@ export default {
             this.getMenu();
         },
         changeBackendType(role) {
-            if (this.usesDomainBackendAddress(role)) {
+            if (role.load_mode == 'iframe' || this.usesDomainBackendAddress(role)) {
                 this.syncIframeBackendDefaults(role);
                 this.getMenu();
                 return;
@@ -1380,12 +1456,13 @@ export default {
                     changed = true;
                 }
             } else {
-                if (!role.root_protocol) {
-                    role.root_protocol = 'http://';
+                if (role.root_protocol != 'https://') {
+                    role.root_protocol = 'https://';
                     changed = true;
                 }
-                if (role.root_url === undefined || role.root_url === null) {
-                    role.root_url = '';
+                let rootUrl = this.normalizeHttpsExternalUrl(role.root_url);
+                if (role.root_url !== rootUrl) {
+                    role.root_url = rootUrl;
                     changed = true;
                 }
             }
@@ -1402,7 +1479,7 @@ export default {
                     type: 'internal',
                     backend_identifie: placeholder,
                     backend_path: path,
-                    root_protocol: 'http://',
+                    root_protocol: 'https://',
                 };
             }
             let externalBackend = this.parseExternalBackendUrl(value);
@@ -1419,7 +1496,11 @@ export default {
                 let path = String(role.backend_path || '').trim().replace(/^\/+/, '');
                 return `https://${this.getIframeDomainPlaceholder()}${path ? '/' + path : ''}`;
             }
-            return this.getExternalBackendUrl(role);
+            let url = this.normalizeHttpsExternalUrl(role.root_url);
+            return url ? `https://${url}` : '';
+        },
+        normalizeHttpsExternalUrl(url) {
+            return String(url || '').trim().replace(/^[a-z][a-z\d+.-]*:\/\//i, '');
         },
         parseExternalBackendUrl(url) {
             let match = (url || '').match(/^([a-z][a-z\d+.-]*:\/\/)(.*)$/i);
@@ -1721,9 +1802,7 @@ export default {
                         proxy_request: {
                             query: proxy_request_query,
                         },
-                        ...((r.support != 'thirdparty_cd' || r.name != 'normal') ? {
-                            frontend_props: frontend_props
-                        } : {}),
+                        frontend_props: frontend_props
                     };
                 } else {
                     let usesDomainBackendAddress = this.usesDomainBackendAddress(r);
@@ -1749,9 +1828,7 @@ export default {
 
                             backend_identifie: this.getExternalBackendUrl(r),
                         }),
-                        ...((r.support != 'thirdparty_cd' || r.name != 'normal') ? {
-                            frontend_props: frontend_props
-                        } : {}),
+                        frontend_props: frontend_props
                     };
                 }
 

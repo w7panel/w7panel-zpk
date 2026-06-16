@@ -319,12 +319,19 @@ func ProcessManifestIdentify(manifestRow Manifest) Manifest {
 		if !existsDefaultMenu && len(item.Menu) > 0 {
 			item.Menu[0].IsDefault = 1
 		}
-		item.BackendConfig.BackendIdentifie = strings.ReplaceAll(item.BackendConfig.BackendIdentifie, "_", "-")
+		item.BackendConfig.BackendIdentifie = normalizeBackendIdentifie(item.BackendConfig.BackendIdentifie)
 		manifestRow.Bindings[index] = item
 	}
 	manifestRow.Platform.Tradition.EnvironmentName = strings.ReplaceAll(manifestRow.Platform.Tradition.EnvironmentName, "_", "-")
 
 	return manifestRow
+}
+
+func normalizeBackendIdentifie(identifie string) string {
+	if strings.Contains(identifie, "{{") || strings.Contains(identifie, "://") {
+		return identifie
+	}
+	return strings.ReplaceAll(identifie, "_", "-")
 }
 
 func GetManifestV2(manifest Manifest) Manifest {

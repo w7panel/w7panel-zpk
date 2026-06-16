@@ -1670,11 +1670,11 @@ spec:
       restartPolicy: Never
       containers:
         - name: create-site-job
-          image: zpk.w7.cc/public/site-manager:v1.1.5
+          image: zpk.w7.cc/public/site-manager:v1.2.2
           command:
             - sh
             - -c
-            - /home/rangine create:site --operation={{ ternary "upgrade" "install" .Release.IsUpgrade }} --w7panel-domain={{ .Values.global.panel.innerUrl }} --w7panel-token={{ .Values.global.panel.panelRealToken }} --title=%s --name=%s --language=%s --version=%s --domain={{ .Values.DOMAIN_URL }} --ssl={{ .Values.ingressForceHttps }} --cmd=%s --code-download-url=%s --app_name=%s -f /home/config.yaml
+            - /home/rangine create:site --operation={{ ternary "upgrade" "install" .Release.IsUpgrade }} --w7panel-domain={{ .Values.global.panel.innerUrl }} --w7panel-token={{ .Values.global.panel.panelRealToken }} --title=%s --name=%s --language=%s --version=%s --domain={{ .Values.DOMAIN_URL }} --ssl={{ default false .Values.ingressForceHttps }} --cmd=%s --code-download-url=%s --app_name=%s --k8s-app-name={{ $fullName }} -f /home/config.yaml
 `, application.Identifie+"-"+tradition.EnvironmentVersion+"-副本", tradition.EnvironmentName, tradition.EnvironmentLanguage, tradition.EnvironmentVersion, cmd, zipUrl, application.Identifie)
 
 	filePath := filepath.Join(rootDir, "create-site-job.yaml")
@@ -1797,6 +1797,7 @@ func (hc *HelmPack) generateMicroAppTemplate(rootDir string, manifest logic2.Man
 {{- $defaultPort = .Values.service.port -}}
 {{- end -}}
 {{- $releaseName := .Release.Name -}}
+{{- $applicationType := "%s" -}}
 
 {{- define "__cur__.fullname" -}}
 {{- if .Values.fullnameOverride }}
@@ -1835,9 +1836,13 @@ spec:
         {{- range .Values.backend_config }}
         {{ .role }}:
           {{- if eq .load_mode "iframe" }}
-          serverUrl: "https://{{ $.Values.DOMAIN_URL }}"
+          serverUrl: {{ tpl .backend_identifier $ | quote }}
           {{- else if eq .type "internal" }}
+          {{- if eq $applicationType "tradition" }}
+          serverUrl: {{ tpl .backend_identifier $ | quote }}
+          {{- else }}
           serverUrl: "http://{{ $fullName }}.{{ $releaseNamespace }}.svc.cluster.local:{{ default $defaultPort .backend_port }}"
+          {{- end }}
           {{- else if eq .type "external" }}
           serverUrl: {{ .backend_identifier }}
           {{- end }}
@@ -1888,7 +1893,7 @@ spec:
           parent: "{{ .parent }}"
           {{- end }}
       {{- end }}
-`, manifest.Application.Identifie, manifest.Application.Version, manifest.Application.Version, appName, manifest.Application.Identifie, manifest.Application.Version)
+`, manifest.Application.Type, manifest.Application.Identifie, manifest.Application.Version, manifest.Application.Version, appName, manifest.Application.Identifie, manifest.Application.Version)
 
 	return writeFile(microAppFilePath, microAppTemplate)
 }

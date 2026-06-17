@@ -98,23 +98,36 @@ func (c Formula) Info(ctx *gin.Context) {
 	}
 	canUpgradeVersion := ""
 	formulaExpire := false
+	targetFormulaIdentify := ""
 	if params.Token != "" {
 		if err := w7.ZpkMarketSdk.CheckToken(params.Token, formula.Name); err != nil {
 			c.JsonResponseWithServerError(ctx, err)
 			return
 		}
 	} else {
-		ok := logic.Order{}.CheckFormulaCanInstallOrUpgrade(*formula, consoleUid, params.OrderSn, params.IsUpgrade > 0)
+		ok, formulaIdentify := logic.Order{}.CheckFormulaCanInstallOrUpgrade(*formula, consoleUid, params.OrderSn, params.IsUpgrade > 0)
 		if !ok {
 			c.JsonResponseWithError(ctx, errors.New("请先购买后再安装"), 500)
 			return
 		}
-		canUpgradeVersion, formulaExpire, err = logic.Order{}.GetFormulaCanUpgradeVersion(*formula, consoleUid, params.OrderSn)
-		slog.Info("formula can upgrade version", "formula", formula.Name, "consoleUid", consoleUid, "version", canUpgradeVersion, "err", err)
+		canUpgradeVersion, formulaExpire, formulaIdentify, err = logic.Order{}.GetFormulaCanUpgradeVersion(*formula, consoleUid, params.OrderSn)
+		slog.Info("formula can upgrade version", "formula", formula.Name, "consoleUid", consoleUid, "version", canUpgradeVersion, "formulaIdentify", formulaIdentify, "err", err)
 		if err != nil {
 			c.JsonResponseWithError(ctx, err, 500)
 			return
 		}
+		if formulaIdentify != "" && formulaIdentify != formula.Name {
+			targetFormulaIdentify = formulaIdentify
+		}
+	}
+	if targetFormulaIdentify != "" {
+		slog.Info("switch formula by order formula identify", "from", formula.Name, "to", targetFormulaIdentify, "orderSn", params.OrderSn)
+		formula, err = depotLogin.GetFormula(targetFormulaIdentify, params.Version, nil)
+		if err != nil {
+			c.JsonResponseWithError(ctx, err, 500)
+			return
+		}
+		params.CurVersion = formula.Version
 	}
 
 	var version *entity.Version

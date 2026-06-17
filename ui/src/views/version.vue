@@ -73,7 +73,9 @@
                                         </div>
                                         <div class="cross-upgrade-name">{{ currentAppName }}</div>
                                     </div>
-                                    <div class="cross-upgrade-arrow">-&gt;</div>
+                                    <div class="cross-upgrade-arrow">
+                                        <IconArrowRight />
+                                    </div>
                                     <div class="cross-upgrade-target-list">
                                         <div v-for="item in selectedCrossUpgradeTargets" :key="item.identifie"
                                             class="cross-upgrade-target-card">
@@ -105,12 +107,18 @@
                         </div>
                     </div>
                     <div class="mt-20 gray-box">
-                        <div class="c-16 b">开发版本</div>
+                        <div class="version-section-header">
+                            <div class="c-16 b">开发版本</div>
+                            <a-checkbox v-model="marketPublish.enabled" :disabled="marketPublish.saving"
+                                @change="handleMarketPublishEnabledChange">
+                                自动发布到制品市场
+                            </a-checkbox>
+                        </div>
                         <div class="mt-10">
                             <div v-for="(item, index) in list" :key="index" class="item version-dev-item">
                                 <div class="version-dev-main">
                                     <div class="c-66">版本号</div>
-                                    <div class="mt-20" style="display: flex; align-items: center;height: 24px;">
+                                    <div class="mt-20 version-title-row">
                                         <span class="lh-1 fs-20 b">{{ item.name }}</span>
 
                                         <a-tooltip
@@ -119,14 +127,16 @@
                                             <span class="ml-10 cursor" style="color:#E6A23C;">待审核</span>
                                         </a-tooltip>
 
-                                        <span v-if="item.id == version.id" class="c-blue"
-                                            style="border: 1px solid #0052d9;margin-left: 12px;padding: 1px;">线上版本</span>
-                                        <span class="publish-status" @click="toPublish(item)"
-                                            :class="{ '-1': 'c-99', 1: 'c-blue', 2: 'c-green', 3: 'c-red' }[item.publish_status]">{{
-                                                { '-1': '未发布', 1: '发布中', 2: '已发布', 3: '发布失败' }[item.publish_status]
-                                            }}</span>
-                                        <span class="publish-status-button c-blue" @click="toPublish(item)"
-                                            style="border:1px solid;padding:1px 3px;">点击发布</span>
+                                        <a-tag class="version-status-tag publish-status" bordered
+                                            :color="getPublishStatusColor(item.publish_status)">
+                                            {{ getPublishStatusText(item.publish_status) }}
+                                        </a-tag>
+                                        <a-tag v-if="item.id == version.id"
+                                            class="version-status-tag" color="green" bordered>线上版本</a-tag>
+                                        <a-button v-if="canUnpublishVersion(item)" class="publish-action-button"
+                                            type="outline" @click="toUnpublish(item)">点击下架</a-button>
+                                        <a-button v-else-if="canPublishVersion(item)" class="publish-action-button"
+                                            type="outline" @click="toPublish(item)">点击发布</a-button>
 
                                         <template v-if="item.publish_status == 3">
                                             <a-tooltip :content="item.publish_fail_reason" position="top">
@@ -370,7 +380,7 @@ import ManifestConfigTable from '@/components/manifest-config-table.vue';
 import ManifestConfigTableColumn from '@/components/manifest-config-table-column.vue';
 import userMixin from "@/utils/user-mixin";
 import { messageError, messageSuccess } from '@/utils/ui-feedback';
-import { IconArrowLeft, IconPlus, IconCloud } from '@arco-design/web-vue/es/icon';
+import { IconArrowLeft, IconArrowRight, IconPlus, IconCloud } from '@arco-design/web-vue/es/icon';
 
 export default {
     components: {
@@ -380,6 +390,7 @@ export default {
         ManifestConfigTable,
         ManifestConfigTableColumn,
         IconArrowLeft,
+        IconArrowRight,
         IconPlus,
         IconCloud,
     },
@@ -442,6 +453,10 @@ export default {
                 candidates: [],
                 identifies: [],
                 setting: {},
+            },
+            marketPublish: {
+                enabled: false,
+                saving: false,
             },
 
             publishGoods: {
@@ -595,24 +610,36 @@ export default {
                 let setting = res?.data?.data || {};
                 this.crossUpgrade.setting = setting;
                 this.crossUpgrade.enabled = !!setting.support_cross_upgrade;
+                this.marketPublish.enabled = !!(
+                    setting.support_auto_publish_to_zpk_market
+                    || setting.support_publish_to_zpk_market
+                );
             }).finally(() => {
                 this.crossUpgrade.settingLoading = false;
             });
         },
         saveFormulaSetting() {
             this.crossUpgrade.settingLoading = true;
+            this.marketPublish.saving = true;
             return myAxios.post('/respo/setting/set', {
                 identifie: this.identifie,
                 support_cross_upgrade: !!this.crossUpgrade.enabled,
-                support_auto_publish_to_zpk_market: !!(
-                    this.crossUpgrade.setting?.support_publish_to_zpk_market
-                    || this.crossUpgrade.setting?.support_auto_publish_to_zpk_market
-                ),
+                support_auto_publish_to_zpk_market: !!this.marketPublish.enabled,
             }).then(() => {
+                this.crossUpgrade.setting = {
+                    ...this.crossUpgrade.setting,
+                    support_cross_upgrade: !!this.crossUpgrade.enabled,
+                    support_auto_publish_to_zpk_market: !!this.marketPublish.enabled,
+                };
                 messageSuccess('操作成功');
             }).finally(() => {
                 this.crossUpgrade.settingLoading = false;
+                this.marketPublish.saving = false;
             });
+        },
+        handleMarketPublishEnabledChange(checked) {
+            this.marketPublish.enabled = checked;
+            this.saveFormulaSetting();
         },
         normalizeCrossUpgradeIdentifiers(value) {
             return this.normalizeCrossUpgradeTargets(value).map(item => item.identifie).filter(Boolean);
@@ -645,7 +672,7 @@ export default {
                 return;
             }
             this.crossUpgrade.identifies = [];
-            this.submitCrossUpgradeFormulas({ allowEmpty: true }).finally(() => {
+            this.submitCrossUpgradeFormulas({ allowEmpty: true, silent: true }).finally(() => {
                 this.saveFormulaSetting();
             });
         },
@@ -687,7 +714,9 @@ export default {
                 identifie: this.identifie,
                 cross_upgrade_formulas: this.crossUpgrade.enabled ? this.crossUpgrade.identifies : [],
             }).then(() => {
-                messageSuccess('操作成功');
+                if (!options.silent) {
+                    messageSuccess('操作成功');
+                }
                 this.getInfo();
             }).finally(() => {
                 this.crossUpgrade.saving = false;
@@ -927,15 +956,11 @@ export default {
                 version: item.name
             }, {
                 timeout: 0
-            }).then(res => {
+            }).then(() => {
                 this.publishGoods.loading = false;
-                if (this.is_register && this.info.install_service_fee !== 0) {
-                    this.openPublishGoods(item);
-                } else {
-                    messageSuccess('操作成功')
-                    this.getInfo();
-                    this.getList();
-                }
+                messageSuccess('操作成功')
+                this.getInfo();
+                this.getList();
             }).catch((error) => {
                 this.publishGoods.loading = false;
                 if (error?.response?.data?.error) {
@@ -947,6 +972,45 @@ export default {
                     messageError(str);
                 }
             });
+        },
+        toUnpublish(item) {
+            this.publishGoods.loading = true;
+            myAxios.post('/respo/version-unpublish', {
+                identifie: this.identifie,
+                version: item.name
+            }, {
+                timeout: 0
+            }).then(() => {
+                this.publishGoods.loading = false;
+                messageSuccess('操作成功')
+                this.getInfo();
+                this.getList();
+            }).catch((error) => {
+                this.publishGoods.loading = false;
+                if (error?.response?.data?.error) {
+                    messageError(error.response.data.error);
+                }
+
+                let str = error?.response?.data?.message;
+                if (str) {
+                    messageError(str);
+                }
+            });
+        },
+        canPublishVersion(item) {
+            return [-1, 3, '-1', '3'].includes(item.publish_status);
+        },
+        canUnpublishVersion(item) {
+            return this.isPublishedVersion(item) && item.id == this.version.id;
+        },
+        isPublishedVersion(item) {
+            return [2, '2'].includes(item.publish_status);
+        },
+        getPublishStatusText(status) {
+            return { '-1': '未发布', 1: '发布中', 2: '已发布', 3: '发布失败' }[status] || '未发布';
+        },
+        getPublishStatusColor(status) {
+            return { '-1': 'gray', 1: 'blue', 2: 'green', 3: 'red' }[status] || 'gray';
         },
         async uploadImg({ file, js_ticket, host }) {
             let formData = new FormData();
@@ -1137,11 +1201,14 @@ export default {
 }
 
 .cross-upgrade-arrow {
-    color: #999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 32px;
+    width: 32px;
+    height: 64px;
+    color: #86909c;
     font-size: 20px;
-    font-weight: 600;
-    line-height: 1;
-    margin-top: 22px;
 }
 
 .cross-upgrade-target-list {
@@ -1378,12 +1445,28 @@ export default {
     border-bottom: 0;
 }
 
-.gray-box .item:hover .publish-status {
-    display: none;
+.version-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 12px;
+    flex-wrap: wrap;
 }
 
-.gray-box .item:hover .publish-status-button {
-    display: inline;
+.version-title-row {
+    display: flex;
+    align-items: center;
+    min-height: 32px;
+    min-width: 0;
+}
+
+.version-status-tag {
+    margin-left: 10px;
+    height: 32px;
+    padding: 0 12px;
+    font-size: 14px;
+    line-height: 30px;
+    box-sizing: border-box;
 }
 
 .white-box {
@@ -1426,14 +1509,17 @@ export default {
 }
 
 .publish-status {
-    margin-left: 10px;
-    cursor: pointer;
+    flex: 0 0 auto;
 }
 
-.publish-status-button {
+.publish-action-button {
     margin-left: 10px;
-    cursor: pointer;
     display: none;
+    min-width: 96px;
+}
+
+.gray-box .item:hover .publish-action-button {
+    display: inline-flex;
 }
 
 .warning-icon {

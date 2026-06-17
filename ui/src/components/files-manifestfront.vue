@@ -1195,6 +1195,21 @@ export default {
                     value: this.wrapConfigVariable('system.access_token'),
                     description: '面板登录用户自身维护的 access token，只能用于获取用户信息，不能准确定位 appid',
                 },
+                {
+                    key: 'openid',
+                    value: this.wrapConfigVariable('system.openid'),
+                    description: '微擎云端用户 openid',
+                },
+                {
+                    key: 'nickname',
+                    value: this.wrapConfigVariable('system.nickname'),
+                    description: '微擎云端用户昵称',
+                },
+                {
+                    key: 'console_uid',
+                    value: this.wrapConfigVariable('system.console_uid'),
+                    description: '微擎云端用户 uid',
+                }
             ];
         },
         variableGroups() {

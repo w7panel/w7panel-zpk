@@ -305,16 +305,3 @@ func (c FormulaGoods) GetGoodsAuditStatus(ctx *gin.Context) {
 
 	c.JsonResponseWithoutError(ctx, gin.H{"audit_status": goodsInfo.AuditStatus})
 }
-
-func (c FormulaGoods) PublishGoods(ctx *gin.Context) {
-	type ParamsValidate struct {
-		Identifie string `form:"identifie" binding:"required"`
-		Version   string `form:"version" binding:"required"`
-	}
-	params := ParamsValidate{}
-	if !c.Validate(ctx, &params) {
-		return
-	}
-
-	c.JsonSuccessResponse(ctx)
-}

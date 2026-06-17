@@ -246,8 +246,11 @@ func (c Version) publishFormula(consoleUid int32, formula *logic.Formula) error 
 	}
 
 	if formula.Setting != nil && formula.Setting.SupportAutoPublishToZpkMarket {
-		if formula.ConsoleUid <= 0 || formula.ConsoleUid != consoleUid {
-			return errors.New("非法操作")
+		if consoleUid <= 0 {
+			return errors.New("请先在面板绑定微擎云端账号")
+		}
+		if formula.ConsoleUid > 0 && formula.ConsoleUid != consoleUid {
+			return errors.New("请先在面板绑定微擎云端账号")
 		}
 		err = logic.FormulaGoods{}.PublishGoods(formula, devcenter.PublishGoodsReq{
 			ConsoleUid: int(consoleUid),

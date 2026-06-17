@@ -38,8 +38,9 @@ func (c FormulaSetting) Get(ctx *gin.Context) {
 
 func (c FormulaSetting) Set(ctx *gin.Context) {
 	type ParamsValidate struct {
-		Identifie           string `form:"identifie" json:"identifie" binding:"required"`
-		SupportCrossUpgrade bool   `form:"support_cross_upgrade" json:"support_cross_upgrade"`
+		Identifie                     string `form:"identifie" json:"identifie" binding:"required"`
+		SupportCrossUpgrade           bool   `form:"support_cross_upgrade" json:"support_cross_upgrade"`
+		SupportAutoPublishToZpkMarket bool   `json:"support_auto_publish_to_zpk_market"`
 	}
 	params := ParamsValidate{}
 	if !c.Validate(ctx, &params) {
@@ -53,6 +54,8 @@ func (c FormulaSetting) Set(ctx *gin.Context) {
 	}
 
 	formula.Setting.SupportCrossUpgrade = params.SupportCrossUpgrade
+	formula.Setting.SupportPublishToZpkMarket = params.SupportAutoPublishToZpkMarket
+
 	_, err := dao.Q.Formula.Where(dao.Q.Formula.ID.Eq(formula.ID)).Update(dao.Q.Formula.Setting, formula.Setting)
 	if err != nil {
 		c.JsonResponseWithServerError(ctx, err)

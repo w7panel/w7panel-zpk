@@ -4,10 +4,10 @@ import (
 	"errors"
 
 	"github.com/gin-gonic/gin"
-	"github.com/w7panel/w7panel-zpk/app/respo/logic"
 	"github.com/w7panel/w7panel-zpk/common/accessor"
 	"github.com/w7panel/w7panel-zpk/common/dao"
 	"github.com/w7panel/w7panel-zpk/common/entity"
+	logic2 "github.com/w7panel/w7panel-zpk/common/logic"
 )
 
 type FormulaSetting struct {
@@ -23,8 +23,8 @@ func (c FormulaSetting) Get(ctx *gin.Context) {
 		return
 	}
 
-	formula := logic.GetFormulaByName(params.Identifie)
-	if formula == nil {
+	formula, err := c.getDepot().GetFormula(params.Identifie, "", logic2.User{}.GetUser(ctx))
+	if err != nil {
 		c.JsonResponseWithServerError(ctx, errors.New("制品不存在"))
 		return
 	}
@@ -48,8 +48,8 @@ func (c FormulaSetting) Set(ctx *gin.Context) {
 		return
 	}
 
-	formula := logic.GetFormulaByName(params.Identifie)
-	if formula == nil {
+	formula, err := c.getDepot().GetFormula(params.Identifie, "", logic2.User{}.GetUser(ctx))
+	if err != nil {
 		c.JsonResponseWithServerError(ctx, errors.New("制品不存在"))
 		return
 	}
@@ -60,7 +60,7 @@ func (c FormulaSetting) Set(ctx *gin.Context) {
 	formula.Setting.SupportCrossUpgrade = params.SupportCrossUpgrade
 	formula.Setting.SupportAutoPublishToZpkMarket = params.SupportAutoPublishToZpkMarket
 
-	_, err := dao.Q.Formula.Where(dao.Q.Formula.ID.Eq(formula.ID)).Updates(entity.Formula{
+	_, err = dao.Q.Formula.Where(dao.Q.Formula.ID.Eq(formula.ID)).Updates(entity.Formula{
 		Setting: formula.Setting,
 	})
 	if err != nil {

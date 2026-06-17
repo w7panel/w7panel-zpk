@@ -29,6 +29,7 @@ type Formula struct {
 	ServicePackages            *accessor.ServicePackagesOption      `gorm:"column:service_packages;serializer:json" json:"service_packages"`
 	VersionPrices              *accessor.VersionPricesOption        `gorm:"column:version_prices;serializer:json" json:"version_prices"`
 	CrossUpgradeFormulas       *accessor.CrossUpgradeFormulasOption `gorm:"column:cross_upgrade_formulas;serializer:json" json:"cross_upgrade_formulas"`
+	Setting                    *accessor.FormulaSettingOption       `gorm:"column:setting;serializer:json" json:"setting"`
 	AuditStatus                int32                                `gorm:"column:audit_status;default:3" json:"audit_status"`
 	AuditRemark                string                               `gorm:"column:audit_remark" json:"audit_remark"`
 	PublishOfficialStoreStatus int32                                `gorm:"column:publish_official_store_status" json:"publish_official_store_status"`

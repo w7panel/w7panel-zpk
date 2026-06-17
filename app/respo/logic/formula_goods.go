@@ -84,13 +84,17 @@ func (l FormulaGoods) PublishGoods(formula *Formula, publishGoodsReq devcenter.P
 	if err != nil {
 		return err
 	}
-	crossUpgradeFormulas := make([]accessor.CrossUpgradeFormula, 0)
-	if formula.CrossUpgradeFormulas != nil && formula.CrossUpgradeFormulas.List != nil {
-		crossUpgradeFormulas = formula.CrossUpgradeFormulas.List
-	}
-	crossUpgradeFormulaContent, err := json.Marshal(crossUpgradeFormulas)
-	if err != nil {
-		return err
+
+	var crossUpgradeFormulaContent []byte
+	if formula.Setting != nil && formula.Setting.SupportCrossUpgrade {
+		crossUpgradeFormulas := make([]accessor.CrossUpgradeFormula, 0)
+		if formula.CrossUpgradeFormulas != nil && formula.CrossUpgradeFormulas.List != nil {
+			crossUpgradeFormulas = formula.CrossUpgradeFormulas.List
+		}
+		crossUpgradeFormulaContent, err = json.Marshal(crossUpgradeFormulas)
+		if err != nil {
+			return err
+		}
 	}
 
 	if formula.GoodsId > 0 {

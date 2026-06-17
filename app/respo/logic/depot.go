@@ -221,6 +221,7 @@ func (self *Depot) GetFormula(name string, version string, user *entity.Registry
 		CrossUpgradeFormulas: row.CrossUpgradeFormulas,
 		IsFreeUpgrade:        row.IsFreeUpgrade,
 		ProductType:          row.ProductType,
+		Setting:              row.Setting,
 	}
 
 	if version != "" {

@@ -96,6 +96,7 @@ type Formula struct {
 	ProductType          int32
 	GoodsId              int32
 	GoodsProductId       int32
+	Setting              *accessor.FormulaSettingOption
 }
 
 func (self *Formula) GetVersionByName(version string) *entity.Version {

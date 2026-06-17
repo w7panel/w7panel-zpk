@@ -143,6 +143,11 @@ func (c FormulaGoods) SetCrossUpgradeFormulas(ctx *gin.Context) {
 		return
 	}
 
+	if formula.Setting == nil || !formula.Setting.SupportCrossUpgrade {
+		c.JsonResponseWithServerError(ctx, errors.New("不支持设置跨应用更新"))
+		return
+	}
+
 	crossUpgradeFormulas, err := c.getCrossUpgradeFormulasByIdentifies(formula.ID, params.CrossUpgradeFormulas, logic2.User{}.GetUser(ctx))
 	if err != nil {
 		c.JsonResponseWithError(ctx, err, 500)

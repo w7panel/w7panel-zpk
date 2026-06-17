@@ -110,6 +110,8 @@ func (provider *Provider) Register(httpServer *http_server.Server, console conso
 		group.Match([]string{"GET", "OPTIONS"}, "/v2/info/:id/:version/:cid", middleware.W7PanelUser{CanSkip: true}.Process, middleware.ConsoleUser{CanSkip: true}.Process, controller.Formula{}.Info)
 		group.Match([]string{"POST", "OPTIONS"}, "/icon", middleware.DenyDomainReq{}.Process, middleware.W7PanelUser{}.Process, controller.FormulaAttach{}.EditIcon)
 		group.Match([]string{"POST", "OPTIONS"}, "/status", middleware.DenyDomainReq{}.Process, middleware.W7PanelUser{}.Process, controller.Formula{}.Status)
+		group.Match([]string{"POST", "OPTIONS"}, "/setting/get", middleware.DenyDomainReq{}.Process, middleware.W7PanelUser{}.Process, controller.FormulaSetting{}.Get)
+		group.Match([]string{"POST", "OPTIONS"}, "/setting/set", middleware.DenyDomainReq{}.Process, middleware.W7PanelUser{}.Process, controller.FormulaSetting{}.Set)
 
 		//设置商品价格属性
 		group.Match([]string{"POST", "OPTIONS"}, "/goods/can-upgrade-versions", middleware.DenyDomainReq{}.Process, middleware.W7PanelUser{}.Process, controller.FormulaGoods{}.GetCanFeeUpgradeVersions)

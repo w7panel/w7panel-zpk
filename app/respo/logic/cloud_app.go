@@ -95,6 +95,7 @@ func (l CloudApp) UnpackNotAppToFormula(notAppId int, user *entity.RegistryUser,
 	goodsPrice := float64(0)
 	productType := 0
 	isFreeUpgrade := 0
+	supportCrossUpgrade := 0
 	goodsLabels := make([]devcenter.Label, 0)
 	goodsExt := make(map[string]interface{})
 	crossUpgradeFormulas := make([]accessor.CrossUpgradeFormula, 0)
@@ -120,8 +121,15 @@ func (l CloudApp) UnpackNotAppToFormula(notAppId int, user *entity.RegistryUser,
 				goodsExt = goodsInfo.Ext.(map[string]interface{})
 			}
 		}
-		if _, exists := goodsExt["extra"]; exists {
-			extra := goodsExt["extra"].(map[string]interface{})
+		if rawExtra, exists := goodsExt["extra"]; exists {
+			extra, ok := rawExtra.(map[string]interface{})
+			if !ok {
+				tmpContent, _ := json.Marshal(rawExtra)
+				_ = json.Unmarshal(tmpContent, &extra)
+			}
+			if extra == nil {
+				extra = map[string]interface{}{}
+			}
 			if _, exists := extra["product_type"]; exists {
 				tmp, ok := extra["product_type"].(string)
 				if ok {
@@ -158,6 +166,22 @@ func (l CloudApp) UnpackNotAppToFormula(notAppId int, user *entity.RegistryUser,
 					_ = json.Unmarshal(tmpContent, &crossUpgradeFormulas)
 				}
 			}
+			if _, exists := extra["support_cross_upgrade"]; exists {
+				tmp, ok := extra["support_cross_upgrade"].(string)
+				if ok {
+					supportCrossUpgrade, err = strconv.Atoi(tmp)
+					if err != nil {
+						return err
+					}
+				} else {
+					tmp1, ok := extra["support_cross_upgrade"].(int)
+					if ok {
+						supportCrossUpgrade = tmp1
+					}
+				}
+			} else if len(crossUpgradeFormulas) > 0 {
+				supportCrossUpgrade = 1
+			}
 		}
 		if goodsInfo.ServiceConfig.GiveMonth > 0 && appServicePackages != nil && len(appServicePackages) > 0 {
 			for i, item := range appServicePackages {
@@ -182,7 +206,7 @@ func (l CloudApp) UnpackNotAppToFormula(notAppId int, user *entity.RegistryUser,
 	}
 
 	updateFormula := entity.Formula{
-		RemoteUID:         int32(consoleUid),
+		RemoteUID:         consoleUid,
 		GoodsID:           int32(goodsId),
 		GoodsProductID:    int32(goodsProductId),
 		InstallServiceFee: goodsPrice,
@@ -190,6 +214,9 @@ func (l CloudApp) UnpackNotAppToFormula(notAppId int, user *entity.RegistryUser,
 		IsFreeUpgrade:     int32(isFreeUpgrade),
 		CrossUpgradeFormulas: &accessor.CrossUpgradeFormulasOption{
 			List: crossUpgradeFormulas,
+		},
+		Setting: &accessor.FormulaSettingOption{
+			SupportCrossUpgrade: supportCrossUpgrade > 0,
 		},
 	}
 	if appBranchInfo.Price != nil && appBranchInfo.Price.Price != 0 {

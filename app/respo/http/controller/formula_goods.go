@@ -241,6 +241,7 @@ func (c FormulaGoods) GetCrossUpgradeFormulaCandidates(ctx *gin.Context) {
 			GoodsID:        row.GoodsID,
 			GoodsProductID: row.GoodsProductID,
 			Price:          row.InstallServiceFee,
+			Icon:           "/zpk/zip/icon/" + row.Name,
 		})
 	}
 	c.JsonResponseWithoutError(ctx, list)

@@ -6,6 +6,7 @@ type CrossUpgradeFormula struct {
 	GoodsID        int32   `json:"goods_id"`
 	GoodsProductID int32   `json:"goods_product_id"`
 	Price          float64 `json:"price"`
+	Icon           string  `json:"icon"`
 }
 
 type CrossUpgradeFormulasOption struct {

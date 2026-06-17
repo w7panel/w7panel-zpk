@@ -42,9 +42,10 @@ func (s ZpkMarketService) DiscardUsedOrder(orderSn string) error {
 	}, nil)
 }
 
-func (s ZpkMarketService) CheckFormulaCanInstallOrUpgrade(goodsId, consoleUid int32, orderSn string, isUpgrade bool) (bool, error) {
+func (s ZpkMarketService) CheckFormulaCanInstallOrUpgrade(goodsId, consoleUid int32, orderSn string, isUpgrade bool) (bool, string, error) {
 	type result struct {
-		CanInstallOrUpgrade bool `json:"can_install_or_upgrade"`
+		CanInstallOrUpgrade bool   `json:"can_install_or_upgrade"`
+		FormulaIdentify     string `json:"formula_identify"`
 	}
 
 	ret := result{}
@@ -55,16 +56,17 @@ func (s ZpkMarketService) CheckFormulaCanInstallOrUpgrade(goodsId, consoleUid in
 		"is_upgrade":  isUpgrade,
 	}, &ret)
 	if err != nil {
-		return false, err
+		return false, "", err
 	}
 
-	return ret.CanInstallOrUpgrade, nil
+	return ret.CanInstallOrUpgrade, ret.FormulaIdentify, nil
 }
 
-func (s ZpkMarketService) GetFormulaCanUpgradeVersion(goodsId, consoleUid int32, orderSn string) (string, bool, error) {
+func (s ZpkMarketService) GetFormulaCanUpgradeVersion(goodsId, consoleUid int32, orderSn string) (string, bool, string, error) {
 	type result struct {
-		FormulaVersion string `json:"formula_version"`
-		IsUpgrade      bool   `json:"is_upgrade"`
+		FormulaVersion  string `json:"formula_version"`
+		IsUpgrade       bool   `json:"is_upgrade"`
+		FormulaIdentify string `json:"formula_identify"`
 	}
 
 	ret := result{}
@@ -74,10 +76,10 @@ func (s ZpkMarketService) GetFormulaCanUpgradeVersion(goodsId, consoleUid int32,
 		"order_sn":    orderSn,
 	}, &ret)
 	if err != nil {
-		return "", false, err
+		return "", false, "", err
 	}
 
-	return ret.FormulaVersion, ret.IsUpgrade, nil
+	return ret.FormulaVersion, ret.IsUpgrade, ret.FormulaIdentify, nil
 }
 
 func postSigned[T any](s ZpkMarketService, path string, params map[string]interface{}, result *T) error {

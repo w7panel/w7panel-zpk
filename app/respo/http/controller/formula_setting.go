@@ -7,6 +7,7 @@ import (
 	"github.com/w7panel/w7panel-zpk/app/respo/logic"
 	"github.com/w7panel/w7panel-zpk/common/accessor"
 	"github.com/w7panel/w7panel-zpk/common/dao"
+	"github.com/w7panel/w7panel-zpk/common/entity"
 )
 
 type FormulaSetting struct {
@@ -52,11 +53,16 @@ func (c FormulaSetting) Set(ctx *gin.Context) {
 		c.JsonResponseWithServerError(ctx, errors.New("制品不存在"))
 		return
 	}
+	if formula.Setting == nil {
+		formula.Setting = &accessor.FormulaSettingOption{}
+	}
 
 	formula.Setting.SupportCrossUpgrade = params.SupportCrossUpgrade
 	formula.Setting.SupportAutoPublishToZpkMarket = params.SupportAutoPublishToZpkMarket
 
-	_, err := dao.Q.Formula.Where(dao.Q.Formula.ID.Eq(formula.ID)).Update(dao.Q.Formula.Setting, formula.Setting)
+	_, err := dao.Q.Formula.Where(dao.Q.Formula.ID.Eq(formula.ID)).Updates(entity.Formula{
+		Setting: formula.Setting,
+	})
 	if err != nil {
 		c.JsonResponseWithServerError(ctx, err)
 		return

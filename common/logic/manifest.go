@@ -242,7 +242,7 @@ type IngressBackend struct {
 	Name      string `yaml:"name" json:"name"`
 	Port      int    `yaml:"port" json:"port"`
 	Match     string `yaml:"match" json:"match"`
-	MoreMatch struct {
+	MoreMatch *struct {
 		Header []struct {
 			Key   string `yaml:"key" json:"key"`
 			Value string `yaml:"value" json:"value"`
@@ -255,7 +255,7 @@ type IngressBackend struct {
 			Type  string `yaml:"type" json:"type"`
 		} `yaml:"query" json:"query"`
 	} `yaml:"moreMatch" json:"moreMatch"`
-	Rewrite struct {
+	Rewrite *struct {
 		Host string `yaml:"host" json:"host"`
 		Path string `yaml:"path" json:"path"`
 	} `yaml:"rewrite" json:"rewrite"`

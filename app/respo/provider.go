@@ -100,7 +100,6 @@ func (provider *Provider) Register(httpServer *http_server.Server, console conso
 		group.Match([]string{"POST", "OPTIONS"}, "/delete", middleware.DenyDomainReq{}.Process, middleware.W7PanelUser{}.Process, controller.Formula{}.Delete)
 		group.Match([]string{"POST", "OPTIONS"}, "/file", middleware.DenyDomainReq{}.Process, middleware.W7PanelUser{}.Process, controller.FormulaAttach{}.SaveFile)
 		group.Match([]string{"POST", "OPTIONS"}, "/path-tree", middleware.DenyDomainReq{}.Process, middleware.W7PanelUser{}.Process, controller.FormulaAttach{}.Files)
-		group.Match([]string{"POST", "OPTIONS"}, "/publish", middleware.DenyDomainReq{}.Process, middleware.W7PanelUser{}.Process, controller.Version{}.Publish)
 		group.Match([]string{"GET", "OPTIONS"}, "/list", middleware.W7PanelUser{CanSkip: true, NoAutoCreateUser: true}.Process, middleware.ConsoleUser{CanSkip: true}.Process, controller.Formula{}.List)
 		group.Match([]string{"GET", "OPTIONS"}, "/detail/:id", controller.Formula{}.Detail)
 		group.Match([]string{"GET", "OPTIONS"}, "/v2/detail/:id/:version", controller.Formula{}.Detail)
@@ -130,9 +129,10 @@ func (provider *Provider) Register(httpServer *http_server.Server, console conso
 		group.Match([]string{"POST", "OPTIONS"}, "/uninstall/complete-notify", controller.Formula{}.UnInstallComplete)
 
 		// 版本相关
+		group.Match([]string{"POST", "OPTIONS"}, "/publish", middleware.DenyDomainReq{}.Process, middleware.W7PanelUser{}.Process, controller.Version{}.Publish)
 		group.Match([]string{"POST", "OPTIONS"}, "/version-list", middleware.W7PanelUser{}.Process, controller.Version{}.GetList)
 		group.Match([]string{"POST", "OPTIONS"}, "/version-add", middleware.DenyDomainReq{}.Process, middleware.W7PanelUser{}.Process, controller.Version{}.Add)
-		//group.Match([]string{"POST", "OPTIONS"}, "/version-publish", middleware.W7PanelUser{}.Process, controller.Version{}.Publish)
+		group.Match([]string{"POST", "OPTIONS"}, "/version-unpublish", middleware.DenyDomainReq{}.Process, middleware.W7PanelUser{}.Process, controller.Version{}.Unpublish)
 		// 制品压缩包管理
 		group.Match([]string{"POST", "OPTIONS"}, "/get-zip-file-list", middleware.W7PanelUser{}.Process, controller.Attach{}.GetBackendZipFileList)
 		group.Match([]string{"POST", "OPTIONS"}, "/get-zip-file-content", middleware.W7PanelUser{}.Process, controller.Attach{}.GetBackendZipFileContent)

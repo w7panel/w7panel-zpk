@@ -93,30 +93,8 @@ func (c Version) Publish(ctx *gin.Context) {
 		return
 	}
 
-	// 如果没有zip包，只有镜像时，不需要打包发布
-	// 将文件打包到 Storage 目录，需要同步的再进行同步
-	err = depotLogin.Pack(formula, false)
-	if err != nil {
-		c.JsonResponseWithServerError(ctx, err)
-		return
-	}
-
-	if formula.Setting != nil && formula.Setting.SupportAutoPublishToZpkMarket {
-		consoleUid := logic2.User{}.GetConsoleUid(ctx)
-		if formula.ConsoleUid <= 0 || formula.ConsoleUid != consoleUid {
-			c.JsonResponseWithError(ctx, errors.New("非法操作"), 500)
-			return
-		}
-		err = logic.FormulaGoods{}.PublishGoods(formula, devcenter.PublishGoodsReq{
-			ConsoleUid: int(consoleUid),
-		})
-		if err != nil {
-			c.JsonResponseWithServerError(ctx, err)
-			return
-		}
-	}
-
-	err = logic.AddFormulaPublishTask(formula.Name, formula.Version, formula.VersionId)
+	consoleUid := logic2.User{}.GetConsoleUid(ctx)
+	err = c.publishFormula(consoleUid, formula)
 	if err != nil {
 		c.JsonResponseWithServerError(ctx, err)
 		return
@@ -127,6 +105,85 @@ func (c Version) Publish(ctx *gin.Context) {
 		"message": "发起打包成功",
 	})
 	return
+}
+
+func (c Version) Unpublish(ctx *gin.Context) {
+	type ParamsValidate struct {
+		Identifie string `form:"identifie" json:"identifie" binding:"required"`
+		Version   string `form:"version" json:"version" binding:"required"`
+	}
+	params := ParamsValidate{}
+	if !c.Validate(ctx, &params) {
+		return
+	}
+
+	depotLogin := c.getDepot()
+	formula, err := depotLogin.GetFormula(params.Identifie, params.Version, logic2.User{}.GetUser(ctx))
+	if err != nil {
+		c.JsonResponseWithError(ctx, err, 500)
+		return
+	}
+	if formula.LatestVersionId != formula.VersionId {
+		c.JsonResponseWithError(ctx, errors.New("只能下架当前线上版本"), 500)
+		return
+	}
+
+	currentVersion, err := dao.Q.Version.Where(dao.Q.Version.ID.Eq(formula.VersionId)).First()
+	if err != nil {
+		c.JsonResponseWithError(ctx, err, 500)
+		return
+	}
+	if currentVersion.PublishStatus != logic.FormulaPublishStatusSuccess && currentVersion.PublishStatus != 0 {
+		c.JsonResponseWithError(ctx, errors.New("当前版本不是已发布状态"), 500)
+		return
+	}
+
+	prevVersion, err := dao.Q.Version.
+		Where(dao.Q.Version.FormulaID.Eq(formula.ID)).
+		Where(dao.Q.Version.ID.Lt(currentVersion.ID)).
+		Where(dao.Q.Version.PublishStatus.In(logic.FormulaPublishStatusSuccess, 0)).
+		Order(dao.Q.Version.ID.Desc()).
+		First()
+	if err != nil {
+		c.JsonResponseWithError(ctx, err, 500)
+		return
+	}
+	if prevVersion == nil {
+		c.JsonResponseWithError(ctx, errors.New("没有可顺延的已发布版本"), 500)
+		return
+	}
+
+	prevVersionFormula, err := depotLogin.GetFormula(params.Identifie, prevVersion.Name, logic2.User{}.GetUser(ctx))
+	if err != nil {
+		c.JsonResponseWithError(ctx, err, 500)
+		return
+	}
+
+	err = dao.Q.Transaction(func(tx *dao.Query) error {
+		_, err := tx.Version.Where(tx.Version.ID.Eq(currentVersion.ID)).Updates(entity.Version{
+			PublishStatus:     -1,
+			PublishFailReason: "",
+		})
+		if err != nil {
+			return err
+		}
+
+		_, err = tx.Formula.Where(tx.Formula.ID.Eq(formula.ID)).Update(tx.Formula.VersionLatestID, prevVersion.ID)
+		return err
+	})
+	if err != nil {
+		c.JsonResponseWithError(ctx, err, 500)
+		return
+	}
+
+	consoleUid := logic2.User{}.GetConsoleUid(ctx)
+	err = c.publishFormula(consoleUid, prevVersionFormula)
+	if err != nil {
+		c.JsonResponseWithServerError(ctx, errors.New("顺延版本发布失败, 请尝试手动发布，err:"+err.Error()))
+		return
+	}
+
+	c.JsonSuccessResponse(ctx)
 }
 
 func (c Version) GetList(ctx *gin.Context) {
@@ -168,7 +225,7 @@ func (c Version) GetList(ctx *gin.Context) {
 		}
 		list = append(list, versionListItem{
 			Version:   result[i],
-			CreatedAt: formatVersionCreatedAt(result[i].CreatedAt),
+			CreatedAt: c.formatVersionCreatedAt(result[i].CreatedAt),
 		})
 	}
 
@@ -180,7 +237,30 @@ func (c Version) GetList(ctx *gin.Context) {
 	})
 }
 
-func formatVersionCreatedAt(createdAt time.Time) string {
+func (c Version) publishFormula(consoleUid int32, formula *logic.Formula) error {
+	// 如果没有zip包，只有镜像时，不需要打包发布
+	// 将文件打包到 Storage 目录，需要同步的再进行同步
+	err := c.getDepot().Pack(formula, false)
+	if err != nil {
+		return err
+	}
+
+	if formula.Setting != nil && formula.Setting.SupportAutoPublishToZpkMarket {
+		if formula.ConsoleUid <= 0 || formula.ConsoleUid != consoleUid {
+			return errors.New("非法操作")
+		}
+		err = logic.FormulaGoods{}.PublishGoods(formula, devcenter.PublishGoodsReq{
+			ConsoleUid: int(consoleUid),
+		})
+		if err != nil {
+			return err
+		}
+	}
+
+	return logic.AddFormulaPublishTask(formula.Name, formula.Version, formula.VersionId)
+}
+
+func (c Version) formatVersionCreatedAt(createdAt time.Time) string {
 	if createdAt.IsZero() {
 		return ""
 	}

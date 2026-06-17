@@ -1196,8 +1196,8 @@ export default {
                     description: '微擎云端用户昵称',
                 },
                 {
-                    key: 'console_uid',
-                    value: this.wrapConfigVariable('system.console_uid'),
+                    key: 'cloud_uid',
+                    value: this.wrapConfigVariable('system.cloud_uid'),
                     description: '微擎云端用户 uid',
                 }
             ];

@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"errors"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -8,6 +9,7 @@ import (
 	"github.com/w7panel/w7panel-zpk/common/dao"
 	"github.com/w7panel/w7panel-zpk/common/entity"
 	logic2 "github.com/w7panel/w7panel-zpk/common/logic"
+	"github.com/w7panel/w7panel-zpk/common/service/w7/devcenter"
 	"gorm.io/gen"
 )
 
@@ -70,6 +72,59 @@ func (c Version) Add(ctx *gin.Context) {
 	c.JsonResponseWithoutError(ctx, gin.H{
 		"id":      versionRow.ID,
 		"version": versionRow.Name,
+	})
+	return
+}
+
+func (c Version) Publish(ctx *gin.Context) {
+	type ParamsValidate struct {
+		Identifie string `form:"identifie" binding:"required"`
+		Version   string `form:"version" binding:"required"`
+	}
+	params := ParamsValidate{}
+	if !c.Validate(ctx, &params) {
+		return
+	}
+
+	depotLogin := c.getDepot()
+	formula, err := depotLogin.GetFormula(params.Identifie, params.Version, logic2.User{}.GetUser(ctx))
+	if err != nil {
+		c.JsonResponseWithError(ctx, err, 500)
+		return
+	}
+
+	// 如果没有zip包，只有镜像时，不需要打包发布
+	// 将文件打包到 Storage 目录，需要同步的再进行同步
+	err = depotLogin.Pack(formula, false)
+	if err != nil {
+		c.JsonResponseWithServerError(ctx, err)
+		return
+	}
+
+	if formula.Setting != nil && formula.Setting.SupportAutoPublishToZpkMarket {
+		consoleUid := logic2.User{}.GetConsoleUid(ctx)
+		if formula.ConsoleUid <= 0 || formula.ConsoleUid != consoleUid {
+			c.JsonResponseWithError(ctx, errors.New("非法操作"), 500)
+			return
+		}
+		err = logic.FormulaGoods{}.PublishGoods(formula, devcenter.PublishGoodsReq{
+			ConsoleUid: int(consoleUid),
+		})
+		if err != nil {
+			c.JsonResponseWithServerError(ctx, err)
+			return
+		}
+	}
+
+	err = logic.AddFormulaPublishTask(formula.Name, formula.Version, formula.VersionId)
+	if err != nil {
+		c.JsonResponseWithServerError(ctx, err)
+		return
+	}
+
+	c.JsonResponseWithoutError(ctx, gin.H{
+		"status":  logic.SYNC_STATUS_PROCESS,
+		"message": "发起打包成功",
 	})
 	return
 }

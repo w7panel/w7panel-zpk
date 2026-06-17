@@ -310,43 +310,9 @@ func (c FormulaGoods) PublishGoods(ctx *gin.Context) {
 	type ParamsValidate struct {
 		Identifie string `form:"identifie" binding:"required"`
 		Version   string `form:"version" binding:"required"`
-		Logo      string `form:"logo" binding:"required"`
 	}
 	params := ParamsValidate{}
 	if !c.Validate(ctx, &params) {
-		return
-	}
-
-	depotLogin := c.getDepot()
-	formula, err := depotLogin.GetFormula(params.Identifie, params.Version, logic2.User{}.GetUser(ctx))
-	if err != nil {
-		c.JsonResponseWithError(ctx, err, 500)
-		return
-	}
-	if formula.InstallServiceFee <= 0 {
-		c.JsonResponseWithError(ctx, errors.New("请先设置安装费用"), 500)
-		return
-	}
-
-	consoleUid := logic2.User{}.GetConsoleUid(ctx)
-	if formula.ConsoleUid != 0 && formula.ConsoleUid != consoleUid {
-		c.JsonResponseWithError(ctx, errors.New("非法操作"), 500)
-		return
-	}
-
-	publishReq := devcenter.PublishGoodsReq{
-		ConsoleUid: int(consoleUid),
-		Logo:       params.Logo,
-		WindowLogo: params.Logo,
-		GoodsImgs: []map[string]string{
-			map[string]string{
-				"url": params.Logo,
-			},
-		},
-	}
-	err = logic.FormulaGoods{}.PublishGoods(formula, publishReq)
-	if err != nil {
-		c.JsonResponseWithError(ctx, err, 500)
 		return
 	}
 

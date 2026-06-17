@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/w7panel/w7panel-zpk/common/accessor"
@@ -21,7 +22,46 @@ const ServicePackageEnable = 2
 type FormulaGoods struct {
 }
 
+func (l FormulaGoods) uploadImage(formula *Formula) (string, error) {
+	iconFile, err := GetLocalClient().GetFile(formula.GetIconRelativePath())
+	iconPath := ""
+	if err == nil {
+		iconPath = iconFile.Name()
+	} else {
+		iconPath = facade.GetConfig().GetString("setting.depot.default_icon_path")
+	}
+
+	imgFile, err := os.Open(iconPath)
+	if err != nil {
+		return "", err
+	}
+	host := "console.w7.cc"
+	ticket, err1 := w7.W7CloudAttach.GetJsTicketByHost(host)
+	if err1 != nil && err1.IsError() {
+		return "", err1
+	}
+
+	img, err := w7.W7CloudAttach.UploadImg(ticket, imgFile, imgFile.Name())
+	if err != nil {
+		return "", err
+	}
+
+	return img.Attach.Path, nil
+}
+
 func (l FormulaGoods) PublishGoods(formula *Formula, publishGoodsReq devcenter.PublishGoodsReq) error {
+	iconPath, err := l.uploadImage(formula)
+	if err != nil {
+		return err
+	}
+	publishGoodsReq.Logo = iconPath
+	publishGoodsReq.WindowLogo = iconPath
+	publishGoodsReq.GoodsImgs = []map[string]string{
+		map[string]string{
+			"url": iconPath,
+		},
+	}
+
 	tags, err := dao.Q.TagFormula.Preload(dao.Q.TagFormula.Tag).Where(dao.Q.TagFormula.FormulaID.Eq(formula.ID)).Find()
 	if err != nil {
 		return err

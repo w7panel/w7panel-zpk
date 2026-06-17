@@ -364,44 +364,6 @@ func (c Formula) Delete(ctx *gin.Context) {
 	c.JsonSuccessResponse(ctx)
 }
 
-func (c Formula) Publish(ctx *gin.Context) {
-	type ParamsValidate struct {
-		Identifie string `form:"identifie" binding:"required"`
-		Version   string `form:"version" binding:"required"`
-	}
-	params := ParamsValidate{}
-	if !c.Validate(ctx, &params) {
-		return
-	}
-
-	depotLogin := c.getDepot()
-	formula, err := depotLogin.GetFormula(params.Identifie, params.Version, logic2.User{}.GetUser(ctx))
-	if err != nil {
-		c.JsonResponseWithError(ctx, err, 500)
-		return
-	}
-
-	// 如果没有zip包，只有镜像时，不需要打包发布
-	// 将文件打包到 Storage 目录，需要同步的再进行同步
-	err = depotLogin.Pack(formula, false)
-	if err != nil {
-		c.JsonResponseWithServerError(ctx, err)
-		return
-	}
-
-	err = logic.AddFormulaPublishTask(formula.Name, formula.Version, formula.VersionId)
-	if err != nil {
-		c.JsonResponseWithServerError(ctx, err)
-		return
-	}
-
-	c.JsonResponseWithoutError(ctx, gin.H{
-		"status":  logic.SYNC_STATUS_PROCESS,
-		"message": "发起打包成功",
-	})
-	return
-}
-
 func (c Formula) List(ctx *gin.Context) {
 	depotLogin := c.getDepot()
 	type ParamsValidate struct {

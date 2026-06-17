@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/w7panel/w7panel-zpk/app/respo/logic"
+	"github.com/w7panel/w7panel-zpk/common/accessor"
 	"github.com/w7panel/w7panel-zpk/common/dao"
 	"github.com/w7panel/w7panel-zpk/common/entity"
 	"github.com/w7panel/w7panel-zpk/common/function"
@@ -237,10 +238,11 @@ func (c Formula) Info(ctx *gin.Context) {
 	if formula.VersionPrices != nil && formula.VersionPrices.List != nil {
 		versionPrices = formula.VersionPrices.List
 	}
-	crossUpgradeFormulas := make([]string, 0)
-	if formula.CrossUpgradeFormulas != nil && formula.CrossUpgradeFormulas.List != nil {
+	crossUpgradeFormulas := make([]accessor.CrossUpgradeFormula, 0)
+	if formula.Setting != nil && formula.Setting.SupportCrossUpgrade && formula.CrossUpgradeFormulas != nil && formula.CrossUpgradeFormulas.List != nil {
 		for _, item := range formula.CrossUpgradeFormulas.List {
-			crossUpgradeFormulas = append(crossUpgradeFormulas, item.Identifie)
+			item.Icon = "/zpk/zip/icon/" + item.Identifie
+			crossUpgradeFormulas = append(crossUpgradeFormulas, item)
 		}
 	}
 	ticket, _ := logic.Ticket{}.GetTicket(logic.TicketInfo{

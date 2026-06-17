@@ -1176,16 +1176,6 @@ export default {
                     description: '面板登录用户 ID',
                 },
                 {
-                    key: 'openid',
-                    value: this.wrapConfigVariable('system.openid'),
-                    description: '面板登录用户 openid',
-                },
-                {
-                    key: 'nickname',
-                    value: this.wrapConfigVariable('system.nickname'),
-                    description: '面板登录用户昵称',
-                },
-                {
                     key: 'role',
                     value: this.wrapConfigVariable('system.role'),
                     description: '面板用户角色，取值包括 founder、super、normal、technician',

@@ -126,7 +126,9 @@ func (l FormulaGoods) PublishGoods(formula *Formula, publishGoodsReq devcenter.P
 	}
 
 	var crossUpgradeFormulaContent []byte
+	supportCrossUpgrade := 0
 	if formula.Setting != nil && formula.Setting.SupportCrossUpgrade {
+		supportCrossUpgrade = 1
 		crossUpgradeFormulas := make([]accessor.CrossUpgradeFormula, 0)
 		if formula.CrossUpgradeFormulas != nil && formula.CrossUpgradeFormulas.List != nil {
 			crossUpgradeFormulas = formula.CrossUpgradeFormulas.List
@@ -160,6 +162,7 @@ func (l FormulaGoods) PublishGoods(formula *Formula, publishGoodsReq devcenter.P
 		"respo_latest_version":   formula.Version,
 		"service_packages":       string(servicePackagesContent),
 		"version_prices":         string(versionPricesContent),
+		"support_cross_upgrade":  supportCrossUpgrade,
 		"cross_upgrade_formulas": string(crossUpgradeFormulaContent),
 		"product_type":           formula.ProductType,
 		"is_free_upgrade":        formula.IsFreeUpgrade,

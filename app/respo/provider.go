@@ -100,7 +100,7 @@ func (provider *Provider) Register(httpServer *http_server.Server, console conso
 		group.Match([]string{"POST", "OPTIONS"}, "/delete", middleware.DenyDomainReq{}.Process, middleware.W7PanelUser{}.Process, controller.Formula{}.Delete)
 		group.Match([]string{"POST", "OPTIONS"}, "/file", middleware.DenyDomainReq{}.Process, middleware.W7PanelUser{}.Process, controller.FormulaAttach{}.SaveFile)
 		group.Match([]string{"POST", "OPTIONS"}, "/path-tree", middleware.DenyDomainReq{}.Process, middleware.W7PanelUser{}.Process, controller.FormulaAttach{}.Files)
-		group.Match([]string{"POST", "OPTIONS"}, "/publish", middleware.DenyDomainReq{}.Process, middleware.W7PanelUser{}.Process, controller.Formula{}.Publish)
+		group.Match([]string{"POST", "OPTIONS"}, "/publish", middleware.DenyDomainReq{}.Process, middleware.W7PanelUser{}.Process, controller.Version{}.Publish)
 		group.Match([]string{"GET", "OPTIONS"}, "/list", middleware.W7PanelUser{CanSkip: true, NoAutoCreateUser: true}.Process, middleware.ConsoleUser{CanSkip: true}.Process, controller.Formula{}.List)
 		group.Match([]string{"GET", "OPTIONS"}, "/detail/:id", controller.Formula{}.Detail)
 		group.Match([]string{"GET", "OPTIONS"}, "/v2/detail/:id/:version", controller.Formula{}.Detail)

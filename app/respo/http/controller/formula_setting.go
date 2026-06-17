@@ -54,7 +54,7 @@ func (c FormulaSetting) Set(ctx *gin.Context) {
 	}
 
 	formula.Setting.SupportCrossUpgrade = params.SupportCrossUpgrade
-	formula.Setting.SupportPublishToZpkMarket = params.SupportAutoPublishToZpkMarket
+	formula.Setting.SupportAutoPublishToZpkMarket = params.SupportAutoPublishToZpkMarket
 
 	_, err := dao.Q.Formula.Where(dao.Q.Formula.ID.Eq(formula.ID)).Update(dao.Q.Formula.Setting, formula.Setting)
 	if err != nil {

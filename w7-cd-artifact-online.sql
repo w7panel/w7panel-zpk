@@ -45,6 +45,7 @@ CREATE TABLE `ims_formula` (
                                `service_packages` text,
                                `version_prices` text,
                                `cross_upgrade_formulas` text,
+                               `setting` text,
                                `audit_status` tinyint DEFAULT '3',
                                `audit_remark` varchar(500) DEFAULT NULL,
                                `publish_official_store_status` tinyint DEFAULT '0',

@@ -10,6 +10,9 @@ relation:
       cross_upgrade_formulas:
         type: CrossUpgradeFormulasOption
         serializer: json
+      setting:
+        type: FormulaSettingOption
+        serializer: json
     relate:
       - table: version
         foreign_key: id

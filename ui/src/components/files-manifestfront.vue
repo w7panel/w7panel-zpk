@@ -172,7 +172,7 @@
                                                 <div v-else
                                                     class="backend-url-config backend-url-config-external df ai-c">
                                                     <a-input v-model="r.root_url" @change="getMenu" placeholder="请输入地址"
-                                                        class="backend-url-control backend-url-input" addBefore='https://'/>
+                                                        class="backend-url-control backend-url-input" prepend='https://'/>
                                                 </div>
                                                 <div v-if="r.type == 'internal' && !hasBackendDomainConfig()"
                                                     class="domain-warning">

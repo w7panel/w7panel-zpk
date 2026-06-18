@@ -32,7 +32,7 @@ func (c Version) Add(ctx *gin.Context) {
 	depot := c.getDepot()
 	srcFormula, err := depot.GetFormula(params.Identifie, "", user)
 	if err != nil {
-		c.JsonResponseWithError(ctx, err, 500)
+		c.JsonResponseWithServerError(ctx, err)
 		return
 	}
 
@@ -45,7 +45,7 @@ func (c Version) Add(ctx *gin.Context) {
 	if versionRow != nil {
 		_, err = dao.Q.Version.Where(dao.Q.Version.ID.Eq(versionRow.ID)).Update(dao.Q.Version.Description, params.Description)
 		if err != nil {
-			c.JsonResponseWithError(ctx, err, 500)
+			c.JsonResponseWithServerError(ctx, err)
 			return
 		}
 	} else {
@@ -59,12 +59,12 @@ func (c Version) Add(ctx *gin.Context) {
 
 		destFormula, err := depot.GetFormula(params.Identifie, params.Version, user)
 		if err != nil {
-			c.JsonResponseWithError(ctx, err, 500)
+			c.JsonResponseWithServerError(ctx, err)
 			return
 		}
 		err = depot.Copy(srcFormula, destFormula)
 		if err != nil {
-			c.JsonResponseWithError(ctx, err, 500)
+			c.JsonResponseWithServerError(ctx, err)
 			return
 		}
 	}
@@ -89,7 +89,7 @@ func (c Version) Publish(ctx *gin.Context) {
 	depotLogin := c.getDepot()
 	formula, err := depotLogin.GetFormula(params.Identifie, params.Version, logic2.User{}.GetUser(ctx))
 	if err != nil {
-		c.JsonResponseWithError(ctx, err, 500)
+		c.JsonResponseWithServerError(ctx, err)
 		return
 	}
 
@@ -120,17 +120,17 @@ func (c Version) Unpublish(ctx *gin.Context) {
 	depotLogin := c.getDepot()
 	formula, err := depotLogin.GetFormula(params.Identifie, params.Version, logic2.User{}.GetUser(ctx))
 	if err != nil {
-		c.JsonResponseWithError(ctx, err, 500)
+		c.JsonResponseWithServerError(ctx, err)
 		return
 	}
 
 	currentVersion, err := dao.Q.Version.Where(dao.Q.Version.ID.Eq(formula.VersionId)).First()
 	if err != nil {
-		c.JsonResponseWithError(ctx, err, 500)
+		c.JsonResponseWithServerError(ctx, err)
 		return
 	}
 	if currentVersion.PublishStatus != logic.FormulaPublishStatusSuccess && currentVersion.PublishStatus != 0 {
-		c.JsonResponseWithError(ctx, errors.New("当前版本不是已发布状态"), 500)
+		c.JsonResponseWithServerError(ctx, errors.New("当前版本不是已发布状态"))
 		return
 	}
 
@@ -140,18 +140,14 @@ func (c Version) Unpublish(ctx *gin.Context) {
 		Where(dao.Q.Version.PublishStatus.In(logic.FormulaPublishStatusSuccess, 0)).
 		Order(dao.Q.Version.ID.Desc()).
 		First()
-	if err != nil {
-		c.JsonResponseWithError(ctx, err, 500)
-		return
-	}
-	if prevVersion == nil {
-		c.JsonSuccessResponse(ctx)
+	if err != nil || prevVersion == nil {
+		c.JsonResponseWithServerError(ctx, errors.New("当前版本不可下架"))
 		return
 	}
 
 	prevVersionFormula, err := depotLogin.GetFormula(params.Identifie, prevVersion.Name, logic2.User{}.GetUser(ctx))
 	if err != nil {
-		c.JsonResponseWithError(ctx, err, 500)
+		c.JsonResponseWithServerError(ctx, err)
 		return
 	}
 
@@ -168,7 +164,7 @@ func (c Version) Unpublish(ctx *gin.Context) {
 		return err
 	})
 	if err != nil {
-		c.JsonResponseWithError(ctx, err, 500)
+		c.JsonResponseWithServerError(ctx, err)
 		return
 	}
 
@@ -201,7 +197,7 @@ func (c Version) GetList(ctx *gin.Context) {
 
 	formula, err := c.getDepot().GetFormula(params.Identifie, "", logic2.User{}.GetUser(ctx))
 	if err != nil {
-		c.JsonResponseWithError(ctx, err, 500)
+		c.JsonResponseWithServerError(ctx, err)
 		return
 	}
 

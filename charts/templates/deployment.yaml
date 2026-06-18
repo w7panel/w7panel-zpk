@@ -60,7 +60,7 @@ spec:
             - name: DEPOT_LOCAL_BASE_DIR
               value: /home/zpk-storage
             - name: DEPOT_MARKET_DOMAIN
-              value: https://zm.idc.w7.com
+              value: https://api.zm.w7.com
             - name: SESSION_COOKIE_DOMAIN
               value: {{ .Values.global.DOMAIN }}
           volumeMounts:

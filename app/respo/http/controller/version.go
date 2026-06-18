@@ -123,10 +123,6 @@ func (c Version) Unpublish(ctx *gin.Context) {
 		c.JsonResponseWithError(ctx, err, 500)
 		return
 	}
-	if formula.LatestVersionId != formula.VersionId {
-		c.JsonResponseWithError(ctx, errors.New("只能下架当前线上版本"), 500)
-		return
-	}
 
 	currentVersion, err := dao.Q.Version.Where(dao.Q.Version.ID.Eq(formula.VersionId)).First()
 	if err != nil {
@@ -149,7 +145,7 @@ func (c Version) Unpublish(ctx *gin.Context) {
 		return
 	}
 	if prevVersion == nil {
-		c.JsonResponseWithError(ctx, errors.New("没有可顺延的已发布版本"), 500)
+		c.JsonSuccessResponse(ctx)
 		return
 	}
 

@@ -124,19 +124,23 @@
                                         <a-tooltip
                                             v-if="item.id == version.id && goods_id && audit_status && audit_status < 4"
                                             content="应用已发布至微擎云市场，等待管理员审核" position="top">
-                                            <span class="ml-10 cursor" style="color:#E6A23C;">待审核</span>
+                                            <a-tag class="version-status-tag" color="orange">待审核</a-tag>
                                         </a-tooltip>
 
-                                        <a-tag class="version-status-tag publish-status" bordered
+                                        <a-tag class="version-status-tag publish-status"
                                             :color="getPublishStatusColor(item.publish_status)">
                                             {{ getPublishStatusText(item.publish_status) }}
                                         </a-tag>
                                         <a-tag v-if="item.id == version.id"
-                                            class="version-status-tag" color="green" bordered>线上版本</a-tag>
-                                        <a-button v-if="canUnpublishVersion(item)" class="publish-action-button"
-                                            type="outline" @click="toUnpublish(item)">点击下架</a-button>
-                                        <a-button v-else-if="canPublishVersion(item)" class="publish-action-button"
-                                            type="outline" @click="toPublish(item)">点击发布</a-button>
+                                            class="version-status-tag" color="green">线上版本</a-tag>
+                                        <a-button v-if="canPublishVersion(item)" class="publish-action-button"
+                                            type="outline" @click="toPublish(item)" size="mini">点击发布</a-button>
+                                        <template v-else-if="isPublishedVersion(item)">
+                                            <a-button class="publish-action-button"
+                                                type="outline" @click="toUnpublish(item)" size="mini">点击下架</a-button>
+                                            <a-button v-if="!isOnlineVersion(item)" class="publish-action-button"
+                                                type="outline" @click="toPublish(item)" size="mini">点击发布</a-button>
+                                        </template>
 
                                         <template v-if="item.publish_status == 3">
                                             <a-tooltip :content="item.publish_fail_reason" position="top">
@@ -963,11 +967,8 @@ export default {
                 this.getList();
             }).catch((error) => {
                 this.publishGoods.loading = false;
-                if (error?.response?.data?.error) {
-                    messageError(error.response.data.error);
-                }
 
-                let str = error?.response?.data?.message;
+                let str = !error?.response?.data?.error ? error?.response?.data?.message : '';
                 if (str) {
                     messageError(str);
                 }
@@ -987,11 +988,8 @@ export default {
                 this.getList();
             }).catch((error) => {
                 this.publishGoods.loading = false;
-                if (error?.response?.data?.error) {
-                    messageError(error.response.data.error);
-                }
 
-                let str = error?.response?.data?.message;
+                let str = !error?.response?.data?.error ? error?.response?.data?.message : '';
                 if (str) {
                     messageError(str);
                 }
@@ -1000,8 +998,8 @@ export default {
         canPublishVersion(item) {
             return [-1, 3, '-1', '3'].includes(item.publish_status);
         },
-        canUnpublishVersion(item) {
-            return this.isPublishedVersion(item) && item.id == this.version.id;
+        isOnlineVersion(item) {
+            return item.id == this.version.id;
         },
         isPublishedVersion(item) {
             return [2, '2'].includes(item.publish_status);
@@ -1462,11 +1460,6 @@ export default {
 
 .version-status-tag {
     margin-left: 10px;
-    height: 32px;
-    padding: 0 12px;
-    font-size: 14px;
-    line-height: 30px;
-    box-sizing: border-box;
 }
 
 .white-box {
@@ -1515,11 +1508,12 @@ export default {
 .publish-action-button {
     margin-left: 10px;
     display: none;
-    min-width: 96px;
 }
 
 .gray-box .item:hover .publish-action-button {
     display: inline-flex;
+    align-items: center;
+    line-height: unset;
 }
 
 .warning-icon {

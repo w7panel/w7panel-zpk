@@ -1124,7 +1124,7 @@ export default {
             let names = [{
                 id: this.identifie,
                 name: this.identifie,
-                title: this.form.name,
+                title: this.form.name || this.identifie,
             }];
 
             if (this.option?.app_ports?.length) {

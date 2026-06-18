@@ -2172,21 +2172,21 @@ func (hc *HelmPack) addIngressMatchAnnotations(annotations map[string]interface{
 	backend := route.Backend
 
 	// Header 匹配
-	if backend.MoreMatch.Header != nil {
+	if backend.MoreMatch != nil && backend.MoreMatch.Header != nil {
 		for _, header := range backend.MoreMatch.Header {
 			annotations[fmt.Sprintf("higress.io/%s-match-header-%s", header.Type, header.Key)] = header.Value
 		}
 	}
 
 	// Query 匹配
-	if backend.MoreMatch.Query != nil {
+	if backend.MoreMatch != nil && backend.MoreMatch.Query != nil {
 		for _, query := range backend.MoreMatch.Query {
 			annotations[fmt.Sprintf("higress.io/%s-match-query-%s", query.Type, query.Key)] = query.Value
 		}
 	}
 
 	// Method 匹配
-	if backend.MoreMatch.Method != nil {
+	if backend.MoreMatch != nil && backend.MoreMatch.Method != nil {
 		annotations["higress.io/match-method"] = strings.Join(backend.MoreMatch.Method, " ")
 	}
 }
@@ -2196,13 +2196,13 @@ func (hc *HelmPack) addIngressRewriteAnnotations(annotations map[string]interfac
 	backend := route.Backend
 
 	// Host 重写
-	if backend.Rewrite.Host != "" {
+	if backend.Rewrite != nil && backend.Rewrite.Host != "" {
 		annotations["higress.io/enable-rewrite"] = "true"
 		annotations["higress.io/upstream-vhost"] = backend.Rewrite.Host
 	}
 
 	// Path 重写
-	if backend.Rewrite.Path != "" {
+	if backend.Rewrite != nil && backend.Rewrite.Path != "" {
 		annotations["higress.io/enable-rewrite"] = "true"
 		annotations["higress.io/rewrite-target"] = backend.Rewrite.Path
 	}

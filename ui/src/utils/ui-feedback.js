@@ -35,18 +35,15 @@ export function message(config) {
     const normalizedConfig = normalizeMessageConfig(config);
     const type = normalizeMessageType(normalizedConfig.type);
     const { content, duration, id, icon, position, showIcon, closable, onClose, resetOnHover } = normalizedConfig;
+    const messageConfig = { content };
 
-    return Message[type]({
-        content,
-        duration,
-        id,
-        icon,
-        position,
-        showIcon,
-        closable,
-        onClose,
-        resetOnHover
+    Object.entries({ duration, id, icon, position, showIcon, closable, onClose, resetOnHover }).forEach(([key, value]) => {
+        if (value !== undefined) {
+            messageConfig[key] = value;
+        }
     });
+
+    return Message[type](messageConfig);
 }
 
 export function messageSuccess(content, config = {}) {

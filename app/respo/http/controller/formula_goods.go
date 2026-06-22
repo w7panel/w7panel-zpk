@@ -2,6 +2,7 @@ package controller
 
 import (
 	"errors"
+	"fmt"
 	"slices"
 	"sort"
 
@@ -14,6 +15,7 @@ import (
 	logic2 "github.com/w7panel/w7panel-zpk/common/logic"
 	"github.com/w7panel/w7panel-zpk/common/service/w7"
 	"github.com/w7panel/w7panel-zpk/common/service/w7/devcenter"
+	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 )
 
 type FormulaGoods struct {
@@ -233,6 +235,10 @@ func (c FormulaGoods) GetCrossUpgradeFormulaCandidates(ctx *gin.Context) {
 		return
 	}
 
+	schemaHttp := "https://"
+	_ = depotLogin.GetFormulaBackendZipDownloadUrl(formula, false)
+	domain := facade.GetConfig().GetString("setting.depot.external_domain")
+
 	list := make([]accessor.CrossUpgradeFormula, 0, len(rows))
 	for _, row := range rows {
 		list = append(list, accessor.CrossUpgradeFormula{
@@ -241,7 +247,7 @@ func (c FormulaGoods) GetCrossUpgradeFormulaCandidates(ctx *gin.Context) {
 			GoodsID:        row.GoodsID,
 			GoodsProductID: row.GoodsProductID,
 			Price:          row.InstallServiceFee,
-			Icon:           "/zpk/zip/icon/" + row.Name,
+			Icon:           fmt.Sprintf("%s%s%s", schemaHttp, domain, "/zpk/zip/icon/"+row.Name),
 		})
 	}
 	c.JsonResponseWithoutError(ctx, list)

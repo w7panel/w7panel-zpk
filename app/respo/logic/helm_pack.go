@@ -1625,10 +1625,11 @@ spec:
 }
 
 func getVersionIdentifie(appName, version string) string {
-	if version == "" {
-		return appName
+	if version != "" {
+		cleanVersion := strings.ReplaceAll(version, ".", "")
+		return appName + "_" + cleanVersion
 	}
-	return appName + "-" + version
+	return appName
 }
 
 func buildTraditionSiteName(tradition logic2.Tradition) string {

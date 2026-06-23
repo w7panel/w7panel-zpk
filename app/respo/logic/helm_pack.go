@@ -1635,7 +1635,8 @@ func getVersionIdentifie(appName, version string) string {
 func buildTraditionSiteName(tradition logic2.Tradition) string {
 	appName := tradition.EnvironmentName
 	version := tradition.EnvironmentVersion
-	return "copy-" + strings.ToLower(function.GetRandomStringNotContainerNumber(6)) + "-" + strings.ReplaceAll(getVersionIdentifie(appName, version), "_", "-")
+	envIdentifie := strings.ToLower(strings.ReplaceAll(getVersionIdentifie(appName, version), "_", "-"))
+	return fmt.Sprintf(`{{ printf "copy-%%s-%%s" (printf "%%s-%%s" $fullName %q | sha256sum | trunc 8) %q | trunc 63 | trimSuffix "-" }}`, envIdentifie, envIdentifie)
 }
 
 func getStartParamsEnvJSONTemplate() string {

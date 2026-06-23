@@ -137,6 +137,7 @@
                                             type="outline" @click="toPublish(item)" size="mini">点击发布</a-button>
                                         <template v-else-if="isPublishedVersion(item)">
                                             <a-button class="publish-action-button"
+                                                status="danger"
                                                 type="outline" @click="toUnpublish(item)" size="mini">点击下架</a-button>
                                             <a-button v-if="!isOnlineVersion(item)" class="publish-action-button"
                                                 type="outline" @click="toPublish(item)" size="mini">点击发布</a-button>
@@ -1164,7 +1165,6 @@ export default {
     flex-direction: column;
     align-items: center;
     gap: 10px;
-    min-width: 120px;
 }
 
 .cross-upgrade-icon {

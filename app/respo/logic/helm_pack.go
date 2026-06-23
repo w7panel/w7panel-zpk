@@ -1694,7 +1694,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: create-site-job
-          image: zpk.w7.cc/public/site-manager:v1.2.5
+          image: zpk.w7.cc/public/site-manager:v1.2.6
           command:
             - sh
             - -c

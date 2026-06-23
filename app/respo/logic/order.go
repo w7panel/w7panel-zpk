@@ -13,16 +13,22 @@ type Order struct {
 }
 
 func (l Order) DiscardUsedOrder(ticketInfo TicketInfo) error {
-	return w7.ZpkMarketSdk.DiscardUsedOrder(ticketInfo.OrderSn)
+	if ticketInfo.ConsoleUid <= 0 || ticketInfo.OrderSn == "" {
+		return nil
+	}
+	return w7.ZpkMarketSdk.DiscardUsedOrder(ticketInfo.ConsoleUid, ticketInfo.OrderSn)
 }
 
 func (l Order) UseOrder(ticketInfo TicketInfo) error {
-	return w7.ZpkMarketSdk.UseOrder(ticketInfo.OrderSn, ticketInfo.FormulaVersion, ticketInfo.IsUpgrade)
+	if ticketInfo.ConsoleUid <= 0 || ticketInfo.OrderSn == "" {
+		return nil
+	}
+	return w7.ZpkMarketSdk.UseOrder(ticketInfo.ConsoleUid, ticketInfo.OrderSn, ticketInfo.FormulaVersion, ticketInfo.IsUpgrade)
 }
 
 func (l Order) CheckFormulaCanInstallOrUpgrade(formula Formula, consoleUid int32, orderSn string, isUpgrade bool) (bool, string) {
 	slog.Info("check order permission can install", "formula_name", formula.Name, "version", formula.Version, "consoleuid", consoleUid, "orderSn", orderSn, "isUpgrade", isUpgrade)
-	if formula.GoodsId == 0 || formula.ConsoleUid == consoleUid {
+	if formula.GoodsId <= 0 || formula.ConsoleUid == consoleUid {
 		return true, formula.Name
 	}
 	if formula.GoodsId > 0 && orderSn == "" {
@@ -46,7 +52,7 @@ func (l Order) CheckFormulaCanInstallOrUpgrade(formula Formula, consoleUid int32
 func (l Order) GetFormulaCanUpgradeVersion(formula Formula, consoleUid int32, orderSn string) (string, bool, string, error) {
 	slog.Info("check order permission can upgrade", "formula", formula, "consoleuid", consoleUid, "orderSn", orderSn)
 
-	if formula.GoodsId == 0 || formula.ConsoleUid == consoleUid {
+	if formula.GoodsId <= 0 || formula.ConsoleUid == consoleUid {
 		return "", false, formula.Name, nil
 	}
 

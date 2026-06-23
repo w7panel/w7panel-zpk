@@ -28,17 +28,19 @@ func (s ZpkMarketService) CheckToken(token, formulaIdentify string) error {
 	}, nil)
 }
 
-func (s ZpkMarketService) UseOrder(orderSn, formulaVersion string, isUpgrade bool) error {
+func (s ZpkMarketService) UseOrder(consoleUid int32, orderSn, formulaVersion string, isUpgrade bool) error {
 	return postSigned[any](s, "/zpk-market/order/use-order", map[string]interface{}{
 		"order_sn":        orderSn,
 		"formula_version": formulaVersion,
 		"is_upgrade":      isUpgrade,
+		"console_uid":     consoleUid,
 	}, nil)
 }
 
-func (s ZpkMarketService) DiscardUsedOrder(orderSn string) error {
+func (s ZpkMarketService) DiscardUsedOrder(consoleUid int32, orderSn string) error {
 	return postSigned[any](s, "/zpk-market/order/discard-used-order", map[string]interface{}{
-		"order_sn": orderSn,
+		"order_sn":    orderSn,
+		"console_uid": consoleUid,
 	}, nil)
 }
 

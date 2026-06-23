@@ -70,7 +70,7 @@ func (c FormulaGoods) SetServiceFee(ctx *gin.Context) {
 	type ParamsValidate struct {
 		Identifie         string                                   `form:"identifie" json:"identifie" binding:"required"`
 		ProductType       int                                      `form:"product_type" json:"product_type" binding:"required"`
-		InstallServiceFee float64                                  `form:"service_fee" json:"service_fee" binding:"required"`
+		InstallServiceFee float64                                  `form:"service_fee" json:"service_fee"`
 		IsFreeUpgrade     int                                      `form:"is_free_upgrade" json:"is_free_upgrade"`
 		ServicePackages   []devcenter.NotAppServicePackage         `form:"service_packages" json:"service_packages"`
 		VersionPrices     []devcenter.NotAppBranchVersionPriceInfo `form:"version_prices" json:"version_prices"`

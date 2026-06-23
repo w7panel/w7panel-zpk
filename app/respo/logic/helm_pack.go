@@ -1638,6 +1638,10 @@ func buildTraditionSiteName(tradition logic2.Tradition) string {
 	return "copy-" + strings.ToLower(function.GetRandomStringNotContainerNumber(6)) + "-" + strings.ReplaceAll(getVersionIdentifie(appName, version), "_", "-")
 }
 
+func getStartParamsEnvJSONTemplate() string {
+	return `{{- $startParamsEnv := dict -}}{{- range $qkey, $qvalue := .Values.startParams }}{{- $_ := set $startParamsEnv $qkey (tpl $qvalue $) -}}{{- end }}{{ $startParamsEnv | toJson | b64enc }}`
+}
+
 func (hc *HelmPack) generateCreateSiteJobTemplate(rootDir string, application logic2.Application, tradition logic2.Tradition, k8sAppName string) error {
 	depot, _ := NewDepot()
 	zipUrl, _ := depot.GetFormulaBackendZipDownloadUrlByApplication(application, false)
@@ -1690,12 +1694,12 @@ spec:
       restartPolicy: Never
       containers:
         - name: create-site-job
-          image: zpk.w7.cc/public/site-manager:v1.2.3
+          image: zpk.w7.cc/public/site-manager:v1.2.4
           command:
             - sh
             - -c
-            - /home/rangine create:site --operation={{ ternary "upgrade" "install" .Release.IsUpgrade }} --w7panel-domain={{ .Values.global.panel.innerUrl }} --w7panel-token={{ .Values.global.panel.panelRealToken }} --title=%s --name=%s --language=%s --version=%s --domain={{ .Values.DOMAIN_URL }} --ssl={{ default false .Values.ingressForceHttps }} --cmd=%s --code-download-url=%s --app_name=%s --k8s-app-name=%s -f /home/config.yaml
-`, application.Identifie+"-"+tradition.EnvironmentVersion+"-副本", tradition.EnvironmentName, tradition.EnvironmentLanguage, tradition.EnvironmentVersion, cmd, zipUrl, application.Identifie, k8sAppName)
+            - /home/rangine create:site --operation={{ ternary "upgrade" "install" .Release.IsUpgrade }} --w7panel-domain={{ .Values.global.panel.innerUrl }} --w7panel-token={{ .Values.global.panel.panelRealToken }} --title=%s --name=%s --language=%s --version=%s --domain={{ .Values.DOMAIN_URL }} --ssl={{ default false .Values.ingressForceHttps }} --cmd=%s --code-download-url=%s --app_name=%s --k8s-app-name=%s --start-params-env-base64=%s -f /home/config.yaml
+`, application.Identifie+"-"+tradition.EnvironmentVersion+"-副本", tradition.EnvironmentName, tradition.EnvironmentLanguage, tradition.EnvironmentVersion, cmd, zipUrl, application.Identifie, k8sAppName, getStartParamsEnvJSONTemplate())
 
 	filePath := filepath.Join(rootDir, "create-site-job.yaml")
 	return os.WriteFile(filePath, []byte(jobTemplate), 0644)

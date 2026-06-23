@@ -133,6 +133,12 @@ func (hc *HelmPack) PackToHelm() error {
 		return err
 	}
 
+	traditionReleaseName := ""
+	traditionSiteName := ""
+	if hc.Manifest.Application.Type == logic2.Tradition_App {
+		traditionReleaseName = hc.Manifest.Platform.Tradition.EnvironmentName
+		traditionSiteName = buildTraditionSiteName(hc.Manifest.Platform.Tradition)
+	}
 	if hc.Manifest.Platform.Helm.ChartName != "" || hc.Manifest.Platform.Helm.Repository != "" || (hc.Manifest.Platform.Helm.DependYamls != nil && len(hc.Manifest.Platform.Helm.DependYamls) > 0) {
 		err := hc.processHelmPkg(helmDir)
 		if err != nil {
@@ -142,7 +148,7 @@ func (hc *HelmPack) PackToHelm() error {
 		if err := hc.generateValuesYaml(helmDir); err != nil {
 			return err
 		}
-		if err := hc.generateCreateSiteJobTemplate(templatesDir, hc.Manifest.Application, hc.Manifest.Platform.Tradition); err != nil {
+		if err := hc.generateCreateSiteJobTemplate(templatesDir, hc.Manifest.Application, hc.Manifest.Platform.Tradition, traditionSiteName); err != nil {
 			return err
 		}
 	} else {
@@ -191,7 +197,7 @@ func (hc *HelmPack) PackToHelm() error {
 		if err := hc.generateMicroAppTemplate(templatesDir, hc.Manifest); err != nil {
 			return err
 		}
-		if err := hc.generateRegisterSiteJobTemplate(templatesDir, hc.Manifest); err != nil {
+		if err := hc.generateRegisterSiteJobTemplate(templatesDir, hc.Manifest, traditionReleaseName, traditionSiteName, traditionSiteName); err != nil {
 			return err
 		}
 	}
@@ -1618,7 +1624,20 @@ spec:
 	return os.WriteFile(filePath, []byte(jobTemplate), 0644)
 }
 
-func (hc *HelmPack) generateCreateSiteJobTemplate(rootDir string, application logic2.Application, tradition logic2.Tradition) error {
+func getVersionIdentifie(appName, version string) string {
+	if version == "" {
+		return appName
+	}
+	return appName + "-" + version
+}
+
+func buildTraditionSiteName(tradition logic2.Tradition) string {
+	appName := tradition.EnvironmentName
+	version := tradition.EnvironmentVersion
+	return "copy-" + strings.ToLower(function.GetRandomStringNotContainerNumber(6)) + "-" + strings.ReplaceAll(getVersionIdentifie(appName, version), "_", "-")
+}
+
+func (hc *HelmPack) generateCreateSiteJobTemplate(rootDir string, application logic2.Application, tradition logic2.Tradition, k8sAppName string) error {
 	depot, _ := NewDepot()
 	zipUrl, _ := depot.GetFormulaBackendZipDownloadUrlByApplication(application, false)
 
@@ -1670,18 +1689,18 @@ spec:
       restartPolicy: Never
       containers:
         - name: create-site-job
-          image: zpk.w7.cc/public/site-manager:v1.2.2
+          image: zpk.w7.cc/public/site-manager:v1.2.3
           command:
             - sh
             - -c
-            - /home/rangine create:site --operation={{ ternary "upgrade" "install" .Release.IsUpgrade }} --w7panel-domain={{ .Values.global.panel.innerUrl }} --w7panel-token={{ .Values.global.panel.panelRealToken }} --title=%s --name=%s --language=%s --version=%s --domain={{ .Values.DOMAIN_URL }} --ssl={{ default false .Values.ingressForceHttps }} --cmd=%s --code-download-url=%s --app_name=%s --k8s-app-name={{ $fullName }} -f /home/config.yaml
-`, application.Identifie+"-"+tradition.EnvironmentVersion+"-副本", tradition.EnvironmentName, tradition.EnvironmentLanguage, tradition.EnvironmentVersion, cmd, zipUrl, application.Identifie)
+            - /home/rangine create:site --operation={{ ternary "upgrade" "install" .Release.IsUpgrade }} --w7panel-domain={{ .Values.global.panel.innerUrl }} --w7panel-token={{ .Values.global.panel.panelRealToken }} --title=%s --name=%s --language=%s --version=%s --domain={{ .Values.DOMAIN_URL }} --ssl={{ default false .Values.ingressForceHttps }} --cmd=%s --code-download-url=%s --app_name=%s --k8s-app-name=%s -f /home/config.yaml
+`, application.Identifie+"-"+tradition.EnvironmentVersion+"-副本", tradition.EnvironmentName, tradition.EnvironmentLanguage, tradition.EnvironmentVersion, cmd, zipUrl, application.Identifie, k8sAppName)
 
 	filePath := filepath.Join(rootDir, "create-site-job.yaml")
 	return os.WriteFile(filePath, []byte(jobTemplate), 0644)
 }
 
-func (hc *HelmPack) generateRegisterSiteJobTemplate(rootDir string, manifest logic2.Manifest) error {
+func (hc *HelmPack) generateRegisterSiteJobTemplate(rootDir string, manifest logic2.Manifest, releaseName, appName, containerName string) error {
 	if !manifest.Application.RegisterSite {
 		return nil
 	}
@@ -1691,9 +1710,17 @@ func (hc *HelmPack) generateRegisterSiteJobTemplate(rootDir string, manifest log
 		return nil
 	}
 
-	containerName := manifest.Application.Identifie
-	if len(manifest.Platform.ContainerV2s) > 0 {
-		containerName = manifest.Platform.ContainerV2s[0].Name
+	if releaseName == "" {
+		releaseName = "{{ .Release.Name }}"
+	}
+	if appName == "" {
+		appName = "{{ $fullName }}"
+	}
+	if containerName == "" {
+		containerName = manifest.Application.Identifie
+		if len(manifest.Platform.ContainerV2s) > 0 {
+			containerName = manifest.Platform.ContainerV2s[0].Name
+		}
 	}
 
 	jobTemplate := fmt.Sprintf(`{{- define "__cur__.fullname" -}}
@@ -1735,8 +1762,8 @@ spec:
           command:
             - sh
             - -c
-            - /ko-app/w7panel site:register-zpk-http --panelUrl={{ .Values.global.panel.innerUrl }} --installId={{ .Values.global.panel.installId }} --siteIdentifie=%s --host={{ .Values.DOMAIN_URL }} --releaseName={{ .Release.Name }} --appName={{ $fullName }} --namespace=default --containerName=%s
-`, manifest.Application.Identifie, containerName)
+            - /ko-app/w7panel site:register-zpk-http --panelUrl={{ .Values.global.panel.innerUrl }} --installId={{ .Values.global.panel.installId }} --siteIdentifie=%s --host={{ .Values.DOMAIN_URL }} --releaseName=%s --appName=%s --namespace=default --containerName=%s
+`, manifest.Application.Identifie, releaseName, appName, containerName)
 
 	return writeFile(jobFilePath, jobTemplate)
 }

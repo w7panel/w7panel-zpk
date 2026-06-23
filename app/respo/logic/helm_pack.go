@@ -1694,11 +1694,11 @@ spec:
       restartPolicy: Never
       containers:
         - name: create-site-job
-          image: zpk.w7.cc/public/site-manager:v1.2.4
+          image: zpk.w7.cc/public/site-manager:v1.2.5
           command:
             - sh
             - -c
-            - /home/rangine create:site --operation={{ ternary "upgrade" "install" .Release.IsUpgrade }} --w7panel-domain={{ .Values.global.panel.innerUrl }} --w7panel-token={{ .Values.global.panel.panelRealToken }} --title=%s --name=%s --language=%s --version=%s --domain={{ .Values.DOMAIN_URL }} --ssl={{ default false .Values.ingressForceHttps }} --cmd=%s --code-download-url=%s --app_name=%s --k8s-app-name=%s --start-params-env-base64=%s -f /home/config.yaml
+            - /home/rangine create:site --operation={{ ternary "upgrade" "install" .Release.IsUpgrade }} --w7panel-domain={{ .Values.global.panel.innerUrl }} --w7panel-token={{ .Values.global.panel.panelRealToken }} --title=%s --name=%s --language=%s --version=%s --domain={{ .Values.DOMAIN_URL }} --ssl={{ default false .Values.ingressForceHttps }} --cmd=%s --code-download-url=%s --app_name=%s --k8s-app-name={{ $fullName }} --k8s-env-app-name=%s --start-params-env-base64=%s -f /home/config.yaml
 `, application.Identifie+"-"+tradition.EnvironmentVersion+"-副本", tradition.EnvironmentName, tradition.EnvironmentLanguage, tradition.EnvironmentVersion, cmd, zipUrl, application.Identifie, k8sAppName, getStartParamsEnvJSONTemplate())
 
 	filePath := filepath.Join(rootDir, "create-site-job.yaml")

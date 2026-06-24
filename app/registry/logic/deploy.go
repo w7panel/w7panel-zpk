@@ -22,9 +22,6 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-type K8sPodInfo struct {
-}
-
 const (
 	K8sDeployWhenTagUpdate = int32(1)
 	K8sDeployWhenTagAdd    = int32(2)

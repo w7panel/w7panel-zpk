@@ -12,6 +12,7 @@ import (
 	logic2 "github.com/w7panel/w7panel-zpk/common/logic"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
+	"gorm.io/gorm"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
@@ -19,6 +20,31 @@ import (
 
 type Deploy struct {
 	controller.Abstract
+}
+
+func (c Deploy) getRuleWithRepository(ctx *gin.Context, ruleID int) (*entity.RegistryRepositoryDeployRule, error) {
+	rule, err := dao.Q.RegistryRepositoryDeployRule.
+		Where(dao.Q.RegistryRepositoryDeployRule.ID.Eq(int32(ruleID))).
+		First()
+	if err != nil {
+		return nil, err
+	}
+	if rule == nil {
+		return nil, errors.New("该规则不存在")
+	}
+
+	repository, err := logic.Repository{}.GetByIdWithUser(int(rule.RepositoryID), logic2.User{}.GetUser(ctx))
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.New("repository 不存在")
+		}
+		return nil, err
+	}
+	if repository == nil {
+		return nil, errors.New("repository 不存在")
+	}
+
+	return rule, nil
 }
 
 func (c Deploy) K8sProxy(ctx *gin.Context) {
@@ -247,19 +273,13 @@ func (c Deploy) EditRule(ctx *gin.Context) {
 		return
 	}
 
-	curRepository, _ := logic.Repository{}.GetByIdWithUser(params.RepositoryId, logic2.User{}.GetUser(ctx))
-	if curRepository == nil {
-		c.JsonResponseWithServerError(ctx, errors.New("repository 不存在"))
+	_, err := c.getRuleWithRepository(ctx, params.Id)
+	if err != nil {
+		c.JsonResponseWithServerError(ctx, err)
 		return
 	}
 
-	curRule, _ := dao.Q.RegistryRepositoryDeployRule.Where(dao.Q.RegistryRepositoryDeployRule.ID.Eq(int32(params.Id))).First()
-	if curRule == nil {
-		c.JsonResponseWithServerError(ctx, errors.New("该规则不存在"))
-		return
-	}
-
-	_, err := dao.Q.RegistryRepositoryDeployRule.Where(dao.Q.RegistryRepositoryDeployRule.ID.Eq(int32(params.Id))).Updates(entity.RegistryRepositoryDeployRule{
+	_, err = dao.Q.RegistryRepositoryDeployRule.Where(dao.Q.RegistryRepositoryDeployRule.ID.Eq(int32(params.Id))).Updates(entity.RegistryRepositoryDeployRule{
 		RepositoryID:      int32(params.RepositoryId),
 		DeployType:        int32(params.DeployType),
 		MatchType:         int32(params.MatchType),
@@ -286,7 +306,7 @@ func (c Deploy) QueryRule(ctx *gin.Context) {
 		return
 	}
 
-	info, err := dao.Q.RegistryRepositoryDeployRule.Where(dao.Q.RegistryRepositoryDeployRule.ID.Eq(int32(params.Id))).First()
+	info, err := c.getRuleWithRepository(ctx, params.Id)
 	if err != nil {
 		c.JsonResponseWithServerError(ctx, err)
 		return
@@ -303,7 +323,13 @@ func (c Deploy) DelRule(ctx *gin.Context) {
 		return
 	}
 
-	_, err := dao.Q.RegistryRepositoryDeployRule.Where(dao.Q.RegistryRepositoryDeployRule.ID.Eq(int32(params.Id))).Delete()
+	rule, err := c.getRuleWithRepository(ctx, params.Id)
+	if err != nil {
+		c.JsonResponseWithServerError(ctx, err)
+		return
+	}
+
+	_, err = dao.Q.RegistryRepositoryDeployRule.Delete(rule)
 	if err != nil {
 		c.JsonResponseWithServerError(ctx, err)
 		return
@@ -341,6 +367,12 @@ func (c Deploy) RuleDeployLog(ctx *gin.Context) {
 	}
 	params := ParamsValidate{}
 	if !c.Validate(ctx, &params) {
+		return
+	}
+
+	_, err := c.getRuleWithRepository(ctx, params.Id)
+	if err != nil {
+		c.JsonResponseWithServerError(ctx, err)
 		return
 	}
 

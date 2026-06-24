@@ -236,7 +236,7 @@ func (hc *HelmPack) processHelmPkg(rootDir string) error {
 					return err
 				}
 				localHelmZipPath = filepath.Join(rootDir, path.Base(urlInfo.Path))
-				err = function.DownloadFile(context.Background(), helmDownloadUrl, localHelmZipPath, nil)
+				err = function.DownloadFile(context.Background(), helmDownloadUrl, localHelmZipPath)
 				if err != nil {
 					return err
 				}

@@ -3,11 +3,6 @@ package attach
 import (
 	"errors"
 	"fmt"
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/smithy-go/ptr"
-	"github.com/google/uuid"
-	"github.com/w7panel/w7panel-zpk/common/function"
-	"github.com/w7panel/w7panel-zpk/common/service"
 	"io"
 	"log"
 	"mime/multipart"
@@ -15,6 +10,12 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/smithy-go/ptr"
+	"github.com/google/uuid"
+	"github.com/w7panel/w7panel-zpk/common/function"
+	"github.com/w7panel/w7panel-zpk/common/service"
 )
 
 func newLocalClient(input *StorageInput) *localClient {
@@ -38,10 +39,10 @@ type localClient struct {
 
 func (self *localClient) UploadByFile(remoteName string, file *os.File) error {
 	destFile, err := self.getFileHandler(remoteName)
-	defer destFile.Close()
 	if err != nil {
 		return err
 	}
+	defer destFile.Close()
 	_, err = io.Copy(destFile, file)
 	if err != nil {
 		return err
@@ -59,7 +60,10 @@ func (self *localClient) UploadByContent(remoteName string, content string) erro
 }
 
 func (self *localClient) UploadByFilePath(remoteName string, localFilePath string) error {
-	file, _ := os.OpenFile(localFilePath, os.O_RDONLY, 0666)
+	file, err := os.OpenFile(localFilePath, os.O_RDONLY, 0666)
+	if err != nil {
+		return err
+	}
 	return self.UploadByFile(remoteName, file)
 }
 

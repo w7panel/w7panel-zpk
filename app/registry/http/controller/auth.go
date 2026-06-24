@@ -90,7 +90,7 @@ func (c Auth) validateUser(ctx *gin.Context) (*entity.RegistryUser, error) {
 		password = ctx.Request.FormValue("password")
 	}
 
-	slog.Info("auth req", "username", username, "password", password)
+	slog.Info("auth req", "username", username)
 
 	account := ctx.Request.FormValue("account")
 	if account == "" {

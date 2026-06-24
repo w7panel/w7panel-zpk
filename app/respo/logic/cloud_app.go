@@ -314,13 +314,13 @@ func (l CloudApp) unpackNotAppVersionToFormula(notAppInfo devcenter.NotApp, notA
 			return err1
 		}
 
-		err = function.DownloadFile(context.Background(), downloadUrl, savePath, nil)
+		err = function.DownloadFile(context.Background(), downloadUrl, savePath)
 		if err != nil {
 			return err
 		}
 	}
 	if notAppInfo.Logo != "" {
-		err := function.DownloadFile(context.Background(), notAppInfo.Logo, iconPath, nil)
+		err := function.DownloadFile(context.Background(), notAppInfo.Logo, iconPath)
 		if err != nil {
 			return err
 		}

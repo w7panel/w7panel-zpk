@@ -16,6 +16,7 @@ import (
 	logic2 "github.com/w7panel/w7panel-zpk/common/logic"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
+	"gorm.io/gorm"
 	"oras.land/oras-go/v2"
 )
 
@@ -26,6 +27,49 @@ type RepositoryRespInfo struct {
 
 type Repository struct {
 	controller.Abstract
+}
+
+func (c Repository) checkNamespacePermission(ctx *gin.Context, namespace string, requirePush bool) error {
+	namespaceModel, err := logic.Namespace{}.GetByName(namespace)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errors.New("namespace 不存在")
+		}
+		return err
+	}
+	if namespaceModel == nil {
+		return errors.New("namespace 不存在")
+	}
+
+	user := logic2.User{}.GetUser(ctx)
+	if user == nil {
+		return errors.New("用户信息异常")
+	}
+	if (logic2.User{}).IsAdminUser(user) || namespaceModel.UserID == user.ID {
+		return nil
+	}
+
+	permission, err := dao.Q.RegistryUserPermission.
+		Where(dao.Q.RegistryUserPermission.UserID.Eq(user.ID)).
+		Where(dao.Q.RegistryUserPermission.ResourceType.Eq(string(logic.PermissionResourceTypeNamespace))).
+		Where(dao.Q.RegistryUserPermission.ResourceValue.Eq(namespace)).
+		First()
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errors.New("user no permission")
+		}
+		return err
+	}
+	if permission == nil {
+		return errors.New("user no permission")
+	}
+	if requirePush {
+		if permission.Action == nil || !slices.Contains(*permission.Action, string(logic.PermissionActionTypePush)) {
+			return errors.New("invalid action")
+		}
+	}
+
+	return nil
 }
 
 func (c Repository) Create(ctx *gin.Context) {
@@ -40,9 +84,14 @@ func (c Repository) Create(ctx *gin.Context) {
 		return
 	}
 
+	if err := c.checkNamespacePermission(ctx, params.Namespace, true); err != nil {
+		c.JsonResponseWithServerError(ctx, err)
+		return
+	}
+
 	existsRepository, _ := logic.Repository{}.GetByNameAndNamespace(params.Name, params.Namespace)
 	if existsRepository != nil {
-		c.JsonResponseWithServerError(ctx, errors.New("namespace 已存在"))
+		c.JsonResponseWithServerError(ctx, errors.New("repository 已存在"))
 		return
 	}
 
@@ -101,6 +150,10 @@ func (c Repository) List(ctx *gin.Context) {
 	user := logic2.User{}.GetUser(ctx)
 	query := dao.Q.RegistryRepository.Order(dao.Q.RegistryRepository.CreatedAt.Desc())
 	if params.Namespace != "" {
+		if err := c.checkNamespacePermission(ctx, params.Namespace, false); err != nil {
+			c.JsonResponseWithServerError(ctx, err)
+			return
+		}
 		query = query.Where(dao.Q.RegistryRepository.Namespace.Eq(params.Namespace))
 	} else if user != nil && !(logic2.User{}.IsAdminUser(user)) {
 		namespacePermissions, _ := dao.Q.RegistryUserPermission.

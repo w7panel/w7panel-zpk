@@ -27,6 +27,9 @@ func (c Deploy) getRuleWithRepository(ctx *gin.Context, ruleID int) (*entity.Reg
 		Where(dao.Q.RegistryRepositoryDeployRule.ID.Eq(int32(ruleID))).
 		First()
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.New("该规则不存在")
+		}
 		return nil, err
 	}
 	if rule == nil {
@@ -278,6 +281,11 @@ func (c Deploy) EditRule(ctx *gin.Context) {
 		c.JsonResponseWithServerError(ctx, err)
 		return
 	}
+	curRepository, _ := logic.Repository{}.GetByIdWithUser(params.RepositoryId, logic2.User{}.GetUser(ctx))
+	if curRepository == nil {
+		c.JsonResponseWithServerError(ctx, errors.New("repository 不存在"))
+		return
+	}
 
 	_, err = dao.Q.RegistryRepositoryDeployRule.Where(dao.Q.RegistryRepositoryDeployRule.ID.Eq(int32(params.Id))).Updates(entity.RegistryRepositoryDeployRule{
 		RepositoryID:      int32(params.RepositoryId),
@@ -329,7 +337,16 @@ func (c Deploy) DelRule(ctx *gin.Context) {
 		return
 	}
 
-	_, err = dao.Q.RegistryRepositoryDeployRule.Delete(rule)
+	err = dao.Q.Transaction(func(tx *dao.Query) error {
+		_, err := tx.RegistryRepositoryDeployRuleMatchLog.
+			Where(tx.RegistryRepositoryDeployRuleMatchLog.RuleID.Eq(rule.ID)).
+			Delete()
+		if err != nil {
+			return err
+		}
+		_, err = tx.RegistryRepositoryDeployRule.Delete(rule)
+		return err
+	})
 	if err != nil {
 		c.JsonResponseWithServerError(ctx, err)
 		return

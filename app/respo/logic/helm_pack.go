@@ -1652,11 +1652,36 @@ func encodeCommandJSONBase64(commands []string) (string, error) {
 	return base64.StdEncoding.EncodeToString(val), nil
 }
 
+func encodeShellsJSONBase64(shells []logic2.Shell) (string, error) {
+	if len(shells) == 0 {
+		return "", nil
+	}
+
+	val, err := json.Marshal(shells)
+	if err != nil {
+		return "", err
+	}
+	return base64.StdEncoding.EncodeToString(val), nil
+}
+
+func (hc *HelmPack) getTraditionShells() []logic2.Shell {
+	shells := make([]logic2.Shell, 0, len(hc.Manifest.Platform.Container.Shells))
+	shells = append(shells, hc.Manifest.Platform.Container.Shells...)
+	for _, container := range hc.Manifest.Platform.ContainerV2s {
+		shells = append(shells, container.Shells...)
+	}
+	return shells
+}
+
 func (hc *HelmPack) generateCreateSiteJobTemplate(rootDir string, application logic2.Application, tradition logic2.Tradition, k8sAppName string) error {
 	depot, _ := NewDepot()
 	zipUrl, _ := depot.GetFormulaBackendZipDownloadUrlByApplication(application, false)
 
 	cmdBase64, err := encodeCommandJSONBase64(tradition.Cmd)
+	if err != nil {
+		return err
+	}
+	shellsBase64, err := encodeShellsJSONBase64(hc.getTraditionShells())
 	if err != nil {
 		return err
 	}
@@ -1705,8 +1730,8 @@ spec:
             - sh
             - -c
             - >-
-              /home/rangine create:site --operation={{ ternary "upgrade" "install" .Release.IsUpgrade }} --w7panel-domain={{ .Values.global.panel.innerUrl }} --w7panel-token={{ .Values.global.panel.panelRealToken }} --title=%s --name=%s --language=%s --version=%s --domain={{ .Values.DOMAIN_URL }} --ssl={{ default false .Values.ingressForceHttps }} --cmd-base64=%s --code-download-url=%s --app_name=%s --k8s-app-name={{ $fullName }} --k8s-env-app-name=%s --start-params-env-base64=%s -f /home/config.yaml
-`, application.Identifie+"-"+tradition.EnvironmentVersion+"-副本", tradition.EnvironmentName, tradition.EnvironmentLanguage, tradition.EnvironmentVersion, cmdBase64, zipUrl, application.Identifie, k8sAppName, getStartParamsEnvJSONTemplate())
+              /home/rangine create:site --operation={{ ternary "upgrade" "install" .Release.IsUpgrade }} --w7panel-domain={{ .Values.global.panel.innerUrl }} --w7panel-token={{ .Values.global.panel.panelRealToken }} --title=%s --name=%s --language=%s --version=%s --domain={{ .Values.DOMAIN_URL }} --ssl={{ default false .Values.ingressForceHttps }} --cmd-base64=%s --shells-base64=%s --code-download-url=%s --app_name=%s --k8s-app-name={{ $fullName }} --k8s-env-app-name=%s --start-params-env-base64=%s -f /home/config.yaml
+`, application.Identifie+"-"+tradition.EnvironmentVersion+"-副本", tradition.EnvironmentName, tradition.EnvironmentLanguage, tradition.EnvironmentVersion, cmdBase64, shellsBase64, zipUrl, application.Identifie, k8sAppName, getStartParamsEnvJSONTemplate())
 
 	filePath := filepath.Join(rootDir, "create-site-job.yaml")
 	return os.WriteFile(filePath, []byte(jobTemplate), 0644)

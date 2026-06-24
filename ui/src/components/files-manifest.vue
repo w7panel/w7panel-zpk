@@ -248,7 +248,7 @@
                                 </div>
                             </a-form-item>
 
-                            <a-form-item v-if="form.type != 'tradition' && form.type != 'helm' && form.type != 'light'"
+                            <a-form-item v-if="form.type != 'helm' && form.type != 'light'"
                                 label="脚本配置" field="shell" class="mt-16">
                                 <div style="flex:1;">
                                     <manifest-config-table :rows="form.shell" add-text="添加脚本"
@@ -1241,7 +1241,7 @@ platform:
                 this.$refs.formref.validate(async (errors) => {
                     if (errors) { messageWarning('必填项不能为空'); return }
 
-                    if (this.form.type == 'helm' || this.form.type == 'tradition') {
+                    if (this.form.type == 'helm') {
                         try {
                             delete this.json.platform['container-v2']
                             delete this.json.platform['volumes']
@@ -1249,11 +1249,17 @@ platform:
                             delete this.json.platform.ingress
                             delete this.json.platform.runtimeClassName
                         } catch { }
+                    } else if (this.form.type == 'tradition') {
+                        try {
+                            delete this.json.platform['volumes']
+                            delete this.json.platform['volumeClaimTemplates']
+                            delete this.json.platform.ingress
+                            delete this.json.platform.runtimeClassName
+                        } catch { }
+                        this.applyPlatformShells();
                     } else if (this.form.type == 'docker') {
 
-                        if (this.json.platform?.['container-v2']?.[0]) {
-                            this.json.platform['container-v2'][0].shells = this.form.shell.filter(i => i.type && i.shell);
-                        }
+                        this.applyPlatformShells();
 
                         this.json.platform.ingress = (this.form.ingress || []).map(i => ({
                             name: i.name,
@@ -1556,12 +1562,35 @@ platform:
                 })
             })
         },
+        getValidShells() {
+            return (this.form.shell || []).filter(i => i.type && i.shell);
+        },
+        applyPlatformShells() {
+            this.json.platform = this.json.platform || {};
+            const shells = this.getValidShells();
+            if (!shells.length) {
+                if (this.json.platform?.['container-v2']?.[0]) {
+                    delete this.json.platform['container-v2'][0].shells;
+                }
+                if (this.form.type == 'tradition') {
+                    delete this.json.platform['container-v2'];
+                }
+                return;
+            }
+
+            if (!this.json.platform['container-v2']?.[0]) {
+                this.json.platform['container-v2'] = [{
+                    name: this.json.application?.identifie || this.form.identifie || 'main',
+                }];
+            }
+            this.json.platform['container-v2'][0].shells = shells;
+        },
         submit(otherData, callback) {
 
             this.$refs.formref.validate(async (errors) => {
                 if (errors) { messageWarning('必填项不能为空'); return }
 
-                if (this.form.type == 'helm' || this.form.type == 'tradition') {
+                if (this.form.type == 'helm') {
                     try {
                         delete this.json.platform['container-v2']
                         delete this.json.platform['volumes']
@@ -1569,12 +1598,17 @@ platform:
                         delete this.json.platform.ingress
                         delete this.json.platform.runtimeClassName
                     } catch { }
+                } else if (this.form.type == 'tradition') {
+                    try {
+                        delete this.json.platform['volumes']
+                        delete this.json.platform['volumeClaimTemplates']
+                        delete this.json.platform.ingress
+                        delete this.json.platform.runtimeClassName
+                    } catch { }
+                    this.applyPlatformShells();
                 } else if (this.form.type == 'docker') {
 
-                    if (this.json.platform?.['container-v2']?.[0]) {
-                        this.json.platform['container-v2'][0].shells = this.form.shell.filter(i => i.type && i.shell);
-                    }
-
+                    this.applyPlatformShells();
 
                     this.json.platform.ingress = (this.form.ingress || []).map(i => ({
                         name: i.name,

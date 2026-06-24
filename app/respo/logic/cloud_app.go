@@ -27,10 +27,6 @@ import (
 type CloudApp struct {
 }
 
-func (l CloudApp) GetNotAppName(formula *Formula, consoleUid int) string {
-	return formula.Name + strconv.Itoa(consoleUid)
-}
-
 func (l CloudApp) UnpackNotAppToFormula(notAppId int, user *entity.RegistryUser, consoleUid int32) error {
 	notAppInfo, err := w7.DevCenterNotAppSdk.GetNotAppInfo(devcenter.NotAppInfoReq{
 		ConsoleUid: consoleUid,

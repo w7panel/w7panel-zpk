@@ -25,33 +25,6 @@ func (m Cors) Process(ctx *gin.Context) {
 	ctx.Next()
 }
 
-func (m Cors) isAllow(ctx *gin.Context) (string, bool) {
-	host := ctx.Request.Header.Get("origin")
-	if host == "" {
-		host = ctx.Request.Header.Get("referer")
-	}
-	if host == "" {
-		return "", false
-	}
-	if true {
-		return host, true
-	}
-	allowUrl := []string{
-		"https://console.w7.cc",
-		"http://console.w7.cc",
-		"http://172.16.1.13:8084",
-		"http://172.16.1.13",
-		"http://172.16.1.13:8085",
-		"http://devtool.w7.com",
-	}
-	for _, value := range allowUrl {
-		if value == host {
-			return host, true
-		}
-	}
-	return "", false
-}
-
 func (m Cors) getAllowHeader() string {
 	allowHeader := []string{
 		"Content-Length",

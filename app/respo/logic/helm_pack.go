@@ -963,10 +963,6 @@ func hasSharedPersistentStorage(mainVolumes []v1.Volume, subVolumes []v1.Volume)
 	return false
 }
 
-func (hc *HelmPack) generatePortName(port v1.ContainerPort) string {
-	return "port-" + strconv.Itoa(int(port.ContainerPort))
-}
-
 func buildStableSubPathTemplate(containerName string, volumeMount v1.VolumeMount) string {
 	return fmt.Sprintf(`{{ printf "%%s|%%s|%%s|%s|%s|%s" .Release.Name .Release.Namespace .Chart.Name | sha256sum | trunc 12 }}`,
 		containerName,

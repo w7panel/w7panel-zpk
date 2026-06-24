@@ -58,19 +58,6 @@ func ConvertDigitsToLetters(s string) string {
 	}, s)
 }
 
-func CheckFileAllowUpload(filename string) bool {
-	allowFileExt := []string{
-		".zip", ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".cvs",
-		".jpg", ".png", ".jpeg", ".gif",
-	}
-	for _, s := range allowFileExt {
-		if strings.HasSuffix(filename, s) {
-			return true
-		}
-	}
-	return false
-}
-
 func EncodeURIComponent(s string, excluded ...[]byte) string {
 	var b bytes.Buffer
 	written := 0

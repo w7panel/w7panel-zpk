@@ -5,10 +5,8 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
-	"crypto/sha1"
 	"encoding/base64"
 	"errors"
-	"fmt"
 	"io"
 )
 
@@ -21,12 +19,6 @@ func pad(buf []byte, blockSize int) []byte {
 func unpad(src []byte) []byte {
 	padding := src[len(src)-1]
 	return src[:len(src)-int(padding)]
-}
-
-func Sha1(str string) string {
-	hash := sha1.New()
-	_, _ = io.WriteString(hash, str)
-	return fmt.Sprintf("%x", hash.Sum(nil))
 }
 
 func AesEncrypt(plaintext string, key string) (string, error) {

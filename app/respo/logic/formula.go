@@ -115,10 +115,6 @@ func (self *Formula) GetIconRelativePath() string {
 	return filepath.Join("icon", self.GetIconName())
 }
 
-func (self *Formula) GetZipRelativeDir() string {
-	return filepath.Join("Storage", self.Name)
-}
-
 func (self *Formula) GetFilesRelativeDir() string {
 	return filepath.Join(GetFormulaRelativeDir(self.Name, self.VersionId), "files")
 }

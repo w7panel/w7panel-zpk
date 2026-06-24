@@ -208,6 +208,10 @@ func (c Namespace) Edit(ctx *gin.Context) {
 	oldNamespaceName := curNamespace.Name
 	namespaceRenamed := oldNamespaceName != params.Name
 	if namespaceRenamed {
+		if oldNamespaceName == logic2.DefaultNamespace {
+			c.JsonResponseWithServerError(ctx, errors.New("default namespace 不可重命名"))
+			return
+		}
 		existsNamespace, _ := logic.Namespace{}.GetByName(params.Name)
 		if existsNamespace != nil && existsNamespace.ID != curNamespace.ID {
 			c.JsonResponseWithServerError(ctx, errors.New("namespace 已存在"))
@@ -224,6 +228,22 @@ func (c Namespace) Edit(ctx *gin.Context) {
 				Where(tx.RegistryUserPermission.ResourceValue.Eq(oldNamespaceName)).
 				Update(tx.RegistryUserPermission.ResourceValue, params.Name)
 			if err != nil {
+				return err
+			}
+
+			oldRepositoryPrefix := oldNamespaceName + "/"
+			newRepositoryPrefix := params.Name + "/"
+			repositoryPermissions, err := tx.RegistryUserPermission.
+				Where(tx.RegistryUserPermission.ResourceType.Eq(string(logic.PermissionResourceTypeRepository))).
+				Where(tx.RegistryUserPermission.ResourceValue.Like(oldRepositoryPrefix + "%")).
+				Find()
+			if err != nil {
+				return err
+			}
+			for _, permission := range repositoryPermissions {
+				permission.ResourceValue = newRepositoryPrefix + strings.TrimPrefix(permission.ResourceValue, oldRepositoryPrefix)
+			}
+			if err = tx.RegistryUserPermission.Save(repositoryPermissions...); err != nil {
 				return err
 			}
 

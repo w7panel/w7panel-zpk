@@ -205,7 +205,9 @@ func (c Namespace) Edit(ctx *gin.Context) {
 		return
 	}
 
-	if curNamespace.Name != params.Name {
+	oldNamespaceName := curNamespace.Name
+	namespaceRenamed := oldNamespaceName != params.Name
+	if namespaceRenamed {
 		existsNamespace, _ := logic.Namespace{}.GetByName(params.Name)
 		if existsNamespace != nil && existsNamespace.ID != curNamespace.ID {
 			c.JsonResponseWithServerError(ctx, errors.New("namespace 已存在"))
@@ -215,7 +217,26 @@ func (c Namespace) Edit(ctx *gin.Context) {
 	}
 	curNamespace.VisibleType = int32(params.VisibleType)
 
-	err := dao.Q.RegistryNamespace.Save(curNamespace)
+	err := dao.Q.Transaction(func(tx *dao.Query) error {
+		if namespaceRenamed {
+			_, err := tx.RegistryUserPermission.
+				Where(tx.RegistryUserPermission.ResourceType.Eq(string(logic.PermissionResourceTypeNamespace))).
+				Where(tx.RegistryUserPermission.ResourceValue.Eq(oldNamespaceName)).
+				Update(tx.RegistryUserPermission.ResourceValue, params.Name)
+			if err != nil {
+				return err
+			}
+
+			_, err = tx.RegistryRepository.
+				Where(tx.RegistryRepository.Namespace.Eq(oldNamespaceName)).
+				Update(tx.RegistryRepository.Namespace, params.Name)
+			if err != nil {
+				return err
+			}
+		}
+
+		return tx.RegistryNamespace.Save(curNamespace)
+	})
 	if err != nil {
 		c.JsonResponseWithServerError(ctx, errors.New("namespace 保存失败, err: "+err.Error()))
 		return

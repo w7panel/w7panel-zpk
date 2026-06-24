@@ -354,7 +354,8 @@ func (c Repository) Delete(ctx *gin.Context) {
 		if err != nil {
 			return err
 		}
-		return logic.Permission{}.DelPermissionByResource(tx, curRepository.Name, logic.PermissionResourceTypeRepository)
+		resourceValue := logic2.BuildRepositoryName(curRepository.Name, curRepository.Namespace)
+		return logic.Permission{}.DelPermissionByResource(tx, resourceValue, logic.PermissionResourceTypeRepository)
 	})
 	if err != nil {
 		c.JsonResponseWithServerError(ctx, err)

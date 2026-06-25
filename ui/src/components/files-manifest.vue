@@ -935,7 +935,7 @@ export default {
                 this.json.platform.workload = this.json?.platform?.workload || {};
                 this.json.platform.workload.type = data?.pluginData?.kind || 'deployments';
 
-                this.json.platform['container-v2'][0].shells = this.form.shell.filter(i => i.type && i.shell);
+                this.applyPlatformShells();
 
                 this.json.platform.ingress = (this.form.ingress || []).map(i => ({
                     name: i.name,
@@ -1475,7 +1475,7 @@ platform:
                 this.form.cmd = j.platform?.tradition?.cmd || [''];
 
                 this.form.ingress = JSON.parse(JSON.stringify(j.platform?.ingress || []));
-                this.form.shell = JSON.parse(JSON.stringify(j.platform?.['container-v2']?.[0]?.shells || []));
+                this.form.shell = JSON.parse(JSON.stringify(j.platform?.shells || j.platform?.['container-v2']?.[0]?.shells || []));
                 this.form.build_context = j.platform?.['container-v2']?.[0]?.build?.context || '';
                 this.form.containers = j.platform?.['container-v2'] || [];
 
@@ -1569,21 +1569,13 @@ platform:
             this.json.platform = this.json.platform || {};
             const shells = this.getValidShells();
             if (!shells.length) {
-                if (this.json.platform?.['container-v2']?.[0]) {
-                    delete this.json.platform['container-v2'][0].shells;
-                }
-                if (this.form.type == 'tradition') {
-                    delete this.json.platform['container-v2'];
-                }
+                delete this.json.platform.shells;
                 return;
             }
-
-            if (!this.json.platform['container-v2']?.[0]) {
-                this.json.platform['container-v2'] = [{
-                    name: this.json.application?.identifie || this.form.identifie || 'main',
-                }];
+            this.json.platform.shells = shells;
+            if (this.json.platform?.['container-v2']?.[0]) {
+                delete this.json.platform['container-v2'][0].shells;
             }
-            this.json.platform['container-v2'][0].shells = shells;
         },
         submit(otherData, callback) {
 

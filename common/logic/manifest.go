@@ -56,6 +56,7 @@ type Platform struct {
 	Depends              []Depend                   `yaml:"depends" json:"depends"`
 	StartParams          []StartParams              `yaml:"startParams" json:"startParams"`
 	Gpu                  string                     `yaml:"runtimeClassName" json:"runtimeClassName"`
+	Shells               []Shell                    `yaml:"shells" json:"shells"`
 }
 
 type Workload struct {
@@ -370,8 +371,12 @@ func GetManifestV2(manifest Manifest) Manifest {
 			manifest.Platform.ContainerV2s[index].Name = manifest.Application.Identifie + strconv.Itoa(index)
 		}
 	}
-
-	manifest.Platform.ContainerV2s[0].CodeAttachUrl = manifest.Source.Url
+	if len(manifest.Platform.ContainerV2s) > 0 {
+		manifest.Platform.ContainerV2s[0].CodeAttachUrl = manifest.Source.Url
+		if len(manifest.Platform.Shells) == 0 {
+			manifest.Platform.Shells = manifest.Platform.ContainerV2s[0].Shells
+		}
+	}
 
 	return manifest
 }

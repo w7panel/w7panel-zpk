@@ -867,6 +867,7 @@ func (hc *HelmPack) generateValuesYaml(rootDir string) error {
 			"targetSelectorApp": hc.SharedStorageTargetApp,
 		},
 	}
+	values["jobs"] = hc.getJobsValues(hc.Manifest.Platform)
 	helmContainers := make([]map[string]interface{}, 0, len(hc.Manifest.Platform.ContainerV2s))
 	for _, container := range hc.Manifest.Platform.ContainerV2s {
 		helmContainers = append(helmContainers, hc.generateContainerV2Values(container, hc.Manifest.Application))
@@ -1000,7 +1001,6 @@ func (hc *HelmPack) generateContainerV2Values(container logic2.ContainerV2, appl
 		"lifecycle":       container.Lifecycle,
 		"securityContext": hc.getSecurityContext(container),
 		"isInitContainer": container.IsInitContainer,
-		"jobs":            hc.getJobValues(container),
 		"buildImageJobs":  hc.getBuildImageValues(container, application),
 	}
 }
@@ -1407,27 +1407,18 @@ spec:
 }
 
 func (hc *HelmPack) generateShellsTemplates(rootDir string) error {
-	if len(hc.Manifest.Platform.ContainerV2s) == 0 {
+	if len(hc.Manifest.Platform.Shells) == 0 {
 		return nil
 	}
 
-	jobTemplate := `{{- if or (hasKey .Values "containers") (gt (len .Values.containers) 0) }}
-  {{- $hasJobs := false }}
-  {{- range .Values.containers }}
-    {{- if and (hasKey . "jobs") (gt (len .jobs) 0) }}
-      {{- $hasJobs = true }}
-    {{- end }}
-  {{- end }}
-  {{- if $hasJobs }}
+	jobTemplate := `{{- if gt (len .Values.jobs) 0 }}
 	{{- $root := . }}
-    {{/* 渲染所有 Job */}}
-    {{- range $container := .Values.containers }}
-      {{- range $job := $container.jobs }}
+    {{- range $job := .Values.jobs }}
 ---
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: {{ include "common.fullname" $root }}-{{ $container.name }}-job-{{ $job.name }}
+  name: {{ include "common.fullname" $root }}-job-{{ $job.name }}
   labels:
     {{- include "common.labels" $root | nindent 4 }}
     group: {{ $root.Release.Name }}
@@ -1470,18 +1461,18 @@ spec:
         {{- include "common.volumesToYaml" (dict "root" $root "volumes" $root.Values.volumes) | nindent 8 }}
       {{- end }}
       containers:
-        - name: {{ $container.name }}-{{ $job.name }}
+        - name: {{ $job.name }}
           {{- if $job.image }}
           image: {{ $job.image | quote }}
           {{- else }}
-          image: "{{ $container.image.repository }}:{{ $container.image.tag }}"
+          image: "{{ $job.container.image.repository }}:{{ $job.container.image.tag }}"
           {{- end }}
-          imagePullPolicy: {{ $container.image.pullPolicy | default "IfNotPresent" }}
+          imagePullPolicy: {{ $job.container.image.pullPolicy | default "IfNotPresent" }}
           command: ["/bin/sh", "-c"]
           args:
             - {{ $job.shell | quote }}
           env:
-            {{- with $container.env }}
+            {{- with $job.container.env }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
             {{- if $root.Values.startParams }}
@@ -1490,23 +1481,21 @@ spec:
               value: {{ tpl $v $root | quote }}
             {{- end }}
             {{- end }}
-          {{- with $container.resources }}
+          {{- with $job.container.resources }}
           resources: {{- toYaml . | nindent 12 }}
           {{- end }}
-          {{- $renderedVolumeMounts := include "common.jobVolumeMountsToYaml" (dict "root" $root "mounts" $container.volumeMounts) }}
+          {{- $renderedVolumeMounts := include "common.jobVolumeMountsToYaml" (dict "root" $root "mounts" $job.container.volumeMounts) }}
           {{- if $renderedVolumeMounts }}
           volumeMounts: {{- $renderedVolumeMounts | nindent 12 }}
           {{- end }}
-          {{- with $container.securityContext }}
+          {{- with $job.container.securityContext }}
           securityContext: {{- toYaml . | nindent 12 }}
           {{- end }}
-      {{- end }}
     {{- end }}
-  {{- end }}
 {{- end }}
 `
 
-	filePath := filepath.Join(rootDir, "container-job.yaml")
+	filePath := filepath.Join(rootDir, "shell-job.yaml")
 	return os.WriteFile(filePath, []byte(jobTemplate), 0644)
 }
 
@@ -1664,15 +1653,6 @@ func encodeShellsJSONBase64(shells []logic2.Shell) (string, error) {
 	return base64.StdEncoding.EncodeToString(val), nil
 }
 
-func (hc *HelmPack) getTraditionShells() []logic2.Shell {
-	shells := make([]logic2.Shell, 0, len(hc.Manifest.Platform.Container.Shells))
-	shells = append(shells, hc.Manifest.Platform.Container.Shells...)
-	for _, container := range hc.Manifest.Platform.ContainerV2s {
-		shells = append(shells, container.Shells...)
-	}
-	return shells
-}
-
 func (hc *HelmPack) generateCreateSiteJobTemplate(rootDir string, application logic2.Application, tradition logic2.Tradition, k8sAppName string) error {
 	depot, _ := NewDepot()
 	zipUrl, _ := depot.GetFormulaBackendZipDownloadUrlByApplication(application, false)
@@ -1681,7 +1661,7 @@ func (hc *HelmPack) generateCreateSiteJobTemplate(rootDir string, application lo
 	if err != nil {
 		return err
 	}
-	shellsBase64, err := encodeShellsJSONBase64(hc.getTraditionShells())
+	shellsBase64, err := encodeShellsJSONBase64(hc.Manifest.Platform.Shells)
 	if err != nil {
 		return err
 	}
@@ -2018,9 +1998,9 @@ func (hc *HelmPack) getSecurityContext(container logic2.ContainerV2) map[string]
 	return conf
 }
 
-func (hc *HelmPack) getJobValues(container logic2.ContainerV2) []map[string]interface{} {
-	shells := make([]map[string]interface{}, 0)
-	for _, item := range container.Shells {
+func (hc *HelmPack) getShellJobValues(items []logic2.Shell) []map[string]interface{} {
+	jobs := make([]map[string]interface{}, 0)
+	for _, item := range items {
 		shellWeight := 0
 		hookName := ""
 		switch item.Type {
@@ -2044,7 +2024,7 @@ func (hc *HelmPack) getJobValues(container logic2.ContainerV2) []map[string]inte
 			hookName = "custom"
 		}
 
-		shells = append(shells, map[string]interface{}{
+		jobs = append(jobs, map[string]interface{}{
 			"enabled": true,
 			"title":   item.Title,
 			"image":   item.Image,
@@ -2055,7 +2035,46 @@ func (hc *HelmPack) getJobValues(container logic2.ContainerV2) []map[string]inte
 		})
 	}
 
-	return shells
+	return jobs
+}
+
+func (hc *HelmPack) getJobsValues(platform logic2.Platform) []map[string]interface{} {
+	jobs := make([]map[string]interface{}, 0)
+	containerValues := hc.getShellJobContainerValues(platform)
+	for _, job := range hc.getShellJobValues(platform.Shells) {
+		job["container"] = containerValues
+		jobs = append(jobs, job)
+	}
+	return jobs
+}
+
+func (hc *HelmPack) getShellJobContainerValues(platform logic2.Platform) map[string]interface{} {
+	if len(platform.ContainerV2s) == 0 {
+		return map[string]interface{}{
+			"name":            strings.ReplaceAll(hc.Manifest.Application.Identifie, "_", "-"),
+			"image":           map[string]interface{}{"repository": GetBuildImageName(hc.Manifest.Application), "tag": "latest", "pullPolicy": "IfNotPresent"},
+			"env":             []v1.EnvVar{},
+			"resources":       v1.ResourceRequirements{},
+			"volumeMounts":    []v1.VolumeMount{},
+			"securityContext": map[string]interface{}{},
+		}
+	}
+
+	container := platform.ContainerV2s[0]
+	for index, volume := range container.VolumeMounts {
+		if volume.SubPath == "%RANDOM_DIR%" || volume.SubPath == "RANDOM_DIR" {
+			container.VolumeMounts[index].SubPath = buildStableSubPathTemplate(container.Name, volume)
+		}
+	}
+
+	return map[string]interface{}{
+		"name":            strings.ReplaceAll(container.Name, "_", "-"),
+		"image":           hc.getImageValues(container),
+		"env":             container.Env,
+		"resources":       container.Resources,
+		"volumeMounts":    container.VolumeMounts,
+		"securityContext": hc.getSecurityContext(container),
+	}
 }
 
 func (hc *HelmPack) getBuildImageValues(container logic2.ContainerV2, application logic2.Application) []map[string]interface{} {

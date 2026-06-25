@@ -277,8 +277,6 @@ export default {
                         this.$router.push('/zpk-manifest-editor?version_id=' + this.version_id + '&identifie=' + this.identifie + '&filename=' + otherData.editfile + '&vtitle=' + this.vtitle);
                         return;
                     }
-                    this.$router.push('/zpk-fileadd?version_id=' + this.version_id + '&identifie=' + this.identifie + '&filename=' + otherData.editfile + '&vtitle=' + this.vtitle);
-                    return;
                 }
                 if (otherData?.stop) {
                     (typeof callback == 'function') && callback();

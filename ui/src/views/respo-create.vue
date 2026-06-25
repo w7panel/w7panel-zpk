@@ -20,19 +20,6 @@
             </files-manifest>
         </a-spin>
     </div>
-
-    <a-modal v-model:visible="addfile.show" title="添加文件" :width="600" :footer="false"
-        modal-class="zpk-version-dialog">
-        <div class="mt-20 df ai-c ml-20">
-            <div style="width:70px;">文件名</div>
-            <a-input v-model="addfile.filename" placeholder="请输入文件名" style="width:400px;"></a-input>
-        </div>
-        <div class="dialog-footer file-name-dialog-footer">
-            <a-button @click="addfile.show = false;">取消</a-button>
-            <a-button type="primary"
-                @click="$router.push('/zpk-fileadd?identifie=' + identifie + '&filename=' + addfile.filename)">确认添加</a-button>
-        </div>
-    </a-modal>
 </template>
 
 <script>
@@ -71,10 +58,6 @@ export default {
             manifest: '',
             loading: false,
             tree: [],
-            addfile: {
-                show: false,
-                filename: '',
-            },
             noPlatform: false,
             noManifest: false,
         }
@@ -162,8 +145,6 @@ export default {
                         this.$router.push('/zpk-manifest-editor?identifie=' + this.identifie + '&filename=' + otherData.editfile);
                         return;
                     }
-                    this.$router.push('/zpk-fileadd?identifie=' + this.identifie + '&filename=' + otherData.editfile);
-                    return;
                 }
                 messageSuccess('添加manifest成功');
                 this.getInfo(this.identifie, () => {

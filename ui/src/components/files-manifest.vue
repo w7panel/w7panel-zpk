@@ -215,9 +215,6 @@
                                             </div>
                                         </div>
                                     </files-upload>
-                                    <div class="c-blue cursor ml-20"
-                                        @click="$router.push('/zpk-filetree?id=' + identifie + '&versionid=' + version_id + '&vtitle=' + vtitle)">
-                                        编辑</div>
                                     <div class="c-blue cursor ml-20" @click="deleteUpload">删除</div>
                                 </div>
                                 <div v-if="zip.hasDockerfile === false" class="c-red mt-10">没有检测到Dockerfile文件，请重新上传

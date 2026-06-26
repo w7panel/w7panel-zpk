@@ -1286,7 +1286,7 @@ export default {
             let value = item?.value;
             let name = this.unwrapConfigVariable(value);
             if (item?.isSelect || this.systemVarOptions.some(i => i.value == name)) {
-                return `"{{.Values.${name}}}"`;
+                return this.wrapConfigVariable(name);
             }
             return value;
         },
@@ -1304,6 +1304,10 @@ export default {
             if (match) {
                 let name = match[1].trim();
                 return { value: this.wrapConfigVariable(name), isSelect: true, variableType: 'start' };
+            }
+            let variableName = this.unwrapConfigVariable(raw);
+            if (this.systemVarOptions.some(i => i.value == variableName)) {
+                return { value: this.wrapConfigVariable(variableName), isSelect: true, variableType: 'start' };
             }
             let systemMatch = raw.match(/^\$\{system\.[^}]+\}$/);
             return { value: raw, isSelect: false, variableType: systemMatch ? 'system' : '' };
@@ -1411,7 +1415,7 @@ export default {
                 role.type = role.type || 'internal';
                 this.syncIframeBackendDefaults(role);
             } else {
-                if (this.form.type != 'tradition' && role.type == 'internal' && [this.getIframeDomainPlaceholder(), this.getIframeDomainDisplayPlaceholder()].includes(role.backend_identifie)) {
+                if (this.form.type != 'tradition' && role.type == 'internal' && role.backend_identifie == this.getIframeDomainPlaceholder()) {
                     role.backend_identifie = this.getDefaultBackendIdentifie();
                     role.backend_port = this.getDefaultBackendPort(role.backend_identifie);
                 }
@@ -1443,7 +1447,7 @@ export default {
             return changed;
         },
         getIframeDomainPlaceholder() {
-            return '{{.Values.DOMAIN_URL}}';
+            return '${DOMAIN_URL}';
         },
         getIframeDomainDisplayPlaceholder() {
             return '${DOMAIN_URL}';
@@ -1452,7 +1456,7 @@ export default {
             let changed = false;
             let placeholder = this.getIframeDomainPlaceholder();
             if (role.type == 'internal') {
-                if (role.backend_identifie != placeholder && role.backend_identifie != this.getIframeDomainDisplayPlaceholder()) {
+                if (role.backend_identifie != placeholder) {
                     role.backend_identifie = placeholder;
                     changed = true;
                 }
@@ -1476,10 +1480,8 @@ export default {
         parseIframeBackendUrl(url) {
             let value = String(url || '');
             let placeholder = this.getIframeDomainPlaceholder();
-            let displayPlaceholder = this.getIframeDomainDisplayPlaceholder();
-            let matchedPlaceholder = value.includes(placeholder) ? placeholder : (value.includes(displayPlaceholder) ? displayPlaceholder : '');
-            if (matchedPlaceholder) {
-                let path = value.slice(value.indexOf(matchedPlaceholder) + matchedPlaceholder.length).replace(/^\/+/, '');
+            if (value.includes(placeholder)) {
+                let path = value.slice(value.indexOf(placeholder) + placeholder.length).replace(/^\/+/, '');
                 return {
                     type: 'internal',
                     backend_identifie: placeholder,

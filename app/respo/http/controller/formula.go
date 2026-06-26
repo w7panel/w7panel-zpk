@@ -271,6 +271,7 @@ func (c Formula) Info(ctx *gin.Context) {
 	}
 
 	responseManifest.Version = 3
+	responseManifest.VersionV2 = 3
 	tmpContent, _ := yaml.Marshal(responseManifest)
 	responseManifestMap := map[string]interface{}{}
 	_ = yaml.Unmarshal(tmpContent, &responseManifestMap)

@@ -11,6 +11,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -1629,6 +1630,29 @@ func getStartParamsEnvJSONTemplate() string {
 	return `{{- $startParamsEnv := dict -}}{{- range $qkey, $qvalue := .Values.startParams }}{{- $_ := set $startParamsEnv $qkey (tpl $qvalue $) -}}{{- end }}{{ $startParamsEnv | toJson | b64enc }}`
 }
 
+var helmValuesPlaceholderRegexp = regexp.MustCompile(`\$\{([A-Za-z_][A-Za-z0-9_.-]*)\}`)
+
+func renderHelmValuesPlaceholders(value string) string {
+	return helmValuesPlaceholderRegexp.ReplaceAllStringFunc(value, func(match string) string {
+		parts := helmValuesPlaceholderRegexp.FindStringSubmatch(match)
+		if len(parts) != 2 || strings.HasPrefix(parts[1], "system.") {
+			return match
+		}
+		return "{{ .Values." + parts[1] + " }}"
+	})
+}
+
+func renderHelmValuesPlaceholdersMap(values map[string]string) map[string]string {
+	if len(values) == 0 {
+		return values
+	}
+	rendered := make(map[string]string, len(values))
+	for key, value := range values {
+		rendered[key] = renderHelmValuesPlaceholders(value)
+	}
+	return rendered
+}
+
 func encodeCommandJSONBase64(commands []string) (string, error) {
 	if len(commands) == 0 {
 		return "", nil
@@ -2479,20 +2503,20 @@ func (hc *HelmPack) generateMicroAppTemplate(rootDir string, manifest logic2.Man
 			"role":               item.Name,
 			"load_mode":          item.LoadMode,
 			"type":               item.BackendConfig.Type,
-			"backend_identifier": item.BackendConfig.BackendIdentifie,
+			"backend_identifier": renderHelmValuesPlaceholders(item.BackendConfig.BackendIdentifie),
 			"backend_port":       item.BackendConfig.BackendPort,
-			"proxy_request":      item.BackendConfig.RequestProxy,
-			"frontend_props":     item.BackendConfig.FrontendProps,
+			"proxy_request": logic2.RequestProxy{
+				Headers: renderHelmValuesPlaceholdersMap(item.BackendConfig.RequestProxy.Headers),
+				Query:   renderHelmValuesPlaceholdersMap(item.BackendConfig.RequestProxy.Query),
+			},
+			"frontend_props": renderHelmValuesPlaceholdersMap(item.BackendConfig.FrontendProps),
 		}
 		menuConfigValues = append(menuConfigValues, map[string]interface{}{
-			"title":               item.Title,
-			"name":                item.Name,
-			"status":              item.Status,
-			"support":             item.Support,
-			"framework":           item.Framework,
-			"is_default_register": item.IsDefaultRegister,
-			"location":            item.Location,
-			"menu":                item.Menu,
+			"title":   item.Title,
+			"name":    item.Name,
+			"status":  item.Status,
+			"support": item.Support,
+			"menu":    item.Menu,
 		})
 		backendConfigValues = append(backendConfigValues, conf)
 	}
@@ -2598,9 +2622,7 @@ spec:
       title: {{ .title }}
       status: {{ .status }}
       support: {{ .support }}
-      framework: {{ .framework }}
-      is_default_register: {{ .is_default_register }}
-      location: {{ .location }}
+      location: left
       menu:
         {{- range .menu }}
         - displayorder: {{ .displayorder }}
@@ -2613,7 +2635,7 @@ spec:
           {{- else }}
           icon_svg: null
           {{- end }}
-          location: {{ .location }}
+          location: left
           is_default: {{ .is_default }}
           parent: "{{ .parent }}"
           {{- end }}

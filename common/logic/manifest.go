@@ -1,6 +1,7 @@
 package logic
 
 import (
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -27,6 +28,7 @@ type Manifest struct {
 	Source      Source      `yaml:"source" json:"source"`
 	Web         Source      `yaml:"web" json:"web"`
 	Version     int         `yaml:"v" json:"v"`
+	VersionV2   int         `yaml:"version" json:"version"`
 }
 
 type Application struct {
@@ -38,7 +40,6 @@ type Application struct {
 	ClusterPrivileged bool                   `yaml:"clusterPrivileges" json:"clusterPrivileges"`
 	RegisterSite      bool                   `yaml:"registerSite" json:"registerSite"`
 	Type              string                 `yaml:"type" json:"type"`
-	FrontType         []string               `yaml:"front_type" json:"front_type"`
 	Annotation        map[string]interface{} `yaml:"annotation" json:"annotation"`
 	Version           string                 `yaml:"version" json:"version"`
 }
@@ -216,16 +217,13 @@ type BackendConfig struct {
 }
 
 type Bindings struct {
-	Title             string        `yaml:"title" json:"title"`
-	Name              string        `yaml:"name" json:"name"`
-	Status            int           `yaml:"status" json:"status"`
-	Support           string        `yaml:"support" json:"support"`
-	Framework         string        `yaml:"framework" json:"framework"`
-	IsDefaultRegister int           `yaml:"is_default_register" json:"is_default_register"`
-	Location          string        `yaml:"location" json:"location"`
-	Menu              []Menu        `yaml:"menu" json:"menu"`
-	LoadMode          string        `yaml:"load_mode" json:"load_mode"`
-	BackendConfig     BackendConfig `yaml:"backend_config" json:"backend_config"`
+	Title         string        `yaml:"title" json:"title"`
+	Name          string        `yaml:"name" json:"name"`
+	Status        int           `yaml:"status" json:"status"`
+	Support       string        `yaml:"support" json:"support"`
+	Menu          []Menu        `yaml:"menu" json:"menu"`
+	LoadMode      string        `yaml:"load_mode" json:"load_mode"`
+	BackendConfig BackendConfig `yaml:"backend_config" json:"backend_config"`
 }
 
 type Menu struct {
@@ -329,13 +327,15 @@ func ProcessManifestIdentify(manifestRow Manifest) Manifest {
 }
 
 func normalizeBackendIdentifie(identifie string) string {
-	if strings.Contains(identifie, "{{") || strings.Contains(identifie, "://") {
+	if strings.Contains(identifie, "{{") || strings.Contains(identifie, "${") || strings.Contains(identifie, "://") {
 		return identifie
 	}
 	return strings.ReplaceAll(identifie, "_", "-")
 }
 
 func GetManifestV2(manifest Manifest) Manifest {
+	manifest = normalizeLegacyManifestPlaceholders(manifest)
+
 	if len(manifest.Platform.StartParams) == 0 {
 		manifest.Platform.StartParams = manifest.Platform.Container.StartParams
 	}
@@ -379,6 +379,34 @@ func GetManifestV2(manifest Manifest) Manifest {
 	}
 
 	return manifest
+}
+
+var legacyHelmValuesPlaceholderRegexp = regexp.MustCompile(`"?\{\{\s*\.Values\.([A-Za-z_][A-Za-z0-9_.-]*)\s*\}\}"?`)
+
+func normalizeLegacyManifestPlaceholders(manifest Manifest) Manifest {
+	for index, item := range manifest.Bindings {
+		item.BackendConfig.BackendIdentifie = normalizeLegacyHelmValuesPlaceholders(item.BackendConfig.BackendIdentifie)
+		item.BackendConfig.RequestProxy.Headers = normalizeLegacyHelmValuesPlaceholdersMap(item.BackendConfig.RequestProxy.Headers)
+		item.BackendConfig.RequestProxy.Query = normalizeLegacyHelmValuesPlaceholdersMap(item.BackendConfig.RequestProxy.Query)
+		item.BackendConfig.FrontendProps = normalizeLegacyHelmValuesPlaceholdersMap(item.BackendConfig.FrontendProps)
+		manifest.Bindings[index] = item
+	}
+	return manifest
+}
+
+func normalizeLegacyHelmValuesPlaceholders(value string) string {
+	return legacyHelmValuesPlaceholderRegexp.ReplaceAllString(value, `${$1}`)
+}
+
+func normalizeLegacyHelmValuesPlaceholdersMap(values map[string]string) map[string]string {
+	if len(values) == 0 {
+		return values
+	}
+	normalized := make(map[string]string, len(values))
+	for key, value := range values {
+		normalized[key] = normalizeLegacyHelmValuesPlaceholders(value)
+	}
+	return normalized
 }
 
 // convertContainerToContainerV2 将旧版 Container 转换为新版 ContainerV2

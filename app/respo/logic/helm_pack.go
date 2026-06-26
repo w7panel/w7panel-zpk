@@ -1715,7 +1715,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: create-site-job
-          image: zpk.w7.cc/public/site-manager:v1.2.10
+          image: zpk.w7.cc/public/site-manager:v1.2.11
           command:
             - sh
             - -c
@@ -1734,7 +1734,7 @@ spec:
               ENABLE_SSL='{{ default false .Values.ingressForceHttps }}'
               APP_IDENTIFY=%q
               SITE_K8S_APP='{{ $fullName }}'
-              NEW_ENV_K8S_APP=%q
+              NEW_ENV_K8S_APP='%s'
               CODE_DOWNLOAD_URL=%q
               STATE_CONFIG='{{ $fullName }}-site-state'
 
@@ -2039,7 +2039,6 @@ spec:
               fi
 
               /home/rangine create:site \
-                --operation="$OPERATION" \
                 --w7panel-domain="$PANEL_URL" \
                 --w7panel-token="$PANEL_TOKEN" \
                 --title="$ENV_TITLE" \
@@ -2089,7 +2088,7 @@ metadata:
     helm.sh/hook-weight: "-5"
     helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
 spec:
-  backoffLimit: 2
+  backoffLimit: 0
   ttlSecondsAfterFinished: 60
   template:
     metadata:
@@ -2101,7 +2100,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: site-shell-job
-          image: zpk.w7.cc/public/site-manager:v1.2.10
+          image: zpk.w7.cc/public/site-manager:v1.2.11
           command:
             - sh
             - -c
@@ -2182,24 +2181,31 @@ spec:
                 panel_get "/k8s-proxy/apis/apps/v1/namespaces/default/deployments/$(panel_safe_name "$deploy_name")"
               }
 
+              log_shell() {
+                printf '[site-shell] %%s %%s\n' "$(date -u +"%%Y-%%m-%%dT%%H:%%M:%%SZ")" "$*"
+              }
+
               wait_job() {
                 job_name="$1"
                 safe_job_name=$(panel_safe_name "$job_name")
                 start_ts=$(date +%%s)
+                log_shell "wait job start: name=$safe_job_name"
                 while true; do
                   job_json=$(panel_get "/k8s-proxy/apis/batch/v1/namespaces/default/jobs/$safe_job_name")
                   complete=$(printf '%%s' "$job_json" | jq -r '[.status.conditions[]? | select(.type=="Complete" and .status=="True")] | length')
                   failed=$(printf '%%s' "$job_json" | jq -r '[.status.conditions[]? | select(.type=="Failed" and .status=="True")] | length')
                   if [ "$complete" != "0" ]; then
+                    log_shell "wait job complete: name=$safe_job_name"
                     return 0
                   fi
                   if [ "$failed" != "0" ]; then
-                    printf '%%s\n' "$job_json"
+                    log_shell "wait job failed: name=$safe_job_name"
+                    printf '%%s\n' "$job_json" | jq -c '.status.conditions // []'
                     return 1
                   fi
                   now_ts=$(date +%%s)
                   if [ $((now_ts - start_ts)) -gt 600 ]; then
-                    echo "wait job timeout: $job_name"
+                    log_shell "wait job timeout: name=$safe_job_name"
                     return 1
                   fi
                   sleep 2
@@ -2233,6 +2239,7 @@ spec:
                 if [ -z "$job_image" ] || [ "$job_image" = "null" ]; then
                   job_image="$TARGET_ENV_IMAGE"
                 fi
+                log_shell "create job start: type=$shell_type title=$shell_title name=$job_name image=$job_image"
 
                 job_json=$(jq -n \
                   --arg jobName "$job_name" \
@@ -2267,7 +2274,7 @@ spec:
                         } + (if $shellType == "custom" then {"w7.cc/custom-hook":"true"} else {} end))
                       },
                       spec: {
-                        backoffLimit: 2,
+                        backoffLimit: 0,
                         ttlSecondsAfterFinished: 60,
                         template: {
                           metadata: {
@@ -2300,7 +2307,9 @@ spec:
                     }')
 
                 panel_post "/k8s-proxy/apis/batch/v1/namespaces/default/jobs" "$job_json" >/dev/null
+                log_shell "create job success: type=$shell_type title=$shell_title name=$job_name"
                 wait_job "$job_name"
+                log_shell "shell job finished: type=$shell_type title=$shell_title name=$job_name"
               }
 
               run_restart_patch() {
@@ -2342,15 +2351,21 @@ spec:
                 shell_type="$2"
                 shell_items="$3"
                 if [ "$shell_items" = "[]" ]; then
+                  log_shell "skip shell type: type=$shell_type reason=empty"
                   return 0
                 fi
+                log_shell "run shell type start: type=$shell_type"
                 printf '%%s' "$shell_items" | jq -c '.[]' | while read -r shell_line; do
                   title=$(printf '%%s' "$shell_line" | jq -r '.title // ""')
                   image=$(printf '%%s' "$shell_line" | jq -r '.image // ""')
                   body=$(printf '%%s' "$shell_line" | jq -r '.shell // ""')
-                  [ -n "$body" ] || continue
+                  if [ -z "$body" ]; then
+                    log_shell "skip empty shell: type=$shell_type title=$title"
+                    continue
+                  fi
                   create_shell_job "$shell_type" "$title" "$image" "$body" "$start_params_json"
                 done
+                log_shell "run shell type success: type=$shell_type"
               }
 
               state_json=$(load_state)

@@ -1666,7 +1666,17 @@ func (hc *HelmPack) generateCreateSiteJobTemplate(rootDir string, application lo
 		return err
 	}
 
-	jobTemplate := fmt.Sprintf(`{{- define "__cur__.fullname" -}}
+	createSiteJob := buildTraditionCreateSiteJobTemplate(application, tradition, k8sAppName, zipUrl)
+	if err := writeFile(filepath.Join(rootDir, "create-site-job.yaml"), createSiteJob); err != nil {
+		return err
+	}
+
+	siteShellJob := buildTraditionSiteShellJobTemplate(cmdBase64, shellsBase64, getStartParamsEnvJSONTemplate())
+	return writeFile(filepath.Join(rootDir, "site-shell-job.yaml"), siteShellJob)
+}
+
+func buildTraditionCreateSiteJobTemplate(application logic2.Application, tradition logic2.Tradition, k8sAppName, zipUrl string) string {
+	return fmt.Sprintf(`{{- define "__cur__.fullname" -}}
 {{- if .Values.fullnameOverride }}
 {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
 {{- else }}
@@ -1690,7 +1700,7 @@ metadata:
     w7.cc/job-source: appgroup
   annotations:
     helm.sh/hook: pre-install,pre-upgrade
-    helm.sh/hook-weight: "1"
+    helm.sh/hook-weight: "-10"
     helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
 spec:
   backoffLimit: 2
@@ -1705,16 +1715,672 @@ spec:
       restartPolicy: Never
       containers:
         - name: create-site-job
-          image: zpk.w7.cc/public/site-manager:v1.2.9
+          image: zpk.w7.cc/public/site-manager:v1.2.10
           command:
             - sh
             - -c
-            - >-
-              /home/rangine create:site --operation={{ ternary "upgrade" "install" .Release.IsUpgrade }} --w7panel-domain={{ .Values.global.panel.innerUrl }} --w7panel-token={{ .Values.global.panel.panelRealToken }} --title=%s --name=%s --language=%s --version=%s --domain={{ .Values.DOMAIN_URL }} --ssl={{ default false .Values.ingressForceHttps }} --cmd-base64=%s --shells-base64=%s --code-download-url=%s --app_name=%s --k8s-app-name={{ $fullName }} --k8s-env-app-name=%s --start-params-env-base64=%s -f /home/config.yaml
-`, application.Identifie+"-"+tradition.EnvironmentVersion+"-副本", tradition.EnvironmentName, tradition.EnvironmentLanguage, tradition.EnvironmentVersion, cmdBase64, shellsBase64, zipUrl, application.Identifie, k8sAppName, getStartParamsEnvJSONTemplate())
+            - |-
+              set -eu
 
-	filePath := filepath.Join(rootDir, "create-site-job.yaml")
-	return os.WriteFile(filePath, []byte(jobTemplate), 0644)
+              PANEL_URL="{{ .Values.global.panel.innerUrl }}"
+              PANEL_TOKEN="{{ .Values.global.panel.panelRealToken }}"
+              SITE_MANAGER_URL="http://w7-sitemanager-site-manager.default.svc.cluster.local:8000"
+              OPERATION='{{ ternary "upgrade" "install" .Release.IsUpgrade }}'
+              ENV_TITLE=%q
+              ENV_GROUP=%q
+              ENV_LANGUAGE=%q
+              ENV_VERSION=%q
+              DOMAIN='{{ .Values.DOMAIN_URL }}'
+              ENABLE_SSL='{{ default false .Values.ingressForceHttps }}'
+              APP_IDENTIFY=%q
+              SITE_K8S_APP='{{ $fullName }}'
+              NEW_ENV_K8S_APP=%q
+              CODE_DOWNLOAD_URL=%q
+              STATE_CONFIG='{{ $fullName }}-site-state'
+
+              K8S_ENV_APP_NAME="$NEW_ENV_K8S_APP"
+              K8S_ENV_ID=""
+              TARGET_SHARED="false"
+              CREATED_ENV_APP=""
+              CREATED_INGRESS_NAME=""
+              CREATE_SITE_SUCCESS="false"
+
+              panel_safe_name() {
+                echo "$1" | tr '_' '-'
+              }
+
+              panel_get() {
+                curl -fsS -H "Authorizationx: Bearer $PANEL_TOKEN" "$PANEL_URL$1"
+              }
+
+              panel_post() {
+                path="$1"
+                data="$2"
+                curl -fsS -X POST \
+                  -H "Authorizationx: Bearer $PANEL_TOKEN" \
+                  -H "Content-Type: application/json" \
+                  -d "$data" \
+                  "$PANEL_URL$path"
+              }
+
+              panel_patch() {
+                path="$1"
+                data="$2"
+                curl -fsS -X PATCH \
+                  -H "Authorizationx: Bearer $PANEL_TOKEN" \
+                  -H "Content-Type: application/merge-patch+json" \
+                  -d "$data" \
+                  "$PANEL_URL$path"
+              }
+
+              panel_delete() {
+                path="$1"
+                curl -fsS -X DELETE \
+                  -H "Authorizationx: Bearer $PANEL_TOKEN" \
+                  "$PANEL_URL$path"
+              }
+
+              cleanup_created_resources() {
+                if [ "$CREATE_SITE_SUCCESS" = "true" ]; then
+                  return 0
+                fi
+                if [ -n "$CREATED_INGRESS_NAME" ]; then
+                  panel_delete "/k8s-proxy/apis/networking.k8s.io/v1/namespaces/default/ingresses/$CREATED_INGRESS_NAME" >/dev/null 2>&1 || true
+                fi
+                if [ -n "$CREATED_ENV_APP" ]; then
+                  panel_delete "/k8s-proxy/apis/apps/v1/namespaces/default/deployments/$(panel_safe_name "$CREATED_ENV_APP")" >/dev/null 2>&1 || true
+                fi
+              }
+              trap cleanup_created_resources EXIT
+              panel_delete "/k8s-proxy/api/v1/namespaces/default/configmaps/$STATE_CONFIG" >/dev/null 2>&1 || true
+
+              sm_post() {
+                path="$1"
+                data="$2"
+                curl -fsS -X POST \
+                  -H "Content-Type: application/json" \
+                  -d "$data" \
+                  "$SITE_MANAGER_URL$path"
+              }
+
+              sm_post_maybe() {
+                path="$1"
+                data="$2"
+                curl -sS -X POST \
+                  -H "Content-Type: application/json" \
+                  -d "$data" \
+                  "$SITE_MANAGER_URL$path" || true
+              }
+
+              query_deploy() {
+                deploy_name="$1"
+                panel_get "/k8s-proxy/apis/apps/v1/namespaces/default/deployments/$(panel_safe_name "$deploy_name")"
+              }
+
+              find_shared_environment() {
+                list_payload=$(jq -n --arg group "$ENV_GROUP" '{page:1,page_size:100,group:$group}')
+                list_resp=$(sm_post "/api/environment/list" "$list_payload")
+                rows=$(printf '%%s' "$list_resp" | jq -c \
+                  --arg group "$ENV_GROUP" \
+                  --arg language "$ENV_LANGUAGE" \
+                  --arg version "$ENV_VERSION" \
+                  '(.data.list // .data.items // [])[] | select(.group == $group and .language == $language and .version == $version and (.app_name // "") != "" and (.id // "") != "")')
+
+                while IFS= read -r row; do
+                  [ -n "$row" ] || continue
+                  app_name=$(printf '%%s' "$row" | jq -r '.app_name')
+                  if query_deploy "$app_name" >/dev/null 2>&1; then
+                    env_id=$(printf '%%s' "$row" | jq -r '.id // empty')
+                    printf '%%s\t%%s' "$env_id" "$app_name"
+                    return 0
+                  fi
+                done <<EOF
+              $rows
+              EOF
+                return 1
+              }
+
+              create_ingress_if_needed() {
+                if [ "$OPERATION" != "install" ]; then
+                  return 0
+                fi
+                ingress_name="ing-$(date +%%s)-$RANDOM"
+                ingress_name=$(printf '%%s' "$ingress_name" | tr '[:upper:]_' '[:lower:]-' | cut -c1-63 | sed 's/-$//')
+                ingress_json=$(jq -n \
+                  --arg ingressName "$ingress_name" \
+                  --arg domain "$DOMAIN" \
+                  --arg enableSsl "$ENABLE_SSL" \
+                  '{
+                    apiVersion: "networking.k8s.io/v1",
+                    kind: "Ingress",
+                    metadata: {
+                      name: $ingressName,
+                      namespace: "default",
+                      annotations: ({
+                        "kubernetes.io/ingress.class": "higress",
+                        "higress.io/resource-definer": "higress"
+                      } + (if $enableSsl == "true" then {
+                        "higress.io/ssl-redirect": "false",
+                        "w7.cc/ssl-redirect": "false",
+                        "cert-manager.io/cluster-issuer": "w7-letsencrypt-prod",
+                        "cert-manager.io/renew-before": "30m"
+                      } else {} end)),
+                      labels: {
+                        "higress.io/resource-definer": "higress",
+                        "app": "w7-sitemanager-site-manager-nginx",
+                        "group": "w7-sitemanager"
+                      }
+                    },
+                    spec: {
+                      rules: [
+                        {
+                          host: $domain,
+                          http: {
+                            paths: [
+                              {
+                                path: "/",
+                                pathType: "Prefix",
+                                backend: {
+                                  service: {
+                                    name: "w7-sitemanager-site-manager-nginx",
+                                    port: { number: 80 }
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      ]
+                    }
+                  }
+                  | if $enableSsl == "true" then .spec.tls = [{hosts: [$domain], secretName: ($domain + "-tls-secret")}] else . end')
+                panel_post "/k8s-proxy/apis/networking.k8s.io/v1/namespaces/default/ingresses" "$ingress_json" >/dev/null
+                CREATED_INGRESS_NAME="$ingress_name"
+              }
+
+              create_environment_app() {
+                source_deploy_json="$1"
+                new_deploy_json=$(printf '%%s' "$source_deploy_json" | jq \
+                  --arg newName "$NEW_ENV_K8S_APP" \
+                  --arg version "$ENV_VERSION" \
+                  '
+                  del(.metadata.resourceVersion, .metadata.uid, .metadata.creationTimestamp, .metadata.managedFields, .metadata.ownerReferences, .status)
+                  | .metadata.name = $newName
+                  | .metadata.generation = 0
+                  | .metadata.annotations = (.metadata.annotations // {})
+                  | .metadata.labels = (.metadata.labels // {})
+                  | .metadata.annotations["w7.cc/create-svc"] = "true"
+                  | .metadata.annotations["title"] = $newName
+                  | .metadata.labels["app"] = $newName
+                  | .spec.selector.matchLabels = (.spec.selector.matchLabels // {})
+                  | .spec.selector.matchLabels["app"] = $newName
+                  | .spec.template.metadata.labels = (.spec.template.metadata.labels // {})
+                  | .spec.template.metadata.labels["app"] = $newName
+                  | .spec.template.spec.containers[0].name = $newName
+                  | ( .spec.template.metadata.annotations["w7.cc/image_template"] // "" ) as $tpl
+                  | if $tpl != "" then .spec.template.spec.containers[0].image = ($tpl | gsub("\\{version\\}"; $version)) else . end
+                  | .spec.template.spec.containers[0].env = (
+                      (.spec.template.spec.containers[0].env // [])
+                      | map(if .name == "METADATA_NAME" then .value = $newName | del(.valueFrom) else . end)
+                    )
+                  | .spec.template.spec.affinity = {
+                      podAffinity: {
+                        requiredDuringSchedulingIgnoredDuringExecution: [
+                          {
+                            labelSelector: {
+                              matchExpressions: [
+                                {
+                                  key: "w7.cc/identifie",
+                                  operator: "In",
+                                  values: ["w7-sitemanager"]
+                                }
+                              ]
+                            },
+                            topologyKey: "kubernetes.io/hostname"
+                          }
+                        ]
+                      }
+                    }')
+                panel_post "/k8s-proxy/apis/apps/v1/namespaces/default/deployments" "$new_deploy_json" >/dev/null
+
+                K8S_ENV_APP_NAME="$NEW_ENV_K8S_APP"
+                K8S_ENV_ID=""
+                CREATED_ENV_APP="$NEW_ENV_K8S_APP"
+                TARGET_SHARED="false"
+              }
+
+              resolve_target_env() {
+                source_deploy_json=$(query_deploy "$ENV_GROUP")
+                image_is_share=$(printf '%%s' "$source_deploy_json" | jq -r '.spec.template.metadata.annotations["w7.cc/image_is_share"] // .metadata.annotations["w7.cc/image_is_share"] // "false"')
+                if [ "$image_is_share" = "true" ]; then
+                  shared_env=$(find_shared_environment || true)
+                  if [ -n "$shared_env" ]; then
+                    K8S_ENV_ID=$(printf '%%s' "$shared_env" | cut -f1)
+                    K8S_ENV_APP_NAME=$(printf '%%s' "$shared_env" | cut -f2)
+                    TARGET_SHARED="true"
+                    return 0
+                  fi
+                fi
+
+                create_environment_app "$source_deploy_json"
+              }
+
+              get_site_env_app_name() {
+                info_payload=$(jq -n --arg domain "$DOMAIN" '{domain:$domain}')
+                site_info=$(sm_post_maybe "/api/site/info" "$info_payload")
+                printf '%%s' "$site_info" | jq -r '.data.site_environment.app_name // empty' 2>/dev/null || true
+              }
+
+              get_nginx_vhost_template() {
+                deploy_json=$(query_deploy "$K8S_ENV_APP_NAME")
+                printf '%%s' "$deploy_json" | jq -r '.spec.template.metadata.annotations["w7.cc/nginx_vhost_template"] // .metadata.annotations["w7.cc/nginx_vhost_template"] // ""'
+              }
+
+              save_state() {
+                target_env_deploy=$(get_site_env_app_name)
+                if [ -z "$target_env_deploy" ]; then
+                  target_env_deploy="$K8S_ENV_APP_NAME"
+                fi
+                target_deploy_json=$(query_deploy "$target_env_deploy")
+                target_env_image=$(printf '%%s' "$target_deploy_json" | jq -r '.spec.template.spec.containers[0].image // ""')
+                target_env_volumes=$(printf '%%s' "$target_deploy_json" | jq -c '.spec.template.spec.volumes // []')
+                target_env_volume_mounts=$(printf '%%s' "$target_deploy_json" | jq -c '.spec.template.spec.containers[0].volumeMounts // []')
+                target_env_affinity=$(printf '%%s' "$target_deploy_json" | jq -c '.spec.template.spec.affinity // {}')
+                target_env_resources=$(printf '%%s' "$target_deploy_json" | jq -c '.spec.template.spec.containers[0].resources // {}')
+                target_env_security_context=$(printf '%%s' "$target_deploy_json" | jq -c '.spec.template.spec.containers[0].securityContext // {}')
+                target_env_image_pull_policy=$(printf '%%s' "$target_deploy_json" | jq -r '.spec.template.spec.containers[0].imagePullPolicy // "IfNotPresent"')
+
+                state_json=$(jq -n \
+                  --arg name "$STATE_CONFIG" \
+                  --arg targetEnvDeploy "$target_env_deploy" \
+                  --arg targetEnvId "$K8S_ENV_ID" \
+                  --arg targetEnvImage "$target_env_image" \
+                  --arg targetEnvVolumes "$target_env_volumes" \
+                  --arg targetEnvVolumeMounts "$target_env_volume_mounts" \
+                  --arg targetEnvAffinity "$target_env_affinity" \
+                  --arg targetEnvResources "$target_env_resources" \
+                  --arg targetEnvSecurityContext "$target_env_security_context" \
+                  --arg targetEnvImagePullPolicy "$target_env_image_pull_policy" \
+                  --arg targetShared "$TARGET_SHARED" \
+                  --arg operation "$OPERATION" \
+                  --arg domain "$DOMAIN" \
+                  '{
+                    apiVersion: "v1",
+                    kind: "ConfigMap",
+                    metadata: {
+                      name: $name,
+                      namespace: "default"
+                    },
+                    data: {
+                      target_env_deploy: $targetEnvDeploy,
+                      target_env_id: $targetEnvId,
+                      target_env_image: $targetEnvImage,
+                      target_env_volumes: $targetEnvVolumes,
+                      target_env_volume_mounts: $targetEnvVolumeMounts,
+                      target_env_affinity: $targetEnvAffinity,
+                      target_env_resources: $targetEnvResources,
+                      target_env_security_context: $targetEnvSecurityContext,
+                      target_env_image_pull_policy: $targetEnvImagePullPolicy,
+                      target_shared: $targetShared,
+                      operation: $operation,
+                      domain: $domain
+                    }
+                  }')
+                panel_post "/k8s-proxy/api/v1/namespaces/default/configmaps" "$state_json" >/dev/null \
+                  || panel_patch "/k8s-proxy/api/v1/namespaces/default/configmaps/$STATE_CONFIG" "$state_json" >/dev/null
+              }
+
+              resolve_target_env
+              create_ingress_if_needed
+              NGINX_VHOST_TEMPLATE=$(get_nginx_vhost_template)
+              ENV_ID_ARG=""
+              if [ -n "$K8S_ENV_ID" ] && [ "$K8S_ENV_ID" != "null" ]; then
+                ENV_ID_ARG="--environment-id=$K8S_ENV_ID"
+              fi
+
+              /home/rangine create:site \
+                --operation="$OPERATION" \
+                --w7panel-domain="$PANEL_URL" \
+                --w7panel-token="$PANEL_TOKEN" \
+                --title="$ENV_TITLE" \
+                --name="$ENV_GROUP" \
+                --language="$ENV_LANGUAGE" \
+                --version="$ENV_VERSION" \
+                --domain="$DOMAIN" \
+                --ssl="$ENABLE_SSL" \
+                --code-download-url="$CODE_DOWNLOAD_URL" \
+                --app_name="$APP_IDENTIFY" \
+                --k8s-app-name="$SITE_K8S_APP" \
+                --k8s-env-app-name="$K8S_ENV_APP_NAME" \
+                $ENV_ID_ARG \
+                --nginx-vhost-template="$NGINX_VHOST_TEMPLATE" \
+                -f /home/config.yaml
+
+              CREATE_SITE_SUCCESS="true"
+              save_state
+`, application.Identifie+"-"+tradition.EnvironmentVersion+"-副本", tradition.EnvironmentName, tradition.EnvironmentLanguage, tradition.EnvironmentVersion, application.Identifie, k8sAppName, zipUrl)
+}
+
+func buildTraditionSiteShellJobTemplate(cmdBase64, shellsBase64, startParamsEnvBase64 string) string {
+	return fmt.Sprintf(`{{- define "__cur__.fullname" -}}
+{{- if .Values.fullnameOverride }}
+{{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
+{{- else }}
+{{- $name := default .Chart.Name .Values.nameOverride }}
+{{- if contains $name .Release.Name }}
+{{- .Release.Name | trunc 63 | trimSuffix "-" }}
+{{- else }}
+{{- .Release.Name }}-{{ $name | trunc 63 | trimSuffix "-" }}
+{{- end }}
+{{- end }}
+{{- end }}
+
+{{- $fullName := include "__cur__.fullname" . -}}
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ $fullName }}-site-shell
+  labels:
+    group: {{ .Release.Name }}
+    w7.cc/job-source: appgroup
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-5"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 60
+  template:
+    metadata:
+      {{- if .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: site-shell-job
+          image: zpk.w7.cc/public/site-manager:v1.2.10
+          command:
+            - sh
+            - -c
+            - |-
+              set -eu
+
+              PANEL_URL="{{ .Values.global.panel.innerUrl }}"
+              PANEL_TOKEN="{{ .Values.global.panel.panelRealToken }}"
+              STATE_CONFIG='{{ $fullName }}-site-state'
+              CMD_B64='%s'
+              SHELLS_B64='%s'
+              START_PARAMS_ENV_B64='%s'
+
+              panel_safe_name() {
+                echo "$1" | tr '_' '-'
+              }
+
+              panel_get() {
+                curl -fsS -H "Authorizationx: Bearer $PANEL_TOKEN" "$PANEL_URL$1"
+              }
+
+              panel_post() {
+                path="$1"
+                data="$2"
+                curl -fsS -X POST \
+                  -H "Authorizationx: Bearer $PANEL_TOKEN" \
+                  -H "Content-Type: application/json" \
+                  -d "$data" \
+                  "$PANEL_URL$path"
+              }
+
+              panel_patch() {
+                path="$1"
+                data="$2"
+                curl -fsS -X PATCH \
+                  -H "Authorizationx: Bearer $PANEL_TOKEN" \
+                  -H "Content-Type: application/strategic-merge-patch+json" \
+                  -d "$data" \
+                  "$PANEL_URL$path"
+              }
+
+              panel_delete() {
+                path="$1"
+                curl -fsS -X DELETE \
+                  -H "Authorizationx: Bearer $PANEL_TOKEN" \
+                  "$PANEL_URL$path"
+              }
+
+              decode_b64_json() {
+                val="$1"
+                fallback="$2"
+                if [ -z "$val" ] || [ "$val" = "{}" ] || [ "$val" = "null" ]; then
+                  echo "$fallback"
+                  return
+                fi
+                printf '%%s' "$val" | base64 -d
+              }
+
+              load_state() {
+                start_ts=$(date +%%s)
+                while true; do
+                  state_json=$(panel_get "/k8s-proxy/api/v1/namespaces/default/configmaps/$STATE_CONFIG" 2>/dev/null || true)
+                  if printf '%%s' "$state_json" | jq -e '.data.target_env_deploy' >/dev/null 2>&1; then
+                    printf '%%s' "$state_json"
+                    return
+                  fi
+                  now_ts=$(date +%%s)
+                  if [ $((now_ts - start_ts)) -gt 300 ]; then
+                    echo "site state configmap not ready: $STATE_CONFIG" >&2
+                    exit 1
+                  fi
+                  sleep 2
+                done
+              }
+
+              query_deploy() {
+                deploy_name="$1"
+                panel_get "/k8s-proxy/apis/apps/v1/namespaces/default/deployments/$(panel_safe_name "$deploy_name")"
+              }
+
+              wait_job() {
+                job_name="$1"
+                safe_job_name=$(panel_safe_name "$job_name")
+                start_ts=$(date +%%s)
+                while true; do
+                  job_json=$(panel_get "/k8s-proxy/apis/batch/v1/namespaces/default/jobs/$safe_job_name")
+                  complete=$(printf '%%s' "$job_json" | jq -r '[.status.conditions[]? | select(.type=="Complete" and .status=="True")] | length')
+                  failed=$(printf '%%s' "$job_json" | jq -r '[.status.conditions[]? | select(.type=="Failed" and .status=="True")] | length')
+                  if [ "$complete" != "0" ]; then
+                    return 0
+                  fi
+                  if [ "$failed" != "0" ]; then
+                    printf '%%s\n' "$job_json"
+                    return 1
+                  fi
+                  now_ts=$(date +%%s)
+                  if [ $((now_ts - start_ts)) -gt 600 ]; then
+                    echo "wait job timeout: $job_name"
+                    return 1
+                  fi
+                  sleep 2
+                done
+              }
+
+              build_env_array() {
+                start_params_json="$1"
+                jq -n \
+                  --argjson startParams "$start_params_json" \
+                  '
+                  (
+                    $startParams
+                    | to_entries
+                    | map({name: .key, value: (.value|tostring)})
+                  )
+                  '
+              }
+
+              create_shell_job() {
+                shell_type="$1"
+                shell_title="$2"
+                shell_image="$3"
+                shell_body="$4"
+                start_params_json="$5"
+
+                env_array=$(build_env_array "$start_params_json")
+                job_name="$(printf '%%s' "$TARGET_ENV_DEPLOY-$shell_type-$(date +%%s)-$RANDOM" | tr '[:upper:]_' '[:lower:]-' | cut -c1-63)"
+                container_name="$(printf '%%s' "$TARGET_ENV_DEPLOY-shell" | tr '[:upper:]_' '[:lower:]-' | cut -c1-63)"
+                job_image="$shell_image"
+                if [ -z "$job_image" ] || [ "$job_image" = "null" ]; then
+                  job_image="$TARGET_ENV_IMAGE"
+                fi
+
+                job_json=$(jq -n \
+                  --arg jobName "$job_name" \
+                  --arg targetApp "$TARGET_ENV_DEPLOY" \
+                  --arg containerName "$container_name" \
+                  --arg shellType "$shell_type" \
+                  --arg shellTitle "$shell_title" \
+                  --arg jobImage "$job_image" \
+                  --arg shellBody "$shell_body" \
+                  --arg imagePullPolicy "$TARGET_ENV_IMAGE_PULL_POLICY" \
+                  --argjson envArray "$env_array" \
+                  --argjson volumes "$TARGET_ENV_VOLUMES" \
+                  --argjson volumeMounts "$TARGET_ENV_VOLUME_MOUNTS" \
+                  --argjson affinity "$TARGET_ENV_AFFINITY" \
+                  --argjson resources "$TARGET_ENV_RESOURCES" \
+                  --argjson securityContext "$TARGET_ENV_SECURITY_CONTEXT" \
+                  '
+                  {
+                      apiVersion: "batch/v1",
+                      kind: "Job",
+                      metadata: {
+                        name: $jobName,
+                        namespace: "default",
+                        labels: {
+                          app: $targetApp,
+                          group: $targetApp,
+                          "w7.cc/job-source": "appgroup"
+                        },
+                        annotations: ({
+                          "w7.cc/shell-type": $shellType,
+                          "w7.cc/title": $shellTitle
+                        } + (if $shellType == "custom" then {"w7.cc/custom-hook":"true"} else {} end))
+                      },
+                      spec: {
+                        backoffLimit: 2,
+                        ttlSecondsAfterFinished: 60,
+                        template: {
+                          metadata: {
+                            labels: {
+                              app: $jobName,
+                              group: $targetApp,
+                              "w7.cc/job-source": "tradition-site"
+                            }
+                          },
+                          spec: {
+                            restartPolicy: "Never",
+                            affinity: $affinity,
+                            volumes: $volumes,
+                            containers: [
+                              {
+                                name: $containerName,
+                                image: $jobImage,
+                                imagePullPolicy: $imagePullPolicy,
+                                command: ["/bin/sh", "-c"],
+                                args: [$shellBody],
+                                env: $envArray,
+                                resources: $resources,
+                                volumeMounts: $volumeMounts,
+                                securityContext: $securityContext
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    }')
+
+                panel_post "/k8s-proxy/apis/batch/v1/namespaces/default/jobs" "$job_json" >/dev/null
+                wait_job "$job_name"
+              }
+
+              run_restart_patch() {
+                if [ "$TARGET_SHARED" = "true" ]; then
+                  return 0
+                fi
+                cmd_json=$(decode_b64_json "$CMD_B64" "[]")
+                if [ "$cmd_json" = "[]" ]; then
+                  return 0
+                fi
+                patch_json=$(jq -n \
+                  --arg ts "$(date -u +"%%Y-%%m-%%dT%%H:%%M:%%SZ")" \
+                  --arg deployName "$TARGET_ENV_DEPLOY" \
+                  --argjson cmd "$cmd_json" \
+                  '{
+                    spec: {
+                      template: {
+                        metadata: {
+                          annotations: {
+                            "kubectl.kubernetes.io/restartedAt": $ts
+                          }
+                        },
+                        spec: {
+                          containers: [
+                            {
+                              name: $deployName,
+                              command: $cmd
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  }')
+                panel_patch "/k8s-proxy/apis/apps/v1/namespaces/default/deployments/$(panel_safe_name "$TARGET_ENV_DEPLOY")" "$patch_json" >/dev/null
+              }
+
+              run_shells_by_type() {
+                start_params_json="$1"
+                shell_type="$2"
+                shell_items="$3"
+                if [ "$shell_items" = "[]" ]; then
+                  return 0
+                fi
+                printf '%%s' "$shell_items" | jq -c '.[]' | while read -r shell_line; do
+                  title=$(printf '%%s' "$shell_line" | jq -r '.title // ""')
+                  image=$(printf '%%s' "$shell_line" | jq -r '.image // ""')
+                  body=$(printf '%%s' "$shell_line" | jq -r '.shell // ""')
+                  [ -n "$body" ] || continue
+                  create_shell_job "$shell_type" "$title" "$image" "$body" "$start_params_json"
+                done
+              }
+
+              state_json=$(load_state)
+              TARGET_ENV_DEPLOY=$(printf '%%s' "$state_json" | jq -r '.data.target_env_deploy')
+              TARGET_ENV_IMAGE=$(printf '%%s' "$state_json" | jq -r '.data.target_env_image // ""')
+              TARGET_ENV_VOLUMES=$(printf '%%s' "$state_json" | jq -r '.data.target_env_volumes // "[]"')
+              TARGET_ENV_VOLUME_MOUNTS=$(printf '%%s' "$state_json" | jq -r '.data.target_env_volume_mounts // "[]"')
+              TARGET_ENV_AFFINITY=$(printf '%%s' "$state_json" | jq -r '.data.target_env_affinity // "{}"')
+              TARGET_ENV_RESOURCES=$(printf '%%s' "$state_json" | jq -r '.data.target_env_resources // "{}"')
+              TARGET_ENV_SECURITY_CONTEXT=$(printf '%%s' "$state_json" | jq -r '.data.target_env_security_context // "{}"')
+              TARGET_ENV_IMAGE_PULL_POLICY=$(printf '%%s' "$state_json" | jq -r '.data.target_env_image_pull_policy // "IfNotPresent"')
+              TARGET_SHARED=$(printf '%%s' "$state_json" | jq -r '.data.target_shared')
+              OPERATION=$(printf '%%s' "$state_json" | jq -r '.data.operation')
+              DOMAIN=$(printf '%%s' "$state_json" | jq -r '.data.domain')
+
+              start_params_json=$(decode_b64_json "$START_PARAMS_ENV_B64" "{}")
+              user_shells_json=$(decode_b64_json "$SHELLS_B64" "[]")
+
+              if [ "$OPERATION" = "install" ]; then
+                run_shells_by_type "$start_params_json" "pre-install" "$(printf '%%s' "$user_shells_json" | jq '[.[] | select(.type == "pre-install" or .type == "requireinstall")]')"
+                run_restart_patch
+                run_shells_by_type "$start_params_json" "post-install" "$(printf '%%s' "$user_shells_json" | jq '[.[] | select(.type == "post-install" or .type == "install")]')"
+              else
+                run_shells_by_type "$start_params_json" "pre-upgrade" "$(printf '%%s' "$user_shells_json" | jq '[.[] | select(.type == "pre-upgrade")]')"
+                run_restart_patch
+                run_shells_by_type "$start_params_json" "post-upgrade" "$(printf '%%s' "$user_shells_json" | jq '[.[] | select(.type == "post-upgrade" or .type == "upgrade")]')"
+              fi
+              run_shells_by_type "$start_params_json" "custom" "$(printf '%%s' "$user_shells_json" | jq '[.[] | select(.type == "custom")]')"
+              panel_delete "/k8s-proxy/api/v1/namespaces/default/configmaps/$STATE_CONFIG" >/dev/null
+`, cmdBase64, shellsBase64, startParamsEnvBase64)
 }
 
 func (hc *HelmPack) generateRegisterSiteJobTemplate(rootDir string, manifest logic2.Manifest, releaseName, appName, containerName string) error {
@@ -2010,10 +2676,19 @@ func (hc *HelmPack) getShellJobValues(items []logic2.Shell) []map[string]interfa
 		case "pre-install":
 			shellWeight = -4
 			hookName = "pre-install"
+		case "pre-upgrade":
+			shellWeight = -4
+			hookName = "pre-upgrade"
 		case "install":
 			shellWeight = -3
 			hookName = "post-install"
+		case "post-install":
+			shellWeight = -3
+			hookName = "post-install"
 		case "upgrade":
+			shellWeight = -2
+			hookName = "post-upgrade"
+		case "post-upgrade":
 			shellWeight = -2
 			hookName = "post-upgrade"
 		case "uninstall":

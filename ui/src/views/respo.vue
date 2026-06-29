@@ -150,6 +150,7 @@ import myAxios from '@/utils';
 import dfimg from '@/assets/img/dfimg.png';
 import w7Identifie from "@/components/w7-identifie.vue";
 import { messageError, messageSuccess, messageWarning } from '@/utils/ui-feedback';
+import emitWujieEvent from '@/utils/wujie-event';
 import { IconPlus, IconSearch, IconCopy, IconExclamationCircleFill } from '@arco-design/web-vue/es/icon';
 
 export default {
@@ -240,7 +241,7 @@ export default {
     },
     installEvent(data) {
       let url = this.webUrl + '/respo/info/' + data.identifie;
-      window.$wujie?.bus?.$emit?.('toStoreInstall', encodeURIComponent(url))
+      emitWujieEvent('toStoreInstall', encodeURIComponent(url))
     },
     onekeyCopy(text, callback) {
       var createInput = document.createElement('textarea');

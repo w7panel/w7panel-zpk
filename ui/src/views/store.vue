@@ -63,6 +63,7 @@
 import myAxios from '@/utils'
 import dfimg from '@/assets/img/dfimg.png';
 import { messageSuccess } from '@/utils/ui-feedback';
+import emitWujieEvent from '@/utils/wujie-event';
 export default{
     data(){
         return {
@@ -173,7 +174,7 @@ export default{
         },
         installEvent(data){
             let url = this.webUrl + '/respo/info/' + data.identifie;
-            window.$wujie?.bus?.$emit?.('toStoreInstall', url)
+            emitWujieEvent('toStoreInstall', url)
         },
     }
 }

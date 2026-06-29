@@ -67,6 +67,7 @@
 <script>
 import ManifestConfigTable from '@/components/manifest-config-table.vue';
 import ManifestConfigTableColumn from '@/components/manifest-config-table-column.vue';
+import emitWujieEvent from '@/utils/wujie-event';
 import { IconEdit, IconPlus } from '@arco-design/web-vue/es/icon';
 
 export default {
@@ -163,7 +164,7 @@ export default {
             };
         },
         addRoute(item) {
-            window.$wujie?.bus.$emit("ingressEdit", {
+            emitWujieEvent("ingressEdit", {
                 ingress: this.createRoute(),
                 appList: this.appNames,
                 appPorts: this.appPorts,
@@ -210,7 +211,7 @@ export default {
             }
         },
         openEdit(row, index, ridx) {
-            window.$wujie?.bus.$emit("ingressEdit", {
+            emitWujieEvent("ingressEdit", {
                 ingress: row,
                 appList: this.appNames,
                 appPorts: this.appPorts,
@@ -220,7 +221,7 @@ export default {
             })
         },
         openStrategy(row, index, ridx) {
-            window.$wujie?.bus.$emit("ingressStrategy", {
+            emitWujieEvent("ingressStrategy", {
                 ingress: row,
                 callback: (data) => {
                     this.modelValue[index]['routes'][ridx].backend.strategy = data;

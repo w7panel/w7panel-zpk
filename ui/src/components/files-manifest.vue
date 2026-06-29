@@ -504,8 +504,7 @@ import {
     IconUpload,
 } from '@arco-design/web-vue/es/icon';
 import { confirm, messageError, messageSuccess, messageWarning } from '@/utils/ui-feedback';
-
-import { bus } from "wujie";
+import emitWujieEvent from '@/utils/wujie-event';
 
 export default {
     emits: ['writefile'],
@@ -908,7 +907,7 @@ export default {
             let containers = this.json?.platform?.['container-v2']?.filter(i => !i.isInitContainer);
             let initContainers = this.json?.platform?.['container-v2']?.filter(i => i.isInitContainer);
 
-            window.$wujie?.bus.$emit("containerPlugin", {
+            emitWujieEvent("containerPlugin", {
                 volumes,
                 volumeClaimTemplates,
                 containers,
@@ -1554,7 +1553,7 @@ platform:
         },
         getPanelData() {
             return new Promise((resolve, reject) => {
-                bus.$emit('submit' + this.wujieId, (data) => {
+                emitWujieEvent('submit' + this.wujieId, (data) => {
                     resolve(data)
                 })
             })

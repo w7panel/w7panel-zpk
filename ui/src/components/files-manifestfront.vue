@@ -854,6 +854,7 @@ import W7Identifie from '@/components/w7-identifie.vue';
 import ArcoIcon from '@/components/arco-icon.vue';
 import ManifestConfigTable from '@/components/manifest-config-table.vue';
 import ManifestConfigTableColumn from '@/components/manifest-config-table-column.vue';
+import emitWujieEvent from '@/utils/wujie-event';
 import {
     IconCheckCircleFill,
     IconEdit,
@@ -1711,7 +1712,7 @@ export default {
             this.cdrole = nextRoleState;
         },
         initPanelRoles() {
-            window.$wujie?.bus.$emit("getRole", (roles) => {
+            emitWujieEvent("getRole", (roles) => {
                 const result = {}
                 for (let role of roles) {
                     result[role.name] = role.title;

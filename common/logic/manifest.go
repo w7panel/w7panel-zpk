@@ -39,6 +39,7 @@ type Application struct {
 	InstallOnlyOnce   bool                   `yaml:"once" json:"once"`
 	ClusterPrivileged bool                   `yaml:"clusterPrivileges" json:"clusterPrivileges"`
 	RegisterSite      bool                   `yaml:"registerSite" json:"registerSite"`
+	FrontType         []string               `yaml:"front_type" json:"front_type"`
 	Type              string                 `yaml:"type" json:"type"`
 	Annotation        map[string]interface{} `yaml:"annotation" json:"annotation"`
 	Version           string                 `yaml:"version" json:"version"`

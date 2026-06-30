@@ -2528,6 +2528,7 @@ func (hc *HelmPack) generateMicroAppTemplate(rootDir string, manifest logic2.Man
 {{- end -}}
 {{- $releaseName := .Release.Name -}}
 {{- $applicationType := "%s" -}}
+{{- $applicationIdentify := "%s" -}}
 
 {{- define "__cur__.fullname" -}}
 {{- if .Values.fullnameOverride }}
@@ -2571,7 +2572,11 @@ spec:
           {{- if eq $applicationType "tradition" }}
           serverUrl: {{ tpl .backend_identifier $ | quote }}
           {{- else }}
-          serverUrl: "http://{{ $fullName }}.{{ $releaseNamespace }}.svc.cluster.local:{{ default $defaultPort .backend_port }}"
+          {{- $backendFullName := $fullName -}}
+          {{- if ne .backend_identifier $applicationIdentify -}}
+          {{- $backendFullName = default .backend_identifier (dig .backend_identifier "fullnameOverride" "" $.Values) -}}
+          {{- end }}
+          serverUrl: "http://{{ $backendFullName }}.{{ $releaseNamespace }}.svc.cluster.local:{{ default $defaultPort .backend_port }}"
           {{- end }}
           {{- else if eq .type "external" }}
           serverUrl: {{ .backend_identifier }}
@@ -2621,7 +2626,7 @@ spec:
           parent: "{{ .parent }}"
           {{- end }}
       {{- end }}
-`, manifest.Application.Type, manifest.Application.Identifie, manifest.Application.Version, manifest.Application.Version, appName, manifest.Application.Identifie, manifest.Application.Version)
+	`, manifest.Application.Type, manifest.Application.Identifie, manifest.Application.Identifie, manifest.Application.Version, manifest.Application.Version, appName, manifest.Application.Identifie, manifest.Application.Version)
 
 	return writeFile(microAppFilePath, microAppTemplate)
 }

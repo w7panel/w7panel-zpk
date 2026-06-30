@@ -2263,6 +2263,7 @@ spec:
                 job_json=$(jq -n \
                   --arg jobName "$job_name" \
                   --arg targetApp "$TARGET_ENV_DEPLOY" \
+                  --arg fullName "{{ $fullName }}" \
                   --arg containerName "$container_name" \
                   --arg shellType "$shell_type" \
                   --arg shellTitle "$shell_title" \
@@ -2289,7 +2290,8 @@ spec:
                         },
                         annotations: ({
                           "w7.cc/shell-type": $shellType,
-                          "w7.cc/title": $shellTitle
+                          "w7.cc/title": $shellTitle,
+                          "w7.cc/group-name": $fullName
                         } + (if $shellType == "custom" then {"w7.cc/custom-hook":"true"} else {} end))
                       },
                       spec: {

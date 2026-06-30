@@ -2264,6 +2264,7 @@ spec:
                   --arg jobName "$job_name" \
                   --arg targetApp "$TARGET_ENV_DEPLOY" \
                   --arg fullName "{{ $fullName }}" \
+                  --arg releaseName "{{ .Release.Name }}" \
                   --arg containerName "$container_name" \
                   --arg shellType "$shell_type" \
                   --arg shellTitle "$shell_title" \
@@ -2285,7 +2286,7 @@ spec:
                         namespace: "default",
                         labels: {
                           app: $targetApp,
-                          group: $targetApp,
+                          group: $releaseName,
                           "w7.cc/job-source": "appgroup"
                         },
                         annotations: ({
@@ -2304,7 +2305,7 @@ spec:
                             },
                             labels: {
                               app: $jobName,
-                              group: $targetApp,
+                              group: $releaseName,
                               "w7.cc/job-source": "tradition-site"
                             }
                           },

@@ -1652,6 +1652,14 @@ func renderHelmValuesPlaceholdersMap(values map[string]string) map[string]string
 }
 
 func encodeCommandJSONBase64(commands []string) (string, error) {
+	normalizedCommands := make([]string, 0, len(commands))
+	for _, command := range commands {
+		if strings.TrimSpace(command) == "" {
+			continue
+		}
+		normalizedCommands = append(normalizedCommands, command)
+	}
+	commands = normalizedCommands
 	if len(commands) == 0 {
 		return "", nil
 	}
@@ -1737,7 +1745,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: create-site-job
-          image: zpk.w7.cc/public/site-manager:v1.2.11
+          image: zpk.w7.cc/public/site-manager:v1.2.12
           command:
             - sh
             - -c
@@ -1898,10 +1906,35 @@ spec:
 
               create_environment_app() {
                 source_deploy_json="$1"
+                yaml_copy_rules=$(printf '%%s' "$source_deploy_json" | jq -r '.spec.template.metadata.annotations["w7.cc/yaml_copy"] // ""')
+                if [ -n "$yaml_copy_rules" ] && [ "$yaml_copy_rules" != "null" ]; then
+                  site_manager_deploy_json=$(query_deploy "w7-sitemanager-site-manager")
+                  source_deploy_json=$(printf '%%s' "$source_deploy_json" | jq -c \
+                    --argjson sourceDeploy "$site_manager_deploy_json" \
+                    --argjson copyRules "$yaml_copy_rules" \
+                    '
+                    def path_parts($p):
+                      $p
+                      | split(".")
+                      | map(
+                          capture("^(?<name>[^\\[]+)(?:\\[(?<idx>[0-9]+)\\])?$") as $m
+                          | if $m.idx == null then [$m.name] else [$m.name, ($m.idx | tonumber)] end
+                        )
+                      | add;
+
+                    reduce ($copyRules // [])[] as $rule
+                      (.;
+                        setpath(
+                          path_parts($rule.target);
+                          ($sourceDeploy | getpath(path_parts($rule.source)))
+                        )
+                      )
+                    ')
+                fi
                 new_deploy_json=$(printf '%%s' "$source_deploy_json" | jq \
                   --arg newName "$NEW_ENV_K8S_APP" \
                   --arg version "$ENV_VERSION" \
-                  --arg appIdentify "$APP_IDENTIFY" \
+                  --arg fullName "{{ $fullName }}" \
                   '
                   del(.metadata.resourceVersion, .metadata.uid, .metadata.creationTimestamp, .metadata.managedFields, .metadata.ownerReferences, .status)
                   | .metadata.name = $newName
@@ -1910,7 +1943,7 @@ spec:
                   | .metadata.labels = (.metadata.labels // {})
                   | .metadata.annotations["w7.cc/create-svc"] = "true"
                   | .metadata.annotations["title"] = $newName
-                  | .metadata.annotations["w7.cc/real-group-name"] = $appIdentify
+                  | .metadata.annotations["w7.cc/real-group-name"] = $fullName
                   | .metadata.labels["app"] = $newName
                   | .spec.selector.matchLabels = (.spec.selector.matchLabels // {})
                   | .spec.selector.matchLabels["app"] = $newName
@@ -2086,7 +2119,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: site-shell-job
-          image: zpk.w7.cc/public/site-manager:v1.2.11
+          image: zpk.w7.cc/public/site-manager:v1.2.12
           command:
             - sh
             - -c
@@ -2299,8 +2332,18 @@ spec:
               }
 
               run_restart_patch() {
+                if [ -z "$CMD_B64" ] || [ "$CMD_B64" = "{}" ] || [ "$CMD_B64" = "null" ]; then
+                  log_shell "skip restart patch: reason=empty-command"
+                  return 0
+                fi
                 cmd_json=$(decode_b64_json "$CMD_B64" "[]")
-                if [ "$cmd_json" = "[]" ]; then
+                if ! printf '%%s' "$cmd_json" | jq -e 'type == "array"' >/dev/null 2>&1; then
+                  log_shell "skip restart patch: reason=invalid-command-json"
+                  return 0
+                fi
+                cmd_json=$(printf '%%s' "$cmd_json" | jq -c 'map(select(type == "string" and test("\\S")))')
+                if [ "$(printf '%%s' "$cmd_json" | jq 'length')" = "0" ]; then
+                  log_shell "skip restart patch: reason=empty-command"
                   return 0
                 fi
                 patch_json=$(jq -n \
@@ -2327,6 +2370,25 @@ spec:
                     }
                   }')
                 panel_patch "/k8s-proxy/apis/apps/v1/namespaces/default/deployments/$(panel_safe_name "$TARGET_ENV_DEPLOY")" "$patch_json" >/dev/null
+              }
+
+              restart_site_manager_nginx() {
+                nginx_deploy="w7-sitemanager-site-manager-nginx"
+                patch_json=$(jq -n \
+                  --arg ts "$(date -u +"%%Y-%%m-%%dT%%H:%%M:%%SZ")" \
+                  '{
+                    spec: {
+                      template: {
+                        metadata: {
+                          annotations: {
+                            "kubectl.kubernetes.io/restartedAt": $ts
+                          }
+                        }
+                      }
+                    }
+                  }')
+                panel_patch "/k8s-proxy/apis/apps/v1/namespaces/default/deployments/$(panel_safe_name "$nginx_deploy")" "$patch_json" >/dev/null
+                log_shell "restart deployment patched: name=$nginx_deploy"
               }
 
               run_shells_by_type() {
@@ -2369,10 +2431,12 @@ spec:
               if [ "$OPERATION" = "install" ]; then
                 run_shells_by_type "$start_params_json" "pre-install" "$(printf '%%s' "$user_shells_json" | jq '[.[] | select(.type == "pre-install" or .type == "requireinstall")]')"
                 run_restart_patch
+                restart_site_manager_nginx
                 run_shells_by_type "$start_params_json" "post-install" "$(printf '%%s' "$user_shells_json" | jq '[.[] | select(.type == "post-install" or .type == "install")]')"
               else
                 run_shells_by_type "$start_params_json" "pre-upgrade" "$(printf '%%s' "$user_shells_json" | jq '[.[] | select(.type == "pre-upgrade")]')"
                 run_restart_patch
+                restart_site_manager_nginx
                 run_shells_by_type "$start_params_json" "post-upgrade" "$(printf '%%s' "$user_shells_json" | jq '[.[] | select(.type == "post-upgrade" or .type == "upgrade")]')"
               fi
               run_shells_by_type "$start_params_json" "custom" "$(printf '%%s' "$user_shells_json" | jq '[.[] | select(.type == "custom")]')"
@@ -2464,6 +2528,7 @@ func (hc *HelmPack) generateMicroAppTemplate(rootDir string, manifest logic2.Man
 {{- end -}}
 {{- $releaseName := .Release.Name -}}
 {{- $applicationType := "%s" -}}
+{{- $applicationIdentify := "%s" -}}
 
 {{- define "__cur__.fullname" -}}
 {{- if .Values.fullnameOverride }}
@@ -2507,7 +2572,11 @@ spec:
           {{- if eq $applicationType "tradition" }}
           serverUrl: {{ tpl .backend_identifier $ | quote }}
           {{- else }}
-          serverUrl: "http://{{ $fullName }}.{{ $releaseNamespace }}.svc.cluster.local:{{ default $defaultPort .backend_port }}"
+          {{- $backendFullName := $fullName -}}
+          {{- if ne .backend_identifier $applicationIdentify -}}
+          {{- $backendFullName = default .backend_identifier (dig .backend_identifier "fullnameOverride" "" $.Values) -}}
+          {{- end }}
+          serverUrl: "http://{{ $backendFullName }}.{{ $releaseNamespace }}.svc.cluster.local:{{ default $defaultPort .backend_port }}"
           {{- end }}
           {{- else if eq .type "external" }}
           serverUrl: {{ .backend_identifier }}
@@ -2557,7 +2626,7 @@ spec:
           parent: "{{ .parent }}"
           {{- end }}
       {{- end }}
-`, manifest.Application.Type, manifest.Application.Identifie, manifest.Application.Version, manifest.Application.Version, appName, manifest.Application.Identifie, manifest.Application.Version)
+	`, manifest.Application.Type, manifest.Application.Identifie, manifest.Application.Identifie, manifest.Application.Version, manifest.Application.Version, appName, manifest.Application.Identifie, manifest.Application.Version)
 
 	return writeFile(microAppFilePath, microAppTemplate)
 }

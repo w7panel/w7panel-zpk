@@ -1839,29 +1839,6 @@ spec:
                 panel_get "/k8s-proxy/apis/apps/v1/namespaces/default/deployments/$(panel_safe_name "$deploy_name")"
               }
 
-              find_shared_environment() {
-                list_payload=$(jq -n --arg group "$ENV_GROUP" '{page:1,page_size:100,group:$group}')
-                list_resp=$(sm_post "/api/environment/list" "$list_payload")
-                rows=$(printf '%%s' "$list_resp" | jq -c \
-                  --arg group "$ENV_GROUP" \
-                  --arg language "$ENV_LANGUAGE" \
-                  --arg version "$ENV_VERSION" \
-                  '(.data.list // .data.items // [])[] | select(.group == $group and .language == $language and .version == $version and (.app_name // "") != "" and (.id // "") != "")')
-
-                while IFS= read -r row; do
-                  [ -n "$row" ] || continue
-                  app_name=$(printf '%%s' "$row" | jq -r '.app_name')
-                  if query_deploy "$app_name" >/dev/null 2>&1; then
-                    env_id=$(printf '%%s' "$row" | jq -r '.id // empty')
-                    printf '%%s\t%%s' "$env_id" "$app_name"
-                    return 0
-                  fi
-                done <<EOF
-              $rows
-              EOF
-                return 1
-              }
-
               create_ingress_if_needed() {
                 if [ "$OPERATION" != "install" ]; then
                   return 0
@@ -1925,6 +1902,7 @@ spec:
                 new_deploy_json=$(printf '%%s' "$source_deploy_json" | jq \
                   --arg newName "$NEW_ENV_K8S_APP" \
                   --arg version "$ENV_VERSION" \
+                  --arg appIdentify "$APP_IDENTIFY" \
                   '
                   del(.metadata.resourceVersion, .metadata.uid, .metadata.creationTimestamp, .metadata.managedFields, .metadata.ownerReferences, .status)
                   | .metadata.name = $newName
@@ -1933,6 +1911,7 @@ spec:
                   | .metadata.labels = (.metadata.labels // {})
                   | .metadata.annotations["w7.cc/create-svc"] = "true"
                   | .metadata.annotations["title"] = $newName
+                  | .metadata.annotations["w7.cc/real-group-name"] = $appIdentify
                   | .metadata.labels["app"] = $newName
                   | .spec.selector.matchLabels = (.spec.selector.matchLabels // {})
                   | .spec.selector.matchLabels["app"] = $newName
@@ -1973,17 +1952,6 @@ spec:
 
               resolve_target_env() {
                 source_deploy_json=$(query_deploy "$ENV_GROUP")
-                image_is_share=$(printf '%%s' "$source_deploy_json" | jq -r '.spec.template.metadata.annotations["w7.cc/image_is_share"] // .metadata.annotations["w7.cc/image_is_share"] // "false"')
-                if [ "$image_is_share" = "true" ]; then
-                  shared_env=$(find_shared_environment || true)
-                  if [ -n "$shared_env" ]; then
-                    K8S_ENV_ID=$(printf '%%s' "$shared_env" | cut -f1)
-                    K8S_ENV_APP_NAME=$(printf '%%s' "$shared_env" | cut -f2)
-                    TARGET_SHARED="true"
-                    return 0
-                  fi
-                fi
-
                 create_environment_app "$source_deploy_json"
               }
 

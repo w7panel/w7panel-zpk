@@ -181,17 +181,26 @@
                 </div>
             </a-tab-pane>
             <a-tab-pane key="paidset" title="付费设置">
-                <div>
+                <div class="version-paid-panel">
+                    <a-alert type="info" show-icon class="zpk-primary-alert version-paid-alert" title="提示" :closable="false">
+                        <div class="registry-alert-item">1，根据升级规则，小版本升级时会跨版本跳过，升级服务只能指定大版本</div>
+                        <div class="registry-alert-item mt-6">2，当用户升级时遇到多个收费版本，只需要购买最后一个大版本</div>
+                        <div class="registry-alert-item mt-6">3，当设置所有版本付费后，用户每次大版本升级都需要付费</div>
+                        <div class="registry-alert-item mt-6">4，当设置周期服务费用后，用户如果在服务期内，所有版本升级不再次收费</div>
+                    </a-alert>
                     <a-form :model="instFee" ref="instFee" :rules="rules" label-align="left"
                         class="version-paid-form"
-                        :label-col-props="{ flex: '0 0 72px' }" :wrapper-col-props="{ flex: '1' }">
-                        <a-form-item label="售价" field="service_fee">
-                            <a-input style="width: 200px;" v-model="instFee.service_fee" type="number" placeholder="请输入服务费">
-                                <template #append>元</template>
-                            </a-input>
+                        :label-col-props="{ flex: '0 0 96px' }" :wrapper-col-props="{ flex: '1' }">
+                        <a-form-item label="授权费用" field="service_fee">
+                            <div>
+                                <a-input style="width: 200px;" v-model="instFee.service_fee" type="number" placeholder="请输入授权费用">
+                                    <template #append>元</template>
+                                </a-input>
+                                <div class="version-form-help">用户获得该制品商业使用权的授权费用</div>
+                            </div>
                         </a-form-item>
 
-                        <a-form-item label="升级服务">
+                        <a-form-item label="升级服务费用">
                             <div class="version-setting-block">
                                 <manifest-config-table :rows="instFee.version_prices" add-text="添加升级服务"
                                     @add="addVersionPrice">
@@ -201,7 +210,7 @@
                                                 <a-select v-model="record.version" placeholder="请选择">
                                                     <a-option v-for="vl in instFee.can_upgrade_versions" :key="vl"
                                                         :value="vl"
-                                                        :label="vl === 9999 ? '其他版本' : (vl + '.*.*')"></a-option>
+                                                        :label="vl === 9999 ? '所有版本' : (vl + '.*.*')"></a-option>
                                                 </a-select>
                                             </template>
                                         </manifest-config-table-column>
@@ -223,7 +232,7 @@
                             </div>
                         </a-form-item>
 
-                        <a-form-item label="服务周期">
+                        <a-form-item label="周期服务费用">
                             <div class="version-setting-block">
                                 <div class="df ai-c">
                                     <a-switch v-model="instFee.enable_service_package_fee" />
@@ -1447,13 +1456,29 @@ export default {
     width: 100%;
 }
 
+.version-paid-panel {
+    width: 860px;
+    max-width: 100%;
+}
+
+.version-paid-alert {
+    margin-bottom: 20px;
+}
+
 .version-setting-block {
     width: 100%;
 }
 
+.version-form-help {
+    margin-top: 6px;
+    color: var(--color-text-3);
+    font-size: 12px;
+    line-height: 18px;
+}
+
 .version-paid-form :deep(.arco-form-item-label-col) {
-    flex: 0 0 72px !important;
-    width: 72px;
+    flex: 0 0 96px !important;
+    width: 96px;
 }
 
 .version-paid-form :deep(.arco-form-item-wrapper-col) {

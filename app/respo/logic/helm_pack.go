@@ -2291,7 +2291,7 @@ spec:
                         annotations: ({
                           "w7.cc/shell-type": $shellType,
                           "w7.cc/title": $shellTitle,
-                          "w7.cc/group-name": $fullName
+                          "w7.cc/group-name": $fullName,
                         } + (if $shellType == "custom" then {"w7.cc/custom-hook":"true"} else {} end))
                       },
                       spec: {
@@ -2299,6 +2299,9 @@ spec:
                         ttlSecondsAfterFinished: 60,
                         template: {
                           metadata: {
+                            annotations: {
+                              "w7.cc/group-name": $fullName,
+                            },
                             labels: {
                               app: $jobName,
                               group: $targetApp,
@@ -2460,6 +2463,10 @@ func (hc *HelmPack) generateRegisterSiteJobTemplate(rootDir string, manifest log
 kind: Site
 metadata:
   name: {{ .Release.Name }}
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-20"
+    helm.sh/hook-delete-policy: before-hook-creation
 spec:
   host: {{ .Values.DOMAIN_URL }}
   siteIdentifier: %s

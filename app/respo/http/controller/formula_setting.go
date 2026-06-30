@@ -42,6 +42,7 @@ func (c FormulaSetting) Set(ctx *gin.Context) {
 		Identifie                     string `form:"identifie" json:"identifie" binding:"required"`
 		SupportCrossUpgrade           bool   `form:"support_cross_upgrade" json:"support_cross_upgrade"`
 		SupportAutoPublishToZpkMarket bool   `json:"support_auto_publish_to_zpk_market"`
+		EnableServicePackageFee       *bool  `json:"enable_service_package_fee"`
 	}
 	params := ParamsValidate{}
 	if !c.Validate(ctx, &params) {
@@ -59,6 +60,9 @@ func (c FormulaSetting) Set(ctx *gin.Context) {
 
 	formula.Setting.SupportCrossUpgrade = params.SupportCrossUpgrade
 	formula.Setting.SupportAutoPublishToZpkMarket = params.SupportAutoPublishToZpkMarket
+	if params.EnableServicePackageFee != nil {
+		formula.Setting.EnableServicePackageFee = *params.EnableServicePackageFee
+	}
 
 	_, err = dao.Q.Formula.Where(dao.Q.Formula.ID.Eq(formula.ID)).Updates(entity.Formula{
 		Setting: formula.Setting,

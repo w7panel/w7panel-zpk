@@ -104,8 +104,9 @@ func (l FormulaGoods) PublishGoods(formula *Formula, publishGoodsReq devcenter.P
 	}
 	publishGoodsReq.Description = publishGoodsReq.Summary
 
+	enableServicePackageFee := formula.Setting != nil && formula.Setting.EnableServicePackageFee
 	servicePackages := make([]devcenter.NotAppServicePackage, 0)
-	if formula.ServicePackages != nil && formula.ServicePackages.List != nil {
+	if enableServicePackageFee && formula.ServicePackages != nil && formula.ServicePackages.List != nil {
 		for _, item := range formula.ServicePackages.List {
 			if item.IsEnable == ServicePackageEnable {
 				servicePackages = append(servicePackages, item)
@@ -164,8 +165,6 @@ func (l FormulaGoods) PublishGoods(formula *Formula, publishGoodsReq devcenter.P
 		"version_prices":         string(versionPricesContent),
 		"support_cross_upgrade":  supportCrossUpgrade,
 		"cross_upgrade_formulas": string(crossUpgradeFormulaContent),
-		"product_type":           formula.ProductType,
-		"is_free_upgrade":        formula.IsFreeUpgrade,
 	}
 	publishGoodsReq.RespoUrl = fmt.Sprintf("https://%s/zpk/respo/info/%s", facade.GetConfig().GetString("setting.depot.external_domain"), formula.Name)
 

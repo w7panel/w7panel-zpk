@@ -196,9 +196,6 @@ func (self *Depot) GetFormula(name string, version string, user *entity.Registry
 		return nil, err_handler.Throw("仓库不存在请先添加", nil)
 	}
 
-	if row.ProductType == 99 {
-		row.ProductType = 0
-	}
 	result := &Formula{
 		ID:                   row.ID,
 		UserId:               row.UserID,
@@ -220,7 +217,6 @@ func (self *Depot) GetFormula(name string, version string, user *entity.Registry
 		VersionPrices:        row.VersionPrices,
 		CrossUpgradeFormulas: row.CrossUpgradeFormulas,
 		IsFreeUpgrade:        row.IsFreeUpgrade,
-		ProductType:          row.ProductType,
 		Setting:              row.Setting,
 	}
 

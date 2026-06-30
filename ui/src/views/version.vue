@@ -185,28 +185,13 @@
                     <a-form :model="instFee" ref="instFee" :rules="rules" label-align="left"
                         class="version-paid-form"
                         :label-col-props="{ flex: '0 0 72px' }" :wrapper-col-props="{ flex: '1' }">
-                        <a-form-item label="付费类型">
-                            <div class="pt-10">
-                                <a-radio-group v-model="instFee.product_type">
-                                    <a-radio value="1">按授权付费</a-radio>
-                                    <a-radio value="2">按安装付费</a-radio>
-                                </a-radio-group>
-                                <div class="mt-8">
-
-                                    <span v-if="instFee.product_type == '1'" class="c-99">仅针对项目拥有所有权的商家，可按项目授权出售</span>
-                                    <span v-if="instFee.product_type == '2'"
-                                        class="c-99">对该项目熟悉并打包成可用安装包的技术人员，可按安装付费出售</span>
-                                </div>
-                            </div>
-                        </a-form-item>
-
                         <a-form-item label="售价" field="service_fee">
                             <a-input style="width: 200px;" v-model="instFee.service_fee" type="number" placeholder="请输入服务费">
                                 <template #append>元</template>
                             </a-input>
                         </a-form-item>
 
-                        <a-form-item v-if="instFee.product_type == '1'" label="升级服务">
+                        <a-form-item label="升级服务">
                             <div class="version-setting-block">
                                 <manifest-config-table :rows="instFee.version_prices" add-text="添加升级服务"
                                     @add="addVersionPrice">
@@ -237,21 +222,19 @@
                                 </manifest-config-table>
                             </div>
                         </a-form-item>
-                        <a-form-item v-if="instFee.product_type == '2'" label="付费升级">
-                            <div>
-                                <a-switch v-model="instFee.is_free_upgrade" />
-                                <span class="c-99" style="margin-left:10px;">用户想升级到指定版本，需要付费。</span>
-                            </div>
-                        </a-form-item>
 
-                        <a-form-item v-if="instFee.product_type == '1'" label="服务周期">
+                        <a-form-item label="服务周期">
                             <div class="version-setting-block">
+                                <div class="df ai-c">
+                                    <a-switch v-model="instFee.enable_service_package_fee" />
+                                    <span class="c-99" style="margin-left:10px;">开启后可配置周期费用。</span>
+                                </div>
                                 <div class="mt-6" style="line-height:18px;">
                                     <span class="warning-icon" style="display:inline-block; vertical-align:middle;">!</span>
                                     <span class="c-99"
                                         style="margin-left:4px; vertical-align:middle;">到期后无法维护更新,需要再次购买服务周期套餐才可以维护更新</span>
                                 </div>
-                                <manifest-config-table class="mt-10" :rows="instFee.service_packages"
+                                <manifest-config-table v-if="instFee.enable_service_package_fee" class="mt-10" :rows="instFee.service_packages"
                                     add-text="添加服务周期" @add="addServicePackage">
                                     <template #columns>
                                         <manifest-config-table-column data-index="price" title="价格">
@@ -440,8 +423,7 @@ export default {
 
             instFee: {
                 show: false,
-                is_free_upgrade: false,
-                product_type: '1',
+                enable_service_package_fee: false,
                 service_fee: '',
                 service_packages: [],
                 version_prices: [],
@@ -619,6 +601,7 @@ export default {
                     setting.support_auto_publish_to_zpk_market
                     || setting.support_publish_to_zpk_market
                 );
+                this.instFee.enable_service_package_fee = !!setting.enable_service_package_fee;
             }).finally(() => {
                 this.crossUpgrade.settingLoading = false;
             });
@@ -630,11 +613,13 @@ export default {
                 identifie: this.identifie,
                 support_cross_upgrade: !!this.crossUpgrade.enabled,
                 support_auto_publish_to_zpk_market: !!this.marketPublish.enabled,
+                enable_service_package_fee: !!this.instFee.enable_service_package_fee,
             }).then(() => {
                 this.crossUpgrade.setting = {
                     ...this.crossUpgrade.setting,
                     support_cross_upgrade: !!this.crossUpgrade.enabled,
                     support_auto_publish_to_zpk_market: !!this.marketPublish.enabled,
+                    enable_service_package_fee: !!this.instFee.enable_service_package_fee,
                 };
                 messageSuccess('操作成功');
             }).finally(() => {
@@ -825,17 +810,12 @@ export default {
             version_prices.map(i => {
                 i.versionName = this.versionsKV[i.version];
             })
-            let product_type = 1;
-            if (this.info?.product_type == 1 || this.info?.product_type == 2) {
-                product_type = this.info?.product_type;
-            }
             this.instFee = {
                 ...this.instFee,
-                product_type: String(product_type),
                 old_fee: this.info?.install_service_fee,
                 service_fee: this.info?.install_service_fee || '',
+                enable_service_package_fee: !!(this.info?.setting?.enable_service_package_fee ?? this.crossUpgrade.setting?.enable_service_package_fee),
                 service_packages: this.normalizeServicePackageRows(this.info?.service_packages || []),
-                is_free_upgrade: this.info?.is_free_upgrade || false,
                 version_prices: version_prices,
             }
         },
@@ -847,16 +827,10 @@ export default {
 
                 myAxios.post('/respo/goods/set-service-fee', {
                     identifie: this.identifie,
-                    product_type: Number(this.instFee.product_type),
                     service_fee: Number(this.instFee.service_fee),
-                    is_free_upgrade: this.instFee.is_free_upgrade ? 1 : 0,
-
-                    ...(this.instFee.product_type == '1' ? {
-                        service_packages,
-                        version_prices,
-                    } : {
-                        version_prices: [],
-                    })
+                    enable_service_package_fee: !!this.instFee.enable_service_package_fee,
+                    service_packages,
+                    version_prices,
                 }).then(res => {
                     if (this.goods_id && (Number(this.instFee.service_fee) != Number(this.instFee.old_fee)) && this.list.length) {
                         let item = this.list.find(i => i.id === this.version.id);
@@ -891,7 +865,6 @@ export default {
 
                 this.info = res?.data?.data;
                 this.hydrateCrossUpgrade();
-                this.info.is_free_upgrade = !!this.info.is_free_upgrade;
                 if (!this.info.manifest) {
                     this.noPlatform = true;
                 } else {

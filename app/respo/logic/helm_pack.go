@@ -135,10 +135,8 @@ func (hc *HelmPack) PackToHelm() error {
 		return err
 	}
 
-	traditionReleaseName := ""
 	traditionSiteName := ""
 	if hc.Manifest.Application.Type == logic2.Tradition_App {
-		traditionReleaseName = hc.Manifest.Platform.Tradition.EnvironmentName
 		traditionSiteName = buildTraditionSiteName(hc.Manifest.Platform.Tradition)
 	}
 	if hc.Manifest.Platform.Helm.ChartName != "" || hc.Manifest.Platform.Helm.Repository != "" || (hc.Manifest.Platform.Helm.DependYamls != nil && len(hc.Manifest.Platform.Helm.DependYamls) > 0) {
@@ -199,7 +197,7 @@ func (hc *HelmPack) PackToHelm() error {
 		if err := hc.generateMicroAppTemplate(templatesDir, hc.Manifest); err != nil {
 			return err
 		}
-		if err := hc.generateRegisterSiteJobTemplate(templatesDir, hc.Manifest, traditionReleaseName, traditionSiteName, traditionSiteName); err != nil {
+		if err := hc.generateRegisterSiteJobTemplate(templatesDir, hc.Manifest); err != nil {
 			return err
 		}
 	}
@@ -2422,72 +2420,31 @@ spec:
 `, cmdBase64, shellsBase64, startParamsEnvBase64)
 }
 
-func (hc *HelmPack) generateRegisterSiteJobTemplate(rootDir string, manifest logic2.Manifest, releaseName, appName, containerName string) error {
+func (hc *HelmPack) generateRegisterSiteJobTemplate(rootDir string, manifest logic2.Manifest) error {
 	if !manifest.Application.RegisterSite {
 		return nil
 	}
 
-	jobFilePath := filepath.Join(rootDir, "job-register-site.yaml")
-	if function.FileExists(jobFilePath) {
+	siteFilePath := filepath.Join(rootDir, "site-register-site.yaml")
+	if function.FileExists(siteFilePath) || function.FileExists(filepath.Join(rootDir, "job-register-site.yaml")) {
 		return nil
 	}
 
-	if releaseName == "" {
-		releaseName = "{{ .Release.Name }}"
-	}
-	if appName == "" {
-		appName = "{{ $fullName }}"
-	}
-	if containerName == "" {
-		containerName = manifest.Application.Identifie
-		if len(manifest.Platform.ContainerV2s) > 0 {
-			containerName = manifest.Platform.ContainerV2s[0].Name
-		}
-	}
-
-	jobTemplate := fmt.Sprintf(`{{- define "__cur__.fullname" -}}
-{{- if .Values.fullnameOverride }}
-{{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
-{{- else }}
-{{- $name := default .Chart.Name .Values.nameOverride }}
-{{- if contains $name .Release.Name }}
-{{- .Release.Name | trunc 63 | trimSuffix "-" }}
-{{- else }}
-{{- .Release.Name }}-{{ $name | trunc 63 | trimSuffix "-" }}
-{{- end }}
-{{- end }}
-{{- end }}
-
-{{- $fullName := include "__cur__.fullname" . -}}
-
-apiVersion: batch/v1
-kind: Job
+	siteTemplate := fmt.Sprintf(`apiVersion: w7panel.w7.com/v1alpha1
+kind: Site
 metadata:
-  name: {{ $fullName }}-job-register-site
-  labels:
-    group: {{ .Release.Name }}
-    w7.cc/job-source: appgroup
+  name: {{ .Release.Name }}
 spec:
-  backoffLimit: 2
-  ttlSecondsAfterFinished: 60
-  template:
-    metadata:
-      {{- if .Values.podAnnotations }}
-      annotations:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-    spec:
-      restartPolicy: Never
-      containers:
-        - name: register-site-job
-          image: {{ .Values.global.panel.image }}
-          command:
-            - sh
-            - -c
-            - /ko-app/w7panel site:register-zpk-http --panelUrl={{ .Values.global.panel.innerUrl }} --installId={{ .Values.global.panel.installId }} --siteIdentifie=%s --host={{ .Values.DOMAIN_URL }} --releaseName=%s --appName=%s --namespace=default --containerName=%s
-`, manifest.Application.Identifie, releaseName, appName, containerName)
+  host: {{ .Values.DOMAIN_URL }}
+  siteIdentifier: %s
+  target:
+    apiVersion: w7panel.w7.com/v1alpha1
+    kind: AppGroup
+    name: {{ .Release.Name }}
+    namespace: default
+`, manifest.Application.Identifie)
 
-	return writeFile(jobFilePath, jobTemplate)
+	return writeFile(siteFilePath, siteTemplate)
 }
 
 func (hc *HelmPack) generateMicroAppTemplate(rootDir string, manifest logic2.Manifest) error {

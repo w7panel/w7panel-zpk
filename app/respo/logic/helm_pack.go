@@ -1762,7 +1762,6 @@ spec:
 
               K8S_ENV_APP_NAME="$NEW_ENV_K8S_APP"
               K8S_ENV_ID=""
-              TARGET_SHARED="false"
               CREATED_ENV_APP=""
               CREATED_INGRESS_NAME=""
               CREATE_SITE_SUCCESS="false"
@@ -1947,7 +1946,6 @@ spec:
                 K8S_ENV_APP_NAME="$NEW_ENV_K8S_APP"
                 K8S_ENV_ID=""
                 CREATED_ENV_APP="$NEW_ENV_K8S_APP"
-                TARGET_SHARED="false"
               }
 
               resolve_target_env() {
@@ -1991,7 +1989,6 @@ spec:
                   --arg targetEnvResources "$target_env_resources" \
                   --arg targetEnvSecurityContext "$target_env_security_context" \
                   --arg targetEnvImagePullPolicy "$target_env_image_pull_policy" \
-                  --arg targetShared "$TARGET_SHARED" \
                   --arg operation "$OPERATION" \
                   --arg domain "$DOMAIN" \
                   '{
@@ -2011,7 +2008,6 @@ spec:
                       target_env_resources: $targetEnvResources,
                       target_env_security_context: $targetEnvSecurityContext,
                       target_env_image_pull_policy: $targetEnvImagePullPolicy,
-                      target_shared: $targetShared,
                       operation: $operation,
                       domain: $domain
                     }
@@ -2303,9 +2299,6 @@ spec:
               }
 
               run_restart_patch() {
-                if [ "$TARGET_SHARED" = "true" ]; then
-                  return 0
-                fi
                 cmd_json=$(decode_b64_json "$CMD_B64" "[]")
                 if [ "$cmd_json" = "[]" ]; then
                   return 0
@@ -2367,7 +2360,6 @@ spec:
               TARGET_ENV_RESOURCES=$(printf '%%s' "$state_json" | jq -r '.data.target_env_resources // "{}"')
               TARGET_ENV_SECURITY_CONTEXT=$(printf '%%s' "$state_json" | jq -r '.data.target_env_security_context // "{}"')
               TARGET_ENV_IMAGE_PULL_POLICY=$(printf '%%s' "$state_json" | jq -r '.data.target_env_image_pull_policy // "IfNotPresent"')
-              TARGET_SHARED=$(printf '%%s' "$state_json" | jq -r '.data.target_shared')
               OPERATION=$(printf '%%s' "$state_json" | jq -r '.data.operation')
               DOMAIN=$(printf '%%s' "$state_json" | jq -r '.data.domain')
 

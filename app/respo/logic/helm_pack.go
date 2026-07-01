@@ -1778,7 +1778,6 @@ spec:
               STATE_CONFIG='{{ $fullName }}-site-state'
 
               K8S_ENV_APP_NAME="$NEW_ENV_K8S_APP"
-              K8S_ENV_ID=""
               CREATED_ENV_APP=""
               CREATED_INGRESS_NAME=""
               CREATE_SITE_SUCCESS="false"
@@ -1831,15 +1830,6 @@ spec:
               }
               trap cleanup_created_resources EXIT
               panel_delete "/k8s-proxy/api/v1/namespaces/default/configmaps/$STATE_CONFIG" >/dev/null 2>&1 || true
-
-              sm_post() {
-                path="$1"
-                data="$2"
-                curl -fsS -X POST \
-                  -H "Content-Type: application/json" \
-                  -d "$data" \
-                  "$SITE_MANAGER_URL$path"
-              }
 
               sm_post_maybe() {
                 path="$1"
@@ -1915,6 +1905,14 @@ spec:
 
               create_environment_app() {
                 source_deploy_json="$1"
+                safe_new_env_app=$(panel_safe_name "$NEW_ENV_K8S_APP")
+                if panel_get "/k8s-proxy/apis/apps/v1/namespaces/default/deployments/$safe_new_env_app" >/dev/null 2>&1; then
+                  echo "environment deployment already exists, reuse: $safe_new_env_app"
+                  K8S_ENV_APP_NAME="$NEW_ENV_K8S_APP"
+                  CREATED_ENV_APP=""
+                  return 0
+                fi
+
                 yaml_copy_rules=$(printf '%%s' "$source_deploy_json" | jq -r '.spec.template.metadata.annotations["w7.cc/yaml_copy"] // ""')
                 if [ -n "$yaml_copy_rules" ] && [ "$yaml_copy_rules" != "null" ]; then
                   site_manager_deploy_json=$(query_deploy "w7-sitemanager-site-manager")
@@ -1986,7 +1984,6 @@ spec:
                 panel_post "/k8s-proxy/apis/apps/v1/namespaces/default/deployments" "$new_deploy_json" >/dev/null
 
                 K8S_ENV_APP_NAME="$NEW_ENV_K8S_APP"
-                K8S_ENV_ID=""
                 CREATED_ENV_APP="$NEW_ENV_K8S_APP"
               }
 
@@ -2023,7 +2020,6 @@ spec:
                 state_json=$(jq -n \
                   --arg name "$STATE_CONFIG" \
                   --arg targetEnvDeploy "$target_env_deploy" \
-                  --arg targetEnvId "$K8S_ENV_ID" \
                   --arg targetEnvImage "$target_env_image" \
                   --arg targetEnvVolumes "$target_env_volumes" \
                   --arg targetEnvVolumeMounts "$target_env_volume_mounts" \
@@ -2042,7 +2038,6 @@ spec:
                     },
                     data: {
                       target_env_deploy: $targetEnvDeploy,
-                      target_env_id: $targetEnvId,
                       target_env_image: $targetEnvImage,
                       target_env_volumes: $targetEnvVolumes,
                       target_env_volume_mounts: $targetEnvVolumeMounts,
@@ -2061,10 +2056,6 @@ spec:
               resolve_target_env
               create_ingress_if_needed
               NGINX_VHOST_TEMPLATE=$(get_nginx_vhost_template)
-              ENV_ID_ARG=""
-              if [ -n "$K8S_ENV_ID" ] && [ "$K8S_ENV_ID" != "null" ]; then
-                ENV_ID_ARG="--environment-id=$K8S_ENV_ID"
-              fi
 
               /home/rangine create:site \
                 --w7panel-domain="$PANEL_URL" \
@@ -2079,7 +2070,6 @@ spec:
                 --app_name="$APP_IDENTIFY" \
                 --k8s-app-name="$SITE_K8S_APP" \
                 --k8s-env-app-name="$K8S_ENV_APP_NAME" \
-                $ENV_ID_ARG \
                 --nginx-vhost-template="$NGINX_VHOST_TEMPLATE" \
                 -f /home/config.yaml
 
@@ -2503,11 +2493,11 @@ func (hc *HelmPack) generateMicroAppTemplate(rootDir string, manifest logic2.Man
 	backendConfigValues := make([]map[string]interface{}, 0)
 	for _, item := range manifest.Bindings {
 		conf := map[string]interface{}{
-			"role":               item.Name,
-			"load_mode":          item.LoadMode,
-			"type":               item.BackendConfig.Type,
-			"backend_identifier": renderHelmValuesPlaceholders(item.BackendConfig.BackendIdentifie),
-			"backend_port":       item.BackendConfig.BackendPort,
+			"role":         item.Name,
+			"load_mode":    item.LoadMode,
+			"type":         item.BackendConfig.Type,
+			"backend_url":  renderHelmValuesPlaceholders(item.BackendConfig.BackendUrl),
+			"backend_port": item.BackendConfig.BackendPort,
 			"proxy_request": logic2.RequestProxy{
 				Headers: renderHelmValuesPlaceholdersMap(item.BackendConfig.RequestProxy.Headers),
 				Query:   renderHelmValuesPlaceholdersMap(item.BackendConfig.RequestProxy.Query),
@@ -2589,19 +2579,19 @@ spec:
         {{- range .Values.backend_config }}
         {{ .role }}:
           {{- if eq .load_mode "iframe" }}
-          serverUrl: {{ tpl .backend_identifier $ | quote }}
+          serverUrl: {{ tpl .backend_url $ | quote }}
           {{- else if eq .type "internal" }}
           {{- if eq $applicationType "tradition" }}
-          serverUrl: {{ tpl .backend_identifier $ | quote }}
+          serverUrl: {{ tpl .backend_url $ | quote }}
           {{- else }}
           {{- $backendFullName := $fullName -}}
-          {{- if ne .backend_identifier $applicationIdentify -}}
-          {{- $backendFullName = default .backend_identifier (dig .backend_identifier "fullnameOverride" "" $.Values) -}}
+          {{- if ne .backend_url $applicationIdentify -}}
+          {{- $backendFullName = default .backend_url (dig .backend_url "fullnameOverride" "" $.Values) -}}
           {{- end }}
           serverUrl: "http://{{ $backendFullName }}.{{ $releaseNamespace }}.svc.cluster.local:{{ default $defaultPort .backend_port }}"
           {{- end }}
           {{- else if eq .type "external" }}
-          serverUrl: {{ .backend_identifier }}
+          serverUrl: {{ .backend_url }}
           {{- end }}
           load_mode: {{ .load_mode }}
           proxy_request: 

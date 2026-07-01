@@ -345,10 +345,10 @@
                                             </div>
                                             <div v-else-if="r.type == 'internal'" class="backend-url-config df ai-c">
                                                 <span class="backend-url-fixed">http://</span>
-                                                <a-select v-model="r.backend_identifie" allow-search
+                                                <a-select v-model="r.backend_url" allow-search
                                                     placeholder="选择应用标识"
                                                     class="backend-url-control backend-url-identifie"
-                                                    @change="changeBackendIdentifie(r)">
+                                                    @change="changeBackendUrl(r)">
                                                     <a-option v-for="app in backendAppOptions" :key="app.id"
                                                         :label="app.id" :value="app.id">
                                                         <div class="backend-app-option">
@@ -360,7 +360,7 @@
                                                 </a-select>
                                                 <span class="backend-url-fixed">.default.svc.cluster.local:</span>
                                                 <a-auto-complete v-model="r.backend_port"
-                                                    :data="getBackendPortOptions(r.backend_identifie, r.backend_port)"
+                                                    :data="getBackendPortOptions(r.backend_url, r.backend_port)"
                                                     :filter-option="false" placeholder="端口"
                                                     class="backend-url-control backend-url-port" @input="getMenu"
                                                     @change="getMenu" @select="getMenu"></a-auto-complete>
@@ -1371,8 +1371,8 @@ export default {
         usesDomainBackendAddress(role) {
             return role?.type == 'internal' && (role.load_mode == 'iframe' || this.form.type == 'tradition');
         },
-        changeBackendIdentifie(role) {
-            role.backend_port = this.getDefaultBackendPort(role.backend_identifie);
+        changeBackendUrl(role) {
+            role.backend_port = this.getDefaultBackendPort(role.backend_url);
             this.getMenu();
         },
         changeBackendType(role) {
@@ -1382,11 +1382,11 @@ export default {
                 return;
             }
             if (role.type == 'internal') {
-                if (!role.backend_identifie) {
-                    role.backend_identifie = this.getDefaultBackendIdentifie();
+                if (!role.backend_url) {
+                    role.backend_url = this.getDefaultBackendIdentifie();
                 }
                 if (!role.backend_port) {
-                    role.backend_port = this.getDefaultBackendPort(role.backend_identifie);
+                    role.backend_port = this.getDefaultBackendPort(role.backend_url);
                 }
             } else {
                 role.root_protocol = role.root_protocol || 'http://';
@@ -1398,9 +1398,9 @@ export default {
                 role.type = role.type || 'internal';
                 this.syncIframeBackendDefaults(role);
             } else {
-                if (this.form.type != 'tradition' && role.type == 'internal' && role.backend_identifie == this.getIframeDomainPlaceholder()) {
-                    role.backend_identifie = this.getDefaultBackendIdentifie();
-                    role.backend_port = this.getDefaultBackendPort(role.backend_identifie);
+                if (this.form.type != 'tradition' && role.type == 'internal' && role.backend_url == this.getIframeDomainPlaceholder()) {
+                    role.backend_url = this.getDefaultBackendIdentifie();
+                    role.backend_port = this.getDefaultBackendPort(role.backend_url);
                 }
             }
             this.getMenu();
@@ -1418,12 +1418,12 @@ export default {
                     return;
                 }
                 if (role.type != 'internal') { return }
-                if (!role.backend_identifie) {
-                    role.backend_identifie = this.getDefaultBackendIdentifie();
+                if (!role.backend_url) {
+                    role.backend_url = this.getDefaultBackendIdentifie();
                     changed = true;
                 }
                 if (!role.backend_port) {
-                    role.backend_port = this.getDefaultBackendPort(role.backend_identifie);
+                    role.backend_port = this.getDefaultBackendPort(role.backend_url);
                     changed = true;
                 }
             });
@@ -1439,8 +1439,8 @@ export default {
             let changed = false;
             let placeholder = this.getIframeDomainPlaceholder();
             if (role.type == 'internal') {
-                if (role.backend_identifie != placeholder) {
-                    role.backend_identifie = placeholder;
+                if (role.backend_url != placeholder) {
+                    role.backend_url = placeholder;
                     changed = true;
                 }
                 if (role.backend_path === undefined || role.backend_path === null) {
@@ -1467,7 +1467,7 @@ export default {
                 let path = value.slice(value.indexOf(placeholder) + placeholder.length).replace(/^\/+/, '');
                 return {
                     type: 'internal',
-                    backend_identifie: placeholder,
+                    backend_url: placeholder,
                     backend_path: path,
                     root_protocol: 'https://',
                 };
@@ -1475,7 +1475,7 @@ export default {
             let externalBackend = this.parseExternalBackendUrl(value);
             return {
                 type: 'external',
-                backend_identifie: placeholder,
+                backend_url: placeholder,
                 backend_path: '',
                 root_protocol: externalBackend.protocol,
                 root_url: externalBackend.url,
@@ -1712,7 +1712,7 @@ export default {
         addRole() {
             this.$refs.role.validate((errors) => {
                 if (errors) { return }
-                let backend_identifie = this.getDefaultBackendIdentifie();
+                let backend_url = this.getDefaultBackendIdentifie();
                 this.form.role.push({
                     title: this.newRole.title,
                     name: this.newRole.name,
@@ -1724,8 +1724,8 @@ export default {
                     menu: [],
 
                     type: 'internal',
-                    backend_identifie: backend_identifie,
-                    backend_port: this.getDefaultBackendPort(backend_identifie),
+                    backend_url: backend_url,
+                    backend_port: this.getDefaultBackendPort(backend_url),
                     backend_path: '',
                     root_protocol: 'http://',
                     root_url: '',
@@ -1787,7 +1787,7 @@ export default {
                     this.syncIframeBackendDefaults(r);
                     itemObj.backend_config = {
                         type: r.type,
-                        backend_identifie: this.getIframeBackendUrl(r),
+                        backend_url: this.getIframeBackendUrl(r),
                         proxy_request: {
                             query: proxy_request_query,
                         },
@@ -1801,13 +1801,13 @@ export default {
                     itemObj.backend_config = {
                         type: r.type,
                         ...(usesDomainBackendAddress ? {
-                            backend_identifie: this.getIframeBackendUrl(r),
+                            backend_url: this.getIframeBackendUrl(r),
                             proxy_request: {
                                 headers: proxy_request_header,
                                 query: proxy_request_query,
                             },
                         } : r.type == 'internal' ? {
-                            backend_identifie: r.backend_identifie,
+                            backend_url: r.backend_url,
                             backend_port: this.formatBackendPort(r.backend_port),
                             proxy_request: {
                                 headers: proxy_request_header,
@@ -1815,7 +1815,7 @@ export default {
                             },
                         } : {
 
-                            backend_identifie: this.getExternalBackendUrl(r),
+                            backend_url: this.getExternalBackendUrl(r),
                         }),
                         frontend_props: frontend_props
                     };
@@ -1899,7 +1899,7 @@ export default {
             }
             if (v) {
                 if (hasrole) { return }
-                let backend_identifie = this.getDefaultBackendIdentifie();
+                let backend_url = this.getDefaultBackendIdentifie();
                 this.form.role.push({
                     title: title,
                     name: name,
@@ -1911,8 +1911,8 @@ export default {
                     menu: [],
 
                     type: 'internal',
-                    backend_identifie: backend_identifie,
-                    backend_port: this.getDefaultBackendPort(backend_identifie),
+                    backend_url: backend_url,
+                    backend_port: this.getDefaultBackendPort(backend_url),
                     backend_path: '',
                     root_protocol: 'http://',
                     root_url: '',
@@ -2012,9 +2012,9 @@ export default {
                 }
 
                 if (item.load_mode == 'iframe') {
-                    let iframeBackend = this.parseIframeBackendUrl(item?.backend_config?.backend_identifie || '');
+                    let iframeBackend = this.parseIframeBackendUrl(item?.backend_config?.backend_url || '');
                     item.type = iframeBackend.type;
-                    item.backend_identifie = iframeBackend.backend_identifie;
+                    item.backend_url = iframeBackend.backend_url;
                     item.backend_path = iframeBackend.backend_path;
                     item.root_protocol = iframeBackend.root_protocol;
                     item.root_url = iframeBackend.root_url;
@@ -2023,20 +2023,20 @@ export default {
                     item.type = item?.backend_config?.type || 'internal';
                     item.backend_path = '';
                     if (item.type != 'internal') {
-                        let externalBackend = this.parseExternalBackendUrl(item?.backend_config?.backend_identifie || '');
+                        let externalBackend = this.parseExternalBackendUrl(item?.backend_config?.backend_url || '');
                         item.root_protocol = externalBackend.protocol;
                         item.root_url = externalBackend.url;
-                        item.backend_identifie = this.getDefaultBackendIdentifie();
-                        item.backend_port = this.getDefaultBackendPort(item.backend_identifie);
+                        item.backend_url = this.getDefaultBackendIdentifie();
+                        item.backend_port = this.getDefaultBackendPort(item.backend_url);
                     } else {
                         item.root_protocol = 'http://';
                         item.root_url = '';
-                        item.backend_identifie = item?.backend_config?.backend_identifie;
-                        item.backend_identifie = item.backend_identifie || this.getDefaultBackendIdentifie();
+                        item.backend_url = item?.backend_config?.backend_url;
+                        item.backend_url = item.backend_url || this.getDefaultBackendIdentifie();
                         item.backend_port = this.normalizeBackendPortValue(item?.backend_config?.backend_port);
                         if (this.form.type == 'tradition') {
-                            let iframeBackend = this.parseIframeBackendUrl(item?.backend_config?.backend_identifie || '');
-                            item.backend_identifie = iframeBackend.backend_identifie;
+                            let iframeBackend = this.parseIframeBackendUrl(item?.backend_config?.backend_url || '');
+                            item.backend_url = iframeBackend.backend_url;
                             item.backend_path = iframeBackend.type == 'internal' ? iframeBackend.backend_path : '';
                             item.backend_port = '';
                         }

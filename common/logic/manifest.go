@@ -211,6 +211,7 @@ type RequestProxy struct {
 type BackendConfig struct {
 	Type             string            `yaml:"type" json:"type"`
 	BackendIdentifie string            `yaml:"backend_identifie" json:"backend_identifie"`
+	BackendUrl       string            `yaml:"backend_url" json:"backend_url"`
 	BackendPort      int               `yaml:"backend_port" json:"backend_port"`
 	RequestProxy     RequestProxy      `yaml:"proxy_request" json:"proxy_request"`
 	FrontendProps    map[string]string `yaml:"frontend_props" json:"frontend_props"`
@@ -318,7 +319,11 @@ func ProcessManifestIdentify(manifestRow Manifest) Manifest {
 		if !existsDefaultMenu && len(item.Menu) > 0 {
 			item.Menu[0].IsDefault = 1
 		}
-		item.BackendConfig.BackendIdentifie = normalizeBackendIdentifie(item.BackendConfig.BackendIdentifie)
+		if item.BackendConfig.BackendUrl == "" {
+			item.BackendConfig.BackendUrl = item.BackendConfig.BackendIdentifie
+		}
+		item.BackendConfig.BackendUrl = normalizeBackendIdentifie(item.BackendConfig.BackendUrl)
+
 		manifestRow.Bindings[index] = item
 	}
 	manifestRow.Platform.Tradition.EnvironmentName = strings.ReplaceAll(manifestRow.Platform.Tradition.EnvironmentName, "_", "-")
@@ -385,7 +390,7 @@ var legacyHelmValuesPlaceholderRegexp = regexp.MustCompile(`"?\{\{\s*\.Values\.(
 
 func normalizeLegacyManifestPlaceholders(manifest Manifest) Manifest {
 	for index, item := range manifest.Bindings {
-		item.BackendConfig.BackendIdentifie = normalizeLegacyHelmValuesPlaceholders(item.BackendConfig.BackendIdentifie)
+		item.BackendConfig.BackendUrl = normalizeLegacyHelmValuesPlaceholders(item.BackendConfig.BackendUrl)
 		item.BackendConfig.RequestProxy.Headers = normalizeLegacyHelmValuesPlaceholdersMap(item.BackendConfig.RequestProxy.Headers)
 		item.BackendConfig.RequestProxy.Query = normalizeLegacyHelmValuesPlaceholdersMap(item.BackendConfig.RequestProxy.Query)
 		item.BackendConfig.FrontendProps = normalizeLegacyHelmValuesPlaceholdersMap(item.BackendConfig.FrontendProps)

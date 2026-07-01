@@ -223,7 +223,7 @@
 
                             <slot></slot>
 
-                            <a-form-item v-if="form.type == 'tradition'" label="CMD">
+                            <a-form-item v-if="form.type == 'tradition' && !isTraditionCommandDisabled" label="CMD">
                                 <div class="df df-c">
                                     <div v-for="(item, index) in form.cmd" :key="index" class="df ai-e"
                                         :style="{ marginTop: index == 0 ? 0 : '10px' }">
@@ -775,6 +775,12 @@ export default {
         helmChartVersionOptions() {
             return this.filterAutocompleteOptions(this.helmChartVersions, this.helmChartVersionKeyword);
         },
+        selectedEnvironment() {
+            return this.environmentList?.find?.(i => i.identifie == this.form.environmentName) || null;
+        },
+        isTraditionCommandDisabled() {
+            return this.form.type == 'tradition' && this.selectedEnvironment?.image_is_share === true;
+        },
     },
     watch: {
         'dependForm.identifie_before'() {
@@ -901,6 +907,11 @@ export default {
                 },
             }));
         },
+        normalizeCommandByEnvironment() {
+            if (this.isTraditionCommandDisabled) {
+                this.form.cmd = [''];
+            }
+        },
         openAppset() {
             let volumes = this.json?.platform?.volumes;
             let volumeClaimTemplates = this.json?.platform?.volumeClaimTemplates;
@@ -980,6 +991,7 @@ export default {
             if (item.versions?.length) {
                 this.form.environmentVersion = item.versions[0];
             }
+            this.normalizeCommandByEnvironment();
 
             this.changeForm();
         },
@@ -992,9 +1004,17 @@ export default {
                     try {
                         versions = i.annotation['w7.cc/image_version'].split(',')
                     } catch { }
+                    let imageIsShare = false;
+                    try {
+                        imageIsShare = String(i.annotation['w7.cc/image_is_share']).toLowerCase() == 'true';
+                    } catch {
+                        imageIsShare = false;
+                    }
                     i.versions = versions;
+                    i.image_is_share = imageIsShare;
                     return i
                 })
+                this.normalizeCommandByEnvironment();
 
                 this.form.depends?.map?.((item, index) => {
                     if (this.form.type == 'tradition' && this.environmentList?.length) {
@@ -1593,6 +1613,9 @@ platform:
                         delete this.json.platform.ingress
                         delete this.json.platform.runtimeClassName
                     } catch { }
+                    if (this.json.platform?.tradition) {
+                        this.json.platform.tradition.cmd = this.isTraditionCommandDisabled ? [] : this.form.cmd;
+                    }
                     this.applyPlatformShells();
                 } else if (this.form.type == 'docker') {
 
@@ -1679,11 +1702,12 @@ platform:
                 try {
                     environmentLanguage = this.environmentList?.find?.(i => i.identifie == this.form.environmentName)?.annotation?.['w7.cc/image_language'] || environmentLanguage;
                 } catch { }
+                this.normalizeCommandByEnvironment();
                 j.platform.tradition = {
                     environmentName: this.form.environmentName,
                     environmentVersion: this.form.environmentVersion,
                     environmentLanguage: environmentLanguage,
-                    cmd: this.form.cmd,
+                    cmd: this.isTraditionCommandDisabled ? [] : this.form.cmd,
                 }
             }
 

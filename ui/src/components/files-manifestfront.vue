@@ -890,8 +890,6 @@ export default {
             yaml: '',
             git: { url: '' },
             form: {
-
-                front_type: ['thirdparty_cd'],
                 menu_type: 'thirdparty_cd',
                 type: 'front',
                 name: "",
@@ -1744,7 +1742,6 @@ export default {
         },
         getMenu() {
             let role = [];
-            let front_type = new Set();
             let consoleRole = {
                 founder: false,
                 super: false,
@@ -1859,9 +1856,6 @@ export default {
                 this.normalizeBuiltMenuDefault(itemObj.menu, this.hasIncompleteDefaultMenu(r.menu));
 
                 if (itemObj.menu.length > 0 || r.load_mode == 'iframe') {
-                    if (r.support) {
-                        front_type.add(r.support);
-                    }
                     role.push(itemObj);
                 }
             });
@@ -1873,7 +1867,6 @@ export default {
                 ...cdRole,
             }
 
-            this.json.application.front_type = [...front_type];
             this.json.bindings = role;
             this.form.hasIframe = Boolean(this.form.role.find(i => i.load_mode == 'iframe'));
 

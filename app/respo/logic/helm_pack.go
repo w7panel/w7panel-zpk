@@ -1042,7 +1042,7 @@ spec:
     metadata:
       annotations:
       {{- if .Values.podAnnotations }}
-        {{- toYaml . | nindent 8 }}
+        {{- toYaml .Values.podAnnotations | nindent 8 }}
       {{- end }}
         {{- if .Values.annotations }}
         {{- toYaml .Values.annotations | nindent 12 }}
@@ -1435,9 +1435,12 @@ spec:
   ttlSecondsAfterFinished: 60
   template:
     metadata:
+      labels:
+        group: {{ $root.Release.Name }}
+        w7.cc/job-source: appgroup
       annotations:
       {{- if $root.Values.podAnnotations }}
-        {{- toYaml . | nindent 8 }}
+        {{- toYaml $root.Values.podAnnotations | nindent 8 }}
       {{- end }}
         {{- if $root.Values.annotations }}
         {{- toYaml $root.Values.annotations | nindent 12 }}
@@ -1531,9 +1534,12 @@ spec:
   ttlSecondsAfterFinished: 60
   template:
     metadata:
+      labels:
+        group: {{ $root.Release.Name }}
+        w7.cc/job-source: appgroup
       {{- if $root.Values.podAnnotations }}
       annotations:
-        {{- toYaml . | nindent 8 }}
+        {{- toYaml $root.Values.podAnnotations | nindent 8 }}
       {{- end }}
     spec:
       restartPolicy: Never
@@ -1737,9 +1743,12 @@ spec:
   ttlSecondsAfterFinished: 60
   template:
     metadata:
+      labels:
+        group: {{ .Release.Name }}
+        w7.cc/job-source: appgroup
       {{- if .Values.podAnnotations }}
       annotations:
-        {{- toYaml . | nindent 8 }}
+        {{- toYaml .Values.podAnnotations | nindent 8 }}
       {{- end }}
     spec:
       restartPolicy: Never
@@ -2111,9 +2120,12 @@ spec:
   ttlSecondsAfterFinished: 60
   template:
     metadata:
+      labels:
+        group: {{ .Release.Name }}
+        w7.cc/job-source: appgroup
       {{- if .Values.podAnnotations }}
       annotations:
-        {{- toYaml . | nindent 8 }}
+        {{- toYaml .Values.podAnnotations | nindent 8 }}
       {{- end }}
     spec:
       restartPolicy: Never

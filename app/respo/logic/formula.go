@@ -93,7 +93,6 @@ type Formula struct {
 	VersionPrices        *accessor.VersionPricesOption
 	CrossUpgradeFormulas *accessor.CrossUpgradeFormulasOption
 	IsFreeUpgrade        int32
-	ProductType          int32
 	GoodsId              int32
 	GoodsProductId       int32
 	Setting              *accessor.FormulaSettingOption

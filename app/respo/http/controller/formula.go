@@ -266,10 +266,6 @@ func (c Formula) Info(ctx *gin.Context) {
 		IsUpgrade:      params.IsUpgrade > 0,
 	})
 
-	if formula.IsFreeUpgrade == -1 {
-		formula.IsFreeUpgrade = 0
-	}
-
 	responseManifest.Version = 3
 	responseManifest.VersionV2 = 3
 	tmpContent, _ := yaml.Marshal(responseManifest)
@@ -291,8 +287,6 @@ func (c Formula) Info(ctx *gin.Context) {
 		"service_packages":       servicePackages,
 		"version_prices":         versionPrices,
 		"cross_upgrade_formulas": crossUpgradeFormulas,
-		"is_free_upgrade":        formula.IsFreeUpgrade,
-		"product_type":           formula.ProductType,
 		"ticket":                 ticket,
 		"service_expire":         formulaExpire,
 		"goods_id":               formula.GoodsId,
@@ -412,7 +406,6 @@ func (c Formula) List(ctx *gin.Context) {
 		InstallTotal         int32                  `json:"install_total"`
 		Version              *entity.Version        `json:"version"`
 		Status               int32                  `json:"status"`
-		ProductType          int32                  `json:"product_type"`
 		InstallOnlyOnce      bool                   `json:"install_only_once"`
 		RemoteFormulaInfoURL string                 `json:"remote_formula_info_url"`
 		AuditStatus          int32                  `json:"audit_status"`
@@ -523,7 +516,6 @@ func (c Formula) List(ctx *gin.Context) {
 					Tag:                  item.Tag,
 					Version:              item.Version,
 					Status:               item.Status,
-					ProductType:          formula.ProductType,
 					InstallOnlyOnce:      formula.Manifest.Application.InstallOnlyOnce,
 					AuditStatus:          auditStatus,
 					AuditRemark:          auditMessage,

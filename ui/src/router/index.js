@@ -4,7 +4,7 @@ const routes = [
     {
         path: '/',
         name: 'home',
-        component: () => import("../views/store-list.vue")
+        redirect: "/zpk"
     },
     {
         path: '/zpk',
@@ -65,21 +65,6 @@ const routes = [
         path: '/zpk-namespace',
         name: 'zpk-namespace',
         component: () => import("../views/namespace.vue"),
-    },
-    {
-        path: '/zpk-store',
-        name: 'zpk-store',
-        component: () => import("../views/store.vue")
-    },
-    {
-        path: '/zpk-store-list',
-        name: 'zpk-store-list',
-        component: () => import("../views/store-list.vue")
-    },
-    {
-        path: '/site-detail/:name',
-        name: 'site-detail',
-        component: () => import("../views/store-app-detail.vue")
     },
     {
         path: '/zpk-settings',

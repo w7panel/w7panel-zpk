@@ -69,20 +69,14 @@ func (c FormulaGoods) GetCanFeeUpgradeVersions(ctx *gin.Context) {
 func (c FormulaGoods) SetServiceFee(ctx *gin.Context) {
 	type ParamsValidate struct {
 		Identifie         string                                   `form:"identifie" json:"identifie" binding:"required"`
-		ProductType       int                                      `form:"product_type" json:"product_type" binding:"required"`
 		InstallServiceFee float64                                  `form:"service_fee" json:"service_fee"`
-		IsFreeUpgrade     int                                      `form:"is_free_upgrade" json:"is_free_upgrade"`
+		EnableServiceFee  bool                                     `form:"enable_service_package_fee" json:"enable_service_package_fee"`
 		ServicePackages   []devcenter.NotAppServicePackage         `form:"service_packages" json:"service_packages"`
 		VersionPrices     []devcenter.NotAppBranchVersionPriceInfo `form:"version_prices" json:"version_prices"`
 	}
 	params := ParamsValidate{}
 	if !c.Validate(ctx, &params) {
 		return
-	}
-	if params.IsFreeUpgrade > 0 {
-		params.IsFreeUpgrade = 1
-	} else {
-		params.IsFreeUpgrade = -1
 	}
 
 	depotLogin := c.getDepot()
@@ -91,27 +85,25 @@ func (c FormulaGoods) SetServiceFee(ctx *gin.Context) {
 		c.JsonResponseWithError(ctx, errors.New("制品不存在"), 500)
 		return
 	}
-	if formula.ProductType == logic.FORMULA_PRODUCT_CONSOLE_APP && int32(params.ProductType) == logic.FORMULA_PRODUCT_LOCAL_APP {
-		params.ServicePackages = formula.ServicePackages.List
-		params.VersionPrices = formula.VersionPrices.List
-	} else {
-		for i, item := range params.ServicePackages {
-			if item.Id == 0 {
-				params.ServicePackages[i].Id = i + 1
-			}
-		}
-		for i, item := range params.VersionPrices {
-			if item.Id == 0 {
-				params.VersionPrices[i].Id = i + 1
-			}
+	for i, item := range params.ServicePackages {
+		if item.Id == 0 {
+			params.ServicePackages[i].Id = i + 1
 		}
 	}
-	if int32(params.ProductType) == logic.FORMULA_PRODUCT_CONSOLE_APP {
-		params.IsFreeUpgrade = -1
+	for i, item := range params.VersionPrices {
+		if item.Id == 0 {
+			params.VersionPrices[i].Id = i + 1
+		}
+	}
+	if formula.Setting == nil {
+		formula.Setting = &accessor.FormulaSettingOption{}
+	}
+	formula.Setting.EnableServicePackageFee = params.EnableServiceFee
+	if !formula.Setting.EnableServicePackageFee {
+		params.ServicePackages = make([]devcenter.NotAppServicePackage, 0)
 	}
 
 	_, err = dao.Q.Formula.Where(dao.Formula.ID.Eq(formula.ID)).Updates(entity.Formula{
-		ProductType:       int32(params.ProductType),
 		InstallServiceFee: params.InstallServiceFee,
 		ServicePackages: &accessor.ServicePackagesOption{
 			List: params.ServicePackages,
@@ -119,7 +111,7 @@ func (c FormulaGoods) SetServiceFee(ctx *gin.Context) {
 		VersionPrices: &accessor.VersionPricesOption{
 			List: params.VersionPrices,
 		},
-		IsFreeUpgrade: int32(params.IsFreeUpgrade),
+		Setting: formula.Setting,
 	})
 	if err != nil {
 		c.JsonResponseWithError(ctx, err, 500)

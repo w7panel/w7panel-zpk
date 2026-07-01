@@ -182,12 +182,6 @@
             </a-tab-pane>
             <a-tab-pane key="paidset" title="付费设置">
                 <div class="version-paid-panel">
-                    <a-alert type="info" show-icon class="zpk-primary-alert version-paid-alert" title="提示" :closable="false">
-                        <div class="registry-alert-item">1，根据升级规则，小版本升级时会跨版本跳过，升级服务只能指定大版本</div>
-                        <div class="registry-alert-item mt-6">2，当用户升级时遇到多个收费版本，只需要购买最后一个大版本</div>
-                        <div class="registry-alert-item mt-6">3，当设置所有版本付费后，用户每次大版本升级都需要付费</div>
-                        <div class="registry-alert-item mt-6">4，当设置周期服务费用后，用户如果在服务期内，所有版本升级不再次收费</div>
-                    </a-alert>
                     <a-form :model="instFee" ref="instFee" :rules="rules" label-align="left"
                         class="version-paid-form"
                         :label-col-props="{ flex: '0 0 96px' }" :wrapper-col-props="{ flex: '1' }">
@@ -202,6 +196,12 @@
 
                         <a-form-item label="升级服务费用">
                             <div class="version-setting-block">
+                                <a-alert type="info" show-icon class="zpk-primary-alert version-paid-alert mb-20" title="提示" :closable="false">
+                                    <div class="registry-alert-item">根据升级规则，小版本升级时会跨版本跳过，升级服务只能指定大版本</div>
+                                    <div class="registry-alert-item mt-6">当用户升级时遇到多个收费版本，只需要购买最后一个大版本</div>
+                                    <div class="registry-alert-item mt-6">当设置所有版本付费后，用户每次大版本升级都需要付费</div>
+                                    <div class="registry-alert-item mt-6">当设置周期服务费用后，用户如果在服务期内，所有版本升级不再次收费</div>
+                                </a-alert>
                                 <manifest-config-table :rows="instFee.version_prices" add-text="添加升级服务"
                                     @add="addVersionPrice">
                                     <template #columns>
@@ -246,14 +246,14 @@
                                 <manifest-config-table v-if="instFee.enable_service_package_fee" class="mt-10" :rows="instFee.service_packages"
                                     add-text="添加服务周期" @add="addServicePackage">
                                     <template #columns>
-                                        <manifest-config-table-column data-index="price" title="价格">
+                                        <manifest-config-table-column data-index="price" title="价格" width="200px">
                                             <template #cell="{ record }">
                                                 <a-input v-model="record.price" type="number" placeholder="请输入">
                                                     <template #append>元</template>
                                                 </a-input>
                                             </template>
                                         </manifest-config-table-column>
-                                        <manifest-config-table-column data-index="month" title="时长" width="200px">
+                                        <manifest-config-table-column data-index="month" title="时长">
                                             <template #cell="{ record }">
                                                 <a-select v-model="record.month" placeholder="请选择">
                                                     <a-option label="1年" :value="12"></a-option>
@@ -1477,8 +1477,8 @@ export default {
 }
 
 .version-paid-form :deep(.arco-form-item-label-col) {
-    flex: 0 0 96px !important;
-    width: 96px;
+    flex: 0 0 120px !important;
+    width: 120px;
 }
 
 .version-paid-form :deep(.arco-form-item-wrapper-col) {

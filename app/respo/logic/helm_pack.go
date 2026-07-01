@@ -1627,7 +1627,7 @@ func buildTraditionSiteName(tradition logic2.Tradition) string {
 	appName := tradition.EnvironmentName
 	version := tradition.EnvironmentVersion
 	envIdentifie := strings.ToLower(strings.ReplaceAll(getVersionIdentifie(appName, version), "_", "-"))
-	return fmt.Sprintf(`{{ printf "copy-%%s-%%s" (printf "%%s-%%s" $fullName %q | sha256sum | trunc 8) %q | trunc 63 | trimSuffix "-" }}`, envIdentifie, envIdentifie)
+	return fmt.Sprintf(`{{ printf "%%s-%%s" (%q | trunc 54 | trimSuffix "-") (printf "%%s-%%s" $fullName %q | sha256sum | trunc 8) }}`, envIdentifie, envIdentifie)
 }
 
 func getStartParamsEnvJSONTemplate() string {

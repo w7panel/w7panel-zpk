@@ -1950,7 +1950,7 @@ spec:
                   | .metadata.labels = (.metadata.labels // {})
                   | .metadata.annotations["w7.cc/create-svc"] = "true"
                   | .metadata.annotations["title"] = $newName
-                  | .metadata.annotations["w7.cc/real-group-name"] = $fullName
+                  | .metadata.annotations["w7.cc/parent-group-name"] = $fullName
                   | .metadata.labels["app"] = $newName
                   | .spec.selector.matchLabels = (.spec.selector.matchLabels // {})
                   | .spec.selector.matchLabels["app"] = $newName

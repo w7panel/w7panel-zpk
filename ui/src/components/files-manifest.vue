@@ -1685,8 +1685,6 @@ platform:
                     environmentLanguage: environmentLanguage,
                     cmd: this.form.cmd,
                 }
-            } else {
-                delete j.platform.tradition;
             }
 
             if (j.platform) {

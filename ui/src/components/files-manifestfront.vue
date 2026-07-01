@@ -116,27 +116,6 @@
                                         </div>
                                     </div>
                                     <div class="df ai-c">
-                                        <a-popover position="top" :content-style="{ width: '240px' }">
-                                            <div class="df ai-c cursor" style="margin-right:30px;">
-                                                <img src="@/assets/img/micon.png" alt=""
-                                                    style="width:20px;margin-right:5px;" />
-                                                <span class="c-66 lh-1">菜单布局</span>
-                                            </div>
-                                            <template #content>
-                                                <a-radio-group v-model="r.location" class="df" @change="getMenu">
-                                                    <div class="fc df df-c ai-c menulocation cursor"
-                                                        @click="r.location = 'top'; getMenu()">
-                                                        <img src="@/assets/img/menu-t.png" alt="" />
-                                                        <a-radio value="top" class="mt-10">顶部菜单布局</a-radio>
-                                                    </div>
-                                                    <div class="fc df df-c ai-c menulocation cursor"
-                                                        @click="r.location = 'left'; getMenu()">
-                                                        <img src="@/assets/img/menu-l.png" alt="" />
-                                                        <a-radio value="left" class="mt-10">左侧菜单布局</a-radio>
-                                                    </div>
-                                                </a-radio-group>
-                                            </template>
-                                        </a-popover>
                                         <a-checkbox v-if="r.name != 'founder' && r.name != 'super'"
                                             :model-value="r.is_default_register == 2"
                                             @change="v => { r.is_default_register = v ? 2 : 1; chengeRegister(r, r.is_default_register); }">默认邀请端</a-checkbox>
@@ -1200,6 +1179,11 @@ export default {
                     key: 'cloud_uid',
                     value: this.wrapConfigVariable('system.cloud_uid'),
                     description: '微擎云端用户 uid',
+                },
+                {
+                    key: 'cloud_accesstoken',
+                    value: this.wrapConfigVariable('system.cloud_accesstoken'),
+                    description: '微擎云端用户 access token',
                 }
             ];
         },
@@ -1507,6 +1491,32 @@ export default {
             let url = this.normalizeHttpsExternalUrl(role.root_url);
             return url ? `https://${url}` : '';
         },
+        isApplicationBackendUrl(url) {
+            return /\.svc\.cluster\.local(?::|\/|$)/.test(String(url || ''));
+        },
+        getBackendConfigUrl(backendConfig) {
+            return backendConfig?.backend_url || backendConfig?.backend_identifie || '';
+        },
+        parseApplicationBackendUrl(url) {
+            let value = String(url || '');
+            let match = value.match(/^https?:\/\/([^.:/]+)(?:\.[^:/]+)*(?::([^/]+))?/i);
+            return {
+                backend_identifie: match?.[1] || '',
+                backend_port: match?.[2] || '',
+            };
+        },
+        getStaticBackendUrl(role) {
+            if (this.usesDomainBackendAddress(role)) {
+                return this.getIframeBackendUrl(role);
+            }
+            if (role.type == 'internal') {
+                let identifie = role.backend_identifie || this.getDefaultBackendIdentifie();
+                if (!identifie) { return '' }
+                let port = this.normalizeBackendPortValue(role.backend_port || this.getDefaultBackendPort(identifie));
+                return `http://${identifie}.default.svc.cluster.local${port ? ':' + port : ''}`;
+            }
+            return this.getExternalBackendUrl(role);
+        },
         normalizeHttpsExternalUrl(url) {
             return String(url || '').trim().replace(/^[a-z][a-z\d+.-]*:\/\//i, '');
         },
@@ -1805,37 +1815,19 @@ export default {
                 if (r.load_mode == 'iframe') {
                     this.syncIframeBackendDefaults(r);
                     itemObj.backend_config = {
-                        type: r.type,
-                        backend_identifie: this.getIframeBackendUrl(r),
+                        backend_url: this.getIframeBackendUrl(r),
                         proxy_request: {
                             query: proxy_request_query,
                         },
                         frontend_props: frontend_props
                     };
                 } else {
-                    let usesDomainBackendAddress = this.usesDomainBackendAddress(r);
-                    if (usesDomainBackendAddress) {
-                        this.syncIframeBackendDefaults(r);
-                    }
                     itemObj.backend_config = {
-                        type: r.type,
-                        ...(usesDomainBackendAddress ? {
-                            backend_identifie: this.getIframeBackendUrl(r),
-                            proxy_request: {
-                                headers: proxy_request_header,
-                                query: proxy_request_query,
-                            },
-                        } : r.type == 'internal' ? {
-                            backend_identifie: r.backend_identifie,
-                            backend_port: this.formatBackendPort(r.backend_port),
-                            proxy_request: {
-                                headers: proxy_request_header,
-                                query: proxy_request_query,
-                            },
-                        } : {
-
-                            backend_identifie: this.getExternalBackendUrl(r),
-                        }),
+                        backend_url: this.getStaticBackendUrl(r),
+                        proxy_request: {
+                            headers: proxy_request_header,
+                            query: proxy_request_query,
+                        },
                         frontend_props: frontend_props
                     };
                 }
@@ -2035,7 +2027,7 @@ export default {
                 }
 
                 if (item.load_mode == 'iframe') {
-                    let iframeBackend = this.parseIframeBackendUrl(item?.backend_config?.backend_identifie || '');
+                    let iframeBackend = this.parseIframeBackendUrl(this.getBackendConfigUrl(item?.backend_config));
                     item.type = iframeBackend.type;
                     item.backend_identifie = iframeBackend.backend_identifie;
                     item.backend_path = iframeBackend.backend_path;
@@ -2043,10 +2035,14 @@ export default {
                     item.root_url = iframeBackend.root_url;
                     item.backend_port = '';
                 } else {
-                    item.type = item?.backend_config?.type || 'internal';
+                    let backendConfig = item?.backend_config || {};
+                    let backendUrl = backendConfig.backend_url || '';
+                    item.type = backendConfig.type || (backendUrl
+                        ? (this.isApplicationBackendUrl(backendUrl) || backendUrl.includes(this.getIframeDomainPlaceholder()) ? 'internal' : 'external')
+                        : 'internal');
                     item.backend_path = '';
                     if (item.type != 'internal') {
-                        let externalBackend = this.parseExternalBackendUrl(item?.backend_config?.backend_identifie || '');
+                        let externalBackend = this.parseExternalBackendUrl(backendUrl || backendConfig.backend_identifie || '');
                         item.root_protocol = externalBackend.protocol;
                         item.root_url = externalBackend.url;
                         item.backend_identifie = this.getDefaultBackendIdentifie();
@@ -2054,11 +2050,16 @@ export default {
                     } else {
                         item.root_protocol = 'http://';
                         item.root_url = '';
-                        item.backend_identifie = item?.backend_config?.backend_identifie;
+                        item.backend_identifie = backendConfig.backend_identifie;
                         item.backend_identifie = item.backend_identifie || this.getDefaultBackendIdentifie();
-                        item.backend_port = this.normalizeBackendPortValue(item?.backend_config?.backend_port);
+                        item.backend_port = this.normalizeBackendPortValue(backendConfig.backend_port);
+                        if (backendUrl && this.isApplicationBackendUrl(backendUrl)) {
+                            let appBackend = this.parseApplicationBackendUrl(backendUrl);
+                            item.backend_identifie = appBackend.backend_identifie || item.backend_identifie;
+                            item.backend_port = this.normalizeBackendPortValue(appBackend.backend_port);
+                        }
                         if (this.form.type == 'tradition') {
-                            let iframeBackend = this.parseIframeBackendUrl(item?.backend_config?.backend_identifie || '');
+                            let iframeBackend = this.parseIframeBackendUrl(backendUrl || backendConfig.backend_identifie || '');
                             item.backend_identifie = iframeBackend.backend_identifie;
                             item.backend_path = iframeBackend.type == 'internal' ? iframeBackend.backend_path : '';
                             item.backend_port = '';
@@ -2125,17 +2126,25 @@ export default {
         },
         setYaml() {
             this.yaml = jsyaml.dump(this.json, {
-                indent: 4,
+                indent: 2,
                 sortKeys: (a, b) => {
                     if (b == 'menu') { return -1; }
                     return a > b ? 1 : -1;
                 },
             });
-            this.yamlDom = `<pre class='pre'><code class='language-yaml'>${this.yaml}</code></pre>`;
+            this.yamlDom = `<pre class='pre'><code class='language-yaml'>${this.escapeHtml(this.yaml)}</code></pre>`;
             this.$nextTick(() => {
                 window.hljs.highlightAll();
                 this.download();
             });
+        },
+        escapeHtml(text) {
+            return String(text || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
         },
         download() {
             let file = new File([this.yaml], 'manifest.yaml', { type: 'text/plain' });

@@ -1752,17 +1752,25 @@ platform:
         },
         setYaml() {
             this.yaml = jsyaml.dump(this.json, {
-                indent: 4,
+                indent: 2,
                 sortKeys: (a, b) => {
                     if (b == 'menu') { return -1; }
                     return a > b ? 1 : -1;
                 },
             });
-            this.yamlDom = `<pre class='pre'><code class='language-yaml'>${this.yaml}</code></pre>`;
+            this.yamlDom = `<pre class='pre'><code class='language-yaml'>${this.escapeHtml(this.yaml)}</code></pre>`;
             this.$nextTick(() => {
                 window.hljs.highlightAll();
                 this.download();
             });
+        },
+        escapeHtml(text) {
+            return String(text || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
         },
         openYamlPreview() {
             this.showYaml = true;

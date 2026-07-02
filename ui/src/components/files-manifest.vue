@@ -249,39 +249,33 @@
                                 label="脚本配置" field="shell" class="mt-16">
                                 <div style="flex:1;">
                                     <manifest-config-table :rows="form.shell" add-text="添加脚本"
-                                        @add="form.shell.push({ title: '', type: '', shell: '' })">
+                                        table-class="shell-config-table"
+                                        @add="addShellTask">
                                         <template #columns>
-                                            <manifest-config-table-column data-index="type" title="类型">
+                                            <manifest-config-table-column data-index="type" title="类型" width="180px">
                                                 <template #cell="{ record }">
                                                     <a-select v-model="record.type" placeholder="请选择类型"
                                                         style="width:160px;">
-                                                        <a-option label="应用被安装时触发" value="requireinstall"></a-option>
-                                                        <a-option label="应用安装时触发" value="install"></a-option>
-                                                        <a-option label="应用安装前触发" value="pre-install"></a-option>
-                                                        <a-option label="应用更新时触发" value="upgrade"></a-option>
-                                                        <a-option label="应用卸载时触发" value="uninstall"></a-option>
-                                                        <a-option label="手动触发" value="custom"></a-option>
+                                                        <a-option v-for="item in shellTypeOptions" :key="item.value"
+                                                            :label="item.label" :value="item.value"></a-option>
                                                     </a-select>
                                                 </template>
                                             </manifest-config-table-column>
-                                            <manifest-config-table-column data-index="shell" title="脚本">
+                                            <manifest-config-table-column data-index="title" title="名称" width="220px">
                                                 <template #cell="{ record }">
-                                                    <a-textarea v-model="record.shell" :rows="2"
-                                                        :spellcheck="false" placeholder="请输入"></a-textarea>
+                                                    <a-input v-model="record.title" placeholder="请输入任务名称"></a-input>
                                                 </template>
                                             </manifest-config-table-column>
-                                            <manifest-config-table-column data-index="image" title="镜像">
-                                                <template #cell="{ record }">
-                                                    <a-input v-model="record.image" :spellcheck="false"
-                                                        placeholder="不填默认当前应用镜像"></a-input>
+                                            <manifest-config-table-column title="任务" width="160px">
+                                                <template #cell="{ record, index }">
+                                                    <div class="shell-task-cell">
+                                                        <span class="c-99">{{ getShellTaskStatus(record) }}</span>
+                                                        <span class="c-blue cursor handle"
+                                                            @click="openShellConfig(record, index)">编辑</span>
+                                                    </div>
                                                 </template>
                                             </manifest-config-table-column>
-                                            <manifest-config-table-column data-index="title" title="备注">
-                                                <template #cell="{ record }">
-                                                    <a-input v-model="record.title" placeholder="请输入"></a-input>
-                                                </template>
-                                            </manifest-config-table-column>
-                                            <manifest-config-table-column title="操作">
+                                            <manifest-config-table-column title="操作" width="80px">
                                                 <template #cell="{ index }">
                                                     <span class="c-blue cursor handle"
                                                         @click="form.shell.splice(index, 1);">删除</span>
@@ -483,6 +477,36 @@
             </template>
         </a-modal>
 
+        <a-modal v-model:visible="shellConfig.show" title="配置脚本任务" :width="720" :footer="false">
+            <a-alert type="info" show-icon class="zpk-primary-alert mb-20" title="提示" :closable="false">
+                <div class="registry-alert-item">脚本会以独立任务运行，运行容器决定任务使用的镜像、容器 env 和目录挂载。</div>
+                <div class="registry-alert-item mt-6">启动参数会同时注入任务的 env 环境，可在脚本中通过环境变量读取。</div>
+                <div class="registry-alert-item mt-6">传统应用固定使用所选运行环境的应用容器。</div>
+            </a-alert>
+            <a-form v-if="shellConfig.item" :model="shellConfig.item" label-align="left"
+                class="manifest-dialog-form shell-config-form"
+                :label-col-props="{ flex: '0 0 90px' }" :wrapper-col-props="{ flex: '1' }">
+                <a-form-item label="运行容器">
+                    <span v-if="form.type == 'tradition'" class="c-99">使用所选环境应用容器</span>
+                    <a-select v-else v-model="shellConfig.item.container" class="shell-config-control"
+                        :placeholder="hasShellContainerOptions ? '请选择运行容器' : '请先在应用配置中添加容器'"
+                        :disabled="!hasShellContainerOptions" allow-clear style="width:100%;">
+                        <a-option v-for="item in shellContainerOptions" :key="item.value" :label="item.label"
+                            :value="item.value"></a-option>
+                    </a-select>
+                </a-form-item>
+                <a-form-item label="脚本命令">
+                    <a-textarea v-model="shellConfig.item.shell" class="shell-config-control shell-command-input"
+                        :rows="8" :spellcheck="false"
+                        placeholder="请输入脚本命令"></a-textarea>
+                </a-form-item>
+            </a-form>
+            <div class="dialog-footer">
+                <a-button size="large" @click="shellConfig.show = false">取消</a-button>
+                <a-button type="primary" size="large" @click="saveShellConfig">确定</a-button>
+            </div>
+        </a-modal>
+
     </div>
 </template>
 
@@ -599,6 +623,11 @@ export default {
 
             },
 
+            shellConfig: {
+                show: false,
+                editIndex: -1,
+                item: null,
+            },
 
             app_ports: [],
             app_names: [],
@@ -781,6 +810,33 @@ export default {
         isTraditionCommandDisabled() {
             return this.form.type == 'tradition' && this.selectedEnvironment?.image_is_share === true;
         },
+        shellTypeOptions() {
+            return [
+                { label: '安装前执行', value: 'requireinstall' },
+                { label: '安装后执行', value: 'install' },
+                { label: '升级前执行', value: 'pre-upgrade' },
+                { label: '升级后执行', value: 'upgrade' },
+                { label: '卸载后执行', value: 'uninstall' },
+                { label: '手动触发', value: 'custom' },
+            ];
+        },
+        shellContainerOptions() {
+            let containers = this.form.containers?.length
+                ? this.form.containers
+                : (this.json?.platform?.['container-v2'] || []);
+            return (containers || [])
+                .filter(item => item && !item.isInitContainer && item.name)
+                .map(item => ({
+                    label: item.name,
+                    value: item.name,
+                }));
+        },
+        hasShellContainerOptions() {
+            return this.form.type != 'tradition' && this.shellContainerOptions.length > 0;
+        },
+        defaultShellContainer() {
+            return this.hasShellContainerOptions ? this.shellContainerOptions[0].value : '';
+        },
     },
     watch: {
         'dependForm.identifie_before'() {
@@ -861,6 +917,48 @@ export default {
                 : list;
             return source.map(item => ({ label: item, value: item }));
         },
+        addShellTask() {
+            this.form.shell.push({ title: '', type: '', container: this.defaultShellContainer, shell: '' });
+            this.changeForm();
+        },
+        openShellConfig(record, index) {
+            if (!record) { return }
+            if (record.container === undefined) { record.container = ''; }
+            if (this.form.type != 'tradition' && !record.container && this.defaultShellContainer) {
+                record.container = this.defaultShellContainer;
+            }
+            if (record.shell === undefined) { record.shell = ''; }
+            this.shellConfig = {
+                show: true,
+                editIndex: index,
+                item: record,
+            };
+        },
+        getShellTaskStatus(record) {
+            if (!record?.shell) { return '未配置' }
+            if (this.form.type == 'tradition') { return '所选环境应用容器' }
+            return record.container || this.defaultShellContainer || '默认运行容器';
+        },
+        fillDefaultShellContainer() {
+            if (this.form.type == 'tradition' || !this.defaultShellContainer) { return }
+            (this.form.shell || []).forEach(item => {
+                if (item && !item.container) {
+                    item.container = this.defaultShellContainer;
+                }
+            });
+        },
+        resetShellConfig() {
+            this.shellConfig = {
+                show: false,
+                editIndex: -1,
+                item: null,
+            };
+        },
+        saveShellConfig() {
+            this.shellConfig.show = false;
+            this.applyPlatformShells();
+            this.yaml = jsyaml.dump(this.json);
+        },
         onChange() { },
         createDomainStartParam() {
             return {
@@ -933,6 +1031,7 @@ export default {
                 this.json.platform['container-v2'] = allConatiners;
                 this.json.platform['volumes'] = data.volumes;
                 this.json.platform['volumeClaimTemplates'] = data.volumeClaimTemplates;
+                this.fillDefaultShellContainer();
 
                 this.form.storage = Boolean(data?.volumeClaimTemplates?.length);
 
@@ -1494,6 +1593,7 @@ platform:
                 this.form.shell = JSON.parse(JSON.stringify(j.platform?.shells || j.platform?.['container-v2']?.[0]?.shells || []));
                 this.form.build_context = j.platform?.['container-v2']?.[0]?.build?.context || '';
                 this.form.containers = j.platform?.['container-v2'] || [];
+                this.fillDefaultShellContainer();
 
                 this.containerPluginData = {
                     ...this.containerPluginData,
@@ -1915,6 +2015,72 @@ platform:
 .install-depend-table td:nth-child(3),
 .install-depend-table td:last-child {
     white-space: nowrap;
+}
+
+.shell-config-table {
+    width: 100%;
+    table-layout: fixed;
+}
+
+.shell-config-table :deep(.arco-input-wrapper),
+.shell-config-table :deep(.arco-select) {
+    width: 100%;
+}
+
+.shell-task-cell {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    white-space: nowrap;
+    min-width: 0;
+}
+
+.shell-task-cell .c-99 {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.shell-config-form {
+    width: 100%;
+}
+
+.shell-config-form :deep(.arco-form-item) {
+    width: 100%;
+    margin-bottom: 20px;
+}
+
+.shell-config-form :deep(.arco-form-item-layout-horizontal) {
+    display: flex;
+    align-items: flex-start;
+    width: 100%;
+}
+
+.shell-config-form :deep(.arco-form-item-label-col) {
+    flex: 0 0 90px;
+    width: 90px;
+    max-width: 90px;
+}
+
+.shell-config-form :deep(.arco-form-item-wrapper-col) {
+    flex: 1 1 auto;
+    width: calc(100% - 90px);
+    min-width: 0;
+}
+
+.shell-config-form :deep(.arco-form-item-content-wrapper),
+.shell-config-form :deep(.arco-form-item-content) {
+    width: 100%;
+    min-width: 0;
+}
+
+.shell-config-control,
+.shell-config-form :deep(.arco-select),
+.shell-config-form :deep(.arco-textarea-wrapper) {
+    width: 100%;
+}
+
+.shell-command-input {
+    min-height: 180px;
 }
 
 .upfilebox {

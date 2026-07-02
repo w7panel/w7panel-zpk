@@ -2735,13 +2735,14 @@ func (hc *HelmPack) getShellJobValues(items []logic2.Shell) []map[string]interfa
 		}
 
 		jobs = append(jobs, map[string]interface{}{
-			"enabled": true,
-			"title":   item.Title,
-			"image":   item.Image,
-			"shell":   item.Shell,
-			"type":    hookName,
-			"weight":  shellWeight,
-			"name":    strings.ToLower(function.GetRandomStringNotContainerNumber(12)),
+			"enabled":       true,
+			"title":         item.Title,
+			"image":         item.Image,
+			"shell":         item.Shell,
+			"type":          hookName,
+			"weight":        shellWeight,
+			"containerName": item.Container,
+			"name":          strings.ToLower(function.GetRandomStringNotContainerNumber(12)),
 		})
 	}
 
@@ -2750,15 +2751,15 @@ func (hc *HelmPack) getShellJobValues(items []logic2.Shell) []map[string]interfa
 
 func (hc *HelmPack) getJobsValues(platform logic2.Platform) []map[string]interface{} {
 	jobs := make([]map[string]interface{}, 0)
-	containerValues := hc.getShellJobContainerValues(platform)
 	for _, job := range hc.getShellJobValues(platform.Shells) {
-		job["container"] = containerValues
+		containerName, _ := job["containerName"].(string)
+		job["container"] = hc.getShellJobContainerValues(platform, containerName)
 		jobs = append(jobs, job)
 	}
 	return jobs
 }
 
-func (hc *HelmPack) getShellJobContainerValues(platform logic2.Platform) map[string]interface{} {
+func (hc *HelmPack) getShellJobContainerValues(platform logic2.Platform, containerName string) map[string]interface{} {
 	if len(platform.ContainerV2s) == 0 {
 		return map[string]interface{}{
 			"name":            strings.ReplaceAll(hc.Manifest.Application.Identifie, "_", "-"),
@@ -2771,6 +2772,14 @@ func (hc *HelmPack) getShellJobContainerValues(platform logic2.Platform) map[str
 	}
 
 	container := platform.ContainerV2s[0]
+	if containerName != "" {
+		for _, item := range platform.ContainerV2s {
+			if item.Name == containerName {
+				container = item
+				break
+			}
+		}
+	}
 	for index, volume := range container.VolumeMounts {
 		if volume.SubPath == "%RANDOM_DIR%" || volume.SubPath == "RANDOM_DIR" {
 			container.VolumeMounts[index].SubPath = buildStableSubPathTemplate(container.Name, volume)

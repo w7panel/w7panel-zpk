@@ -120,10 +120,11 @@ type Build struct {
 }
 
 type Shell struct {
-	Shell string `yaml:"shell" json:"shell"`
-	Title string `yaml:"title" json:"title"`
-	Type  string `yaml:"type" json:"type"`
-	Image string `yaml:"image" json:"image"`
+	Shell     string `yaml:"shell" json:"shell"`
+	Title     string `yaml:"title" json:"title"`
+	Type      string `yaml:"type" json:"type"`
+	Image     string `yaml:"image" json:"image"`
+	Container string `yaml:"container" json:"container"`
 }
 
 type StartParams struct {

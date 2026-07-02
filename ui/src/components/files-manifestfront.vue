@@ -1720,12 +1720,12 @@ export default {
                     location: 'left',
                     menu: [],
 
-                    type: 'internal',
+                    type: this.form.type === 'tradition' ? 'external' : 'internal',
                     backend_url: backend_url,
                     backend_port: this.getDefaultBackendPort(backend_url),
                     backend_path: '',
                     root_protocol: 'http://',
-                    root_url: '',
+                    root_url: this.form.type === 'tradition' ? this.getIframeDomainPlaceholder() : '',
 
                     proxy_request_header: [],
                     proxy_request_query: [],
@@ -1911,7 +1911,7 @@ export default {
                     backend_port: this.getDefaultBackendPort(backend_url),
                     backend_path: '',
                     root_protocol: 'http://',
-                    root_url: '',
+                    root_url: this.form.type === 'tradition' ? this.getIframeDomainPlaceholder() : '',
                     proxy_request_header: [],
                     proxy_request_query: [],
                     frontend_props: [],

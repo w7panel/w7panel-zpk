@@ -382,24 +382,31 @@
                         <a-form-item class="mt-20" label="安装依赖">
                             <manifest-config-table :rows="form.depends" table-class="install-depend-table"
                                 add-text="添加安装依赖"
-                                @add="form.depends.push({ identifie: '', name: '', required: false, type: 'out' })">
+                                @add="openDependPicker()">
                                 <template #columns>
                                     <manifest-config-table-column data-index="identifie" title="名称" width="36%">
                                         <template #cell="{ record, index }">
-                                            <a-select v-model="record.identifie" size="large"
-                                                @change="getSubDepends(index); record.subidentifie = ''; record.subname = ''; record.name = dependsList[record.identifie]; changeForm()"
-                                                placeholder="请选择">
-                                                <a-option v-for="(name, identifie) in dependsList" :key="identifie"
-                                                    :label="name" :value="identifie"></a-option>
-                                            </a-select>
+                                            <div class="install-depend-app-cell">
+                                                <div class="install-depend-app-main">
+                                                    <div class="install-depend-app-name">
+                                                        {{ getDependName(record) || '未选择依赖' }}
+                                                    </div>
+                                                    <div v-if="record.identifie" class="install-depend-app-identifie">
+                                                        {{ record.identifie }}
+                                                    </div>
+                                                </div>
+                                                <a-button type="text" size="mini" @click="openDependPicker(index)">
+                                                    {{ record.identifie ? '更换' : '选择' }}
+                                                </a-button>
+                                            </div>
                                         </template>
                                     </manifest-config-table-column>
                                     <manifest-config-table-column data-index="subidentifie" title="子应用" width="34%">
                                         <template #cell="{ record, index }">
                                             <a-select v-model="record.subidentifie" size="large"
-                                                @change="record.subname = subDependsList[index][record.subidentifie]; changeForm()"
-                                                placeholder="请选择">
-                                                <a-option v-for="(name, identifie) in subDependsList[index]"
+                                                @change="record.subname = getSubDependName(index, record.subidentifie); changeForm()"
+                                                placeholder="请选择" :disabled="!record.identifie">
+                                                <a-option v-for="(name, identifie) in getSubDependsOptions(index)"
                                                     :key="identifie" :label="name" :value="identifie"></a-option>
                                             </a-select>
                                         </template>
@@ -410,7 +417,7 @@
                                         </template>
                                     </manifest-config-table-column>
                                     <manifest-config-table-column data-index="name" title="标识" width="12%">
-                                        <template #cell="{ record }">{{ dependsList[record.identifie] }}</template>
+                                        <template #cell="{ record }">{{ record.identifie }}</template>
                                     </manifest-config-table-column>
                                     <manifest-config-table-column title="操作" width="8%">
                                         <template #cell="{ index }">
@@ -483,6 +490,53 @@
             </template>
         </a-modal>
 
+        <a-modal v-model:visible="dependPicker.show" title="选择安装依赖" :width="840" :footer="false"
+            modal-class="depend-picker-modal" @close="closeDependPicker">
+            <div class="depend-picker-toolbar">
+                <a-input v-model="dependPicker.keyword" placeholder="搜索制品名称或标识" allow-clear
+                    @keydown.enter="searchDependPicker">
+                    <template #suffix>
+                        <span class="depend-picker-search-action" @click="searchDependPicker">
+                            <icon-search :size="16" />
+                        </span>
+                    </template>
+                </a-input>
+            </div>
+            <a-tabs v-model:active-key="dependPicker.activeTab" @change="changeDependPickerTab">
+                <a-tab-pane key="local" title="本地仓库"></a-tab-pane>
+                <a-tab-pane key="official" title="官方仓库"></a-tab-pane>
+            </a-tabs>
+            <a-table :loading="dependPicker.loading" :data="dependPickerRows" :pagination="false"
+                row-key="identifie" class="depend-picker-table" @row-click="selectDependFromPicker">
+                <template #columns>
+                    <a-table-column title="制品">
+                        <template #cell="{ record }">
+                            <div class="depend-picker-product">
+                                <div class="depend-picker-product-name">{{ record.name || record.identifie }}</div>
+                                <div class="depend-picker-product-identifie">{{ record.identifie }}</div>
+                            </div>
+                        </template>
+                    </a-table-column>
+                    <a-table-column title="版本" :width="120">
+                        <template #cell="{ record }">
+                            {{ record.version?.name || '-' }}
+                        </template>
+                    </a-table-column>
+                    <a-table-column title="操作" :width="100" align="center">
+                        <template #cell="{ record }">
+                            <a-button type="text" size="small" @click.stop="selectDependFromPicker(record)">
+                                选择
+                            </a-button>
+                        </template>
+                    </a-table-column>
+                </template>
+            </a-table>
+            <div class="depend-picker-footer">
+                <a-pagination v-model:current="dependPicker.page" :page-size="dependPicker.pageSize"
+                    :total="dependPickerTotal" @change="changeDependPickerPage" />
+            </div>
+        </a-modal>
+
     </div>
 </template>
 
@@ -501,6 +555,7 @@ import {
     IconExclamationCircleFill,
     IconLoading,
     IconPlus,
+    IconSearch,
     IconUpload,
 } from '@arco-design/web-vue/es/icon';
 import { confirm, messageError, messageSuccess, messageWarning } from '@/utils/ui-feedback';
@@ -526,6 +581,7 @@ export default {
         IconExclamationCircleFill,
         IconLoading,
         IconPlus,
+        IconSearch,
         IconUpload,
     },
     data() {
@@ -711,6 +767,24 @@ export default {
             dependsList: {},
             subDependsList: {},
 
+            dependPicker: {
+                show: false,
+                activeTab: 'local',
+                keyword: '',
+                page: 1,
+                pageSize: 8,
+                loading: false,
+                editIndex: -1,
+                lists: {
+                    local: [],
+                    official: [],
+                },
+                loaded: {
+                    local: false,
+                    official: false,
+                },
+            },
+
             buildImageLogData: null,
             buildImageInterval: null,
 
@@ -780,6 +854,16 @@ export default {
         },
         isTraditionCommandDisabled() {
             return this.form.type == 'tradition' && this.selectedEnvironment?.image_is_share === true;
+        },
+        dependPickerCurrentList() {
+            return this.dependPicker.lists?.[this.dependPicker.activeTab] || [];
+        },
+        dependPickerRows() {
+            let start = (this.dependPicker.page - 1) * this.dependPicker.pageSize;
+            return this.dependPickerCurrentList.slice(start, start + this.dependPicker.pageSize);
+        },
+        dependPickerTotal() {
+            return this.dependPickerCurrentList.length;
         },
     },
     watch: {
@@ -1072,12 +1156,125 @@ export default {
             };
             reader.readAsText(file, 'UTF-8');
         },
-        getSubDepends(index) {
+        getDependName(record) {
+            if (!record) { return '' }
+            return record.name || this.dependsList?.[record.identifie] || record.identifie || '';
+        },
+        getSubDependsOptions(index) {
+            return this.subDependsList?.[index] || { "": "无" };
+        },
+        getSubDependName(index, identifie) {
+            return this.getSubDependsOptions(index)?.[identifie] || '';
+        },
+        normalizeDependList(list = []) {
+            return (list || []).filter(i => i?.install_only_once).map(i => ({
+                ...i,
+                name: i.name || i.identifie,
+            }));
+        },
+        mergeDependsList(list = []) {
+            let obj = { ...this.dependsList };
+            list.forEach(i => {
+                if (i?.identifie) {
+                    obj[i.identifie] = i.name || i.identifie;
+                }
+            });
+            this.dependsList = obj;
+        },
+        openDependPicker(index = -1) {
+            this.dependPicker.show = true;
+            this.dependPicker.editIndex = index;
+            this.dependPicker.page = 1;
+            if (!this.dependPicker.loaded?.[this.dependPicker.activeTab]) {
+                this.getDependPickerList();
+            }
+        },
+        closeDependPicker() {
+            this.dependPicker.editIndex = -1;
+        },
+        searchDependPicker() {
+            this.dependPicker.page = 1;
+            this.getDependPickerList();
+        },
+        changeDependPickerTab() {
+            this.dependPicker.page = 1;
+            this.getDependPickerList();
+        },
+        changeDependPickerPage(page) {
+            this.dependPicker.page = page;
+        },
+        getDependPickerList() {
+            let tab = this.dependPicker.activeTab;
+            this.dependPicker.loading = true;
+            let params = {
+                page: 1,
+                limit: 999,
+                keyword: this.dependPicker.keyword,
+            };
+            let request = tab == 'official'
+                ? myAxios.get('https://zpk.w7.cc/zpk/respo/list?status=2&status=99', {
+                    params,
+                    dontalert: true,
+                })
+                : myAxios.get('/respo/list', {
+                    params,
+                    dontalert: true,
+                });
+            return request.then(res => {
+                let list = this.normalizeDependList(res?.data?.data?.list || []);
+                this.dependPicker.lists[tab] = list;
+                this.dependPicker.loaded[tab] = true;
+                this.mergeDependsList(list);
+            }).catch(() => {
+                this.dependPicker.lists[tab] = [];
+                this.dependPicker.loaded[tab] = true;
+            }).finally(() => {
+                this.dependPicker.loading = false;
+            });
+        },
+        selectDependFromPicker(record) {
+            if (!record?.identifie) { return }
+            let data = {
+                identifie: record.identifie,
+                name: record.name || record.identifie,
+                subidentifie: '',
+                subname: '',
+                required: false,
+                type: 'out',
+            };
+            let index = this.dependPicker.editIndex;
+            if (index >= 0 && this.form.depends[index]) {
+                data.required = Boolean(this.form.depends[index].required);
+                this.form.depends.splice(index, 1, data);
+            } else {
+                this.form.depends.push(data);
+                index = this.form.depends.length - 1;
+            }
+            this.dependPicker.show = false;
+            this.getSubDepends(index, this.dependPicker.activeTab);
+            this.changeForm();
+        },
+        getSubDepends(index, source = '') {
             this.subDependsList[index] = { "": "无" };
-            let identifie = this.form.depends[index].identifie;
-            return myAxios.get('/respo/v2/info/' + identifie + '/1.0.0', {
-                headers: { cancelerror: true }
-            }).then(res => {
+            let identifie = this.form.depends?.[index]?.identifie;
+            if (!identifie) { return Promise.resolve() }
+            let localUrl = '/respo/v2/info/' + identifie + '/1.0.0';
+            let officialUrl = 'https://zpk.w7.cc/zpk/respo/v2/info/' + identifie + '/1.0.0';
+            let urls = source == 'official' ? [officialUrl, localUrl] : [localUrl, officialUrl];
+            let load = (urlIndex = 0) => {
+                let url = urls[urlIndex];
+                if (!url) { return Promise.resolve() }
+                return myAxios.get(url, {
+                    headers: { cancelerror: true },
+                    dontalert: true,
+                }).then(res => {
+                    this.setSubDepends(index, res);
+                }).catch(() => load(urlIndex + 1));
+            };
+            return load();
+        },
+        setSubDepends(index, res) {
+            try {
                 let json = jsyaml.load(res?.data?.data?.manifest);
                 if (json?.platform?.depends?.length) {
                     let d = json?.platform?.depends;
@@ -1085,16 +1282,12 @@ export default {
                         this.subDependsList[index][i.identifie] = i.name;
                     })
                 }
-            })
+            } catch { }
         },
         getDependsList() {
             myAxios.get('/respo/list?limit=999').then(res => {
-                let obj = {};
                 let list = res.data?.data?.list || []
-                list?.filter(i => i.install_only_once).map(i => {
-                    obj[i.identifie] = i.name;
-                })
-                this.dependsList = obj;
+                this.mergeDependsList(this.normalizeDependList(list));
             })
         },
 
@@ -1907,6 +2100,35 @@ platform:
     box-sizing: border-box;
 }
 
+.install-depend-app-cell {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    min-width: 0;
+}
+
+.install-depend-app-main {
+    min-width: 0;
+}
+
+.install-depend-app-name,
+.install-depend-app-identifie {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.install-depend-app-name {
+    color: #333;
+}
+
+.install-depend-app-identifie {
+    margin-top: 2px;
+    color: #999;
+    font-size: 12px;
+}
+
 .install-depend-table :deep(.arco-select),
 .install-depend-table :deep(.arco-input-wrapper) {
     width: 100%;
@@ -1915,6 +2137,50 @@ platform:
 .install-depend-table td:nth-child(3),
 .install-depend-table td:last-child {
     white-space: nowrap;
+}
+
+.depend-picker-toolbar {
+    width: 320px;
+    margin-bottom: 12px;
+}
+
+.depend-picker-search-action {
+    display: inline-flex;
+    align-items: center;
+    color: #666;
+    cursor: pointer;
+}
+
+.depend-picker-table {
+    margin-top: 8px;
+}
+
+.depend-picker-product {
+    min-width: 0;
+    cursor: pointer;
+}
+
+.depend-picker-product-name,
+.depend-picker-product-identifie {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.depend-picker-product-name {
+    color: #333;
+}
+
+.depend-picker-product-identifie {
+    margin-top: 2px;
+    color: #999;
+    font-size: 12px;
+}
+
+.depend-picker-footer {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 16px;
 }
 
 .upfilebox {

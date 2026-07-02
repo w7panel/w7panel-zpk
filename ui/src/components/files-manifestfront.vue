@@ -128,11 +128,12 @@
                                         <a-alert type="info" show-icon class="zpk-primary-alert mb-20" title="提示"
                                             :closable="false">
                                             <div class="registry-alert-item">由于iframe受到了浏览器安全限制，后端地址必须支持https协议访问。</div>
-                                            <div class="registry-alert-item mt-6">由于iframe受到了浏览器安全限制，生成cookies时必须设置 SameSite: None, Secure: true，并且header设置允许 * 跨域，才能正常传递。</div>
+                                            <div class="registry-alert-item mt-6">由于iframe受到了浏览器安全限制，生成cookies时必须设置 SameSite: None, Secure: true，并且header设置允许跨域，才能正常传递。</div>
+                                            <div class="registry-alert-item mt-6">Access-Control-Allow-Origin 需要设置为具体域名，可从请求头 Origin 或 Referer 获取，不可设置为 *。</div>
                                             <div class="registry-alert-item mt-6">变量传递的请求参数只支持query方式，会将GET参数固定拼接到地址后。</div>
                                         </a-alert>
                                         <a-form-item label="地址类型" style="margin-bottom:20px;">
-                                            <a-radio-group v-model="r.type" @change="changeBackendType(r)">
+                                            <a-radio-group v-model="r.type" @change="changeBackendType(r)" :disabled="form.type === 'tradition'">
                                                 <a-radio value="internal">应用地址</a-radio>
                                                 <a-radio value="external">远程地址</a-radio>
                                             </a-radio-group>
@@ -1905,17 +1906,14 @@ export default {
                     is_default_register: 1,
                     location: 'left',
                     menu: [],
-
-                    type: 'internal',
+                    type: this.form.type === 'tradition' ? 'external' : 'internal',
                     backend_url: backend_url,
                     backend_port: this.getDefaultBackendPort(backend_url),
                     backend_path: '',
                     root_protocol: 'http://',
                     root_url: '',
-
                     proxy_request_header: [],
                     proxy_request_query: [],
-
                     frontend_props: [],
                 });
             } else if (hasrole) {
@@ -2010,6 +2008,9 @@ export default {
                 if (item.load_mode == 'iframe') {
                     let iframeBackend = this.parseIframeBackendUrl(item?.backend_config?.backend_url || '');
                     item.type = iframeBackend.type;
+                    if (this.form.type === 'tradition') {
+                        item.type = 'external';
+                    }
                     item.backend_url = iframeBackend.backend_url;
                     item.backend_path = iframeBackend.backend_path;
                     item.root_protocol = iframeBackend.root_protocol;
@@ -2017,6 +2018,9 @@ export default {
                     item.backend_port = '';
                 } else {
                     item.type = item?.backend_config?.type || 'internal';
+                    if (this.form.type === 'tradition') {
+                        item.type = 'external';
+                    }
                     item.backend_path = '';
                     if (item.type != 'internal') {
                         let externalBackend = this.parseExternalBackendUrl(item?.backend_config?.backend_url || '');

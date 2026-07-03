@@ -80,7 +80,7 @@ spec:
               topologyKey: kubernetes.io/hostname
       {{- end }}
 
-	    {{- $root := . }}
+      {{- $root := . }}
       {{- $rootCtx := $ }}
       containers:
       {{- range .Values.containers }}

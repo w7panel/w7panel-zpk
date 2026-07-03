@@ -3,6 +3,7 @@ package logic
 import (
 	"embed"
 	"fmt"
+	"path"
 	"path/filepath"
 	"strings"
 )
@@ -11,7 +12,7 @@ import (
 var helmTemplateFS embed.FS
 
 func loadHelmTemplate(name string) (string, error) {
-	content, err := helmTemplateFS.ReadFile(filepath.Join("helm_templates", name))
+	content, err := helmTemplateFS.ReadFile(path.Join("helm_templates", name))
 	if err != nil {
 		return "", fmt.Errorf("读取 Helm 模板失败 %s: %w", name, err)
 	}

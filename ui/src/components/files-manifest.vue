@@ -1241,6 +1241,7 @@ export default {
                 subname: '',
                 required: false,
                 type: 'out',
+                from: this.dependPicker.activeTab == 'official' ? 'https://zpk.w7.cc' : '',
             };
             let index = this.dependPicker.editIndex;
             if (index >= 0 && this.form.depends[index]) {

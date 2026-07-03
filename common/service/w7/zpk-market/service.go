@@ -28,12 +28,15 @@ func (s ZpkMarketService) CheckToken(token, formulaIdentify string) error {
 	}, nil)
 }
 
-func (s ZpkMarketService) UseOrder(consoleUid int32, orderSn, formulaVersion string, isUpgrade bool) error {
+func (s ZpkMarketService) UseOrder(consoleUid int32, orderSn, formulaVersion string, isUpgrade, reinstall bool, panelIdentifie, panelURL string) error {
 	return postSigned[any](s, "/zpk-market/order/use-order", map[string]interface{}{
 		"order_sn":        orderSn,
 		"formula_version": formulaVersion,
 		"is_upgrade":      isUpgrade,
+		"reinstall":       reinstall,
 		"console_uid":     consoleUid,
+		"panel_identifie": panelIdentifie,
+		"panel_url":       panelURL,
 	}, nil)
 }
 
@@ -44,7 +47,7 @@ func (s ZpkMarketService) DiscardUsedOrder(consoleUid int32, orderSn string) err
 	}, nil)
 }
 
-func (s ZpkMarketService) CheckFormulaCanInstallOrUpgrade(goodsId, consoleUid int32, orderSn string, isUpgrade bool) (bool, string, error) {
+func (s ZpkMarketService) CheckFormulaCanInstallOrUpgrade(goodsId, consoleUid int32, orderSn string, isUpgrade bool, reinstall bool) (bool, string, error) {
 	type result struct {
 		CanInstallOrUpgrade bool   `json:"can_install_or_upgrade"`
 		FormulaIdentify     string `json:"formula_identify"`
@@ -56,6 +59,7 @@ func (s ZpkMarketService) CheckFormulaCanInstallOrUpgrade(goodsId, consoleUid in
 		"console_uid": consoleUid,
 		"order_sn":    orderSn,
 		"is_upgrade":  isUpgrade,
+		"reinstall":   reinstall,
 	}, &ret)
 	if err != nil {
 		return false, "", err

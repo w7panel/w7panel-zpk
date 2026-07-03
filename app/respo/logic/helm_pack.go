@@ -1786,35 +1786,37 @@ spec:
                 echo "$1" | tr '_' '-'
               }
 
-              panel_get() {
-                curl -fsS -H "Authorizationx: Bearer $PANEL_TOKEN" "$PANEL_URL$1"
+              k8s_get() {
+                curl -fsSk \
+                  -H "Authorization: Bearer $PANEL_TOKEN" \
+                  "https://kubernetes.default.svc$1"
               }
 
-              panel_post() {
+              k8s_post() {
                 path="$1"
                 data="$2"
-                curl -fsS -X POST \
-                  -H "Authorizationx: Bearer $PANEL_TOKEN" \
+                curl -fsSk -X POST \
+                  -H "Authorization: Bearer $PANEL_TOKEN" \
                   -H "Content-Type: application/json" \
                   -d "$data" \
-                  "$PANEL_URL$path"
+                  "https://kubernetes.default.svc$path"
               }
 
-              panel_patch() {
+              k8s_patch() {
                 path="$1"
                 data="$2"
-                curl -fsS -X PATCH \
-                  -H "Authorizationx: Bearer $PANEL_TOKEN" \
+                curl -fsSk -X PATCH \
+                  -H "Authorization: Bearer $PANEL_TOKEN" \
                   -H "Content-Type: application/merge-patch+json" \
                   -d "$data" \
-                  "$PANEL_URL$path"
+                  "https://kubernetes.default.svc$path"
               }
 
-              panel_delete() {
+              k8s_delete() {
                 path="$1"
-                curl -fsS -X DELETE \
-                  -H "Authorizationx: Bearer $PANEL_TOKEN" \
-                  "$PANEL_URL$path"
+                curl -fsSk -X DELETE \
+                  -H "Authorization: Bearer $PANEL_TOKEN" \
+                  "https://kubernetes.default.svc$path"
               }
 
               cleanup_created_resources() {
@@ -1822,14 +1824,14 @@ spec:
                   return 0
                 fi
                 if [ -n "$CREATED_INGRESS_NAME" ]; then
-                  panel_delete "/k8s-proxy/apis/networking.k8s.io/v1/namespaces/default/ingresses/$CREATED_INGRESS_NAME" >/dev/null 2>&1 || true
+                  k8s_delete "/apis/networking.k8s.io/v1/namespaces/default/ingresses/$CREATED_INGRESS_NAME" >/dev/null 2>&1 || true
                 fi
                 if [ -n "$CREATED_ENV_APP" ]; then
-                  panel_delete "/k8s-proxy/apis/apps/v1/namespaces/default/deployments/$(panel_safe_name "$CREATED_ENV_APP")" >/dev/null 2>&1 || true
+                  k8s_delete "/apis/apps/v1/namespaces/default/deployments/$(panel_safe_name "$CREATED_ENV_APP")" >/dev/null 2>&1 || true
                 fi
               }
               trap cleanup_created_resources EXIT
-              panel_delete "/k8s-proxy/api/v1/namespaces/default/configmaps/$STATE_CONFIG" >/dev/null 2>&1 || true
+              k8s_delete "/api/v1/namespaces/default/configmaps/$STATE_CONFIG" >/dev/null 2>&1 || true
 
               sm_post_maybe() {
                 path="$1"
@@ -1842,7 +1844,7 @@ spec:
 
               query_deploy() {
                 deploy_name="$1"
-                panel_get "/k8s-proxy/apis/apps/v1/namespaces/default/deployments/$(panel_safe_name "$deploy_name")"
+                k8s_get "/apis/apps/v1/namespaces/default/deployments/$(panel_safe_name "$deploy_name")"
               }
 
               create_ingress_if_needed() {
@@ -1899,14 +1901,14 @@ spec:
                     }
                   }
                   | if $enableSsl == "true" then .spec.tls = [{hosts: [$domain], secretName: ($domain + "-tls-secret")}] else . end')
-                panel_post "/k8s-proxy/apis/networking.k8s.io/v1/namespaces/default/ingresses" "$ingress_json" >/dev/null
+                k8s_post "/apis/networking.k8s.io/v1/namespaces/default/ingresses" "$ingress_json" >/dev/null
                 CREATED_INGRESS_NAME="$ingress_name"
               }
 
               create_environment_app() {
                 source_deploy_json="$1"
                 safe_new_env_app=$(panel_safe_name "$NEW_ENV_K8S_APP")
-                if panel_get "/k8s-proxy/apis/apps/v1/namespaces/default/deployments/$safe_new_env_app" >/dev/null 2>&1; then
+                if k8s_get "/apis/apps/v1/namespaces/default/deployments/$safe_new_env_app" >/dev/null 2>&1; then
                   echo "environment deployment already exists, reuse: $safe_new_env_app"
                   K8S_ENV_APP_NAME="$NEW_ENV_K8S_APP"
                   CREATED_ENV_APP=""
@@ -1981,7 +1983,7 @@ spec:
                         ]
                       }
                     }')
-                panel_post "/k8s-proxy/apis/apps/v1/namespaces/default/deployments" "$new_deploy_json" >/dev/null
+                k8s_post "/apis/apps/v1/namespaces/default/deployments" "$new_deploy_json" >/dev/null
 
                 K8S_ENV_APP_NAME="$NEW_ENV_K8S_APP"
                 CREATED_ENV_APP="$NEW_ENV_K8S_APP"
@@ -2049,8 +2051,8 @@ spec:
                       domain: $domain
                     }
                   }')
-                panel_post "/k8s-proxy/api/v1/namespaces/default/configmaps" "$state_json" >/dev/null \
-                  || panel_patch "/k8s-proxy/api/v1/namespaces/default/configmaps/$STATE_CONFIG" "$state_json" >/dev/null
+                k8s_post "/api/v1/namespaces/default/configmaps" "$state_json" >/dev/null \
+                  || k8s_patch "/api/v1/namespaces/default/configmaps/$STATE_CONFIG" "$state_json" >/dev/null
               }
 
               resolve_target_env
@@ -2058,8 +2060,6 @@ spec:
               NGINX_VHOST_TEMPLATE=$(get_nginx_vhost_template)
 
               /home/rangine create:site \
-                --w7panel-domain="$PANEL_URL" \
-                --w7panel-token="$PANEL_TOKEN" \
                 --title="$ENV_TITLE" \
                 --name="$ENV_GROUP" \
                 --language="$ENV_LANGUAGE" \
@@ -2139,34 +2139,46 @@ spec:
                 echo "$1" | tr '_' '-'
               }
 
-              panel_get() {
-                curl -fsS -H "Authorizationx: Bearer $PANEL_TOKEN" "$PANEL_URL$1"
+              k8s_get() {
+                curl -fsSk \
+                  -H "Authorization: Bearer $PANEL_TOKEN" \
+                  "https://kubernetes.default.svc$1"
+              }
+
+              k8s_post() {
+                path="$1"
+                data="$2"
+                curl -fsSk -X POST \
+                  -H "Authorization: Bearer $PANEL_TOKEN" \
+                  -H "Content-Type: application/json" \
+                  -d "$data" \
+                  "https://kubernetes.default.svc$path"
+              }
+
+              k8s_patch() {
+                path="$1"
+                data="$2"
+                curl -fsSk -X PATCH \
+                  -H "Authorization: Bearer $PANEL_TOKEN" \
+                  -H "Content-Type: application/strategic-merge-patch+json" \
+                  -d "$data" \
+                  "https://kubernetes.default.svc$path"
+              }
+
+              k8s_delete() {
+                path="$1"
+                curl -fsSk -X DELETE \
+                  -H "Authorization: Bearer $PANEL_TOKEN" \
+                  "https://kubernetes.default.svc$path"
               }
 
               panel_post() {
                 path="$1"
                 data="$2"
                 curl -fsS -X POST \
-                  -H "Authorizationx: Bearer $PANEL_TOKEN" \
+                  -H "Authorization: Bearer $PANEL_TOKEN" \
                   -H "Content-Type: application/json" \
                   -d "$data" \
-                  "$PANEL_URL$path"
-              }
-
-              panel_patch() {
-                path="$1"
-                data="$2"
-                curl -fsS -X PATCH \
-                  -H "Authorizationx: Bearer $PANEL_TOKEN" \
-                  -H "Content-Type: application/strategic-merge-patch+json" \
-                  -d "$data" \
-                  "$PANEL_URL$path"
-              }
-
-              panel_delete() {
-                path="$1"
-                curl -fsS -X DELETE \
-                  -H "Authorizationx: Bearer $PANEL_TOKEN" \
                   "$PANEL_URL$path"
               }
 
@@ -2183,7 +2195,7 @@ spec:
               load_state() {
                 start_ts=$(date +%%s)
                 while true; do
-                  state_json=$(panel_get "/k8s-proxy/api/v1/namespaces/default/configmaps/$STATE_CONFIG" 2>/dev/null || true)
+                  state_json=$(k8s_get "/api/v1/namespaces/default/configmaps/$STATE_CONFIG" 2>/dev/null || true)
                   if printf '%%s' "$state_json" | jq -e '.data.target_env_deploy' >/dev/null 2>&1; then
                     printf '%%s' "$state_json"
                     return
@@ -2199,7 +2211,7 @@ spec:
 
               query_deploy() {
                 deploy_name="$1"
-                panel_get "/k8s-proxy/apis/apps/v1/namespaces/default/deployments/$(panel_safe_name "$deploy_name")"
+                k8s_get "/apis/apps/v1/namespaces/default/deployments/$(panel_safe_name "$deploy_name")"
               }
 
               log_shell() {
@@ -2212,7 +2224,7 @@ spec:
                 start_ts=$(date +%%s)
                 log_shell "wait job start: name=$safe_job_name"
                 while true; do
-                  job_json=$(panel_get "/k8s-proxy/apis/batch/v1/namespaces/default/jobs/$safe_job_name")
+                  job_json=$(k8s_get "/apis/batch/v1/namespaces/default/jobs/$safe_job_name")
                   complete=$(printf '%%s' "$job_json" | jq -r '[.status.conditions[]? | select(.type=="Complete" and .status=="True")] | length')
                   failed=$(printf '%%s' "$job_json" | jq -r '[.status.conditions[]? | select(.type=="Failed" and .status=="True")] | length')
                   if [ "$complete" != "0" ]; then
@@ -2333,7 +2345,7 @@ spec:
                       }
                     }')
 
-                panel_post "/k8s-proxy/apis/batch/v1/namespaces/default/jobs" "$job_json" >/dev/null
+                k8s_post "/apis/batch/v1/namespaces/default/jobs" "$job_json" >/dev/null
                 log_shell "create job success: type=$shell_type title=$shell_title name=$job_name"
                 wait_job "$job_name"
                 log_shell "shell job finished: type=$shell_type title=$shell_title name=$job_name"
@@ -2377,26 +2389,30 @@ spec:
                       }
                     }
                   }')
-                panel_patch "/k8s-proxy/apis/apps/v1/namespaces/default/deployments/$(panel_safe_name "$TARGET_ENV_DEPLOY")" "$patch_json" >/dev/null
+                k8s_patch "/apis/apps/v1/namespaces/default/deployments/$(panel_safe_name "$TARGET_ENV_DEPLOY")" "$patch_json" >/dev/null
               }
 
               restart_site_manager_nginx() {
-                nginx_deploy="w7-sitemanager-site-manager-nginx"
-                patch_json=$(jq -n \
-                  --arg ts "$(date -u +"%%Y-%%m-%%dT%%H:%%M:%%SZ")" \
+                selector="app.kubernetes.io%2Finstance%3Dw7-sitemanager%2Capp.kubernetes.io%2Fname%3Dsite-manager-nginx"
+                pods_json=$(k8s_get "/api/v1/namespaces/default/pods?labelSelector=$selector")
+                pod_names=$(printf '%%s' "$pods_json" | jq -c '[.items[]? | select(.status.phase == "Running") | .metadata.name]')
+                if [ "$(printf '%%s' "$pod_names" | jq 'length')" = "0" ]; then
+                  log_shell "skip nginx reload: reason=no-running-pod"
+                  return 1
+                fi
+                exec_json=$(jq -n \
+                  --arg namespace "default" \
+                  --arg containerName "site-manager-nginx" \
+                  --argjson podNames "$pod_names" \
                   '{
-                    spec: {
-                      template: {
-                        metadata: {
-                          annotations: {
-                            "kubectl.kubernetes.io/restartedAt": $ts
-                          }
-                        }
-                      }
-                    }
+                    namespace: $namespace,
+                    podNames: $podNames,
+                    containerName: $containerName,
+                    command: ["nginx", "-s", "reload"],
+                    tty: false
                   }')
-                panel_patch "/k8s-proxy/apis/apps/v1/namespaces/default/deployments/$(panel_safe_name "$nginx_deploy")" "$patch_json" >/dev/null
-                log_shell "restart deployment patched: name=$nginx_deploy"
+                panel_post "/panel-api/v1/exec-all" "$exec_json" >/dev/null
+                log_shell "nginx reload triggered: pods=$pod_names command=nginx -s reload"
               }
 
               run_shells_by_type() {
@@ -2448,7 +2464,7 @@ spec:
                 run_shells_by_type "$start_params_json" "post-upgrade" "$(printf '%%s' "$user_shells_json" | jq '[.[] | select(.type == "post-upgrade" or .type == "upgrade")]')"
               fi
               run_shells_by_type "$start_params_json" "custom" "$(printf '%%s' "$user_shells_json" | jq '[.[] | select(.type == "custom")]')"
-              panel_delete "/k8s-proxy/api/v1/namespaces/default/configmaps/$STATE_CONFIG" >/dev/null
+              k8s_delete "/api/v1/namespaces/default/configmaps/$STATE_CONFIG" >/dev/null
 `, cmdBase64, shellsBase64, startParamsEnvBase64)
 }
 

@@ -265,6 +265,7 @@ func (c Formula) Info(ctx *gin.Context) {
 		FormulaVersion: version.Name,
 		OrderSn:        params.OrderSn,
 		IsUpgrade:      params.IsUpgrade > 0,
+		Reinstall:      params.Reinstall,
 	})
 
 	responseManifest.Version = 3

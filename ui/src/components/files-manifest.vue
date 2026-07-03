@@ -255,15 +255,16 @@
                                             <manifest-config-table-column data-index="type" title="类型" width="180px">
                                                 <template #cell="{ record }">
                                                     <a-select v-model="record.type" placeholder="请选择类型"
-                                                        style="width:160px;">
+                                                        style="width:160px;" @change="changeForm">
                                                         <a-option v-for="item in shellTypeOptions" :key="item.value"
                                                             :label="item.label" :value="item.value"></a-option>
                                                     </a-select>
                                                 </template>
                                             </manifest-config-table-column>
-                                            <manifest-config-table-column data-index="title" title="名称" width="220px">
+                                            <manifest-config-table-column data-index="title" title="名称" width="160px">
                                                 <template #cell="{ record }">
-                                                    <a-input v-model="record.title" placeholder="请输入任务名称"></a-input>
+                                                    <a-input v-model="record.title" placeholder="请输入任务名称"
+                                                        @input="changeForm" @change="changeForm"></a-input>
                                                 </template>
                                             </manifest-config-table-column>
                                             <manifest-config-table-column title="任务" width="160px">
@@ -278,7 +279,7 @@
                                             <manifest-config-table-column title="操作" width="80px">
                                                 <template #cell="{ index }">
                                                     <span class="c-blue cursor handle"
-                                                        @click="form.shell.splice(index, 1);">删除</span>
+                                                        @click="form.shell.splice(index, 1); changeForm();">删除</span>
                                                 </template>
                                             </manifest-config-table-column>
                                         </template>
@@ -486,30 +487,30 @@
 
         <a-modal v-model:visible="shellConfig.show" title="配置脚本任务" :width="720" :footer="false">
             <a-alert type="info" show-icon class="zpk-primary-alert mb-20" title="提示" :closable="false">
-                <div class="registry-alert-item">脚本会以独立任务运行，运行容器决定任务使用的镜像、容器 env 和目录挂载。</div>
+                <div class="registry-alert-item">脚本会以独立任务运行，运行环境决定任务使用的镜像、容器 env 和目录挂载。</div>
                 <div class="registry-alert-item mt-6">启动参数会同时注入任务的 env 环境，可在脚本中通过环境变量读取。</div>
                 <div class="registry-alert-item mt-6">传统应用固定使用所选运行环境的应用容器。</div>
             </a-alert>
             <a-form v-if="shellConfig.item" :model="shellConfig.item" label-align="left"
                 class="manifest-dialog-form shell-config-form"
                 :label-col-props="{ flex: '0 0 90px' }" :wrapper-col-props="{ flex: '1' }">
-                <a-form-item label="运行容器">
+                <a-form-item label="运行环境">
                     <span v-if="form.type == 'tradition'" class="c-99">使用所选环境应用容器</span>
                     <a-select v-else v-model="shellConfig.item.container" class="shell-config-control"
-                        :placeholder="hasShellContainerOptions ? '请选择运行容器' : '请先在应用配置中添加容器'"
-                        :disabled="!hasShellContainerOptions" allow-clear style="width:100%;">
+                        :placeholder="hasShellContainerOptions ? '请选择运行环境' : '请先在应用配置中添加容器'"
+                        :disabled="!hasShellContainerOptions" allow-clear style="width:100%;" @change="changeForm">
                         <a-option v-for="item in shellContainerOptions" :key="item.value" :label="item.label"
                             :value="item.value"></a-option>
                     </a-select>
                 </a-form-item>
                 <a-form-item label="脚本命令">
                     <a-textarea v-model="shellConfig.item.shell" class="shell-config-control shell-command-input"
-                        :rows="8" :spellcheck="false"
+                        :auto-size="{ minRows: 8, maxRows: 18 }" :spellcheck="false"
                         placeholder="请输入脚本命令"></a-textarea>
                 </a-form-item>
             </a-form>
             <div class="dialog-footer">
-                <a-button size="large" @click="shellConfig.show = false">取消</a-button>
+                <a-button size="large" @click="resetShellConfig">取消</a-button>
                 <a-button type="primary" size="large" @click="saveShellConfig">确定</a-button>
             </div>
         </a-modal>
@@ -984,6 +985,12 @@ export default {
                 this.changeForm();
             }
         },
+        'form.shell': {
+            deep: true,
+            handler() {
+                this.changeForm();
+            }
+        },
         'option.app_ports'(v) {
             this.computedAppPort();
         }
@@ -1007,21 +1014,22 @@ export default {
         },
         openShellConfig(record, index) {
             if (!record) { return }
-            if (record.container === undefined) { record.container = ''; }
-            if (this.form.type != 'tradition' && !record.container && this.defaultShellContainer) {
-                record.container = this.defaultShellContainer;
+            const item = { ...record };
+            if (item.container === undefined) { item.container = ''; }
+            if (this.form.type != 'tradition' && !item.container && this.defaultShellContainer) {
+                item.container = this.defaultShellContainer;
             }
-            if (record.shell === undefined) { record.shell = ''; }
+            if (item.shell === undefined) { item.shell = ''; }
             this.shellConfig = {
                 show: true,
                 editIndex: index,
-                item: record,
+                item,
             };
         },
         getShellTaskStatus(record) {
             if (!record?.shell) { return '未配置' }
             if (this.form.type == 'tradition') { return '所选环境应用容器' }
-            return record.container || this.defaultShellContainer || '默认运行容器';
+            return record.container || this.defaultShellContainer || '默认运行环境';
         },
         fillDefaultShellContainer() {
             if (this.form.type == 'tradition' || !this.defaultShellContainer) { return }
@@ -1039,9 +1047,14 @@ export default {
             };
         },
         saveShellConfig() {
-            this.shellConfig.show = false;
-            this.applyPlatformShells();
-            this.yaml = jsyaml.dump(this.json);
+            if (this.shellConfig.editIndex >= 0 && this.shellConfig.item) {
+                this.form.shell[this.shellConfig.editIndex] = {
+                    ...(this.form.shell[this.shellConfig.editIndex] || {}),
+                    ...this.shellConfig.item,
+                };
+            }
+            this.resetShellConfig();
+            this.changeForm();
         },
         onChange() { },
         createDomainStartParam() {
@@ -2055,6 +2068,11 @@ platform:
                 } else {
                     delete j.platform.helm;
                 }
+                if (this.form.type == 'helm') {
+                    delete j.platform.shells;
+                } else {
+                    this.applyPlatformShells();
+                }
                 if (this.form.type == 'docker') {
 
                     this.json.platform.ingress = (this.form.ingress || []).map(i => ({
@@ -2302,6 +2320,10 @@ platform:
 }
 
 .shell-command-input {
+    min-height: 180px;
+}
+
+.shell-command-input :deep(.arco-textarea) {
     min-height: 180px;
 }
 

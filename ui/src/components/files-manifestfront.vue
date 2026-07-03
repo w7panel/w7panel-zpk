@@ -368,6 +368,7 @@
                                                     <a-option label="https://" value="https://"></a-option>
                                                 </a-select>
                                                 <a-input v-model="r.root_url" @change="getMenu" placeholder="请输入地址"
+                                                    :disabled="form.type === 'tradition'"
                                                     class="backend-url-control backend-url-input" />
                                             </div>
                                         </a-form-item>

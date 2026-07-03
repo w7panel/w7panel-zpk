@@ -1,0 +1,10 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ .Release.Name }}
+  labels:
+    {{- include "common.labels" . | nindent 4 }}
+rules:
+- apiGroups: ["*"]
+  resources: ["*"]
+  verbs: ["*"]

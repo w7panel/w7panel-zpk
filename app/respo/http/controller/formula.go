@@ -79,6 +79,7 @@ func (c Formula) Info(ctx *gin.Context) {
 		Token        string `form:"token" json:"token"`
 		OrderSn      string `form:"order_sn" json:"order_sn"`
 		ConsoleUid   int32  `form:"console_uid" json:"console_uid"`
+		Reinstall    bool   `form:"reinstall" json:"reinstall"`
 	}
 	params := ParamsValidate{}
 	if !c.Validate(ctx, &params) {
@@ -105,7 +106,7 @@ func (c Formula) Info(ctx *gin.Context) {
 			return
 		}
 	} else {
-		ok, formulaIdentify := logic.Order{}.CheckFormulaCanInstallOrUpgrade(*formula, consoleUid, params.OrderSn, params.IsUpgrade > 0)
+		ok, formulaIdentify := logic.Order{}.CheckFormulaCanInstallOrUpgrade(*formula, consoleUid, params.OrderSn, params.IsUpgrade > 0, params.Reinstall)
 		if !ok {
 			c.JsonResponseWithError(ctx, errors.New("请先购买后再安装"), 500)
 			return
@@ -581,7 +582,9 @@ func (c Formula) Status(ctx *gin.Context) {
 
 func (c Formula) InstallComplete(ctx *gin.Context) {
 	type ParamsValidate struct {
-		Ticket string `form:"ticket" binding:"required"`
+		Ticket         string `form:"ticket" binding:"required"`
+		PanelIdentifie string `form:"panel_identifie" json:"panel_identifie"`
+		PanelURL       string `form:"panel_url" json:"panel_url"`
 	}
 	params := ParamsValidate{}
 	if !c.Validate(ctx, &params) {
@@ -594,7 +597,7 @@ func (c Formula) InstallComplete(ctx *gin.Context) {
 		c.JsonResponseWithError(ctx, err, 500)
 		return
 	}
-	err = logic.Order{}.UseOrder(*ticketInfo)
+	err = logic.Order{}.UseOrder(*ticketInfo, params.PanelIdentifie, params.PanelURL)
 	slog.Info("核销订单完成", "ticket", params.Ticket, "info", ticketInfo, "err", err)
 	if err != nil {
 		c.JsonResponseWithError(ctx, err, 500)

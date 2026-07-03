@@ -1049,6 +1049,7 @@ export default {
             let findIndex = this.form.depends?.findIndex(i => i.identifie == item.identifie && i.name == item.name)
             if (findIndex != -1) {
                 this.form.depends[findIndex].temporary = true;
+                this.form.depends[findIndex].from = 'https://zpk.w7.cc';
             } else {
                 this.form.depends.push({
                     identifie: item.identifie,
@@ -1057,6 +1058,7 @@ export default {
                     required: true,
                     type: 'out',
                     temporary: true,
+                    from: 'https://zpk.w7.cc',
                 })
             }
 

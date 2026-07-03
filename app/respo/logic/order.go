@@ -19,11 +19,11 @@ func (l Order) DiscardUsedOrder(ticketInfo TicketInfo) error {
 	return w7.ZpkMarketSdk.DiscardUsedOrder(ticketInfo.ConsoleUid, ticketInfo.OrderSn)
 }
 
-func (l Order) UseOrder(ticketInfo TicketInfo, panelIdentifie, panelURL string) error {
+func (l Order) UseOrder(ticketInfo TicketInfo, panelDeviceSN, panelURL string) error {
 	if ticketInfo.ConsoleUid <= 0 || ticketInfo.OrderSn == "" {
 		return nil
 	}
-	return w7.ZpkMarketSdk.UseOrder(ticketInfo.ConsoleUid, ticketInfo.OrderSn, ticketInfo.FormulaVersion, ticketInfo.IsUpgrade, ticketInfo.Reinstall, panelIdentifie, panelURL)
+	return w7.ZpkMarketSdk.UseOrder(ticketInfo.ConsoleUid, ticketInfo.OrderSn, ticketInfo.FormulaVersion, ticketInfo.IsUpgrade, ticketInfo.Reinstall, panelDeviceSN, panelURL)
 }
 
 func (l Order) CheckFormulaCanInstallOrUpgrade(formula Formula, consoleUid int32, orderSn string, isUpgrade bool, reinstall bool) (bool, string) {

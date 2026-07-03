@@ -28,14 +28,14 @@ func (s ZpkMarketService) CheckToken(token, formulaIdentify string) error {
 	}, nil)
 }
 
-func (s ZpkMarketService) UseOrder(consoleUid int32, orderSn, formulaVersion string, isUpgrade, reinstall bool, panelIdentifie, panelURL string) error {
+func (s ZpkMarketService) UseOrder(consoleUid int32, orderSn, formulaVersion string, isUpgrade, reinstall bool, panelDeviceSN, panelURL string) error {
 	return postSigned[any](s, "/zpk-market/order/use-order", map[string]interface{}{
 		"order_sn":        orderSn,
 		"formula_version": formulaVersion,
 		"is_upgrade":      isUpgrade,
 		"reinstall":       reinstall,
 		"console_uid":     consoleUid,
-		"panel_identifie": panelIdentifie,
+		"panel_device_sn": panelDeviceSN,
 		"panel_url":       panelURL,
 	}, nil)
 }

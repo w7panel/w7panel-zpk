@@ -583,9 +583,9 @@ func (c Formula) Status(ctx *gin.Context) {
 
 func (c Formula) InstallComplete(ctx *gin.Context) {
 	type ParamsValidate struct {
-		Ticket         string `form:"ticket" binding:"required"`
-		PanelIdentifie string `form:"panel_identifie" json:"panel_identifie"`
-		PanelURL       string `form:"panel_url" json:"panel_url"`
+		Ticket        string `form:"ticket" binding:"required"`
+		PanelDeviceSN string `form:"panel_device_sn" json:"panel_device_sn"`
+		PanelURL      string `form:"panel_url" json:"panel_url"`
 	}
 	params := ParamsValidate{}
 	if !c.Validate(ctx, &params) {
@@ -598,7 +598,7 @@ func (c Formula) InstallComplete(ctx *gin.Context) {
 		c.JsonResponseWithError(ctx, err, 500)
 		return
 	}
-	err = logic.Order{}.UseOrder(*ticketInfo, params.PanelIdentifie, params.PanelURL)
+	err = logic.Order{}.UseOrder(*ticketInfo, params.PanelDeviceSN, params.PanelURL)
 	slog.Info("核销订单完成", "ticket", params.Ticket, "info", ticketInfo, "err", err)
 	if err != nil {
 		c.JsonResponseWithError(ctx, err, 500)

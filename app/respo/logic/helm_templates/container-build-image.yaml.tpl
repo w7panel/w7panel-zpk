@@ -6,7 +6,7 @@
     {{- end }}
   {{- end }}
   {{- if $hasJobs }}
-	{{- $root := . }}
+    {{- $root := . }}
     {{/* 渲染所有 Job */}}
     {{- range $container := .Values.containers }}
       {{- range $job := $container.buildImageJobs }}

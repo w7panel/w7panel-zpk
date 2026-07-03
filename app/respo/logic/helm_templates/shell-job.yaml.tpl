@@ -1,6 +1,6 @@
 {{- if gt (len .Values.jobs) 0 }}
-	{{- $root := . }}
-    {{- range $job := .Values.jobs }}
+  {{- $root := . }}
+  {{- range $job := .Values.jobs }}
 ---
 apiVersion: batch/v1
 kind: Job
@@ -11,11 +11,11 @@ metadata:
     group: {{ $root.Release.Name }}
     w7.cc/job-source: appgroup
   annotations:
-	{{- if ne $job.type "custom" }}
+  {{- if ne $job.type "custom" }}
     helm.sh/hook: {{ $job.type }}
     helm.sh/hook-weight: "{{ $job.weight }}"
     helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
-	{{- else }}
+  {{- else }}
     w7.cc/custom-hook: 'true'
     {{- end }}
 spec:

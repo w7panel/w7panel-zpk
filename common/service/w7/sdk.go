@@ -48,8 +48,10 @@ func InitW7Sdk(config *viper.Viper) {
 		attachBaseUrl = "http://api.w7.cc"
 	}
 	W7CloudAttach = &cloudapi.Attach{
-		HttpClient: w7.NewClient(config.GetString("zpk.appid"), config.GetString("zpk.secret")).GetHttpClient(),
-		BaseUrl:    attachBaseUrl,
+		HttpClient: w7.NewClient(config.GetString("zpk.appid"), config.GetString("zpk.secret"), w7.Option{
+			ApiUrl: "http://api.w7.cc",
+		}).GetHttpClient(),
+		BaseUrl: attachBaseUrl,
 	}
 
 	ZpkMarketSdk = &zpk_market.ZpkMarketService{

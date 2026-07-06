@@ -55,7 +55,7 @@ func (s Base) ConvertRequestSignByJson(params map[string]string, targetServerUrl
 	client := &http.Client{
 		Timeout: 30 * time.Second,
 	}
-	req, err := http.NewRequest("POST", "https://api.w7.cc/util/app/convert-sign-with-json-body", paramsReader)
+	req, err := http.NewRequest("POST", "http://api.w7.cc/util/app/convert-sign-with-json-body", paramsReader)
 	if err != nil {
 		return nil, err
 	}
@@ -109,7 +109,7 @@ func (s Base) ConvertRequestSign(params map[string]string, targetServerUrl strin
 	client := &http.Client{
 		Timeout: 30 * time.Second,
 	}
-	req, err := http.NewRequest("POST", "https://api.w7.cc/util/app/convert-sign", paramsReader)
+	req, err := http.NewRequest("POST", "http://api.w7.cc/util/app/convert-sign", paramsReader)
 	if err != nil {
 		return nil, err
 	}

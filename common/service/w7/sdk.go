@@ -43,9 +43,9 @@ func InitW7Sdk(config *viper.Viper) {
 		},
 	}
 
-	attachBaseUrl := "https://ds.api.w7.cc"
+	attachBaseUrl := "http://ds.api.w7.cc"
 	if base.DefaultUserAgent == "we7test-develop" {
-		attachBaseUrl = "https://api.w7.cc"
+		attachBaseUrl = "http://api.w7.cc"
 	}
 	W7CloudAttach = &cloudapi.Attach{
 		HttpClient: w7.NewClient(config.GetString("zpk.appid"), config.GetString("zpk.secret")).GetHttpClient(),

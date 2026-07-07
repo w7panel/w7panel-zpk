@@ -50,6 +50,18 @@ setting:
   secret: ${COMMON_SECRET-rogtdpxguk}
   db_dir: ${SQLITE_DIR-/tmp/respo}
   state_file: ${SQLITE_DIR}db_switch_state.json
+system:
+  oidc:
+    base_url: ${SYSTEM_OIDC_BASE_URL-http://w7panel-offline-agent.default.svc.cluster.local}
+    issuer: ${SYSTEM_OIDC_ISSUER-}
+    client_id: ${SYSTEM_OIDC_CLIENT_ID-default}
+    client_secret: ${SYSTEM_OIDC_CLIENT_SECRET-}
+    redirect_uri: ${SYSTEM_OIDC_REDIRECT_URI-}
+    scope: ${SYSTEM_OIDC_SCOPE-openid profile}
+    token_endpoint_auth_method: ${SYSTEM_OIDC_TOKEN_AUTH_METHOD-none}
+    success_redirect: ${SYSTEM_OIDC_SUCCESS_REDIRECT-/}
+    auto_create_user: ${SYSTEM_OIDC_AUTO_CREATE_USER-true}
+    default_role: ${SYSTEM_OIDC_DEFAULT_ROLE-user}
   depot:
     external_domain: ${REGISTRY_EXTERNAL_DOMAIN-172.16.1.161:8000}
     default_icon_path: ${USER_DEFAULT_PATH-/home/icon.png}

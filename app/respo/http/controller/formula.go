@@ -100,27 +100,39 @@ func (c Formula) Info(ctx *gin.Context) {
 	canUpgradeVersion := ""
 	formulaExpire := false
 	targetFormulaIdentify := ""
-	if params.Token != "" {
-		if err := w7.ZpkMarketSdk.CheckToken(params.Token, formula.Name); err != nil {
-			c.JsonResponseWithServerError(ctx, err)
-			return
-		}
-	} else {
-		ok, formulaIdentify := logic.Order{}.CheckFormulaCanInstallOrUpgrade(*formula, consoleUid, params.OrderSn, params.IsUpgrade > 0, params.Reinstall)
-		if !ok {
-			c.JsonResponseWithError(ctx, errors.New("请先购买后再安装"), 500)
-			return
-		}
-		canUpgradeVersion, formulaExpire, formulaIdentify, err = logic.Order{}.GetFormulaCanUpgradeVersion(*formula, consoleUid, params.OrderSn)
-		slog.Info("formula can upgrade version", "formula", formula.Name, "consoleUid", consoleUid, "version", canUpgradeVersion, "formulaIdentify", formulaIdentify, "err", err)
-		if err != nil {
-			c.JsonResponseWithError(ctx, err, 500)
-			return
-		}
-		if formulaIdentify != "" && formulaIdentify != formula.Name {
-			targetFormulaIdentify = formulaIdentify
+
+	user := logic2.User{}.GetUser(ctx)
+	isAdminUser := false
+	userId := int32(0)
+	if user != nil {
+		isAdminUser = logic2.User{}.IsAdminUser(user)
+		userId = user.ID
+	}
+	//临时处理， 后续通过 apppid 查创始人 console_uid 来判断
+	if userId != formula.UserId && !isAdminUser {
+		if params.Token != "" {
+			if err := w7.ZpkMarketSdk.CheckToken(params.Token, formula.Name); err != nil {
+				c.JsonResponseWithServerError(ctx, err)
+				return
+			}
+		} else {
+			ok, formulaIdentify := logic.Order{}.CheckFormulaCanInstallOrUpgrade(*formula, consoleUid, params.OrderSn, params.IsUpgrade > 0, params.Reinstall)
+			if !ok {
+				c.JsonResponseWithError(ctx, errors.New("请先购买后再安装"), 500)
+				return
+			}
+			canUpgradeVersion, formulaExpire, formulaIdentify, err = logic.Order{}.GetFormulaCanUpgradeVersion(*formula, consoleUid, params.OrderSn)
+			slog.Info("formula can upgrade version", "formula", formula.Name, "consoleUid", consoleUid, "version", canUpgradeVersion, "formulaIdentify", formulaIdentify, "err", err)
+			if err != nil {
+				c.JsonResponseWithError(ctx, err, 500)
+				return
+			}
+			if formulaIdentify != "" && formulaIdentify != formula.Name {
+				targetFormulaIdentify = formulaIdentify
+			}
 		}
 	}
+
 	if targetFormulaIdentify != "" {
 		slog.Info("switch formula by order formula identify", "from", formula.Name, "to", targetFormulaIdentify, "orderSn", params.OrderSn)
 		formula, err = depotLogin.GetFormula(targetFormulaIdentify, params.Version, nil)

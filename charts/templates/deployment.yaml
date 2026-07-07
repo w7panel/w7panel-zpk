@@ -4,6 +4,7 @@ metadata:
   name: {{ include "zpk.fullname" . }}
   labels:
     {{- include "zpk.labels" . | nindent 4 }}
+    w7.cc/group-name: {{ .Release.Name }}
   annotations:
     title: 制品库
     w7.cc.app/title: 制品库

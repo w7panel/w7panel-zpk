@@ -164,7 +164,8 @@ spec:
                       labels: {
                         "higress.io/resource-definer": "higress",
                         "app": "w7-sitemanager-site-manager-nginx",
-                        "group": "w7-sitemanager"
+                        "group": "w7-sitemanager",
+                        "w7.cc/group-names": "{{ .Release.Name }}"
                       }
                     },
                     spec: {

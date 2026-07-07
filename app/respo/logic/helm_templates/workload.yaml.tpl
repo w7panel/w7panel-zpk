@@ -4,6 +4,7 @@ metadata:
   name: {{ include "common.fullname" . }}
   labels:
     {{- include "common.labels" . | nindent 4 }}
+    w7.cc/group-name: {{ .Release.Name }}
   annotations:
     title: {{ .Values.app.title | quote }}
     w7.cc.app/title: {{ .Values.app.title | quote }}

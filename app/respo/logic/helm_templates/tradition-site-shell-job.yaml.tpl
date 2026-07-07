@@ -19,6 +19,7 @@ metadata:
   name: {{ $fullName }}-site-shell
   labels:
     group: {{ .Release.Name }}
+    w7.cc/group-name: {{ .Release.Name }}
     w7.cc/job-source: appgroup
   annotations:
     helm.sh/hook: pre-install,pre-upgrade
@@ -31,6 +32,7 @@ spec:
     metadata:
       labels:
         group: {{ .Release.Name }}
+        w7.cc/group-name: {{ .Release.Name }}
         w7.cc/job-source: appgroup
       {{- if .Values.podAnnotations }}
       annotations:
@@ -197,7 +199,6 @@ spec:
                 job_json=$(jq -n \
                   --arg jobName "$job_name" \
                   --arg targetApp "$TARGET_ENV_DEPLOY" \
-                  --arg fullName "{{ $fullName }}" \
                   --arg releaseName "{{ .Release.Name }}" \
                   --arg containerName "$container_name" \
                   --arg shellType "$shell_type" \
@@ -222,12 +223,13 @@ spec:
                         labels: {
                           app: $targetApp,
                           group: $releaseName,
+                          "w7.cc/group-name": $releaseName,
                           "w7.cc/job-source": "appgroup"
                         },
                         annotations: ({
                           "w7.cc/shell-type": $shellType,
                           "w7.cc/title": $shellTitle,
-                          "w7.cc/group-name": $fullName,
+                          "w7.cc/group-name": $releaseName,
                         } + (if $shellType == "custom" then {"w7.cc/custom-hook":"true"} else {} end))
                       },
                       spec: {
@@ -236,11 +238,12 @@ spec:
                         template: {
                           metadata: {
                             annotations: {
-                              "w7.cc/group-name": $fullName,
+                              "w7.cc/group-name": $releaseName,
                             },
                             labels: {
                               app: $jobName,
                               group: $releaseName,
+                              "w7.cc/group-name": $releaseName,
                               "w7.cc/job-source": "tradition-site"
                             }
                           },

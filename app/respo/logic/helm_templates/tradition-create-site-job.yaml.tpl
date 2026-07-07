@@ -19,6 +19,7 @@ metadata:
   name: {{ $fullName }}-create-register-site
   labels:
     group: {{ .Release.Name }}
+    w7.cc/group-name: {{ .Release.Name }}
     w7.cc/job-source: appgroup
   annotations:
     helm.sh/hook: pre-install,pre-upgrade
@@ -31,6 +32,7 @@ spec:
     metadata:
       labels:
         group: {{ .Release.Name }}
+        w7.cc/group-name: {{ .Release.Name }}
         w7.cc/job-source: appgroup
       {{- if .Values.podAnnotations }}
       annotations:
@@ -165,6 +167,7 @@ spec:
                         "higress.io/resource-definer": "higress",
                         "app": "w7-sitemanager-site-manager-nginx",
                         "group": "w7-sitemanager",
+                        "w7.cc/group-name": "w7-sitemanager",
                         "w7.cc/group-names": "{{ .Release.Name }}"
                       }
                     },
@@ -233,7 +236,7 @@ spec:
                 new_deploy_json=$(printf '%s' "$source_deploy_json" | jq \
                   --arg newName "$NEW_ENV_K8S_APP" \
                   --arg version "$ENV_VERSION" \
-                  --arg fullName "{{ $fullName }}" \
+                  --arg releaseName "{{ .Release.Name }}" \
                   --arg namespace "$NAMESPACE" \
                   '
                   del(.metadata.resourceVersion, .metadata.uid, .metadata.creationTimestamp, .metadata.managedFields, .metadata.ownerReferences, .status)
@@ -244,7 +247,8 @@ spec:
                   | .metadata.labels = (.metadata.labels // {})
                   | .metadata.annotations["w7.cc/create-svc"] = "true"
                   | .metadata.annotations["title"] = $newName
-                  | .metadata.annotations["w7.cc/parent-group-name"] = $fullName
+                  | .metadata.annotations["w7.cc/parent-group-name"] = $releaseName
+                  | .metadata.labels["w7.cc/parent-group-name"] = $releaseName
                   | .metadata.labels["app"] = $newName
                   | .spec.selector.matchLabels = (.spec.selector.matchLabels // {})
                   | .spec.selector.matchLabels["app"] = $newName

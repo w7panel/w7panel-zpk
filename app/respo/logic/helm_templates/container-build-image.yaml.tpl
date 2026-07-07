@@ -18,6 +18,7 @@ metadata:
   labels:
     {{- include "common.labels" $root | nindent 4 }}
     group: {{ $root.Release.Name }}
+    w7.cc/group-name: {{ $root.Release.Name }}
     w7.cc/job-source: appgroup
 spec:
   parallelism: 1
@@ -28,6 +29,7 @@ spec:
     metadata:
       labels:
         group: {{ $root.Release.Name }}
+        w7.cc/group-name: {{ $root.Release.Name }}
         w7.cc/job-source: appgroup
       {{- if $root.Values.podAnnotations }}
       annotations:

@@ -9,6 +9,7 @@ metadata:
   labels:
     {{- include "common.labels" $root | nindent 4 }}
     group: {{ $root.Release.Name }}
+    w7.cc/group-name: {{ $root.Release.Name }}
     w7.cc/job-source: appgroup
   annotations:
   {{- if ne $job.type "custom" }}
@@ -25,6 +26,7 @@ spec:
     metadata:
       labels:
         group: {{ $root.Release.Name }}
+        w7.cc/group-name: {{ $root.Release.Name }}
         w7.cc/job-source: appgroup
       annotations:
       {{- if $root.Values.podAnnotations }}

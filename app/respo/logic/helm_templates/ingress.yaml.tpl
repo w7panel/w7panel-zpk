@@ -21,6 +21,7 @@ metadata:
   labels:
     {{- include "common.labels" . | nindent 4 }}
     group: {{ $releaseName }}
+    w7.cc/group-name: {{ $releaseName }}
     __PARENT_INGRESS_LABEL__
   annotations:
   {{- with .Values.ingress.__INGRESS_NAME__.annotations }}

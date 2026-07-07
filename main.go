@@ -74,7 +74,9 @@ func main() {
 	}
 	dao.SetDefault(db)
 
-	w7.InitW7Sdk(app.GetConfig())
+	if err := w7.InitW7Sdk(app.GetConfig()); err != nil {
+		panic(err)
+	}
 
 	// 注册业务 provider，此模块中需要使用 http server 和 console
 	new(respo.Provider).Register(httpServer, app.GetConsole())

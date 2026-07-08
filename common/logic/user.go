@@ -47,7 +47,7 @@ func (l User) GetByUsername(username string) (*entity.RegistryUser, error) {
 	return dao.Q.RegistryUser.Where(dao.RegistryUser.Username.Eq(username)).First()
 }
 
-func (l User) GetOrCreatePanelUser(userId string, username string, userRole string, autoCreate bool) (*entity.RegistryUser, error) {
+func (l User) GetOrCreatePanelUser(userId string, username string, userRole string) (*entity.RegistryUser, error) {
 	unlock := lockPanelUserCreation(username)
 	defer unlock()
 
@@ -56,7 +56,7 @@ func (l User) GetOrCreatePanelUser(userId string, username string, userRole stri
 	if w7panelUser != nil {
 		user, _ = dao.Q.RegistryUser.Where(dao.Q.RegistryUser.ID.Eq(w7panelUser.UserUID)).First()
 	}
-	if user == nil && autoCreate {
+	if user == nil {
 		err := dao.Q.Transaction(func(tx *dao.Query) error {
 			user = &entity.RegistryUser{
 				Username: "w7" + username,

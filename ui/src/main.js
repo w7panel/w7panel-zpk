@@ -20,9 +20,9 @@ if (window.__POWERED_BY_WUJIE__) {
 window.hljs = hljs;
 
 if (process.env.NODE_ENV === 'development') {
-	const devPanelToken = process.env.VUE_APP_PANEL_TOKEN || process.env.VUE_APP_TOKEN;
-	if (devPanelToken) {
-		localStorage.setItem('X-W7Panel-Token', devPanelToken);
+	const devZpkToken = process.env.VUE_APP_ZPK_TOKEN || process.env.VUE_APP_TOKEN;
+	if (devZpkToken) {
+		localStorage.setItem('X-Zpk-Token', devZpkToken);
 	}
 }
 

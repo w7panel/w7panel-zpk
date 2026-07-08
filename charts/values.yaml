@@ -92,6 +92,9 @@ global:
   zpk:
     storageSize: "1Gi"
     storageClaimName: "w7-zpkv2-v2"
+  oidc:
+    enabled: true
+    baseURL: "http://w7panel-offline-agent.default.svc.cluster.local"
 
   DOMAIN:
   WEBHOOK_TOKEN: qW3eR9t

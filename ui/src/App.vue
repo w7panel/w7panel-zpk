@@ -6,6 +6,7 @@
 
 <script>
 import myAxios from "./utils";
+import { getWujieAccessToken, setZpkToken } from "./utils/panel-token";
 export default {
 	data() {
 		return { userInfo: {} }
@@ -15,11 +16,20 @@ export default {
 			this.$router.push(path)
 		});
 
+		await this.loginWithWujieAccessToken()
 		await this.getUserInfo()
 	},
 	methods: {
+		async loginWithWujieAccessToken() {
+			const accessToken = getWujieAccessToken()
+			if (!accessToken) {
+				return
+			}
+			const res = await myAxios.post("/system/oidc/login", { access_token: accessToken })
+			setZpkToken(res.data?.data?.token)
+		},
 		getUserInfo() {
-			myAxios.get("/v2/api/user/cur-user/info").then(res => {
+			return myAxios.get("/v2/api/user/cur-user/info").then(res => {
 				this.userInfo = res.data?.data?.user || {}
 			});
 		}

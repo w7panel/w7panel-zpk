@@ -1,8 +1,14 @@
-export function getPanelToken() {
-    const wujieToken = window?.$wujie?.props?.paneltoken || '';
-    if (wujieToken) {
-        return wujieToken;
-    }
+export function getWujieAccessToken() {
+    return window?.$wujie?.props?.accesstoken || window?.wujie?.props?.accesstoken || '';
+}
 
-    return localStorage.getItem('X-W7Panel-Token') || '';
+export function getZpkToken() {
+    return localStorage.getItem('X-Zpk-Token') || '';
+}
+
+export function setZpkToken(token) {
+    if (!token) {
+        return;
+    }
+    localStorage.setItem('X-Zpk-Token', token);
 }

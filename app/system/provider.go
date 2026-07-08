@@ -14,12 +14,11 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 	httpServer.RegisterRouters(func(engine *gin.Engine) {
 		root := engine.Group("/zpk")
 
-		cors := root.Group("/", middleware.Cors{}.Process)
+		cors := root.Group("/", middleware.Cors{}.Process, middleware.Auth{}.Process)
 		oidc := cors.Group("/system/oidc", middleware.Cors{}.Process, middleware.DenyDomainReq{}.Process)
-		oidc.Match([]string{"GET", "OPTIONS"}, "/login", controller.OIDC{}.Login)
-		oidc.Match([]string{"GET", "OPTIONS"}, "/callback", controller.OIDC{}.Callback)
+		oidc.Match([]string{"POST", "OPTIONS"}, "/w7panel/login", controller.OIDC{}.LoginFromW7panel)
 
-		group := cors.Group("/system", middleware.Cors{}.Process, middleware.DenyDomainReq{}.Process, middleware.W7PanelUser{}.Process, middleware.AdminUser{}.Process)
+		group := cors.Group("/system", middleware.Cors{}.Process, middleware.DenyDomainReq{}.Process, middleware.Auth{}.Process, middleware.AdminUser{}.Process)
 
 		group.Match([]string{"GET", "OPTIONS"}, "/util/db/switch/status", controller.DBSwitch{}.Status)
 		group.Match([]string{"POST", "OPTIONS"}, "/util/db/switch/mysql/test", controller.DBSwitch{}.TestMySQL)
@@ -28,7 +27,7 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 		group.Match([]string{"POST", "OPTIONS"}, "/util/registry/storage/s3/test", controller.RegistryStorage{}.TestS3Connection)
 		group.Match([]string{"POST", "OPTIONS"}, "/util/registry/storage/config/update", controller.RegistryStorage{}.UpdateConfig)
 
-		systemApi := root.Group("/v2/api", middleware.Cors{}.Process, middleware.DenyDomainReq{}.Process, middleware.W7PanelUser{}.Process)
+		systemApi := root.Group("/v2/api", middleware.Cors{}.Process, middleware.DenyDomainReq{}.Process, middleware.Auth{}.Process)
 		systemApi.POST("/user/add", middleware.AdminUser{}.Process, controller.UserManager{}.Create)
 		systemApi.POST("/user/info", middleware.AdminUser{}.Process, controller.UserManager{}.Info)
 		systemApi.POST("/user/list", middleware.AdminUser{}.Process, controller.UserManager{}.List)

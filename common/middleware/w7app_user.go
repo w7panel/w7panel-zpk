@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	"github.com/gin-gonic/gin"
+	"github.com/w7panel/w7panel-zpk/common/logic"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/middleware"
 )
 
@@ -19,7 +20,7 @@ func (m W7AppUser) Process(ctx *gin.Context) {
 		return
 	}
 
-	user, err := getOrCreateUser("0", appid, founderRole, true)
+	user, err := logic.User{}.GetOrCreatePanelUser("0", appid, logic.UserRoleFounder)
 	if err != nil {
 		m.JsonResponseWithServerError(ctx, err)
 		ctx.Abort()

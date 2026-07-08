@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/spf13/viper"
+	opencloud "github.com/w7corp/sdk-open-cloud-go"
 	w7 "github.com/w7corp/sdk-open-cloud-go"
 	"github.com/w7panel/w7panel-zpk/common/service/w7/base"
 	"github.com/w7panel/w7panel-zpk/common/service/w7/cloudapi"
@@ -22,6 +23,7 @@ var DevCenterGoodsSdk *devcenter.GoodsService
 var W7CloudAttach *cloudapi.Attach
 var IpGoodsSdk *ip.GoodsService
 var ZpkMarketSdk *zpk_market.ZpkMarketService
+var OpenCloudSdk *opencloud.Client
 
 type appCredential struct {
 	Appid  string
@@ -78,6 +80,11 @@ func InitW7Sdk(config *viper.Viper) error {
 			Secret:  credential.Secret,
 		},
 	}
+
+	OpenCloudSdk = opencloud.NewClient(credential.Appid, credential.Secret, w7.Option{
+		ApiUrl: "http://api.w7.cc",
+	})
+
 	return nil
 }
 

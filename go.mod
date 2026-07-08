@@ -12,7 +12,6 @@ require (
 	github.com/gabriel-vasile/mimetype v1.4.3
 	github.com/gin-contrib/sessions v1.0.1
 	github.com/gin-gonic/gin v1.10.0
-	github.com/coreos/go-oidc/v3 v3.19.0
 	github.com/go-resty/resty/v2 v2.16.5
 	github.com/go-sql-driver/mysql v1.8.1
 	github.com/google/uuid v1.6.0
@@ -26,7 +25,6 @@ require (
 	github.com/w7corp/sdk-open-cloud-go v1.0.8
 	github.com/we7coreteam/w7-rangine-go/v2 v2.0.10
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.61.0
-	golang.org/x/oauth2 v0.36.0
 	golang.org/x/sync v0.19.0
 	gorm.io/driver/mysql v1.5.6
 	gorm.io/gen v0.3.26
@@ -173,6 +171,7 @@ require (
 	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56 // indirect
 	golang.org/x/mod v0.32.0 // indirect
 	golang.org/x/net v0.49.0 // indirect
+	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/sys v0.40.0 // indirect
 	golang.org/x/term v0.39.0 // indirect
 	golang.org/x/text v0.34.0 // indirect

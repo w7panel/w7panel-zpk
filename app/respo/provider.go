@@ -93,7 +93,7 @@ func (provider *Provider) Register(httpServer *http_server.Server, console conso
 			})
 		})
 
-		cors := root.Group("/", middleware.Cors{}.Process, middleware.Auth{}.Process)
+		cors := root.Group("/", middleware.Cors{}.Process)
 
 		group := cors.Group("/respo", middleware.Cors{}.Process)
 		group.Match([]string{"POST", "OPTIONS"}, "/add", middleware.DenyDomainReq{}.Process, middleware.Auth{}.Process, controller.Formula{}.Add)

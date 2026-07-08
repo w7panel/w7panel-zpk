@@ -2,7 +2,6 @@ package controller
 
 import (
 	"errors"
-	"log/slog"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -27,7 +26,6 @@ func (c OIDC) LoginFromW7panel(ctx *gin.Context) {
 	oidcLogic := systemlogic.OIDC{}
 
 	info, err := oidcLogic.UserInfo(ctx.Request.Context(), params.AccessToken)
-	slog.Info("oidc accesstoken login", "token", params.AccessToken, "info", info, "err", err)
 	if err != nil {
 		c.JsonResponseWithServerError(ctx, err)
 		return

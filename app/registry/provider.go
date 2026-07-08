@@ -30,7 +30,7 @@ func (p Provider) registerRoutes(httpServer *httpserver.Server) {
 		root.Any("/registry/auth", controller.Auth{}.Auth)
 		root.Any("/registry/webhook", controller.WebHook{}.Hook)
 
-		api := root.Group("/api", middleware.Cors{}.Process, middleware.Auth{}.Process, middleware.DenyDomainReq{}.Process, middleware.Auth{}.Process)
+		api := root.Group("/api", middleware.Cors{}.Process, middleware.DenyDomainReq{}.Process, middleware.Auth{}.Process)
 		api.POST("/permission/namespace/set", middleware.AdminUser{}.Process, controller.Permission{}.SetNamespacePermission)
 		api.POST("/permission/namespace/get", middleware.AdminUser{}.Process, controller.Permission{}.GetNamespacePermission)
 

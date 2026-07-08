@@ -14,7 +14,7 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 	httpServer.RegisterRouters(func(engine *gin.Engine) {
 		root := engine.Group("/zpk")
 
-		cors := root.Group("/", middleware.Cors{}.Process, middleware.Auth{}.Process)
+		cors := root.Group("/", middleware.Cors{}.Process)
 		oidc := cors.Group("/system/oidc", middleware.Cors{}.Process, middleware.DenyDomainReq{}.Process)
 		oidc.Match([]string{"POST", "OPTIONS"}, "/w7panel/login", controller.OIDC{}.LoginFromW7panel)
 

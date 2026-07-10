@@ -9,6 +9,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -40,15 +41,13 @@ func (OIDC) UserInfo(ctx context.Context, accessToken string) (*UserInfo, error)
 	}
 
 	endpoint := baseURL + oidcUserInfoPath
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	form := url.Values{}
+	form.Set("access_token", accessToken)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, strings.NewReader(form.Encode()))
 	if err != nil {
 		return nil, err
 	}
-	authorization := accessToken
-	if !strings.HasPrefix(strings.ToLower(authorization), "bearer ") {
-		authorization = "Bearer " + authorization
-	}
-	req.Header.Set("Authorization", authorization)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Accept", "application/json")
 
 	oidcHTTPClient := &http.Client{Timeout: 10 * time.Second}

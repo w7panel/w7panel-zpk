@@ -5,14 +5,21 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	ranginesession "github.com/we7coreteam/w7-rangine-go/v2/src/http/session"
+	"golang.org/x/sync/singleflight"
 )
 
 const ZpkTokenHeader = "X-Zpk-Token"
+
+const sessionRefreshAtKey = "zpk_session_refresh_at"
+const defaultSessionRefreshIntervalSeconds = 300
+
+var sessionRefreshGroup singleflight.Group
 
 type Session struct {
 	Logic
@@ -33,15 +40,6 @@ func (l Session) SaveUserInfo(ctx *gin.Context, user UserSession) (string, error
 		return "", errors.New("session token is empty")
 	}
 	return token, nil
-}
-
-func (l Session) RefreshExpire(ctx *gin.Context) (string, error) {
-	curSession := sessions.Default(ctx)
-	curSession.Options(ranginesession.BuildOptions(facade.GetConfig()))
-	if err := curSession.Save(); err != nil {
-		return "", err
-	}
-	return l.responseSessionToken(ctx), nil
 }
 
 func (l Session) GetUserInfo(ctx *gin.Context, token string) (*UserSession, error) {
@@ -71,8 +69,44 @@ func (l Session) writeUserSession(ctx *gin.Context, user UserSession) error {
 
 	curSession := sessions.Default(ctx)
 	curSession.Set("user", string(content))
+	curSession.Set(sessionRefreshAtKey, time.Now().Unix())
 
 	return curSession.Save()
+}
+
+func (l Session) RefreshExpire(ctx *gin.Context) (string, error) {
+	curSession := sessions.Default(ctx)
+	now := time.Now().Unix()
+	if lastRefreshAt := sessionRefreshAt(curSession.Get(sessionRefreshAtKey)); now-lastRefreshAt < defaultSessionRefreshIntervalSeconds {
+		return "", nil
+	}
+
+	result, err, _ := sessionRefreshGroup.Do("session:"+curSession.ID(), func() (interface{}, error) {
+		now := time.Now().Unix()
+		if lastRefreshAt := sessionRefreshAt(curSession.Get(sessionRefreshAtKey)); now-lastRefreshAt < defaultSessionRefreshIntervalSeconds {
+			return "", nil
+		}
+
+		curSession.Set(sessionRefreshAtKey, now)
+		curSession.Options(ranginesession.BuildOptions(facade.GetConfig()))
+		if err := curSession.Save(); err != nil {
+			return "", err
+		}
+		return l.responseSessionToken(ctx), nil
+	})
+	if err != nil {
+		return "", err
+	}
+	nextToken, _ := result.(string)
+	return nextToken, nil
+}
+
+func sessionRefreshAt(value interface{}) int64 {
+	v, ok := value.(int64)
+	if !ok {
+		return 0
+	}
+	return v
 }
 
 func (l Session) responseSessionToken(ctx *gin.Context) string {

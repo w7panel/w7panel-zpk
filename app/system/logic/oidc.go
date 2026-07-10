@@ -31,9 +31,9 @@ type UserInfo struct {
 }
 
 func (OIDC) UserInfo(ctx context.Context, accessToken string) (*UserInfo, error) {
-	baseURL := strings.TrimRight(strings.TrimSpace(facade.GetConfig().GetString("system.oidc.base_url")), "/")
+	baseURL := strings.TrimRight(strings.TrimSpace(facade.GetConfig().GetString("setting.oidc.base_url")), "/")
 	if baseURL == "" {
-		return nil, errors.New("system.oidc.base_url is required")
+		return nil, errors.New("setting.oidc.base_url is required")
 	}
 	accessToken = strings.TrimSpace(accessToken)
 	if accessToken == "" {

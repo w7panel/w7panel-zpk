@@ -52,7 +52,6 @@ setting:
   secret: ${COMMON_SECRET-rogtdpxguk}
   db_dir: ${SQLITE_DIR-/tmp/respo}
   state_file: ${SQLITE_DIR}db_switch_state.json
-system:
   oidc:
     base_url: ${SYSTEM_OIDC_BASE_URL-http://w7panel-offline-agent.default.svc.cluster.local}
   depot:

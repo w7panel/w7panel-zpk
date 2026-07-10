@@ -1,6 +1,6 @@
 import axios from "axios";
 import { alert, message } from './ui-feedback';
-import { getZpkToken } from './panel-token';
+import { getZpkToken, setZpkToken } from './panel-token';
 import { getZpkBaseURL } from './request-base';
 
 const myAxios = axios.create({
@@ -16,6 +16,7 @@ myAxios.interceptors.request.use(config => {
 })
 
 myAxios.interceptors.response.use(res => {
+    setZpkToken(res.headers?.['x-zpk-token']);
     if (res.status >= 200 && res.status < 300 && res) {
         return Promise.resolve(res)
     }

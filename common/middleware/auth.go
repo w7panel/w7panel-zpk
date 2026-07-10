@@ -45,10 +45,14 @@ func (m Auth) Process(ctx *gin.Context) {
 		return
 	}
 
-	if err := (logic.Session{}).RefreshExpire(ctx); err != nil {
+	nextToken, err := (logic.Session{}).RefreshExpire(ctx)
+	if err != nil {
 		m.JsonResponseWithServerError(ctx, err)
 		ctx.Abort()
 		return
+	}
+	if nextToken != "" {
+		ctx.Header(logic.ZpkTokenHeader, nextToken)
 	}
 
 	ctx.Set("console_uid", sessionUser.ConsoleUid)

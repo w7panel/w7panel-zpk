@@ -35,10 +35,13 @@ func (l Session) SaveUserInfo(ctx *gin.Context, user UserSession) (string, error
 	return token, nil
 }
 
-func (l Session) RefreshExpire(ctx *gin.Context) error {
+func (l Session) RefreshExpire(ctx *gin.Context) (string, error) {
 	curSession := sessions.Default(ctx)
 	curSession.Options(ranginesession.BuildOptions(facade.GetConfig()))
-	return curSession.Save()
+	if err := curSession.Save(); err != nil {
+		return "", err
+	}
+	return l.responseSessionToken(ctx), nil
 }
 
 func (l Session) GetUserInfo(ctx *gin.Context, token string) (*UserSession, error) {

@@ -1,6 +1,6 @@
 import axios from "axios";
 import { alert, message } from './ui-feedback';
-import { getZpkToken, setZpkToken } from './panel-token';
+import {getPanelToken, getZpkToken, setZpkToken} from './panel-token';
 import { getZpkBaseURL } from './request-base';
 
 const myAxios = axios.create({
@@ -10,6 +10,7 @@ const myAxios = axios.create({
 
 myAxios.interceptors.request.use(config => {
     config.headers['X-Zpk-Token'] = getZpkToken();
+    config.headers['X-W7Panel-Token'] = getPanelToken();
     return config
 }, err => {
     Promise.reject(err)

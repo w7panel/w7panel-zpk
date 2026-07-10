@@ -2,6 +2,7 @@ package controller
 
 import (
 	"errors"
+	"log/slog"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -23,9 +24,19 @@ func (c OIDC) LoginFromW7panel(ctx *gin.Context) {
 		return
 	}
 
+	slog.InfoContext(ctx.Request.Context(), "oidc login started",
+		"client_ip", ctx.ClientIP(),
+		"path", ctx.FullPath(),
+	)
+
 	oidcLogic := systemlogic.OIDC{}
 
 	info, err := oidcLogic.UserInfo(ctx.Request.Context(), params.AccessToken)
+	slog.ErrorContext(ctx.Request.Context(), "oidc userinfo",
+		"client_ip", ctx.ClientIP(),
+		"user", info,
+		"err", err,
+	)
 	if err != nil {
 		c.JsonResponseWithServerError(ctx, err)
 		return
@@ -36,6 +47,13 @@ func (c OIDC) LoginFromW7panel(ctx *gin.Context) {
 	}
 
 	user, err := commonlogic.User{}.GetOrCreatePanelUser(info.Subject, info.Username, info.Role)
+	slog.WarnContext(ctx.Request.Context(), "oidc panel user",
+		"subject", info.Subject,
+		"username", info.Username,
+		"role", info.Role,
+		"user", user,
+		"err", err,
+	)
 	if err != nil {
 		c.JsonResponseWithServerError(ctx, err)
 		return

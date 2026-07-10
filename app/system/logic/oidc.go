@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -38,7 +39,8 @@ func (OIDC) UserInfo(ctx context.Context, accessToken string) (*UserInfo, error)
 		return nil, errors.New("access_token is required")
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, baseURL+oidcUserInfoPath, nil)
+	endpoint := baseURL + oidcUserInfoPath
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +71,17 @@ func (OIDC) UserInfo(ctx context.Context, accessToken string) (*UserInfo, error)
 	if err := decoder.Decode(&claims); err != nil {
 		return nil, err
 	}
-	return userInfoFromClaims(claims)
+	info, err := userInfoFromClaims(claims)
+	slog.InfoContext(ctx, "oidc userinfo request completed",
+		"endpoint", endpoint,
+		"status_code", resp.StatusCode,
+		"info", info,
+		"claims", claims,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return info, nil
 }
 
 func userInfoFromClaims(claims map[string]interface{}) (*UserInfo, error) {

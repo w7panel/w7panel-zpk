@@ -25,7 +25,7 @@ export default {
 			if (!accessToken) {
 				return
 			}
-			const res = await myAxios.post("/system/oidc/w7panel/login", { access_token: accessToken })
+			const res = await myAxios.post("/oidc/w7panel/login", { access_token: accessToken })
 			setZpkToken(res.data?.data?.token)
 		},
 		getUserInfo() {

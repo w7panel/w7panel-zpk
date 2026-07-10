@@ -1,5 +1,5 @@
 export function getWujieAccessToken() {
-    return window?.$wujie?.props?.accesstoken || window?.wujie?.props?.accesstoken || '';
+    return window?.$wujie?.props?.access_token || window?.wujie?.props?.access_token || '';
 }
 
 export function getZpkToken() {

@@ -45,6 +45,12 @@ func (m Auth) Process(ctx *gin.Context) {
 		return
 	}
 
+	if err := (logic.Session{}).RefreshExpire(ctx); err != nil {
+		m.JsonResponseWithServerError(ctx, err)
+		ctx.Abort()
+		return
+	}
+
 	ctx.Set("console_uid", sessionUser.ConsoleUid)
 	ctx.Set("user", user)
 	ctx.Next()

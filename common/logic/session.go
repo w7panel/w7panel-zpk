@@ -9,6 +9,7 @@ import (
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
+	ranginesession "github.com/we7coreteam/w7-rangine-go/v2/src/http/session"
 )
 
 const ZpkTokenHeader = "X-Zpk-Token"
@@ -32,6 +33,12 @@ func (l Session) SaveUserInfo(ctx *gin.Context, user UserSession) (string, error
 		return "", errors.New("session token is empty")
 	}
 	return token, nil
+}
+
+func (l Session) RefreshExpire(ctx *gin.Context) error {
+	curSession := sessions.Default(ctx)
+	curSession.Options(ranginesession.BuildOptions(facade.GetConfig()))
+	return curSession.Save()
 }
 
 func (l Session) GetUserInfo(ctx *gin.Context, token string) (*UserSession, error) {

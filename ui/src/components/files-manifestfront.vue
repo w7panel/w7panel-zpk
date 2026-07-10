@@ -1118,13 +1118,15 @@ export default {
         },
         systemBuiltinVarOptions() {
             return [
+                { value: 'system.url' },
+                { value: 'system.group' },
                 { value: 'system.userid' },
-                { value: 'system.openid' },
-                { value: 'system.nickname' },
                 { value: 'system.role' },
                 { value: 'system.access_token' },
-                { value: 'system.group' },
-                { value: 'system.url' },
+                { value: 'system.openid' },
+                { value: 'system.nickname' },
+                { value: 'system.cloud_uid' },
+                { value: 'system.cloud_accesstoken' },
             ].map(item => ({
                 ...item,
                 key: item.value.replace(/^system\./, ''),
@@ -1393,7 +1395,9 @@ export default {
         },
         changeLoadMode(role) {
             if (role.load_mode == 'iframe') {
-                role.type = role.type || 'internal';
+                if (!role.type || (role.type == 'external' && !this.normalizeHttpsExternalUrl(role.root_url))) {
+                    role.type = 'internal';
+                }
                 this.syncIframeBackendDefaults(role);
             } else {
                 if (this.form.type != 'tradition' && role.type == 'internal' && role.backend_url == this.getIframeDomainPlaceholder()) {
@@ -1459,8 +1463,17 @@ export default {
             return changed;
         },
         parseIframeBackendUrl(url) {
-            let value = String(url || '');
+            let value = String(url || '').trim();
             let placeholder = this.getIframeDomainPlaceholder();
+            if (!value) {
+                return {
+                    type: 'internal',
+                    backend_url: placeholder,
+                    backend_path: '',
+                    root_protocol: 'https://',
+                    root_url: '',
+                };
+            }
             if (value.includes(placeholder)) {
                 let path = value.slice(value.indexOf(placeholder) + placeholder.length).replace(/^\/+/, '');
                 return {

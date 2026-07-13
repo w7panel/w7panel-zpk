@@ -53,7 +53,7 @@ setting:
   db_dir: ${SQLITE_DIR-/tmp/respo}
   state_file: ${SQLITE_DIR}db_switch_state.json
   oidc:
-    base_url: ${SYSTEM_OIDC_BASE_URL-http://w7panel-offline-agent.default.svc.cluster.local}
+    base_url: ${SYSTEM_OIDC_BASE_URL-http://w7panel-offline-agent.default.svc.cluster.local:8000}
   depot:
     external_domain: ${REGISTRY_EXTERNAL_DOMAIN-172.16.1.161:8000}
     default_icon_path: ${USER_DEFAULT_PATH-/home/icon.png}

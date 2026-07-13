@@ -8,7 +8,7 @@ image:
   repository: zpk.w7.cc/public/zpk
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: v2.6.18
+  tag: v2.6.19
 
 imagePullSecrets: []
 nameOverride: ""
@@ -94,7 +94,7 @@ global:
     storageClaimName: "w7-zpkv2-v2"
   oidc:
     enabled: true
-    baseURL: "http://w7panel-offline-agent.default.svc.cluster.local"
+    baseURL: "http://w7panel-offline-agent.default.svc.cluster.local:8000"
 
   DOMAIN:
   WEBHOOK_TOKEN: qW3eR9t

@@ -56,7 +56,7 @@ spec:
           serverUrl: "http://{{ $backendFullName }}.{{ $releaseNamespace }}.svc.cluster.local:{{ default $defaultPort .backend_port }}"
           {{- end }}
           {{- else if eq .type "external" }}
-          serverUrl: {{ .backend_url }}
+          serverUrl: {{ tpl .backend_url $ | quote }}
           {{- end }}
           load_mode: {{ .load_mode }}
           proxy_request: 

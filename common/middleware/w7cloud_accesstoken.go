@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"errors"
+	"log/slog"
 
 	"github.com/gin-gonic/gin"
 	"github.com/w7panel/w7panel-zpk/common/service/w7"
@@ -20,6 +21,7 @@ func (m CloudAccessToken) Process(ctx *gin.Context) {
 	}
 
 	userInfo, errResult := w7.OpenCloudSdk.OauthService.GetUserInfo(cloudAccessToken)
+	slog.Info("auth with cloudAccessToken", "token", cloudAccessToken, "userInfo", userInfo, "err", errResult)
 	if errResult.IsError() {
 		m.JsonResponseWithServerError(ctx, errResult.ToError())
 		ctx.Abort()

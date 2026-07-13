@@ -51,6 +51,7 @@ spec:
 
               PANEL_URL="{{ .Values.global.panel.innerUrl }}"
               PANEL_TOKEN="{{ .Values.global.panel.panelRealToken }}"
+              PANEL_ACCESSTOKEN="{{ .Values.global.panel.panelAccessToken }}"
               NAMESPACE="{{ .Release.Namespace }}"
               SITE_MANAGER_NAMESPACE="{{ default .Release.Namespace .Values.global.siteManagerNamespace }}"
               SITE_MANAGER_URL="http://w7-sitemanager-site-manager.$SITE_MANAGER_NAMESPACE.svc.cluster.local:8000"
@@ -357,6 +358,7 @@ spec:
               NGINX_VHOST_TEMPLATE=$(get_nginx_vhost_template)
 
               /home/rangine create:site \
+                --token="$PANEL_ACCESSTOKEN" \
                 --title="$ENV_TITLE" \
                 --name="$ENV_GROUP" \
                 --language="$ENV_LANGUAGE" \

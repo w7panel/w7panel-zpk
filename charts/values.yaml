@@ -94,7 +94,7 @@ global:
     storageClaimName: "w7-zpkv2-v2"
   oidc:
     enabled: true
-    baseURL: "http://w7panel-offline-agent.default.svc.cluster.local:8000"
+    baseURL: "http://w7panel-offline.default.svc.cluster.local:8000"
 
   DOMAIN:
   WEBHOOK_TOKEN: qW3eR9t

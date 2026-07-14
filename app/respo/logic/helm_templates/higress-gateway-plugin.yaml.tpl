@@ -15,6 +15,7 @@ metadata:
     w7.cc/plugin-microapp: {{ .Release.Name | quote }}
     {{ end }}
   labels:
+    w7.cc/group-name: {{ .Release.Name }}
     higress.io/wasm-plugin-name: "__APPLICATION_IDENTIFY__"
     higress.io/wasm-plugin-version: "__APPLICATION_VERSION__"
 spec:

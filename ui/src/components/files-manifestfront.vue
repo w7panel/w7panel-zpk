@@ -94,7 +94,7 @@
                                         </div>
                                         <div v-else-if="r.support === 'thirdparty_cd'" class="df ai-c">
                                             <span class="lh-1 mr-20">{{ r.title }}</span>
-                                            <a-checkbox :model-value="r.load_mode === 'iframe'"
+                                            <a-checkbox v-if="form.type !== 'gateway-plugin'" :model-value="r.load_mode === 'iframe'"
                                                 @change="v => { r.load_mode = v ? 'iframe' : 'static_hosting'; changeLoadMode(r); }">
                                                 <span class="c-66">支持iframe</span></a-checkbox>
                                         </div>
@@ -104,7 +104,7 @@
                                                 <span class="lh-1">{{ r.title }}</span>
                                                 <icon-edit v-if="r.support != 'thirdparty_cd'" class="role-edit-icon" />
                                             </div>
-                                            <a-checkbox :model-value="r.load_mode === 'iframe'"
+                                            <a-checkbox v-if="form.type !== 'gateway-plugin'" :model-value="r.load_mode === 'iframe'"
                                                 @change="v => { r.load_mode = v ? 'iframe' : 'static_hosting'; changeLoadMode(r); }"><span
                                                     class="c-66">支持iframe</span></a-checkbox>
                                         </div>
@@ -123,7 +123,91 @@
                                 </div>
 
                                 <div class="greybox manifest-front-config">
-                                    <template v-if="r.load_mode === 'iframe'">
+                                    <template v-if="form.type === 'gateway-plugin'">
+                                        <div class="greybox-title">插件配置页面</div>
+                                        <a-alert type="info" show-icon class="zpk-primary-alert" title="提示"
+                                            :closable="false">
+                                            <div class="registry-alert-item">网关插件前端用于编辑插件配置，不需要填写接口地址。</div>
+                                            <div class="registry-alert-item mt-6">通过 window.$wujie.props.pluginConfig 获取当前配置，通过 window.$wujie.props.savePluginConfig(config, enabled) 保存配置。</div>
+                                            <div class="registry-alert-item mt-6">configScope 仅标识 global 或 rule；具体网关资源和规则目标由上层网关适配器定位，插件前端只处理当前配置并调用保存回调。</div>
+                                        </a-alert>
+                                        <manifest-config-table :rows="r.frontend_props"
+                                            table-class="manifest-param-table frontend-param-table mt-20"
+                                            add-text="添加前端配置" always-show @add="addParamRow(r.frontend_props)">
+                                            <template #title>
+                                                <div class="df ai-c">
+                                                    前端配置
+                                                    <a-tooltip position="tl"
+                                                        content="配置会通过 window.$wujie.props.frontend_props 和同名顶层属性传递给插件前端">
+                                                        <ArcoIcon name="icon-41" :size="16" />
+                                                    </a-tooltip>
+                                                </div>
+                                            </template>
+                                            <template #columns>
+                                                <manifest-config-table-column data-index="key" title="key">
+                                                    <template #cell="{ record }">
+                                                        <a-input v-model="record.key" placeholder="key"
+                                                            @change="getMenu"
+                                                            style="width:200px;margin-right:10px;"></a-input>
+                                                    </template>
+                                                </manifest-config-table-column>
+                                                <manifest-config-table-column data-index="value" title="value">
+                                                    <template #cell="{ record }">
+                                                        <div class="param-value-field">
+                                                            <a-input v-model="record.value" placeholder="value"
+                                                                @change="changeConfigValue(record)">
+                                                                <template #suffix>
+                                                                    <a-popover trigger="click" position="bottom"
+                                                                        :content-style="{ width: '360px' }">
+                                                                        <span class="config-value-suffix">选择系统配置</span>
+                                                                        <template #content>
+                                                                            <div class="var-picker">
+                                                                                <template v-for="group in variableGroups"
+                                                                                    :key="group.title">
+                                                                                    <div class="var-picker-title">{{ group.title }}</div>
+                                                                                    <div v-if="group.options.length">
+                                                                                        <div v-for="param in group.options"
+                                                                                            :key="param.value"
+                                                                                            class="var-picker-item"
+                                                                                            @click="selectConfigVariable(record, param)">
+                                                                                            <div class="var-picker-name">
+                                                                                                {{ param.key || param.value }}
+                                                                                                <span>{{ param.displayValue }}</span>
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                    <div v-else class="var-picker-empty">暂无可选配置</div>
+                                                                                </template>
+                                                                            </div>
+                                                                        </template>
+                                                                    </a-popover>
+                                                                </template>
+                                                            </a-input>
+                                                        </div>
+                                                    </template>
+                                                </manifest-config-table-column>
+                                                <manifest-config-table-column title="描述">
+                                                    <template #cell="{ record }">{{ getConfigVariableLabel(record) }}</template>
+                                                </manifest-config-table-column>
+                                                <manifest-config-table-column title="操作">
+                                                    <template #cell="{ index }">
+                                                        <span class="c-blue cursor handle"
+                                                            @click="removeParamRow(r.frontend_props, index)">删除</span>
+                                                    </template>
+                                                </manifest-config-table-column>
+                                            </template>
+                                            <template #prepend>
+                                                <tr v-for="item in frontendDefaultProps" :key="item.value"
+                                                    class="frontend-default-prop-row">
+                                                    <td>{{ item.key }}</td>
+                                                    <td>{{ item.value }}</td>
+                                                    <td>{{ item.description }}</td>
+                                                    <td></td>
+                                                </tr>
+                                            </template>
+                                        </manifest-config-table>
+                                    </template>
+                                    <template v-else-if="r.load_mode === 'iframe'">
                                         <div class="greybox-title">iframe配置</div>
                                         <a-alert type="info" show-icon class="zpk-primary-alert mb-20" title="提示"
                                             :closable="false">
@@ -1749,6 +1833,9 @@ export default {
                 cdRole[role.name] = false;
             });
             this.form.role.filter(r => r.support == 'thirdparty_cd').forEach(r => {
+                if (this.form.type === 'gateway-plugin') {
+                    r.load_mode = 'static_hosting';
+                }
 
                 if (r.type == 'external') {
                     try {
@@ -1781,7 +1868,12 @@ export default {
                 let proxy_request_query = this.serializeParamEntries(r.proxy_request_query);
                 let frontend_props = this.serializeParamEntries(r.frontend_props);
 
-                if (r.load_mode == 'iframe') {
+                if (this.form.type === 'gateway-plugin') {
+                    itemObj.backend_config = {
+                        type: 'external',
+                        frontend_props: frontend_props,
+                    };
+                } else if (r.load_mode == 'iframe') {
                     this.syncIframeBackendDefaults(r);
                     itemObj.backend_config = {
                         type: r.type,

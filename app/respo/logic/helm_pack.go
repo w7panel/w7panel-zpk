@@ -139,7 +139,18 @@ func (hc *HelmPack) PackToHelm() error {
 	if hc.Manifest.Application.Type == logic2.Tradition_App {
 		traditionSiteName = buildTraditionSiteName(hc.Manifest.Platform.Tradition)
 	}
-	if hc.Manifest.Platform.Helm.ChartName != "" || hc.Manifest.Platform.Helm.Repository != "" || (hc.Manifest.Platform.Helm.DependYamls != nil && len(hc.Manifest.Platform.Helm.DependYamls) > 0) {
+	if hc.Manifest.Application.Type == logic2.GatewayPluginApp {
+		renderer, err := getGatewayPluginRenderer(hc.Manifest.Platform.GatewayPlugin)
+		if err != nil {
+			return err
+		}
+		if err := hc.generateGatewayPluginValuesYaml(helmDir, renderer); err != nil {
+			return err
+		}
+		if err := hc.generateGatewayPluginTemplate(templatesDir, renderer); err != nil {
+			return err
+		}
+	} else if hc.Manifest.Platform.Helm.ChartName != "" || hc.Manifest.Platform.Helm.Repository != "" || (hc.Manifest.Platform.Helm.DependYamls != nil && len(hc.Manifest.Platform.Helm.DependYamls) > 0) {
 		err := hc.processHelmPkg(helmDir)
 		if err != nil {
 			return err
@@ -197,8 +208,10 @@ func (hc *HelmPack) PackToHelm() error {
 		if err := hc.generateMicroAppTemplate(templatesDir, hc.Manifest); err != nil {
 			return err
 		}
-		if err := hc.generateRegisterSiteJobTemplate(templatesDir, hc.Manifest); err != nil {
-			return err
+		if hc.Manifest.Application.Type != logic2.GatewayPluginApp {
+			if err := hc.generateRegisterSiteJobTemplate(templatesDir, hc.Manifest); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -1100,6 +1113,46 @@ func (hc *HelmPack) generateRegisterSiteJobTemplate(rootDir string, manifest log
 	siteTemplate = strings.ReplaceAll(siteTemplate, "__APPLICATION_IDENTIFIER__", manifest.Application.Identifie)
 
 	return writeFile(siteFilePath, siteTemplate)
+}
+
+func (hc *HelmPack) generateGatewayPluginValuesYaml(rootDir string, renderer gatewayPluginRenderer) error {
+	plugin := hc.Manifest.Platform.GatewayPlugin.Normalize()
+	defaultConfig := plugin.DefaultConfig
+	if defaultConfig == nil {
+		defaultConfig = make(map[string]interface{})
+	}
+	appName := hc.Manifest.Application.Name
+	if appName == "" {
+		appName = hc.Manifest.Application.Identifie
+	}
+	values := map[string]interface{}{
+		"app": map[string]interface{}{
+			"title":    appName,
+			"identify": hc.Manifest.Application.Identifie,
+		},
+		"gatewayPlugin": map[string]interface{}{
+			"supportGlobal": plugin.IsSupportGlobal(),
+			"supportRule":   plugin.Supports.Rule,
+			"defaultConfig": defaultConfig,
+			"configSchema":  plugin.ConfigSchema,
+			"hasFrontend":   strings.TrimSpace(hc.Manifest.Web.Url) != "",
+			"runtime":       renderer.RuntimeValues(plugin),
+		},
+	}
+	return writeYAMLFile(filepath.Join(rootDir, "values.yaml"), values)
+}
+
+func (hc *HelmPack) generateGatewayPluginTemplate(rootDir string, renderer gatewayPluginRenderer) error {
+	template, err := loadHelmTemplate(renderer.TemplateName())
+	if err != nil {
+		return err
+	}
+	template = renderHelmTemplatePlaceholders(template, map[string]string{
+		"__APPLICATION_DESCRIPTION__": strconv.Quote(hc.Manifest.Application.Description),
+		"__APPLICATION_IDENTIFY__":    hc.Manifest.Application.Identifie,
+		"__APPLICATION_VERSION__":     hc.Manifest.Application.Version,
+	})
+	return writeFile(filepath.Join(rootDir, renderer.OutputName()), template)
 }
 
 func (hc *HelmPack) generateMicroAppTemplate(rootDir string, manifest logic2.Manifest) error {

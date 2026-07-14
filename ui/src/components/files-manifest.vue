@@ -43,7 +43,62 @@
                                         <a-radio value="docker">原生应用</a-radio>
                                         <a-radio value="tradition">传统应用</a-radio>
                                         <a-radio value="helm">K8sYaml</a-radio>
+                                        <a-radio value="gateway-plugin">网关插件</a-radio>
                                     </a-radio-group>
+
+                                    <div v-if="form.type == 'gateway-plugin'" class="greybox mt-20"
+                                        style="margin-bottom:0;">
+                                        <div class="greybox-title">网关插件配置</div>
+                                        <a-form-item label="运行时驱动" field="gatewayPluginDriver"
+                                            style="margin-bottom:18px;">
+                                            <a-select v-model="form.gatewayPluginDriver" style="width:240px;"
+                                                @change="changeForm">
+                                                <a-option value="higress-wasm/v1">Higress Wasm</a-option>
+                                            </a-select>
+                                        </a-form-item>
+                                        <a-form-item label="镜像地址" field="gatewayPluginUrl"
+                                            style="margin-bottom:18px;">
+                                            <a-input v-model="form.gatewayPluginUrl" size="large" style="width:500px;"
+                                                placeholder="oci://... 或 http(s)://..." @change="changeForm" />
+                                        </a-form-item>
+                                        <a-form-item label="执行阶段" field="gatewayPluginPhase"
+                                            style="margin-bottom:18px;">
+                                            <a-select v-model="form.gatewayPluginPhase" style="width:240px;"
+                                                @change="changeForm">
+                                                <a-option value="UNSPECIFIED_PHASE">默认阶段</a-option>
+                                                <a-option value="AUTHN">认证阶段</a-option>
+                                                <a-option value="AUTHZ">鉴权阶段</a-option>
+                                                <a-option value="STATS">统计阶段</a-option>
+                                            </a-select>
+                                        </a-form-item>
+                                        <a-form-item label="优先级" field="gatewayPluginPriority"
+                                            style="margin-bottom:18px;">
+                                            <div class="df df-c">
+                                                <a-input-number v-model="form.gatewayPluginPriority" :min="0" :max="1000"
+                                                    style="width:240px;" @change="changeForm" />
+                                                <span class="c-99 mt-6">同一执行阶段按优先级降序执行，数值越大越先执行；默认值为 0。</span>
+                                            </div>
+                                        </a-form-item>
+                                        <a-form-item label="支持范围" style="margin-bottom:18px;">
+                                            <div class="df df-c">
+                                                <div>
+                                                    <a-checkbox v-model="form.gatewayPluginSupportGlobal"
+                                                        @change="changeForm">支持全局配置</a-checkbox>
+                                                    <a-checkbox v-model="form.gatewayPluginSupportRule" class="ml-20"
+                                                        @change="changeForm">支持规则配置</a-checkbox>
+                                                </div>
+                                                <span class="c-99 mt-6">全局配置默认开启；规则配置会显示在应用域名管理的“更多”中。</span>
+                                            </div>
+                                        </a-form-item>
+                                        <a-form-item label="默认配置" style="margin-bottom:0;">
+                                            <div class="df df-c">
+                                                <a-textarea v-model="form.gatewayPluginDefaultConfig" :rows="8"
+                                                    :spellcheck="false" placeholder="请输入 YAML 配置，默认为 {}"
+                                                    style="width:500px;" @change="changeForm" />
+                                                <span class="c-99 mt-6">安装后写入 WasmPlugin 的全局默认配置，字段由插件自身定义，请以插件文档为准。</span>
+                                            </div>
+                                        </a-form-item>
+                                    </div>
 
                                     <a-form-item v-if="form.type == 'helm'" class="mt-20" style="margin-bottom:10px;"
                                         label="启用helm配置">
@@ -187,7 +242,7 @@
                             </a-form-item>
 
                             <a-form-item
-                                v-if="!option || !option.pureManifest && form.type != 'docker' && form.type != 'light' && form.type != 'helm'"
+                                v-if="form.type != 'gateway-plugin' && (!option || !option.pureManifest && form.type != 'docker' && form.type != 'light' && form.type != 'helm')"
                                 label="代码包">
                                 <div class="df ai-e">
                                     <files-upload @success="uploadSuccess" @testDockerfile="v => zip.hasDockerfile = v">
@@ -245,7 +300,7 @@
                                 </div>
                             </a-form-item>
 
-                            <a-form-item v-if="form.type != 'helm' && form.type != 'light'"
+                            <a-form-item v-if="form.type != 'helm' && form.type != 'light' && form.type != 'gateway-plugin'"
                                 label="脚本配置" field="shell" class="mt-16">
                                 <div style="flex:1;">
                                     <manifest-config-table :rows="form.shell" add-text="添加脚本"
@@ -291,7 +346,7 @@
                         </div>
                     </div>
 
-                    <div v-if="form.type != 'helm' && form.type != 'tradition'" class="bg-white com-line mt-20">
+                    <div v-if="form.type != 'helm' && form.type != 'tradition' && form.type != 'gateway-plugin'" class="bg-white com-line mt-20">
                         <div class="mt-16">
 
                             <a-form-item label="应用配置">
@@ -314,7 +369,7 @@
                     </div>
 
                     <div class="bg-white com-line mt-20">
-                        <a-form-item class="mt-16" label="启动参数" field="startParams">
+                        <a-form-item v-if="form.type != 'gateway-plugin'" class="mt-16" label="启动参数" field="startParams">
                             <div class="manifest-field-stack">
                                 <div class="start-param-head">
                                     <div class="start-param-services">
@@ -645,6 +700,13 @@ export default {
                 author: "",
                 description: "",
                 identifie: "",
+                gatewayPluginDriver: 'higress-wasm/v1',
+                gatewayPluginUrl: '',
+                gatewayPluginPhase: 'UNSPECIFIED_PHASE',
+                gatewayPluginPriority: 0,
+                gatewayPluginSupportGlobal: true,
+                gatewayPluginSupportRule: false,
+                gatewayPluginDefaultConfig: '{}',
                 startParams: [],
                 dependsIn: [],
                 depends: [],
@@ -732,6 +794,18 @@ export default {
                             }
                         }
                     },
+                ],
+                gatewayPluginUrl: [
+                    { required: true, message: '请输入插件镜像地址', trigger: 'blur' },
+                ],
+                gatewayPluginDriver: [
+                    { required: true, message: '请选择运行时驱动', trigger: 'change' },
+                ],
+                gatewayPluginPhase: [
+                    { required: true, message: '请选择执行阶段', trigger: 'change' },
+                ],
+                gatewayPluginPriority: [
+                    { required: true, message: '请输入优先级', trigger: 'change' },
                 ],
             },
             addRules: {
@@ -1774,7 +1848,22 @@ platform:
 
             this.form.description = j?.application?.description;
 
-            if (!this.option?.pureManifest) {
+            const gatewayPlugin = j?.platform?.gatewayPlugin || {};
+            const gatewayPluginRuntime = gatewayPlugin.runtime || {};
+            const gatewayPluginRuntimeConfig = gatewayPluginRuntime.config || {};
+            const gatewayPluginSupports = gatewayPlugin.supports || {};
+            this.form.gatewayPluginDriver = gatewayPluginRuntime.driver || 'higress-wasm/v1';
+            this.form.gatewayPluginUrl = gatewayPluginRuntimeConfig.url || '';
+            this.form.gatewayPluginPhase = gatewayPluginRuntimeConfig.phase || 'UNSPECIFIED_PHASE';
+            this.form.gatewayPluginPriority = Number(gatewayPluginRuntimeConfig.priority || 0);
+            this.form.gatewayPluginSupportGlobal = gatewayPluginSupports.global !== false;
+            this.form.gatewayPluginSupportRule = gatewayPluginSupports.rule === true;
+            this.form.gatewayPluginDefaultConfig = jsyaml.dump(gatewayPlugin.defaultConfig || {}, {
+                lineWidth: -1,
+                noRefs: true,
+            }).trim();
+
+            if (!this.option?.pureManifest && this.form.type != 'gateway-plugin') {
                 this.form.name = j?.platform?.baseInfo?.name || '';
                 let identifie = j?.platform?.baseInfo?.identifie || '';
                 this.form.identifie = identifie.match(/^([^-]+)-(.+)$/)?.[2] || '';
@@ -1902,10 +1991,34 @@ platform:
                 delete this.json.platform['container-v2'][0].shells;
             }
         },
+        parseGatewayPluginDefaultConfig(showMessage = false) {
+            try {
+                const config = jsyaml.load(this.form.gatewayPluginDefaultConfig || '{}') || {};
+                if (typeof config !== 'object' || Array.isArray(config)) {
+                    throw new Error('默认配置必须是 YAML 对象');
+                }
+                return config;
+            } catch (error) {
+                if (showMessage) {
+                    messageWarning(error?.message || '默认配置 YAML 格式错误');
+                }
+                return null;
+            }
+        },
         submit(otherData, callback) {
 
             this.$refs.formref.validate(async (errors) => {
                 if (errors) { messageWarning('必填项不能为空'); return }
+
+                if (this.form.type == 'gateway-plugin') {
+                    if (!this.form.gatewayPluginSupportGlobal && !this.form.gatewayPluginSupportRule) {
+                        messageWarning('请至少选择一种支持范围');
+                        return;
+                    }
+                    const defaultConfig = this.parseGatewayPluginDefaultConfig(true);
+                    if (defaultConfig === null) { return }
+                    this.json.platform.gatewayPlugin.defaultConfig = defaultConfig;
+                }
 
                 if (this.form.type == 'helm') {
                     try {
@@ -1936,7 +2049,9 @@ platform:
                     }));
                 }
 
-                this.json.platform.startParams = this.serializeStartParams();
+                if (this.form.type != 'gateway-plugin') {
+                    this.json.platform.startParams = this.serializeStartParams();
+                }
                 this.yaml = jsyaml.dump(this.json);
 
                 this.$emit('complete', this.json, this.yaml, otherData, callback);
@@ -2004,6 +2119,37 @@ platform:
                     this.form.language = '';
                 }
             }
+            if (this.form.type == 'gateway-plugin') {
+                const defaultConfig = this.parseGatewayPluginDefaultConfig(false);
+                const currentDefaultConfig = j.platform?.gatewayPlugin?.defaultConfig
+                    || {};
+                const currentConfigSchema = j.platform?.gatewayPlugin?.configSchema
+                    || {};
+                j.platform = {
+                    gatewayPlugin: {
+                        supports: {
+                            global: Boolean(this.form.gatewayPluginSupportGlobal),
+                            rule: Boolean(this.form.gatewayPluginSupportRule),
+                        },
+                        defaultConfig: defaultConfig === null
+                            ? currentDefaultConfig
+                            : defaultConfig,
+                        ...(Object.keys(currentConfigSchema).length ? { configSchema: currentConfigSchema } : {}),
+                        runtime: {
+                            driver: this.form.gatewayPluginDriver || 'higress-wasm/v1',
+                            config: {
+                                url: this.form.gatewayPluginUrl,
+                                phase: this.form.gatewayPluginPhase || 'UNSPECIFIED_PHASE',
+                                priority: Number(this.form.gatewayPluginPriority || 0),
+                            },
+                        },
+                    },
+                    depends: this.form.dependsIn.concat(this.form.depends),
+                };
+                delete j.source;
+            } else {
+                if (j.platform) { delete j.platform.gatewayPlugin; }
+            }
             j.platform = j.platform || {};
 
             if (this.form.type == 'tradition') {
@@ -2020,7 +2166,7 @@ platform:
                 }
             }
 
-            if (j.platform) {
+            if (j.platform && this.form.type != 'gateway-plugin') {
                 if (this.form.type !== 'helm' || true) {
 
                     if (!this.option?.pureManifest) {

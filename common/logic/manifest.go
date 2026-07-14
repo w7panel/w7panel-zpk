@@ -10,9 +10,12 @@ import (
 )
 
 const (
-	Tradition_App = "tradition"
-	Docker_App    = "docker"
-	Help_App      = "helm"
+	Tradition_App    = "tradition"
+	Docker_App       = "docker"
+	Help_App         = "helm"
+	GatewayPluginApp = "gateway-plugin"
+
+	GatewayPluginDriverHigressWasmV1 = "higress-wasm/v1"
 )
 
 const (
@@ -31,6 +34,37 @@ type Manifest struct {
 	VersionV2   int         `yaml:"version" json:"version"`
 }
 
+type GatewayPlugin struct {
+	Supports      GatewayPluginSupports  `yaml:"supports" json:"supports"`
+	DefaultConfig map[string]interface{} `yaml:"defaultConfig" json:"defaultConfig"`
+	ConfigSchema  map[string]interface{} `yaml:"configSchema,omitempty" json:"configSchema,omitempty"`
+	Runtime       GatewayPluginRuntime   `yaml:"runtime" json:"runtime"`
+}
+
+type GatewayPluginSupports struct {
+	Global bool `yaml:"global" json:"global"`
+	Rule   bool `yaml:"rule" json:"rule"`
+}
+
+type GatewayPluginRuntime struct {
+	Driver string                 `yaml:"driver" json:"driver"`
+	Config map[string]interface{} `yaml:"config" json:"config"`
+}
+
+func (plugin GatewayPlugin) IsSupportGlobal() bool {
+	return plugin.Supports.Global
+}
+
+func (plugin GatewayPlugin) Normalize() GatewayPlugin {
+	if plugin.Runtime.Config == nil {
+		plugin.Runtime.Config = make(map[string]interface{})
+	}
+	if plugin.DefaultConfig == nil {
+		plugin.DefaultConfig = make(map[string]interface{})
+	}
+	return plugin
+}
+
 type Application struct {
 	Name              string                 `yaml:"name" json:"name"`
 	Identifie         string                 `yaml:"identifie" json:"identifie"`
@@ -46,6 +80,7 @@ type Application struct {
 
 type Platform struct {
 	BaseInfo             BaseInfo                   `yaml:"baseInfo" json:"baseInfo"`
+	GatewayPlugin        GatewayPlugin              `yaml:"gatewayPlugin" json:"gatewayPlugin"`
 	Container            Container                  `yaml:"container" json:"container"`
 	ContainerV2s         []ContainerV2              `yaml:"container-v2" json:"container-v2"`
 	Volumes              []v1.Volume                `yaml:"volumes" json:"volumes"`
@@ -289,6 +324,9 @@ type Source struct {
 }
 
 func ProcessManifestIdentify(manifestRow Manifest) Manifest {
+	if manifestRow.Application.Type == GatewayPluginApp {
+		manifestRow.Platform.GatewayPlugin = manifestRow.Platform.GatewayPlugin.Normalize()
+	}
 	if manifestRow.Platform.BaseInfo.Identifie == "" {
 		manifestRow.Platform.BaseInfo = manifestRow.Platform.Container.BaseInfo
 	}

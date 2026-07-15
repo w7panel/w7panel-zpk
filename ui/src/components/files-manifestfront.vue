@@ -125,11 +125,20 @@
                                 <div class="greybox manifest-front-config">
                                     <template v-if="form.type === 'gateway-plugin'">
                                         <div class="greybox-title">插件配置页面</div>
-                                        <a-alert type="info" show-icon class="zpk-primary-alert" title="提示"
+                                        <a-alert type="info" show-icon class="zpk-primary-alert" title="MicroApp 接入说明"
                                             :closable="false">
-                                            <div class="registry-alert-item">网关插件前端用于编辑插件配置，不需要填写接口地址。</div>
-                                            <div class="registry-alert-item mt-6">通过 window.$wujie.props.pluginConfig 获取当前配置，通过 window.$wujie.props.savePluginConfig(config, enabled) 保存配置。</div>
-                                            <div class="registry-alert-item mt-6">configScope 仅标识 global 或 rule；具体网关资源和规则目标由上层网关适配器定位，插件前端只处理当前配置并调用保存回调。</div>
+                                            <div class="registry-alert-item">
+                                                <strong>运行方式：</strong>网关插件前端作为 MicroApp 嵌入面板，用于编辑插件配置，不需要填写接口地址或自行请求 WasmPlugin。
+                                            </div>
+                                            <div class="registry-alert-item mt-6">
+                                                <strong>配置数据：</strong>通过 <code>window.$wujie.props.pluginConfig</code> 获取当前配置，通过 <code>pluginEnabled</code> 获取当前配置的启用状态。
+                                            </div>
+                                            <div class="registry-alert-item mt-6">
+                                                <strong>配置范围：</strong><code>configScope</code> 为 <code>global</code> 时表示全局配置；为 <code>rule</code> 时表示域名规则配置，并同时注入当前 <code>domain</code>（域名）、<code>ingressName</code>（Ingress 名称）、<code>namespace</code> 和 <code>path</code>。
+                                            </div>
+                                            <div class="registry-alert-item mt-6">
+                                                <strong>保存方式：</strong>调用 <code>window.$wujie.props.savePluginConfig(config, enabled)</code> 保存当前配置及启用状态，具体资源和规则关联由面板处理。
+                                            </div>
                                         </a-alert>
                                         <manifest-config-table :rows="r.frontend_props"
                                             table-class="manifest-param-table frontend-param-table mt-20"

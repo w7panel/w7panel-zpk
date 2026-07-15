@@ -1192,6 +1192,7 @@ export default {
                 volumeClaimTemplates,
                 containers,
                 initContainers,
+                isTemplate: true,
                 pluginData: this.containerPluginData
             }, (data) => {
                 let initContainers = data?.initContainers || [];

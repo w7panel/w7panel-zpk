@@ -1,66 +1,54 @@
 <template>
     <div>
-        <div>
-            <a-checkbox v-model="checked" :disabled="checked && modelValue.length"
-                @change="v => v ? addIngressEnd('default') : $emit('checkDomainStartParams', false)">启用域名</a-checkbox>
-        </div>
-
-        <div v-for="(item, index) in modelValue" :key="index" class="mt-10" style="width:100%; margin-bottom:10px;">
-            <div class="df ai-c jc-b">
-                <div class="df ai-c">
-                    <a-input v-if="ingressEditIndex == index" :spellcheck="false" v-model="ingressEdit"
-                        @blur="ingressEditIndex = -1; ingressEdit && (item.name = ingressEdit); emitUpdate()"></a-input>
-                    <div v-else @click="ingressEditIndex = index; ingressEdit = item.name;" class="df ai-c cursor">
-                        <span class="lh-1">{{ item.name }}</span>
-                        <icon-edit class="ingress-edit-icon" />
+        <a-tabs v-model:active-key="activeTab" type="card-gutter" editable show-add-button
+            class="ingress-tabs" @add="addIngressEnd()" @delete="removeIngress">
+            <a-tab-pane v-for="(item, index) in modelValue" :key="index"
+                :title="item.name || '未命名配置'" closable>
+                <div style="padding: 0 16px 16px;">
+                    <div class="ingress-name-form-item">
+                        <span class="ingress-name-label">名称</span>
+                        <a-input v-model="item.name" :spellcheck="false" placeholder="请输入名称"
+                            style="width:400px;" @change="emitUpdate"></a-input>
                     </div>
-                    <div class="ml-40 c-blue cursor df-s0" @click="ingressEditIndex = -1; removeIngress(index);">删除业务端
+                    <div @click.stop>
+                        <manifest-config-table :rows="item.routes" table-class="ingress-table"
+                            add-text="添加配置" @add="addRoute(item)">
+                            <template #columns>
+                                <manifest-config-table-column data-index="match" title="匹配模式" width="16%">
+                                    <template #cell="{ record }">
+                                        {{ {Prefix: '前缀匹配', Exact: '精准匹配', ImplementationSpecific: '正则匹配'}[record.backend.match] || '-' }}
+                                    </template>
+                                </manifest-config-table-column>
+                                <manifest-config-table-column data-index="path" title="目录" width="22%" />
+                                <manifest-config-table-column data-index="backend.name" title="应用" width="22%">
+                                    <template #cell="{ record }">
+                                        <div v-if="record.backend && mainapp">
+                                            {{ appNames.find(v => v.id == record.backend.name)?.title }}
+                                        </div>
+                                        <div v-else-if="record.backend && !mainapp">
+                                            {{ appNamesFilter.find(v => v.id == record.backend.name)?.title }}
+                                        </div>
+                                    </template>
+                                </manifest-config-table-column>
+                                <manifest-config-table-column data-index="backend.port" title="端口" width="16%">
+                                    <template #cell="{ record }">
+                                        {{ record.backend.port }}
+                                    </template>
+                                </manifest-config-table-column>
+                                <manifest-config-table-column title="操作" width="24%">
+                                    <template #cell="{ record, index: ridx }">
+                                        <span class="c-blue cursor handle" @click.stop="openEdit(record, index, ridx)">修改</span>
+                                        <span class="c-blue cursor handle" @click.stop="openStrategy(record, index, ridx)">策略</span>
+                                        <span class="c-blue cursor handle" @click.stop="removeRoute(item, ridx)">删除</span>
+                                    </template>
+                                </manifest-config-table-column>
+                            </template>
+                        </manifest-config-table>
                     </div>
                 </div>
-            </div>
-
-            <manifest-config-table class="mt-10" :rows="item.routes" table-class="ingress-table"
-                add-text="添加配置" @add="addRoute(item)">
-                <template #columns>
-                    <manifest-config-table-column data-index="match" title="匹配模式" width="16%">
-                        <template #cell="{ record }">
-                            {{ {Prefix: '前缀匹配', Exact: '精准匹配', ImplementationSpecific: '正则匹配'}[record.backend.match] || '-' }}
-                        </template>
-                    </manifest-config-table-column>
-                    <manifest-config-table-column data-index="path" title="目录" width="22%" />
-                    <manifest-config-table-column data-index="backend.name" title="应用" width="22%" >
-                        <template #cell="{ record }">
-                            <div v-if="record.backend && mainapp">
-                                {{ appNames.find(v => v.id == record.backend.name)?.title }}
-                            </div>
-                            <div v-else-if="record.backend && !mainapp">
-                                {{ appNamesFilter.find(v => v.id == record.backend.name)?.title }}
-                            </div>
-                        </template>
-                    </manifest-config-table-column>
-                    <manifest-config-table-column data-index="backend.port" title="端口" width="16%">
-                        <template #cell="{ record }">
-                            {{ record.backend.port }}
-                        </template>
-                    </manifest-config-table-column>
-                    <manifest-config-table-column title="操作" width="24%">
-                        <template #cell="{ record, index: ridx }">
-                            <span class="c-blue cursor handle" @click="openEdit(record, index, ridx)">修改</span>
-                            <span class="c-blue cursor handle" @click="openStrategy(record, index, ridx)">策略</span>
-                            <span class="c-blue cursor handle" @click="item.routes.splice(ridx, 1);">删除</span>
-                        </template>
-                    </manifest-config-table-column>
-                </template>
-            </manifest-config-table>
-
-
-        </div>
-
-        <div v-if="checked" class="mt-10 lh-1 addrole df ai-c jc-c cursor" style="width:100%;"
-            @click="addIngressEnd();">
-            <span class="addmenu"><icon-plus />添加业务端</span>
-        </div>
-
+            </a-tab-pane>
+        </a-tabs>
+        <a-empty v-if="!modelValue.length" description="暂无域名配置，请点击上方 + 添加" />
     </div>
 </template>
 
@@ -68,10 +56,9 @@
 import ManifestConfigTable from '@/components/manifest-config-table.vue';
 import ManifestConfigTableColumn from '@/components/manifest-config-table-column.vue';
 import emitWujieEvent from '@/utils/wujie-event';
-import { IconEdit, IconPlus } from '@arco-design/web-vue/es/icon';
 
 export default {
-    components: { ManifestConfigTable, ManifestConfigTableColumn, IconEdit, IconPlus },
+    components: { ManifestConfigTable, ManifestConfigTableColumn },
     props: {
         modelValue: {
             type: Array,
@@ -101,9 +88,7 @@ export default {
     emits: ['update:modelValue', 'checkDomainStartParams'],
     data() {
         return {
-            checked: false,
-            ingressEditIndex: -1,
-            ingressEdit: '',
+            activeTab: 0,
             ingressRewrite: {
                 show: false,
                 ingressIndex: 0,
@@ -124,9 +109,10 @@ export default {
     watch: {
         modelValue: {
             handler(newVal) {
-                if (newVal && newVal.length > 0 && !this.checked) {
-                    this.checked = true;
-                    this.$emit('checkDomainStartParams', true);
+                if (!newVal?.length) {
+                    this.activeTab = undefined;
+                } else if (this.activeTab === undefined || Number(this.activeTab) >= newVal.length) {
+                    this.activeTab = 0;
                 }
                 this.fillDefaultPorts();
             },
@@ -144,6 +130,11 @@ export default {
         appNamesFilter() {
             return this.appNames?.filter?.(v => v.id == this.identifie) || [];
         },
+    },
+    mounted() {
+        if (!this.modelValue.length) {
+            this.addIngressEnd('default');
+        }
     },
     methods: {
         getDefaultBackendName() {
@@ -217,6 +208,7 @@ export default {
                 appPorts: this.appPorts,
                 callback: (data) => {
                     this.modelValue[index]['routes'][ridx] = data;
+                    this.emitUpdate();
                 },
             })
         },
@@ -225,24 +217,39 @@ export default {
                 ingress: row,
                 callback: (data) => {
                     this.modelValue[index]['routes'][ridx].backend.strategy = data;
+                    this.emitUpdate();
                 },
             })
+        },
+        removeRoute(item, index) {
+            item.routes.splice(index, 1);
+            this.emitUpdate();
         },
         emitUpdate() {
             this.$emit('update:modelValue', this.modelValue);
         },
-        addIngressEnd(name) {
-            if (name == 'default') {
+        addIngressEnd(name = '') {
+            let wasEmpty = this.modelValue.length === 0;
+            if (wasEmpty) {
                 this.$emit('checkDomainStartParams', true)
             }
             this.modelValue.push({
-                name: name || 'web_' + Math.random().toString(36).slice(2, 8),
+                name: name || (wasEmpty ? 'default' : 'web_' + Math.random().toString(36).slice(2, 8)),
                 routes: [this.createRoute()],
             });
+            this.activeTab = this.modelValue.length - 1;
             this.emitUpdate();
         },
-        removeIngress(index) {
+        removeIngress(key) {
+            let index = Number(key);
+            if (!Number.isInteger(index) || index < 0 || index >= this.modelValue.length) { return }
             this.modelValue.splice(index, 1);
+            if (!this.modelValue.length) {
+                this.activeTab = undefined;
+                this.$emit('checkDomainStartParams', false);
+            } else {
+                this.activeTab = Math.min(index, this.modelValue.length - 1);
+            }
             this.emitUpdate();
         },
 
@@ -250,17 +257,18 @@ export default {
 }
 </script>
 <style scoped>
-.addrole {
-    border: 1px dashed #2d5fff;
-    background: rgb(240, 243, 250);
-    padding: 10px;
-    box-sizing: border-box;
+.ingress-tabs {
+    width: 100%;
 }
 
-.ingress-edit-icon {
-    color: #333333;
-    font-size: 14px;
-    margin-left: 4px;
+.ingress-name-form-item {
+    display: flex;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.ingress-name-label {
+    flex: 0 0 80px;
 }
 
 .table {

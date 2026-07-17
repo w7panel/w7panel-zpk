@@ -17,3 +17,4 @@ w7_cd_artifact/config.yaml
 node_modules/
 dist/
 package-lock.json
+.cache/

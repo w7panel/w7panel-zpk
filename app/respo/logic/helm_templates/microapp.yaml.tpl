@@ -100,7 +100,7 @@ spec:
           {{- else }}
           icon_svg: null
           {{- end }}
-          location: left
+          location: {{ default "left" .location }}
           is_default: {{ .is_default }}
           parent: "{{ .parent }}"
           {{- end }}

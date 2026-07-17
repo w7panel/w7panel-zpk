@@ -4,9 +4,9 @@ import (
 	"errors"
 
 	"github.com/gin-gonic/gin"
-	"github.com/w7panel/w7panel-zpk/app/respo/logic"
 	"github.com/w7panel/w7panel-zpk/common/dao"
 	"github.com/w7panel/w7panel-zpk/common/entity"
+	logic2 "github.com/w7panel/w7panel-zpk/common/logic"
 )
 
 type Tag struct {
@@ -24,9 +24,18 @@ func (self Tag) Add(ctx *gin.Context) {
 		return
 	}
 
-	formula := logic.GetFormulaByName(params.Identifie)
-	if formula == nil {
-		self.JsonResponseWithError(ctx, errors.New("制品不存在"), 500)
+	user := logic2.User{}.GetUser(ctx)
+	if user == nil {
+		self.JsonResponseWithError(ctx, errors.New("用户信息异常"), 401)
+		return
+	}
+	formulaQuery := dao.Q.Formula.Where(dao.Q.Formula.Name.Eq(params.Identifie))
+	if !(logic2.User{}).IsAdminUser(user) {
+		formulaQuery = formulaQuery.Where(dao.Q.Formula.UserID.Eq(user.ID))
+	}
+	formula, err := formulaQuery.First()
+	if err != nil || formula == nil {
+		self.JsonResponseWithError(ctx, errors.New("制品不存在或无权操作"), 404)
 		return
 	}
 
@@ -35,7 +44,10 @@ func (self Tag) Add(ctx *gin.Context) {
 		tag = &entity.Tag{
 			Name: params.Name,
 		}
-		_ = dao.Q.Tag.Create(tag)
+		if err := dao.Q.Tag.Create(tag); err != nil {
+			self.JsonResponseWithServerError(ctx, err)
+			return
+		}
 	}
 
 	formulaTag, _ := dao.TagFormula.Where(dao.TagFormula.Where(dao.TagFormula.TagID.Eq(tag.ID),
@@ -43,10 +55,13 @@ func (self Tag) Add(ctx *gin.Context) {
 	).First()
 
 	if formulaTag == nil {
-		_ = dao.TagFormula.Create(&entity.TagFormula{
+		if err := dao.TagFormula.Create(&entity.TagFormula{
 			FormulaID: formula.ID,
 			TagID:     tag.ID,
-		})
+		}); err != nil {
+			self.JsonResponseWithServerError(ctx, err)
+			return
+		}
 	}
 
 	self.JsonSuccessResponse(ctx)
@@ -64,13 +79,31 @@ func (self Tag) Delete(ctx *gin.Context) {
 		return
 	}
 
+	user := logic2.User{}.GetUser(ctx)
+	if user == nil {
+		self.JsonResponseWithError(ctx, errors.New("用户信息异常"), 401)
+		return
+	}
+	formulaQuery := dao.Q.Formula.Where(dao.Q.Formula.ID.Eq(int32(params.FormulaId)))
+	if !(logic2.User{}).IsAdminUser(user) {
+		formulaQuery = formulaQuery.Where(dao.Q.Formula.UserID.Eq(user.ID))
+	}
+	formula, err := formulaQuery.First()
+	if err != nil || formula == nil {
+		self.JsonResponseWithError(ctx, errors.New("制品不存在或无权操作"), 404)
+		return
+	}
+
 	tag, _ := dao.Tag.Where(dao.Tag.ID.Eq(int32(params.TagId))).First()
 	if tag == nil {
 		self.JsonResponseWithError(ctx, errors.New("标签不存在"), 500)
 		return
 	}
 
-	_, _ = dao.Q.TagFormula.Where(dao.Q.TagFormula.TagID.Eq(tag.ID), dao.Q.TagFormula.FormulaID.Eq(int32(params.FormulaId))).Delete()
+	if _, err := dao.Q.TagFormula.Where(dao.Q.TagFormula.TagID.Eq(tag.ID), dao.Q.TagFormula.FormulaID.Eq(formula.ID)).Delete(); err != nil {
+		self.JsonResponseWithServerError(ctx, err)
+		return
+	}
 	self.JsonSuccessResponse(ctx)
 }
 

@@ -351,20 +351,47 @@ func (self *Depot) DeleteFormula(formula *Formula) error {
 }
 
 func (self *Depot) SaveFile(formula *Formula, filename string, content string) error {
-	filePath := filepath.Join(self.basePath, formula.GetFilesRelativeDir(), filename)
+	filesDir := filepath.Join(self.basePath, formula.GetFilesRelativeDir())
+	filePath, err := resolveFormulaFilePath(filesDir, filename)
+	if err != nil {
+		return err
+	}
 	if content == "" {
-		os.Remove(filePath)
+		if err := os.Remove(filePath); err != nil && !os.IsNotExist(err) {
+			return err
+		}
 	} else {
 		function.CreateDirIfNotExist(filepath.Dir(filePath), os.ModePerm)
-		file, _ := os.Create(filePath)
+		file, err := os.Create(filePath)
+		if err != nil {
+			return err
+		}
 		defer file.Close()
-		_, err := file.Write([]byte(content))
+		_, err = file.Write([]byte(content))
 		if err != nil {
 			return err
 		}
 	}
 
 	return nil
+}
+
+func resolveFormulaFilePath(filesDir, filename string) (string, error) {
+	normalizedFilename := strings.ReplaceAll(filename, "\\", "/")
+	if strings.HasPrefix(normalizedFilename, "/") {
+		return "", fmt.Errorf("非法文件路径: %s", filename)
+	}
+
+	cleanFilename, err := function.CleanZipFilePath(normalizedFilename)
+	if err != nil {
+		return "", err
+	}
+	filePath := filepath.Join(filesDir, filepath.FromSlash(cleanFilename))
+	if !function.IsPathInDir(filePath, filesDir) {
+		return "", fmt.Errorf("非法文件路径: %s", filename)
+	}
+
+	return filePath, nil
 }
 
 func (self *Depot) GetFileList(formula *Formula) (map[string]string, error) {

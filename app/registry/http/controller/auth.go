@@ -7,7 +7,6 @@ import (
 	"regexp"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/w7panel/w7panel-zpk/app/registry/logic"
@@ -110,12 +109,6 @@ func (c Auth) validateUser(ctx *gin.Context) (*entity.RegistryUser, error) {
 	if (user.Password != logic2.User{}.MakeUserPassword(password)) {
 		return nil, errors.New("username or password error")
 	}
-	if user.ExpireDays > 0 {
-		if time.Now().After(user.CreatedAt.Add(time.Duration(user.ExpireDays) * 24 * time.Hour)) {
-			return nil, errors.New("user is expired")
-		}
-	}
-
 	return user, nil
 }
 

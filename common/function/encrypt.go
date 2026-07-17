@@ -16,9 +16,20 @@ func pad(buf []byte, blockSize int) []byte {
 	return append(buf, padText...)
 }
 
-func unpad(src []byte) []byte {
-	padding := src[len(src)-1]
-	return src[:len(src)-int(padding)]
+func unpad(src []byte, blockSize int) ([]byte, error) {
+	if len(src) == 0 {
+		return nil, errors.New("invalid padding")
+	}
+	padding := int(src[len(src)-1])
+	if padding == 0 || padding > blockSize || padding > len(src) {
+		return nil, errors.New("invalid padding")
+	}
+	for _, value := range src[len(src)-padding:] {
+		if int(value) != padding {
+			return nil, errors.New("invalid padding")
+		}
+	}
+	return src[:len(src)-padding], nil
 }
 
 func AesEncrypt(plaintext string, key string) (string, error) {
@@ -67,7 +78,10 @@ func AesDecrypt(ciphertextBase64 string, key string) (string, error) {
 	stream.XORKeyStream(ciphertext, ciphertext)
 
 	// 对解密后的数据去填充
-	unpaddedBytes := unpad(ciphertext)
+	unpaddedBytes, err := unpad(ciphertext, aes.BlockSize)
+	if err != nil {
+		return "", err
+	}
 
 	return string(unpaddedBytes), nil
 }

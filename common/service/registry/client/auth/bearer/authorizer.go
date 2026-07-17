@@ -2,12 +2,12 @@ package bearer
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
-	"github.com/w7panel/w7panel-zpk/common/service/registry/types"
 	"io"
 	"net/http"
 	"net/url"
+
+	"github.com/w7panel/w7panel-zpk/common/service/registry/types"
 )
 
 const (
@@ -117,7 +117,11 @@ func (a *authorizer) fetchToken(scopes []*scope) (*token, error) {
 		case http.StatusForbidden:
 			code = types.ForbiddenCode
 		}
-		return nil, errors.New(fmt.Sprintf("http status code: %s, body: %s", code, string(body)))
+		return nil, &types.Error{
+			Code:       code,
+			StatusCode: resp.StatusCode,
+			Body:       string(body),
+		}
 	}
 	token := &token{}
 	if err = json.Unmarshal(body, token); err != nil {

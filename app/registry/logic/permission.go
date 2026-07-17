@@ -149,13 +149,10 @@ func (l Permission) CheckUserScopes(user *entity.RegistryUser, scopes []registry
 
 func (l Permission) CreateToken(user *entity.RegistryUser, scopes []registry.PermissionScope) (string, error) {
 	userName := ""
-	expireDays := 999
 	if user != nil {
-		if user.ExpireDays <= 0 {
-			expireDays = 999
-		}
 		userName = user.Username
 	}
+	now := time.Now()
 	header := token.Header{
 		Type:       "JWT",
 		SigningAlg: "RS256",
@@ -170,8 +167,8 @@ func (l Permission) CreateToken(user *entity.RegistryUser, scopes []registry.Per
 		Issuer:     facade.GetConfig().GetString("registry_cli.default.oauth.issuer"),
 		Subject:    userName,
 		Audience:   "docker-registry",
-		NotBefore:  time.Now().Unix() - 20,
-		Expiration: time.Now().Add(time.Duration(expireDays) * time.Second * 86400).Unix(),
+		NotBefore:  now.Unix() - 20,
+		Expiration: now.Add(7 * 24 * time.Hour * time.Second).Unix(),
 		Access:     []*token.ResourceActions{},
 	}
 	for _, a := range scopes {

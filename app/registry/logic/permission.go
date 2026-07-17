@@ -168,7 +168,7 @@ func (l Permission) CreateToken(user *entity.RegistryUser, scopes []registry.Per
 		Subject:    userName,
 		Audience:   "docker-registry",
 		NotBefore:  now.Unix() - 20,
-		Expiration: now.Add(7 * 24 * time.Hour * time.Second).Unix(),
+		Expiration: now.Add(7 * 24 * time.Hour).Unix(),
 		Access:     []*token.ResourceActions{},
 	}
 	for _, a := range scopes {

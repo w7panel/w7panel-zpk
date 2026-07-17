@@ -303,12 +303,11 @@
 
 
                             <a-form-item v-if="form.type != 'helm'" label="域名设置" class="mt-16">
-                                <div style="flex:1;">
-
-                                    <form-ingress v-model="form.ingress" :app-names="app_names" :app-ports="app_ports"
-                                        :mainapp="option && option.mainapp" :identifie="identifie"
-                                        @checkDomainStartParams="checkDomainStartParams" />
+                                <div v-if="form.ingress && form.ingress.length">
+                                    {{ form.ingress.map(item => item.name || '未命名配置').join(', ') }}
                                 </div>
+                                <div v-else>无</div>
+                                <span class="cursor c-blue ml-10" @click="openDomainConfig">编辑</span>
                             </a-form-item>
                         </div>
                     </div>
@@ -515,6 +514,16 @@
             </div>
         </a-modal>
 
+        <a-drawer v-model:visible="domainConfig.show" title="配置域名" placement="right" :width="1000"
+            :mask="false" :body-style="{ padding: 0 }" unmount-on-close @ok="saveDomainConfig"
+            @cancel="resetDomainConfig" @close="resetDomainConfig">
+            <div class="domain-config-drawer-content">
+                <form-ingress v-if="domainConfig.show" v-model="domainConfig.ingress"
+                    :app-names="app_names" :app-ports="app_ports"
+                    :mainapp="option && option.mainapp" :identifie="identifie" />
+            </div>
+        </a-drawer>
+
         <a-modal v-model:visible="dependPicker.show" title="选择安装依赖" :width="840" :footer="false"
                     modal-class="depend-picker-modal" @close="closeDependPicker">
                     <div class="depend-picker-toolbar">
@@ -684,6 +693,11 @@ export default {
                 show: false,
                 editIndex: -1,
                 item: null,
+            },
+
+            domainConfig: {
+                show: false,
+                ingress: [],
             },
 
             app_ports: [],
@@ -1055,6 +1069,26 @@ export default {
             }
             this.resetShellConfig();
             this.changeForm();
+        },
+        openDomainConfig() {
+            let ingress = JSON.parse(JSON.stringify(this.form.ingress || []));
+            this.domainConfig = {
+                show: true,
+                ingress,
+            };
+        },
+        resetDomainConfig() {
+            this.domainConfig = {
+                show: false,
+                ingress: [],
+            };
+        },
+        saveDomainConfig() {
+            let ingress = JSON.parse(JSON.stringify(this.domainConfig.ingress || []));
+            this.form.ingress = ingress;
+            this.checkDomainStartParams(Boolean(ingress.length));
+            this.changeForm();
+            this.domainConfig.show = false;
         },
         onChange() { },
         createDomainStartParam() {
@@ -1878,6 +1912,10 @@ platform:
                     this.getChartInfo();
                 }
             }
+            if (this.form.type != 'helm' && this.form.type != 'tradition' && this.form.ingress?.length) {
+                this.form.domain = true;
+                this.disabledDomainStartParams = true;
+            }
             this._initializing = false;
         },
         getPanelData() {
@@ -2170,6 +2208,11 @@ platform:
 .manifest-field-stack {
     width: 100%;
     min-width: 0;
+}
+
+.domain-config-drawer-content {
+    min-width: 0;
+    padding: 24px;
 }
 
 .start-param-head {

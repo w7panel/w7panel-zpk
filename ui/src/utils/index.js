@@ -9,7 +9,7 @@ const myAxios = axios.create({
 });
 
 myAxios.interceptors.request.use(config => {
-    config.headers['X-W7Panel-Token'] = getPanelToken();
+    // config.headers['X-W7Panel-Token'] = getPanelToken();
     return config
 }, err => {
     Promise.reject(err)

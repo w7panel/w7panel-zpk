@@ -191,7 +191,7 @@ func (c Attach) GetFrontendZipFileContent(ctx *gin.Context) {
 		Identifie string `uri:"identifie" binding:"required"`
 		Version   string `uri:"version" binding:"required"`
 		Path      string `uri:"path" binding:"required"`
-		Ticket    string `form:"ticket" binding:"required"`
+		Ticket    string `form:"ticket"`
 	}
 	params := ParamsValidate{}
 	if !c.Validate(ctx, &params) {
@@ -205,15 +205,17 @@ func (c Attach) GetFrontendZipFileContent(ctx *gin.Context) {
 		return
 	}
 
-	ticketInfo, err := logic.Ticket{}.ParseTicket(params.Ticket)
-	slog.Info("ticket解析", "ticket", params.Ticket, "info", ticketInfo, "err", err)
-	if err != nil {
-		c.JsonResponseWithServerError(ctx, err)
-		return
-	}
-	if ticketInfo.FormulaId != formula.ID {
-		c.JsonResponseWithServerError(ctx, errors.New("ticket错误"))
-		return
+	if formula.GoodsId > 0 && formula.InstallServiceFee > 0 {
+		ticketInfo, err := logic.Ticket{}.ParseTicket(params.Ticket)
+		slog.Info("ticket解析", "ticket", params.Ticket, "info", ticketInfo, "err", err)
+		if err != nil {
+			c.JsonResponseWithServerError(ctx, err)
+			return
+		}
+		if ticketInfo.FormulaId != formula.ID {
+			c.JsonResponseWithServerError(ctx, errors.New("ticket错误"))
+			return
+		}
 	}
 
 	content, err := depot.GetFrontendZipFileContent(formula, params.Path)

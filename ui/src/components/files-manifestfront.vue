@@ -137,6 +137,9 @@
                                                 <strong>配置范围：</strong><code>configScope</code> 为 <code>global</code> 时表示全局配置；为 <code>rule</code> 时表示域名规则配置，并同时注入当前 <code>domain</code>（域名）、<code>ingressName</code>（Ingress 名称）、<code>namespace</code> 和 <code>path</code>。
                                             </div>
                                             <div class="registry-alert-item mt-6">
+                                                <strong>菜单配置：</strong>全局配置在创始人端添加菜单，规则配置在普通用户端添加菜单。
+                                            </div>
+                                            <div class="registry-alert-item mt-6">
                                                 <strong>保存方式：</strong>调用 <code>window.$wujie.props.savePluginConfig(config, enabled)</code> 保存当前配置及启用状态，具体资源和规则关联由面板处理。
                                             </div>
                                         </a-alert>

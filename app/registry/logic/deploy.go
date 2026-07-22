@@ -55,7 +55,7 @@ func (l Deploy) OnRepositoryPushed(payload registry.RegistryRepositoryWebHookPay
 	}
 
 	deployType := K8sDeployWhenTagAdd
-	if !tag.LatestPushAt.IsZero() {
+	if tag.LatestPushAt != nil && !tag.LatestPushAt.IsZero() {
 		deployType = K8sDeployWhenTagUpdate
 	}
 

@@ -235,10 +235,12 @@ func (c Repository) Tags(ctx *gin.Context) {
 	totalCount := 0
 	if tags != nil {
 		totalCount = len(tags)
-		tagUpdateTimeMap := make(map[string]time.Time)
+		tagUpdateTimeMap := make(map[string]*time.Time)
 		localTags, _ := dao.Q.RegistryRepositoryTag.Where(dao.Q.RegistryRepositoryTag.RepositoryID.Eq(curRepository.ID)).Find()
 		for _, item := range localTags {
-			tagUpdateTimeMap[item.Name] = item.LatestPushAt
+			if item.LatestPushAt != nil {
+				tagUpdateTimeMap[item.Name] = item.LatestPushAt
+			}
 		}
 
 		function.SortTagsDesc(tags)

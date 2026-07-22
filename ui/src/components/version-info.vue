@@ -4,41 +4,20 @@
             <img v-if="logoimg" :src="logoimg" class="img df-s0" alt="" />
             <div v-else class="df df-c ai-c jc-c"
                 style="width:100%;height:100%;border:1px solid #e7e7e7;border-radius:4px;">
-                <span class="upload-plus">+</span>
-                <span class="c-99 fs-12 lh-1 mt-8">点击上传</span>
+                <span class="c-99 fs-12 lh-1">暂无图标</span>
             </div>
-            <input type="file" @change="uplogo" accept="image/*" />
         </div>
         <a-form class="fc version-info-form" :model="form" label-align="left"
             :label-col-props="{ span: 5, flex: '0 0 56px' }"
             :wrapper-col-props="{ span: 19, flex: '1' }" @keydown.enter.prevent>
             <a-form-item label="名称" style="margin-bottom:10px;">
-                <span v-if="edit.type != 'name'">{{ form.name || '-' }}</span>
-                <a-tooltip v-if="edit.type != 'name'" content="修改">
-                    <a-button class="editbtn" type="text" shape="circle" size="mini"
-                        @click="edit.type = 'name'; edit.name = form.name;">
-                        <template #icon><icon-edit /></template>
-                    </a-button>
-                </a-tooltip>
-                <a-input v-if="edit.type == 'name'" v-model="edit.name" placeholder="请输入"
-                    style="width:160px;" />
-                <span v-if="edit.type == 'name'" class="c-blue cursor ml-20" @click="changeForm('name')">确定</span>
+                <span>{{ form.name || '-' }}</span>
             </a-form-item>
             <a-form-item label="标识" style="margin-bottom:10px;">
                 <span>{{ identifie }}</span>
             </a-form-item>
             <a-form-item label="描述" style="margin-bottom:10px;">
-                <span v-if="edit.type != 'description'">{{ form.description || '-' }}</span>
-                <a-tooltip v-if="edit.type != 'description'" content="修改">
-                    <a-button class="editbtn" type="text" shape="circle" size="mini"
-                        @click="edit.type = 'description'; edit.description = form.description;">
-                        <template #icon><icon-edit /></template>
-                    </a-button>
-                </a-tooltip>
-                <a-input v-if="edit.type == 'description'" v-model="edit.description" placeholder="请输入"
-                    style="width:160px;" />
-                <span v-if="edit.type == 'description'" class="c-blue cursor ml-20"
-                    @click="changeForm('description')">确定</span>
+                <span>{{ form.description || '-' }}</span>
             </a-form-item>
             <a-form-item label="标签" style="margin-bottom:10px;">
 
@@ -137,12 +116,11 @@ export default {
         ManifestConfigTableColumn,
         IconEdit,
     },
-    props: ['identifie', 'info'],
+    props: ['identifie', 'info', 'iconCacheKey'],
     data() {
         return {
             baseurl: '',
             logoimg: '',
-            logofile: null,
             json: null,
 
             form: {
@@ -179,6 +157,9 @@ export default {
         info() {
             this.init();
         },
+        iconCacheKey() {
+            this.init();
+        },
     },
     methods: {
         init() {
@@ -203,6 +184,9 @@ export default {
             if (this.logoimg && !/^https?:\/\//.test(this.logoimg)) {
                 this.logoimg = this.baseurl + this.logoimg;
             }
+            if (this.logoimg && this.iconCacheKey) {
+                this.logoimg += (this.logoimg.includes('?') ? '&' : '?') + 'time=' + this.iconCacheKey;
+            }
             this.form.tags = this.info?.tags || [];
         },
 
@@ -213,22 +197,6 @@ export default {
                 this.tags = res.data?.data?.list || [];
             }).catch(() => { })
 
-        },
-
-        uplogo(event) {
-            this.logofile = event.target.files[0];
-            if (!this.logofile) { return }
-            let formdata = new FormData();
-            formdata.append('identifie', this.identifie);
-            formdata.append('file', this.logofile);
-            myAxios.post('/respo/icon', formdata).then(res => {
-                messageSuccess('添加成功');
-                this.logoimg = res.data?.data?.url;
-                if (!/^https?:\/\//.test(this.logoimg)) {
-                    this.logoimg = this.baseurl + this.logoimg;
-                }
-                this.logoimg = this.logoimg + '?time=' + Date.now();
-            });
         },
 
         deleteTag(index) {
@@ -356,28 +324,6 @@ export default {
     display: flex;
     flex-direction: column;
     gap: 6px;
-}
-
-.app-icon input[type='file'] {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 2;
-    min-width: 0;
-    opacity: 0;
-    cursor: pointer;
-}
-
-.app-icon input[type='file']::-webkit-file-upload-button {
-    display: none;
-}
-
-.upload-plus {
-    color: #666666;
-    font-size: 22px;
-    line-height: 1;
 }
 
 .tag {

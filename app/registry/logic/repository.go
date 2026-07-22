@@ -127,14 +127,14 @@ func (l Repository) OnRepositoryPushed(payload registry.RegistryRepositoryWebHoo
 			err := dao.Q.RegistryRepositoryTag.Create(&entity.RegistryRepositoryTag{
 				RepositoryID: repositoryModel.ID,
 				Name:         payload.Event.Target.Tag,
-				LatestPushAt: time.Now(),
 			})
 			if err != nil {
 				slog.Error("create registry repository tag", "payload", payload, "error", err)
 			}
 		} else {
+			curTime := time.Now()
 			_, err := dao.Q.RegistryRepositoryTag.Where(dao.Q.RegistryRepositoryTag.ID.Eq(tag.ID)).Updates(entity.RegistryRepositoryTag{
-				LatestPushAt: time.Now(),
+				LatestPushAt: &curTime,
 			})
 			if err != nil {
 				slog.Error("update registry repository tag", "payload", payload, "error", err)

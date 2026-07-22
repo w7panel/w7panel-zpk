@@ -12,11 +12,11 @@ const TableNameRegistryRepositoryTag = "ims_registry_repository_tag"
 
 // RegistryRepositoryTag mapped from table <ims_registry_repository_tag>
 type RegistryRepositoryTag struct {
-	ID           int32     `gorm:"column:id;primaryKey;autoIncrement:true" json:"id"`
-	RepositoryID int32     `gorm:"column:repository_id;not null" json:"repository_id"`
-	Name         string    `gorm:"column:name;not null" json:"name"`
-	CrearedAt    time.Time `gorm:"column:creared_at;not null;default:CURRENT_TIMESTAMP" json:"creared_at"`
-	LatestPushAt time.Time `gorm:"column:latest_push_at" json:"latest_push_at"`
+	ID           int32      `gorm:"column:id;primaryKey;autoIncrement:true" json:"id"`
+	RepositoryID int32      `gorm:"column:repository_id;not null" json:"repository_id"`
+	Name         string     `gorm:"column:name;not null" json:"name"`
+	CrearedAt    time.Time  `gorm:"column:creared_at;not null;default:CURRENT_TIMESTAMP" json:"creared_at"`
+	LatestPushAt *time.Time `gorm:"column:latest_push_at" json:"latest_push_at"`
 }
 
 // TableName RegistryRepositoryTag's table name

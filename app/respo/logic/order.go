@@ -1,7 +1,6 @@
 package logic
 
 import (
-	"errors"
 	"log/slog"
 	"strconv"
 
@@ -31,9 +30,6 @@ func (l Order) CheckFormulaCanInstallOrUpgrade(formula Formula, consoleUid int32
 	if formula.GoodsId <= 0 || formula.ConsoleUid == consoleUid {
 		return true, formula.Name
 	}
-	if formula.GoodsId > 0 && orderSn == "" {
-		return false, formula.Name
-	}
 	if isUpgrade && formula.IsFreeUpgrade == FORMULA_FREE_UPGRADE {
 		return true, formula.Name
 	}
@@ -54,10 +50,6 @@ func (l Order) GetFormulaCanUpgradeVersion(formula Formula, consoleUid int32, or
 
 	if formula.GoodsId <= 0 || formula.ConsoleUid == consoleUid {
 		return "", false, formula.Name, nil
-	}
-
-	if formula.GoodsId > 0 && orderSn == "" {
-		return "", false, formula.Name, errors.New("order not exists")
 	}
 
 	version, ok, formulaIdentify, err := w7.ZpkMarketSdk.GetFormulaCanUpgradeVersion(formula.GoodsId, consoleUid, orderSn)

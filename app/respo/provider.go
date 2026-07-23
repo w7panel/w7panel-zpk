@@ -175,7 +175,7 @@ func (provider *Provider) Register(httpServer *http_server.Server, console conso
 		panic(err)
 	}
 	if err = depot.MigrateFormulaFiles(); err != nil {
-		panic(err)
+		slog.Error("migration fail", "err", err)
 	}
 	go depot.PackLoop()
 

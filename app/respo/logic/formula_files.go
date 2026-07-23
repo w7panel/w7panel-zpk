@@ -30,7 +30,7 @@ func (d *Depot) MigrateFormulaFiles() error {
 		if d.formulaFilesMigrated(formulaRow.Name) {
 			continue
 		}
-		formula, formulaErr := d.GetFormula(formulaRow.Name, "", nil)
+		formula, formulaErr := d.getFormula(formulaRow.Name, "", nil, false)
 		if formulaErr != nil {
 			return fmt.Errorf("迁移制品 %s 文件失败: %w", formulaRow.Name, formulaErr)
 		}

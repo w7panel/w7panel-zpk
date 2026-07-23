@@ -7,28 +7,27 @@
                         <span>文档目录</span>
                     </div>
                     <div class="sidebar-list">
-                        <div v-for="item in sidebarFiles" :key="item.path" class="sidebar-item" :class="{
+                        <div v-for="item in docsFiles" :key="item.path" class="sidebar-item" :class="{
                             active: item.path === activeDocPath,
                             'is-dragging': item.path === draggingDocPath,
                             'is-drop-target': item.path === dragOverDocPath,
                         }" @click="selectDoc(item.path)">
                             <div class="sidebar-item-head df ai-c jc-b">
-                                <div class="df ai-c sidebar-item-main" :draggable="!item.isReadme && !saving"
+                                <div class="df ai-c sidebar-item-main" :draggable="!saving"
                                     @dragstart="onDocDragStart(item, $event)" @dragover.prevent="onDocDragOver(item)"
                                     @dragleave="onDocDragLeave(item)" @drop.prevent="onDocDrop(item)"
                                     @dragend="onDocDragEnd">
-                                    <div class="sidebar-item-title ml-8">{{ item.title === 'readme' ? '介绍' : item.title
-                                    }}</div>
+                                    <div class="sidebar-item-title ml-8">{{ item.title }}</div>
                                 </div>
                                 <div class="sidebar-item-actions df ai-c">
-                                    <a-tooltip v-if="!item.isReadme" content="修改文档标题" position="top">
+                                    <a-tooltip content="修改文档标题" position="top">
                                         <a-button class="sidebar-action sidebar-edit" :class="{ 'is-disabled': saving }"
                                             type="text" size="mini" :disabled="saving"
                                             @click.stop="openRenameDialog(item)">
                                             <template #icon><icon-edit /></template>
                                         </a-button>
                                     </a-tooltip>
-                                    <span v-if="!item.isReadme" @click.stop>
+                                    <span @click.stop>
                                         <a-popconfirm content="确认要删除吗" type="warning" ok-text="确定"
                                             cancel-text="取消" content-class="zpk-delete-popconfirm"
                                             :ok-button-props="{ status: 'danger' }"
@@ -54,7 +53,7 @@
                     </div>
                 </div>
 
-                <div class="editor-panel">
+                <div v-if="docsFiles.length" class="editor-panel">
                     <div class="editor-header df ai-c jc-b">
                         <div>
                             <div class="editor-title">{{ currentTitle }}</div>
@@ -71,6 +70,14 @@
                             boxShadowStyle="" :xssOptions="false" placeholder="请输入文档内容" :toolbars="editorToolbars"
                             @click.capture="handleMavonToolbarClick" @change="patchMavonMarkdown" />
                     </div>
+                </div>
+                <div v-else class="editor-empty">
+                    <a-empty description="暂无应用文档">
+                        <a-button type="primary" :disabled="saving" @click="openCreateDialog">
+                            <template #icon><icon-plus /></template>
+                            添加文档
+                        </a-button>
+                    </a-empty>
                 </div>
             </div>
         </a-spin>
@@ -112,7 +119,6 @@ import myAxios from '@/utils';
 import { IconDelete, IconEdit, IconPlus } from '@arco-design/web-vue/es/icon';
 import { messageError, messageSuccess, messageWarning } from '@/utils/ui-feedback';
 
-const README_PATH = 'readme.md';
 const DOCS_DIR = 'docs';
 const DOCS_ORDER_PATH = DOCS_DIR + '/.order';
 const MAVON_ALIGN_TYPES = {
@@ -294,17 +300,21 @@ const createDocFile = (title, content = '') => {
 export default {
     name: 'ProductDescriptionPage',
     components: { IconDelete, IconEdit, IconPlus },
+    props: {
+        identifie: {
+            type: String,
+            default: '',
+        },
+    },
     data() {
         return {
-            identifie: '',
             vtitle: '',
             loading: false,
             saving: false,
             source: 'remote',
-            readmeContent: '',
             docsFiles: [],
             docsOrderContent: '',
-            activeDocPath: README_PATH,
+            activeDocPath: '',
             draggingDocPath: '',
             dragOverDocPath: '',
             createDialog: {
@@ -357,49 +367,32 @@ export default {
         }
     },
     computed: {
+        formulaIdentifie() {
+            return this.identifie || this.$route.query.id || '';
+        },
         hasDocsFiles() {
             return this.docsFiles.length > 0;
-        },
-        sidebarFiles() {
-            return [{
-                title: 'readme',
-                path: README_PATH,
-                isReadme: true,
-            }, ...this.docsFiles.map(item => ({ ...item, isReadme: false }))];
         },
         activeDoc() {
             return this.docsFiles.find(item => item.path === this.activeDocPath) || null;
         },
-        isEditingReadme() {
-            return this.activeDocPath === README_PATH || !this.activeDocPath;
-        },
         currentEditingPath() {
-            return this.isEditingReadme ? README_PATH : this.activeDocPath;
+            return this.activeDocPath;
         },
         saveButtonLoading() {
-            if (this.isEditingReadme) {
-                return this.saving;
-            }
             return this.savingPath === this.currentEditingPath && !!this.currentEditingPath;
         },
         currentTitle() {
-            if (this.isEditingReadme) {
-                return '介绍';
-            }
             return this.activeDoc?.title || '文档';
         },
         toolbarDescription() {
             return '默认显示编辑器内置预览，可通过工具栏切换编辑。';
         },
         currentContent() {
-            if (this.isEditingReadme) {
-                return this.readmeContent || '';
-            }
             return this.activeDoc?.content || '';
         },
     },
     created() {
-        this.identifie = this.$route.query.id;
         this.vtitle = this.$route.query.vtitle || '';
     },
     mounted() {
@@ -413,22 +406,17 @@ export default {
 
             this.loading = true;
             try {
-                let res = await myAxios.post('/respo/path-tree', { identifie: this.identifie });
+                let res = await myAxios.post('/respo/path-tree', { identifie: this.formulaIdentifie });
                 let list = res?.data?.data?.list || {};
 
-                this.readmeContent = list[README_PATH] || '';
                 this.docsOrderContent = list[DOCS_ORDER_PATH] || '';
                 this.docsFiles = this.parseDocsFiles(list);
-                let previousPath = this.activeDocPath || README_PATH;
-                let nextPath = previousPath === README_PATH
-                    ? README_PATH
-                    : (this.docsFiles.find(item => item.path === previousPath)?.path || README_PATH);
+                let previousPath = this.activeDocPath || '';
+                let nextPath = this.docsFiles.find(item => item.path === previousPath)?.path
+                    || this.docsFiles[0]?.path
+                    || '';
                 this.activeDocPath = nextPath;
-                if (nextPath === README_PATH) {
-                    this.inputContent(this.readmeContent);
-                } else {
-                    this.inputContent(this.activeDoc?.content || '');
-                }
+                this.inputContent(this.activeDoc?.content || '');
                 this.$nextTick(() => {
                     this.patchMavonMarkdown();
                 });
@@ -474,7 +462,7 @@ export default {
         postDocsOrderFile(content = this.getDocsOrderContent()) {
             this.docsOrderContent = content;
             return myAxios.post('/respo/file', {
-                identifie: this.identifie,
+                identifie: this.formulaIdentifie,
                 filename: DOCS_ORDER_PATH,
                 content,
             });
@@ -497,7 +485,7 @@ export default {
             }
         },
         onDocDragStart(item, event) {
-            if (!item || item.isReadme || this.saving) { return }
+            if (!item || this.saving) { return }
             this.draggingDocPath = item.path;
             this.dragOverDocPath = '';
             if (event?.dataTransfer) {
@@ -506,7 +494,7 @@ export default {
             }
         },
         onDocDragOver(item) {
-            if (!item || item.isReadme || !this.draggingDocPath || item.path === this.draggingDocPath) { return }
+            if (!item || !this.draggingDocPath || item.path === this.draggingDocPath) { return }
             this.dragOverDocPath = item.path;
         },
         onDocDragLeave(item) {
@@ -515,7 +503,7 @@ export default {
             }
         },
         async onDocDrop(item) {
-            if (!item || item.isReadme || !this.draggingDocPath || item.path === this.draggingDocPath) {
+            if (!item || !this.draggingDocPath || item.path === this.draggingDocPath) {
                 this.onDocDragEnd();
                 return;
             }
@@ -542,11 +530,7 @@ export default {
             if (!path || path === this.activeDocPath) { return }
             this.persistEditorContent();
             this.activeDocPath = path;
-            if (path === README_PATH) {
-                this.inputContent(this.readmeContent);
-            } else {
-                this.inputContent(this.activeDoc?.content || '');
-            }
+            this.inputContent(this.activeDoc?.content || '');
             this.$nextTick(() => {
                 this.patchMavonMarkdown();
             });
@@ -573,7 +557,7 @@ export default {
             this.createDialog.title = '';
         },
         openRenameDialog(item) {
-            if (!item || item.isReadme || !item.path) { return }
+            if (!item || !item.path) { return }
             this.persistEditorContent();
             this.renameDialog.show = true;
             this.renameDialog.title = item.title || '';
@@ -601,7 +585,7 @@ export default {
             if (this.saving) { return }
             this.saving = true;
             try {
-                let latest = await myAxios.post('/respo/path-tree', { identifie: this.identifie });
+                let latest = await myAxios.post('/respo/path-tree', { identifie: this.formulaIdentifie });
                 let latestList = latest?.data?.data?.list || {};
                 let remoteExists = Object.keys(latestList).some(path => normalizePath(path) === targetPath);
                 if (remoteExists) {
@@ -611,7 +595,7 @@ export default {
                 }
 
                 await myAxios.post('/respo/file', {
-                    identifie: this.identifie,
+                    identifie: this.formulaIdentifie,
                     filename: file.path,
                     content: ' ',
                 });
@@ -631,7 +615,7 @@ export default {
         async submitRename() {
             let oldPath = normalizePath(this.renameDialog.path || '');
             let title = (this.renameDialog.title || '').trim().replace(/\.md$/i, '').trim();
-            if (!oldPath || normalizePath(oldPath) === normalizePath(README_PATH)) {
+            if (!oldPath) {
                 this.renameDialog.show = false;
                 return;
             }
@@ -674,7 +658,7 @@ export default {
             this.saving = true;
             this.savingPath = oldPath;
             try {
-                let latest = await myAxios.post('/respo/path-tree', { identifie: this.identifie });
+                let latest = await myAxios.post('/respo/path-tree', { identifie: this.formulaIdentifie });
                 let latestList = latest?.data?.data?.list || {};
                 let remoteExists = Object.keys(latestList).some(path => {
                     let normalized = normalizePath(path);
@@ -687,12 +671,12 @@ export default {
                 }
 
                 await myAxios.post('/respo/file', {
-                    identifie: this.identifie,
+                    identifie: this.formulaIdentifie,
                     filename: targetFile.path,
                     content: current?.content || '',
                 });
                 await myAxios.post('/respo/file', {
-                    identifie: this.identifie,
+                    identifie: this.formulaIdentifie,
                     filename: oldPath,
                     content: '',
                 });
@@ -722,10 +706,6 @@ export default {
         },
         async deleteDoc(path) {
             if (!path) { return }
-            if (normalizePath(path) === normalizePath(README_PATH)) {
-                messageWarning('readme.md 不可删除');
-                return;
-            }
             this.persistEditorContent();
             let current = this.docsFiles.find(item => item.path === path);
             if (!current) { return }
@@ -740,17 +720,14 @@ export default {
                 this.activeDocPath = nextDoc?.path || '';
                 this.inputContent(nextDoc?.content || '');
             } else {
-                this.activeDocPath = README_PATH;
-                this.inputContent(this.readmeContent);
+                this.activeDocPath = '';
+                this.inputContent('');
             }
             await this.saveMultipleDocs('', [path], '删除成功');
         },
         persistEditorContent(activeDocPath = this.activeDocPath) {
             let content = this.mdtxt;
-            if (activeDocPath === README_PATH || !activeDocPath) {
-                this.readmeContent = content;
-                return;
-            }
+            if (!activeDocPath) { return }
             let current = this.docsFiles.find(item => item.path === activeDocPath);
             if (current) {
                 current.content = content;
@@ -825,29 +802,8 @@ export default {
             }
             editor.d_render = this.markdownToHtml(editor.d_value || this.mdtxt || '');
         },
-        async saveSingleReadme() {
-            if (this.saving) { return }
-            this.persistEditorContent();
-            this.saving = true;
-            try {
-                await myAxios.post('/respo/file', {
-                    identifie: this.identifie,
-                    filename: README_PATH,
-                    content: this.readmeContent,
-                });
-                messageSuccess('保存成功');
-                await this.getFiles();
-                this.isEditing = true;
-            } finally {
-                this.saving = false;
-            }
-        },
         async saveDoc(path) {
             if (!path || this.saving) { return }
-            if (path === README_PATH) {
-                await this.saveSingleReadme();
-                return;
-            }
             await this.saveMultipleDocs(path, [], '保存成功');
         },
         async saveMultipleDocs(triggerPath = '', deletePaths = [], successText = '操作成功') {
@@ -861,7 +817,7 @@ export default {
 
                 if (currentDoc) {
                     await myAxios.post('/respo/file', {
-                        identifie: this.identifie,
+                        identifie: this.formulaIdentifie,
                         filename: currentDoc.path,
                         content: currentDoc.content || '',
                     });
@@ -869,7 +825,7 @@ export default {
 
                 for (let i = 0; i < uniqueDeletePaths.length; i++) {
                     await myAxios.post('/respo/file', {
-                        identifie: this.identifie,
+                        identifie: this.formulaIdentifie,
                         filename: uniqueDeletePaths[i],
                         content: '',
                     });
@@ -1083,6 +1039,14 @@ export default {
     display: flex;
     flex: 1;
     flex-direction: column;
+    min-width: 0;
+}
+
+.editor-empty {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    justify-content: center;
     min-width: 0;
 }
 

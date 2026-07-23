@@ -100,8 +100,15 @@
                         </div>
                         <div class="white-box version-base-card">
                             <div class="c-16 b">基础信息</div>
+                            <a-tooltip content="编辑基础信息" position="top">
+                                <a-button class="version-base-edit-button" type="text" shape="circle"
+                                    aria-label="编辑基础信息" @click="baseInfoEdit.visible = true">
+                                    <template #icon><icon-edit /></template>
+                                </a-button>
+                            </a-tooltip>
                             <div class="mt-20">
                                 <version-info :identifie="identifie" :info="info"
+                                    :icon-cache-key="baseInfoEdit.iconCacheKey"
                                     @refresh="() => { getInfo() }"></version-info>
                             </div>
                         </div>
@@ -298,7 +305,7 @@
                 </div>
 
             </a-tab-pane>
-            <a-tab-pane key="appinfo" title="应用介绍">
+            <a-tab-pane key="appinfo" title="应用文档">
                 <description v-if="activeTab == 'appinfo'" :identifie="identifie"></description>
             </a-tab-pane>
             <a-tab-pane key="publish" title="发布设置">
@@ -307,6 +314,9 @@
         </a-tabs>
         </div>
     </a-spin>
+    <application-base-info-modal v-model:visible="baseInfoEdit.visible" :identifie="identifie" :info="info"
+        :icon-cache-key="baseInfoEdit.iconCacheKey"
+        @saved="handleBaseInfoSaved" />
     <a-modal v-model:visible="form.show" :width="640" :title="form.edit ? '编辑版本' : '新建版本'" :footer="false"
         modal-class="createversiondialog">
         
@@ -370,6 +380,7 @@
 <script>
 import myAxios from '@/utils'
 import versionInfo from '@/components/version-info.vue';
+import ApplicationBaseInfoModal from '@/components/application-base-info-modal.vue';
 import jsyaml from "js-yaml";
 import description from './description.vue';
 import publishSettings from './publish-settings.vue';
@@ -377,11 +388,12 @@ import ManifestConfigTable from '@/components/manifest-config-table.vue';
 import ManifestConfigTableColumn from '@/components/manifest-config-table-column.vue';
 import userMixin from "@/utils/user-mixin";
 import { messageError, messageSuccess } from '@/utils/ui-feedback';
-import { IconArrowLeft, IconArrowRight, IconPlus, IconCloud } from '@arco-design/web-vue/es/icon';
+import { IconArrowLeft, IconArrowRight, IconPlus, IconCloud, IconEdit } from '@arco-design/web-vue/es/icon';
 
 export default {
     components: {
         versionInfo,
+        ApplicationBaseInfoModal,
         description,
         publishSettings,
         ManifestConfigTable,
@@ -390,11 +402,16 @@ export default {
         IconArrowRight,
         IconPlus,
         IconCloud,
+        IconEdit,
     },
     mixins: [userMixin],
     data() {
         return {
             activeTab: 'version',
+            baseInfoEdit: {
+                visible: false,
+                iconCacheKey: '',
+            },
             identifie: '',
             title: '',
             baseurl: '',
@@ -514,7 +531,10 @@ export default {
         currentAppLogo() {
             let logo = this.info?.icon_url || this.info?.icon || '';
             if (logo && !/^https?:\/\//.test(logo)) {
-                return this.baseurl + logo;
+                logo = this.baseurl + logo;
+            }
+            if (logo && this.baseInfoEdit.iconCacheKey) {
+                logo += (logo.includes('?') ? '&' : '?') + 'time=' + this.baseInfoEdit.iconCacheKey;
             }
             return logo;
         },
@@ -530,6 +550,12 @@ export default {
         },
     },
     methods: {
+        handleBaseInfoSaved({ iconUpdated } = {}) {
+            if (iconUpdated) {
+                this.baseInfoEdit.iconCacheKey = Date.now();
+            }
+            this.getInfo();
+        },
         handleTabClick(key) {
             if (key == 'paidset') {
                 this.getInstFee();
@@ -1352,6 +1378,23 @@ export default {
 
 .version-base-card {
     flex: 0 0 480px;
+    position: relative;
+}
+
+.version-base-edit-button {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    width: 30px;
+    height: 30px;
+    color: #3370ff;
+    opacity: 0;
+    transition: opacity .2s;
+}
+
+.version-base-card:hover .version-base-edit-button,
+.version-base-edit-button:focus-visible {
+    opacity: 1;
 }
 
 .version-current-content {

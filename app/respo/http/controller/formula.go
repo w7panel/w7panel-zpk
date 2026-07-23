@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/url"
 
 	"github.com/gin-gonic/gin"
 	"github.com/w7panel/w7panel-zpk/app/respo/logic"
@@ -115,16 +116,22 @@ func (c Formula) Info(ctx *gin.Context) {
 				return
 			}
 		} else {
-			ok, formulaIdentify := logic.Order{}.CheckFormulaCanInstallOrUpgrade(*formula, consoleUid, params.OrderSn, params.IsUpgrade > 0, params.Reinstall)
+			ok, formulaIdentify, actualOrderSn := logic.Order{}.CheckFormulaCanInstallOrUpgrade(*formula, consoleUid, params.OrderSn, params.IsUpgrade > 0, params.Reinstall)
 			if !ok {
 				c.JsonResponseWithError(ctx, errors.New("请先购买后再安装"), 500)
 				return
 			}
-			canUpgradeVersion, formulaExpire, formulaIdentify, err = logic.Order{}.GetFormulaCanUpgradeVersion(*formula, consoleUid, params.OrderSn)
+			if actualOrderSn != "" {
+				params.OrderSn = actualOrderSn
+			}
+			canUpgradeVersion, formulaExpire, formulaIdentify, actualOrderSn, err = logic.Order{}.GetFormulaCanUpgradeVersion(*formula, consoleUid, params.OrderSn)
 			slog.Info("formula can upgrade version", "formula", formula.Name, "consoleUid", consoleUid, "version", canUpgradeVersion, "formulaIdentify", formulaIdentify, "err", err)
 			if err != nil {
 				c.JsonResponseWithError(ctx, err, 500)
 				return
+			}
+			if actualOrderSn != "" {
+				params.OrderSn = actualOrderSn
 			}
 			if formulaIdentify != "" && formulaIdentify != formula.Name {
 				targetFormulaIdentify = formulaIdentify
@@ -289,8 +296,15 @@ func (c Formula) Info(ctx *gin.Context) {
 	}
 	tmpContent, _ = yaml.Marshal(responseManifestMap)
 	manifestContent := string(tmpContent)
+	infoURL := fmt.Sprintf("%s%s%s", schemaHttp, domain, ctx.Request.URL.Path)
+	if params.OrderSn != "" {
+		query := url.Values{}
+		query.Set("order_sn", params.OrderSn)
+		infoURL += "?" + query.Encode()
+	}
 
 	c.JsonResponseWithoutError(ctx, gin.H{
+		"info_url":               infoURL,
 		"zip_url":                zipUrl,
 		"manifest":               manifestContent,
 		"version":                version,
@@ -594,6 +608,7 @@ func (c Formula) InstallComplete(ctx *gin.Context) {
 		Ticket        string `form:"ticket" binding:"required"`
 		PanelDeviceSN string `form:"panel_device_sn" json:"panel_device_sn"`
 		PanelURL      string `form:"panel_url" json:"panel_url"`
+		AppIdentify   string `form:"app_identify" json:"app_identify"`
 	}
 	params := ParamsValidate{}
 	if !c.Validate(ctx, &params) {
@@ -606,7 +621,7 @@ func (c Formula) InstallComplete(ctx *gin.Context) {
 		c.JsonResponseWithError(ctx, err, 500)
 		return
 	}
-	err = logic.Order{}.UseOrder(*ticketInfo, params.PanelDeviceSN, params.PanelURL)
+	err = logic.Order{}.UseOrder(*ticketInfo, params.PanelDeviceSN, params.PanelURL, params.AppIdentify)
 	slog.Info("核销订单完成", "ticket", params.Ticket, "info", ticketInfo, "err", err)
 	if err != nil {
 		c.JsonResponseWithError(ctx, err, 500)

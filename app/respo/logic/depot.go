@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -185,10 +186,6 @@ func (self *Depot) AddFormula(name string, version string, user *entity.Registry
 }
 
 func (self *Depot) GetFormula(name string, version string, user *entity.RegistryUser) (*Formula, error) {
-	return self.getFormula(name, version, user, true)
-}
-
-func (self *Depot) getFormula(name string, version string, user *entity.RegistryUser, seedSharedFiles bool) (*Formula, error) {
 	name = strings.ReplaceAll(name, "_", "-")
 
 	query := dao.Q.Formula.Preload(dao.Formula.Tag).Where(dao.Formula.Name.Value(name))
@@ -243,7 +240,7 @@ func (self *Depot) getFormula(name string, version string, user *entity.Registry
 		return nil, err
 	}
 	sharedFilesDir := self.getSharedFilesDir(result.Name)
-	if seedSharedFiles && (!function.FileExists(sharedFilesDir) || function.IsDirEmpty(sharedFilesDir)) {
+	if !function.FileExists(sharedFilesDir) || function.IsDirEmpty(sharedFilesDir) {
 		if err = self.seedSharedFilesFromOci(result); err != nil {
 			slog.Error("seedSharedFilesFromOci err", "formula_name", result.Name, "version", result.Version, "err", err)
 			return nil, err
@@ -433,6 +430,16 @@ func NormalizeFormulaFilePath(filename string) (string, error) {
 		return "", err
 	}
 	return cleanFilename, nil
+}
+
+var formulaManifestPathPattern = regexp.MustCompile(`(^|/)manifest\.yaml$`)
+
+func IsFormulaManifestPath(path string) bool {
+	return formulaManifestPathPattern.MatchString(normalizeFormulaFilePath(path))
+}
+
+func normalizeFormulaFilePath(path string) string {
+	return strings.ReplaceAll(strings.TrimPrefix(path, "/"), "\\", "/")
 }
 
 func (self *Depot) GetManifestFileList(formula *Formula) (map[string]string, error) {

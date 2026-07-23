@@ -174,9 +174,6 @@ func (provider *Provider) Register(httpServer *http_server.Server, console conso
 	if err != nil {
 		panic(err)
 	}
-	if err = depot.MigrateFormulaFiles(); err != nil {
-		panic(err)
-	}
 	go depot.PackLoop()
 
 	logic.InitFormulaPublishLoop()

@@ -167,7 +167,7 @@ func (self *Depot) AddFormula(name string, version string, user *entity.Registry
 		}
 		content, err := yaml.Marshal(manifest)
 		if err == nil {
-			_ = self.SaveFile(&Formula{
+			_ = self.SaveManifestFile(&Formula{
 				Name:      name,
 				VersionId: versionId,
 			}, "manifest.yaml", string(content))
@@ -240,7 +240,7 @@ func (self *Depot) GetFormula(name string, version string, user *entity.Registry
 	}
 
 	//load all manifest
-	list, _ := self.GetFileList(result)
+	list, _ := self.GetManifestFileList(result)
 	for key, value := range list {
 		if strings.Contains(key, "manifest.yaml") {
 			manifestRow := &logic.Manifest{}
@@ -255,6 +255,7 @@ func (self *Depot) GetFormula(name string, version string, user *entity.Registry
 			tmpManifest = logic.GetManifestV2(tmpManifest)
 			manifestRow = &tmpManifest
 			if key == "manifest.yaml" {
+				result.ApplyBaseInfo(manifestRow)
 				result.Manifest = manifestRow
 			}
 
@@ -350,8 +351,21 @@ func (self *Depot) DeleteFormula(formula *Formula) error {
 	return nil
 }
 
-func (self *Depot) SaveFile(formula *Formula, filename string, content string) error {
-	filesDir := filepath.Join(self.basePath, formula.GetFilesRelativeDir())
+func (self *Depot) SaveManifestFile(formula *Formula, filename string, content string) error {
+	if !IsFormulaManifestPath(filename) {
+		return fmt.Errorf("只允许保存 manifest 文件: %s", filename)
+	}
+	return self.saveFile(filepath.Join(self.basePath, formula.GetFilesRelativeDir()), filename, content)
+}
+
+func (self *Depot) SaveSharedFile(formula *Formula, filename string, content string) error {
+	if IsFormulaManifestPath(filename) {
+		return fmt.Errorf("manifest 文件必须保存到版本目录: %s", filename)
+	}
+	return self.saveFile(self.getSharedFilesDir(formula.Name), filename, content)
+}
+
+func (self *Depot) saveFile(filesDir, filename, content string) error {
 	filePath, err := resolveFormulaFilePath(filesDir, filename)
 	if err != nil {
 		return err
@@ -394,8 +408,33 @@ func resolveFormulaFilePath(filesDir, filename string) (string, error) {
 	return filePath, nil
 }
 
-func (self *Depot) GetFileList(formula *Formula) (map[string]string, error) {
-	dir := filepath.Join(self.basePath, formula.GetFilesRelativeDir())
+func (self *Depot) GetManifestFileList(formula *Formula) (map[string]string, error) {
+	files, err := self.getFileList(filepath.Join(self.basePath, formula.GetFilesRelativeDir()))
+	if err != nil {
+		return nil, err
+	}
+	for path := range files {
+		if !IsFormulaManifestPath(path) {
+			delete(files, path)
+		}
+	}
+	return files, nil
+}
+
+func (self *Depot) GetSharedFileList(formula *Formula) (map[string]string, error) {
+	files, err := self.getFileList(self.getSharedFilesDir(formula.Name))
+	if err != nil {
+		return nil, err
+	}
+	for path := range files {
+		if IsFormulaManifestPath(path) {
+			delete(files, path)
+		}
+	}
+	return files, nil
+}
+
+func (self *Depot) getFileList(dir string) (map[string]string, error) {
 	function.CreateDirIfNotExist(dir, os.ModePerm)
 	files := map[string]string{}
 	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
@@ -422,6 +461,10 @@ func (self *Depot) GetFileList(formula *Formula) (map[string]string, error) {
 	return files, nil
 }
 
+func (self *Depot) getSharedFilesDir(formulaName string) string {
+	return filepath.Join(self.basePath, GetFormulaRelativeDir(formulaName, 0), "files")
+}
+
 func (self *Depot) GetBackendZipFileList(formula *Formula) ([]string, error) {
 	result := make([]string, 0)
 
@@ -429,7 +472,11 @@ func (self *Depot) GetBackendZipFileList(formula *Formula) ([]string, error) {
 		return result, nil
 	}
 
-	fileList, _ := self.GetFileList(formula)
+	fileList, _ := self.GetManifestFileList(formula)
+	sharedFiles, _ := self.GetSharedFileList(formula)
+	for path, content := range sharedFiles {
+		fileList[path] = content
+	}
 	zipPath := filepath.Join(self.basePath, formula.ZipPath)
 	zipReader, err := zip.OpenReader(zipPath)
 	if err != nil {
@@ -593,9 +640,30 @@ func (self *Depot) packToOci(formula *Formula) error {
 	}
 	resourcesDescriptor = append(resourcesDescriptor, iconDescriptors...)
 
-	fileList, err := self.GetFileList(formula)
+	fileList, err := self.GetManifestFileList(formula)
 	if err != nil {
 		return err
+	}
+	if formula.Setting != nil && formula.Setting.BaseInfo != nil {
+		if manifestContent, exists := fileList["manifest.yaml"]; exists {
+			manifest := &logic.Manifest{}
+			if err = yaml.Unmarshal([]byte(manifestContent), manifest); err != nil {
+				return err
+			}
+			formula.ApplyBaseInfo(manifest)
+			content, marshalErr := yaml.Marshal(manifest)
+			if marshalErr != nil {
+				return marshalErr
+			}
+			fileList["manifest.yaml"] = string(content)
+		}
+	}
+	sharedFiles, err := self.GetSharedFileList(formula)
+	if err != nil {
+		return err
+	}
+	for path, content := range sharedFiles {
+		fileList[path] = content
 	}
 	slog.Info("打包 filelist 文件", "name", formula.Name, "filelist", fileList, "err", err)
 	fileListDescriptors, err := logic.PackFileListToOci(fileList)
@@ -667,7 +735,11 @@ func (self *Depot) unPackFilesFromOci(formula *Formula) error {
 			}
 
 			for name, content := range files {
-				tempPath := filepath.Join(filesDir, name)
+				targetDir := filesDir
+				if !IsFormulaManifestPath(name) {
+					targetDir = self.getSharedFilesDir(formula.Name)
+				}
+				tempPath := filepath.Join(targetDir, name)
 				function.CreateDirIfNotExist(filepath.Dir(tempPath), os.ModePerm)
 				file, err := os.Create(tempPath)
 				if err != nil {

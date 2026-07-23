@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/w7panel/w7panel-zpk/app/respo/logic"
@@ -328,16 +327,13 @@ func (c Formula) Detail(ctx *gin.Context) {
 		return
 	}
 
-	fileList, err := depotLogin.GetFileList(formula)
+	fileList, err := depotLogin.GetSharedFileList(formula)
 	if err != nil {
 		c.JsonResponseWithError(ctx, err, 500)
 		return
 	}
 	detailMds := map[string]string{}
 	for key, val := range fileList {
-		if strings.HasSuffix(key, "manifest.yaml") {
-			continue
-		}
 		detailMds[key] = val
 	}
 

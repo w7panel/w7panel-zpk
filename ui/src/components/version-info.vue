@@ -258,20 +258,23 @@ export default {
             this.edit.type = '';
             this.submit();
         },
-        submit() {
-            let yaml = jsyaml.dump(this.json, {
-                indent: 4,
-                sortKeys: (a, b) => {
-                    if (b == 'menu') { return -1; }
-                    return a > b ? 1 : -1;
-                },
-            });
-            myAxios.post('/respo/file', {
+        async submit() {
+            let settingRes = await myAxios.post('/respo/setting/get', {
                 identifie: this.identifie,
-                filename: 'manifest.yaml',
-                content: yaml,
-                version: String(this.info?.version?.id),
-            }).then((res) => {
+            });
+            let baseInfo = settingRes?.data?.data?.base_info || {};
+            await myAxios.post('/respo/setting/set', {
+                identifie: this.identifie,
+                base_info: {
+                    ...baseInfo,
+                    name: this.json?.application?.name || this.form.name || '',
+                    description: this.json?.application?.description || this.form.description || '',
+                    annotation: this.json?.application?.annotation || {},
+                    once: Boolean(this.json?.application?.once),
+                    cluster_privileges: Boolean(this.json?.application?.clusterPrivileges),
+                    register_site: Boolean(this.json?.application?.registerSite),
+                },
+            }).then(() => {
                 messageSuccess('操作成功');
                 this.$emit('refresh');
             })

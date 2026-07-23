@@ -406,7 +406,9 @@ export default {
 
             this.loading = true;
             try {
-                let res = await myAxios.post('/respo/path-tree', { identifie: this.formulaIdentifie });
+                let res = await myAxios.post('/respo/share-file/path-tree', {
+                    identifie: this.formulaIdentifie,
+                });
                 let list = res?.data?.data?.list || {};
 
                 this.docsOrderContent = list[DOCS_ORDER_PATH] || '';
@@ -461,7 +463,7 @@ export default {
         },
         postDocsOrderFile(content = this.getDocsOrderContent()) {
             this.docsOrderContent = content;
-            return myAxios.post('/respo/file', {
+            return myAxios.post('/respo/share-file/file', {
                 identifie: this.formulaIdentifie,
                 filename: DOCS_ORDER_PATH,
                 content,
@@ -585,7 +587,9 @@ export default {
             if (this.saving) { return }
             this.saving = true;
             try {
-                let latest = await myAxios.post('/respo/path-tree', { identifie: this.formulaIdentifie });
+                let latest = await myAxios.post('/respo/share-file/path-tree', {
+                    identifie: this.formulaIdentifie,
+                });
                 let latestList = latest?.data?.data?.list || {};
                 let remoteExists = Object.keys(latestList).some(path => normalizePath(path) === targetPath);
                 if (remoteExists) {
@@ -594,7 +598,7 @@ export default {
                     return;
                 }
 
-                await myAxios.post('/respo/file', {
+                await myAxios.post('/respo/share-file/file', {
                     identifie: this.formulaIdentifie,
                     filename: file.path,
                     content: ' ',
@@ -658,7 +662,9 @@ export default {
             this.saving = true;
             this.savingPath = oldPath;
             try {
-                let latest = await myAxios.post('/respo/path-tree', { identifie: this.formulaIdentifie });
+                let latest = await myAxios.post('/respo/share-file/path-tree', {
+                    identifie: this.formulaIdentifie,
+                });
                 let latestList = latest?.data?.data?.list || {};
                 let remoteExists = Object.keys(latestList).some(path => {
                     let normalized = normalizePath(path);
@@ -670,12 +676,12 @@ export default {
                     return;
                 }
 
-                await myAxios.post('/respo/file', {
+                await myAxios.post('/respo/share-file/file', {
                     identifie: this.formulaIdentifie,
                     filename: targetFile.path,
                     content: current?.content || '',
                 });
-                await myAxios.post('/respo/file', {
+                await myAxios.post('/respo/share-file/file', {
                     identifie: this.formulaIdentifie,
                     filename: oldPath,
                     content: '',
@@ -816,7 +822,7 @@ export default {
                 let uniqueDeletePaths = deletePaths.filter((path, index, list) => path && list.indexOf(path) === index);
 
                 if (currentDoc) {
-                    await myAxios.post('/respo/file', {
+                    await myAxios.post('/respo/share-file/file', {
                         identifie: this.formulaIdentifie,
                         filename: currentDoc.path,
                         content: currentDoc.content || '',
@@ -824,7 +830,7 @@ export default {
                 }
 
                 for (let i = 0; i < uniqueDeletePaths.length; i++) {
-                    await myAxios.post('/respo/file', {
+                    await myAxios.post('/respo/share-file/file', {
                         identifie: this.formulaIdentifie,
                         filename: uniqueDeletePaths[i],
                         content: '',

@@ -76,21 +76,10 @@
 </template>
 
 <script>
-import jsyaml from 'js-yaml';
 import myAxios from '@/utils';
 import ManifestConfigTable from '@/components/manifest-config-table.vue';
 import ManifestConfigTableColumn from '@/components/manifest-config-table-column.vue';
 import { messageError, messageSuccess } from '@/utils/ui-feedback';
-
-const README_PATH = 'readme.md';
-const defaultManifest = `application:
-    name: ''
-    identifie: ''
-    description: ''
-    author: ''
-    once: false
-v: 2
-`;
 
 export default {
     name: 'ApplicationBaseInfoModal',
@@ -198,26 +187,24 @@ export default {
             this.loadFailed = false;
             this.resetSelectedIcon();
             try {
-                let [infoRes, filesRes, tagsRes] = await Promise.all([
+                let [infoRes, settingRes, filesRes, tagsRes] = await Promise.all([
                     myAxios.get('/respo/info/' + this.identifie),
-                    myAxios.post('/respo/path-tree', { identifie: this.identifie }),
+                    myAxios.post('/respo/setting/get', { identifie: this.identifie }),
+                    myAxios.post('/respo/share-file/path-tree', { identifie: this.identifie }),
                     myAxios.post('/respo/tag/list', { limit: 999 }),
                 ]);
                 let latestInfo = infoRes?.data?.data || this.info || {};
-                let json = jsyaml.load(latestInfo?.manifest || this.info?.manifest || defaultManifest) || {};
-                this.form.name = json?.platform?.baseInfo?.name || json?.application?.name || '';
-                this.form.description = json?.platform?.baseInfo?.description
-                    || json?.application?.description
-                    || '';
-                this.form.annotations = Object.entries(json?.application?.annotation || {})
+                let baseInfo = settingRes?.data?.data?.base_info || {};
+                this.form.name = baseInfo.name || '';
+                this.form.description = baseInfo.description || '';
+                this.form.annotations = Object.entries(baseInfo.annotation || {})
                     .map(([key, value]) => ({ key, value: String(value) }));
-                this.form.once = Boolean(json?.application?.once);
-                this.form.clusterPrivileges = Boolean(json?.application?.clusterPrivileges);
-                this.form.registerSite = Boolean(json?.application?.registerSite);
+                this.form.once = Boolean(baseInfo.once);
+                this.form.clusterPrivileges = Boolean(baseInfo.cluster_privileges);
+                this.form.registerSite = Boolean(baseInfo.register_site);
                 this.iconPreview = this.getIconUrl(latestInfo?.icon_url || this.info?.icon_url || '');
 
-                let files = filesRes?.data?.data?.list || {};
-                this.form.introduction = files[README_PATH] || '';
+                this.form.introduction = filesRes?.data?.data?.list?.['readme.md'] || '';
                 this.tags = tagsRes?.data?.data?.list || [];
                 this.initialTagIds = (latestInfo?.tags || this.info?.tags || []).map(item => Number(item.id));
                 this.form.tagIds = [...this.initialTagIds];
@@ -263,48 +250,29 @@ export default {
             try {
                 let latestRes = await myAxios.get('/respo/info/' + this.identifie);
                 let latestInfo = latestRes?.data?.data || this.info || {};
-                let json = jsyaml.load(latestInfo?.manifest || this.info?.manifest || defaultManifest) || {};
-                json.application = json.application || {};
-                json.application.identifie = json.application.identifie || this.identifie;
-                json.application.name = name;
-                json.application.description = this.form.description || '';
-                json.application.once = Boolean(this.form.once);
-                json.application.clusterPrivileges = Boolean(this.form.clusterPrivileges);
-                json.application.registerSite = Boolean(this.form.registerSite);
-                json.application.annotation = this.form.annotations.reduce((result, item) => {
+
+                let annotation = this.form.annotations.reduce((result, item) => {
                     let key = (item?.key || '').trim();
                     if (key && item?.value !== undefined && item?.value !== null && String(item.value) !== '') {
                         result[key] = String(item.value);
                     }
                     return result;
                 }, {});
-                if (json.platform) {
-                    json.platform.baseInfo = json.platform.baseInfo || {};
-                    json.platform.baseInfo.identifie = json.platform.baseInfo.identifie
-                        || json.application.identifie
-                        || this.identifie;
-                    json.platform.baseInfo.name = name;
-                    json.platform.baseInfo.description = this.form.description || '';
-                }
 
-                let yaml = jsyaml.dump(json, {
-                    indent: 4,
-                    sortKeys: (a, b) => {
-                        if (b === 'menu') { return -1 }
-                        return a > b ? 1 : -1;
+                await myAxios.post('/respo/setting/set', {
+                    identifie: this.identifie,
+                    base_info: {
+                        name,
+                        description: this.form.description || '',
+                        annotation,
+                        once: Boolean(this.form.once),
+                        cluster_privileges: Boolean(this.form.clusterPrivileges),
+                        register_site: Boolean(this.form.registerSite),
                     },
                 });
-                let version = String(latestInfo?.version?.id || this.info?.version?.id || '');
-
-                await myAxios.post('/respo/file', {
+                await myAxios.post('/respo/share-file/file', {
                     identifie: this.identifie,
-                    filename: 'manifest.yaml',
-                    content: yaml,
-                    version,
-                });
-                await myAxios.post('/respo/file', {
-                    identifie: this.identifie,
-                    filename: README_PATH,
+                    filename: 'readme.md',
                     content: this.form.introduction || '',
                 });
 

@@ -99,14 +99,14 @@ export default {
         },
         addfileInside(json, yaml, data) {
 
-            myAxios.post('/respo/file', {
+            myAxios.post('/respo/manifest/file', {
                 identifie: this.identifie,
                 filename: 'manifest.yaml',
                 content: yaml,
                 version: this.version_id,
             }).then((res) => {
                 if (this.tree.find(i => i.label == path)) { return }
-                myAxios.post('/respo/file', {
+                myAxios.post('/respo/manifest/file', {
                     identifie: this.identifie,
                     filename: data.file,
                     content: data.cont,
@@ -121,7 +121,7 @@ export default {
             });
         },
         getFile() {
-            myAxios.post('/respo/path-tree', {
+            myAxios.post('/respo/manifest/path-tree', {
                 identifie: this.identifie,
                 version: this.version_id,
             }).then(res => {
@@ -134,7 +134,7 @@ export default {
             })
         },
         complete(json, yaml, otherData) {
-            myAxios.post('/respo/file', {
+            myAxios.post('/respo/manifest/file', {
                 identifie: this.identifie,
                 filename: 'manifest.yaml',
                 content: yaml,
@@ -142,7 +142,7 @@ export default {
             }).then((res) => {
                 if (otherData?.editfile) {
                     if (/\.yaml$/.test(otherData.editfile)) {
-                        this.$router.push('/zpk-manifest-editor?identifie=' + this.identifie + '&filename=' + otherData.editfile);
+                        this.$router.push('/zpk-manifest-editor?version_id=' + this.version_id + '&identifie=' + this.identifie + '&filename=' + otherData.editfile);
                         return;
                     }
                 }

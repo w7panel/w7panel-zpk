@@ -37,15 +37,19 @@ func sanitizeFormulaAttachContent(content string) string {
 	return content
 }
 
-func (c FormulaAttach) SaveFile(ctx *gin.Context) {
+func (c FormulaAttach) SaveManifestFile(ctx *gin.Context) {
 	type ParamsValidate struct {
-		Identifie string `form:"identifie" binding:"required"`
-		Filename  string `form:"filename" binding:"required"`
-		Content   string `form:"content" binding:"omitempty"`
-		Version   string `form:"version"`
+		Identifie string `form:"identifie" json:"identifie" binding:"required"`
+		Filename  string `form:"filename" json:"filename" binding:"required"`
+		Content   string `form:"content" json:"content" binding:"omitempty"`
+		Version   string `form:"version" json:"version" binding:"required"`
 	}
 	params := ParamsValidate{}
 	if !c.Validate(ctx, &params) {
+		return
+	}
+	if !logic.IsFormulaManifestPath(params.Filename) {
+		c.JsonResponseWithError(ctx, fmt.Errorf("manifest 接口不支持文件: %s", params.Filename), 500)
 		return
 	}
 
@@ -56,46 +60,55 @@ func (c FormulaAttach) SaveFile(ctx *gin.Context) {
 		return
 	}
 
-	if params.Filename == "manifest.yaml" {
-		manifest := &logic2.Manifest{}
-		err = yaml.Unmarshal([]byte(params.Content), manifest)
-		if err != nil {
-			c.JsonResponseWithError(ctx, errors.New("manifest 解析失败"+err.Error()), 500)
-			return
-		}
-		if manifest.Source.Url != "" && !strings.HasSuffix(manifest.Source.Url, ".git") && !strings.HasSuffix(manifest.Source.Url, ".zip") {
-			c.JsonResponseWithError(ctx, errors.New("zip_url 必须以 .git 或是 .zip 结尾"), 500)
-			return
-		}
-		if manifest.Application.Identifie == "" {
-			manifest.Application.Identifie = manifest.Platform.BaseInfo.Identifie
-		}
-		if manifest.Application.Identifie != formula.Name {
-			c.JsonResponseWithError(ctx, errors.New("manifest 中标识与仓库不一致"), 500)
-			return
-		}
-
-		if formula.Manifest.Source.Url != manifest.Source.Url {
-			if strings.HasPrefix(formula.Manifest.Source.Url, "file://") {
-				file, err := logic.GetLocalClient().GetFile(formula.ZipPath)
-				if err == nil {
-					os.Remove(file.Name())
-				}
-			}
-		}
-
-		_, err = dao.Q.Formula.Where(dao.Formula.ID.Eq(formula.ID)).Updates(entity.Formula{
-			Title: manifest.Application.Name,
-		})
-		if err != nil {
-			c.JsonResponseWithError(ctx, errors.New("更新 title 失败"), 500)
-			return
-		}
-	} else {
-		params.Content = sanitizeFormulaAttachContent(params.Content)
+	manifest := &logic2.Manifest{}
+	err = yaml.Unmarshal([]byte(params.Content), manifest)
+	if err != nil {
+		c.JsonResponseWithError(ctx, errors.New("manifest 解析失败"+err.Error()), 500)
+		return
+	}
+	if manifest.Source.Url != "" && !strings.HasSuffix(manifest.Source.Url, ".git") && !strings.HasSuffix(manifest.Source.Url, ".zip") {
+		c.JsonResponseWithError(ctx, errors.New("zip_url 必须以 .git 或是 .zip 结尾"), 500)
+		return
+	}
+	if manifest.Application.Identifie == "" {
+		manifest.Application.Identifie = manifest.Platform.BaseInfo.Identifie
+	}
+	if manifest.Application.Identifie != formula.Name {
+		c.JsonResponseWithError(ctx, errors.New("manifest 中标识与仓库不一致"), 500)
+		return
 	}
 
-	err = depot.SaveFile(formula, params.Filename, params.Content)
+	if formula.Manifest.Source.Url != manifest.Source.Url {
+		if strings.HasPrefix(formula.Manifest.Source.Url, "file://") {
+			file, err := logic.GetLocalClient().GetFile(formula.ZipPath)
+			if err == nil {
+				os.Remove(file.Name())
+			}
+		}
+	}
+	formula.ApplyBaseInfo(manifest)
+	if formula.Setting != nil && formula.Setting.BaseInfo != nil {
+		content, marshalErr := yaml.Marshal(manifest)
+		if marshalErr != nil {
+			c.JsonResponseWithError(ctx, errors.New("manifest 生成失败"+marshalErr.Error()), 500)
+			return
+		}
+		params.Content = string(content)
+	}
+
+	title := manifest.Application.Name
+	if formula.Setting != nil && formula.Setting.BaseInfo != nil {
+		title = formula.Setting.BaseInfo.Name
+	}
+	_, err = dao.Q.Formula.Where(dao.Formula.ID.Eq(formula.ID)).Updates(entity.Formula{
+		Title: title,
+	})
+	if err != nil {
+		c.JsonResponseWithError(ctx, errors.New("更新 title 失败"), 500)
+		return
+	}
+
+	err = depot.SaveManifestFile(formula, params.Filename, params.Content)
 	if err != nil {
 		c.JsonResponseWithError(ctx, err, 500)
 		return
@@ -104,10 +117,10 @@ func (c FormulaAttach) SaveFile(ctx *gin.Context) {
 	c.JsonSuccessResponse(ctx)
 }
 
-func (c FormulaAttach) Files(ctx *gin.Context) {
+func (c FormulaAttach) ManifestFiles(ctx *gin.Context) {
 	type ParamsValidate struct {
-		Identifie string `form:"identifie" binding:"required"`
-		Version   string `form:"version"`
+		Identifie string `form:"identifie" json:"identifie" binding:"required"`
+		Version   string `form:"version" json:"version" binding:"required"`
 	}
 	params := ParamsValidate{}
 	if !c.Validate(ctx, &params) {
@@ -120,8 +133,7 @@ func (c FormulaAttach) Files(ctx *gin.Context) {
 		c.JsonResponseWithError(ctx, err, 500)
 		return
 	}
-
-	fileList, err := depot.GetFileList(formula)
+	fileList, err := depot.GetManifestFileList(formula)
 	if err != nil {
 		c.JsonResponseWithError(ctx, err, 500)
 		return
@@ -153,6 +165,61 @@ func (c FormulaAttach) Files(ctx *gin.Context) {
 
 	c.JsonResponseWithoutError(ctx, gin.H{
 		"list": returnFileList,
+	})
+}
+
+func (c FormulaAttach) SaveSharedFile(ctx *gin.Context) {
+	type ParamsValidate struct {
+		Identifie string `form:"identifie" json:"identifie" binding:"required"`
+		Filename  string `form:"filename" json:"filename" binding:"required"`
+		Content   string `form:"content" json:"content" binding:"omitempty"`
+	}
+	params := ParamsValidate{}
+	if !c.Validate(ctx, &params) {
+		return
+	}
+	if logic.IsFormulaManifestPath(params.Filename) {
+		c.JsonResponseWithError(ctx, fmt.Errorf("share-file 接口不支持 manifest 文件: %s", params.Filename), 500)
+		return
+	}
+
+	depot := c.getDepot()
+	formula, err := depot.GetFormula(params.Identifie, "", logic2.User{}.GetUser(ctx))
+	if err != nil {
+		c.JsonResponseWithError(ctx, err, 500)
+		return
+	}
+	if err = depot.SaveSharedFile(formula, params.Filename, sanitizeFormulaAttachContent(params.Content)); err != nil {
+		c.JsonResponseWithError(ctx, err, 500)
+		return
+	}
+
+	c.JsonSuccessResponse(ctx)
+}
+
+func (c FormulaAttach) SharedFiles(ctx *gin.Context) {
+	type ParamsValidate struct {
+		Identifie string `form:"identifie" json:"identifie" binding:"required"`
+	}
+	params := ParamsValidate{}
+	if !c.Validate(ctx, &params) {
+		return
+	}
+
+	depot := c.getDepot()
+	formula, err := depot.GetFormula(params.Identifie, "", logic2.User{}.GetUser(ctx))
+	if err != nil {
+		c.JsonResponseWithError(ctx, err, 500)
+		return
+	}
+	fileList, err := depot.GetSharedFileList(formula)
+	if err != nil {
+		c.JsonResponseWithError(ctx, err, 500)
+		return
+	}
+
+	c.JsonResponseWithoutError(ctx, gin.H{
+		"list": fileList,
 	})
 }
 

@@ -98,8 +98,10 @@ func (provider *Provider) Register(httpServer *http_server.Server, console conso
 		group := cors.Group("/respo", middleware.Cors{}.Process)
 		group.Match([]string{"POST", "OPTIONS"}, "/add", middleware.DenyDomainReq{}.Process, middleware.Auth{}.Process, controller.Formula{}.Add)
 		group.Match([]string{"POST", "OPTIONS"}, "/delete", middleware.DenyDomainReq{}.Process, middleware.Auth{}.Process, controller.Formula{}.Delete)
-		group.Match([]string{"POST", "OPTIONS"}, "/file", middleware.DenyDomainReq{}.Process, middleware.Auth{}.Process, controller.FormulaAttach{}.SaveFile)
-		group.Match([]string{"POST", "OPTIONS"}, "/path-tree", middleware.DenyDomainReq{}.Process, middleware.Auth{}.Process, controller.FormulaAttach{}.Files)
+		group.Match([]string{"POST", "OPTIONS"}, "/manifest/file", middleware.DenyDomainReq{}.Process, middleware.Auth{}.Process, controller.FormulaAttach{}.SaveManifestFile)
+		group.Match([]string{"POST", "OPTIONS"}, "/manifest/path-tree", middleware.DenyDomainReq{}.Process, middleware.Auth{}.Process, controller.FormulaAttach{}.ManifestFiles)
+		group.Match([]string{"POST", "OPTIONS"}, "/share-file/file", middleware.DenyDomainReq{}.Process, middleware.Auth{}.Process, controller.FormulaAttach{}.SaveSharedFile)
+		group.Match([]string{"POST", "OPTIONS"}, "/share-file/path-tree", middleware.DenyDomainReq{}.Process, middleware.Auth{}.Process, controller.FormulaAttach{}.SharedFiles)
 		group.Match([]string{"GET", "OPTIONS"}, "/list", middleware.Auth{CanSkip: true}.Process, middleware.ConsoleUser{CanSkip: true}.Process, controller.Formula{}.List)
 		group.Match([]string{"GET", "OPTIONS"}, "/detail/:id", controller.Formula{}.Detail)
 		group.Match([]string{"GET", "OPTIONS"}, "/v2/detail/:id/:version", controller.Formula{}.Detail)
@@ -170,6 +172,9 @@ func (provider *Provider) Register(httpServer *http_server.Server, console conso
 	depot, _ := logic.NewDepot()
 	err = depot.InitDepotEnv()
 	if err != nil {
+		panic(err)
+	}
+	if err = depot.MigrateFormulaFiles(); err != nil {
 		panic(err)
 	}
 	go depot.PackLoop()

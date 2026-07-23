@@ -75,7 +75,7 @@ export default {
     },
     methods: {
         getFile() {
-            myAxios.post('/respo/path-tree', {
+            myAxios.post('/respo/manifest/path-tree', {
                 identifie: this.identifie,
                 version: this.version_id,
             }).then(res => {
@@ -86,7 +86,7 @@ export default {
             });
         },
         complete(json, yaml) {
-            myAxios.post('/respo/file', {
+            myAxios.post('/respo/manifest/file', {
                 identifie: this.identifie,
                 filename: this.title,
                 content: yaml,

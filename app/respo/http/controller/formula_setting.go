@@ -2,6 +2,7 @@ package controller
 
 import (
 	"errors"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/w7panel/w7panel-zpk/common/accessor"
@@ -29,20 +30,32 @@ func (c FormulaSetting) Get(ctx *gin.Context) {
 		return
 	}
 
-	setting := formula.Setting
-	if setting == nil {
-		setting = &accessor.FormulaSettingOption{}
+	setting := accessor.FormulaSettingOption{}
+	if formula.Setting != nil {
+		setting = *formula.Setting
+	}
+	if setting.BaseInfo == nil {
+		setting.BaseInfo = formula.GetBaseInfo()
+		_, err = dao.Q.Formula.Where(dao.Q.Formula.ID.Eq(formula.ID)).Updates(entity.Formula{
+			Title:   setting.BaseInfo.Name,
+			Setting: &setting,
+		})
+		if err != nil {
+			c.JsonResponseWithServerError(ctx, err)
+			return
+		}
 	}
 
-	c.JsonResponseWithoutError(ctx, setting)
+	c.JsonResponseWithoutError(ctx, &setting)
 }
 
 func (c FormulaSetting) Set(ctx *gin.Context) {
 	type ParamsValidate struct {
-		Identifie                     string `form:"identifie" json:"identifie" binding:"required"`
-		SupportCrossUpgrade           bool   `form:"support_cross_upgrade" json:"support_cross_upgrade"`
-		SupportAutoPublishToZpkMarket bool   `json:"support_auto_publish_to_zpk_market"`
-		EnableServicePackageFee       *bool  `json:"enable_service_package_fee"`
+		Identifie                     string                          `form:"identifie" json:"identifie" binding:"required"`
+		SupportCrossUpgrade           *bool                           `form:"support_cross_upgrade" json:"support_cross_upgrade"`
+		SupportAutoPublishToZpkMarket *bool                           `form:"support_auto_publish_to_zpk_market" json:"support_auto_publish_to_zpk_market"`
+		EnableServicePackageFee       *bool                           `form:"enable_service_package_fee" json:"enable_service_package_fee"`
+		BaseInfo                      *accessor.FormulaBaseInfoOption `json:"base_info"`
 	}
 	params := ParamsValidate{}
 	if !c.Validate(ctx, &params) {
@@ -58,15 +71,34 @@ func (c FormulaSetting) Set(ctx *gin.Context) {
 		formula.Setting = &accessor.FormulaSettingOption{}
 	}
 
-	formula.Setting.SupportCrossUpgrade = params.SupportCrossUpgrade
-	formula.Setting.SupportAutoPublishToZpkMarket = params.SupportAutoPublishToZpkMarket
+	if params.SupportCrossUpgrade != nil {
+		formula.Setting.SupportCrossUpgrade = *params.SupportCrossUpgrade
+	}
+	if params.SupportAutoPublishToZpkMarket != nil {
+		formula.Setting.SupportAutoPublishToZpkMarket = *params.SupportAutoPublishToZpkMarket
+	}
 	if params.EnableServicePackageFee != nil {
 		formula.Setting.EnableServicePackageFee = *params.EnableServicePackageFee
 	}
+	if params.BaseInfo != nil {
+		params.BaseInfo.Name = strings.TrimSpace(params.BaseInfo.Name)
+		if params.BaseInfo.Name == "" {
+			c.JsonResponseWithServerError(ctx, errors.New("制品名称不能为空"))
+			return
+		}
+		if params.BaseInfo.Annotation == nil {
+			params.BaseInfo.Annotation = map[string]interface{}{}
+		}
+		formula.Setting.BaseInfo = params.BaseInfo
+	}
 
-	_, err = dao.Q.Formula.Where(dao.Q.Formula.ID.Eq(formula.ID)).Updates(entity.Formula{
+	update := entity.Formula{
 		Setting: formula.Setting,
-	})
+	}
+	if params.BaseInfo != nil {
+		update.Title = params.BaseInfo.Name
+	}
+	_, err = dao.Q.Formula.Where(dao.Q.Formula.ID.Eq(formula.ID)).Updates(update)
 	if err != nil {
 		c.JsonResponseWithServerError(ctx, err)
 		return

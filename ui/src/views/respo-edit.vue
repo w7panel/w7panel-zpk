@@ -206,7 +206,7 @@ export default {
             if (this.deleteLoading) { return }
             let file = this.tree.find(i => i.label == (this.depends[index]?.identifie) + '/manifest.yaml');
             if (file) {
-                myAxios.post('/respo/file', {
+                myAxios.post('/respo/manifest/file', {
                     identifie: this.identifie,
                     filename: file.label,
                     content: '',
@@ -237,7 +237,7 @@ export default {
         },
         addfileInside(json, yaml, data) {
             this.deleteLoading = true;
-            myAxios.post('/respo/file', {
+            myAxios.post('/respo/manifest/file', {
                 identifie: this.identifie,
                 filename: 'manifest.yaml',
                 content: yaml,
@@ -249,7 +249,7 @@ export default {
                     this.dependsIndex = this.depends.length - 1;
                     return
                 }
-                myAxios.post('/respo/file', {
+                myAxios.post('/respo/manifest/file', {
                     identifie: this.identifie,
                     filename: data.file,
                     content: data.cont,
@@ -313,7 +313,7 @@ export default {
 
         dependsComplete(json, yaml, otherData) {
 
-            myAxios.post('/respo/file', {
+            myAxios.post('/respo/manifest/file', {
                 identifie: this.identifie,
                 filename: this.depends[this.dependsIndex].title,
                 content: yaml,
@@ -344,7 +344,7 @@ export default {
         },
 
         complete(json, yaml, otherData, callback) {
-            myAxios.post('/respo/file', {
+            myAxios.post('/respo/manifest/file', {
                 identifie: this.identifie,
                 filename: 'manifest.yaml',
                 content: yaml,
@@ -402,7 +402,7 @@ export default {
         },
         getFile() {
             this.deleteLoading = true;
-            return myAxios.post('/respo/path-tree', {
+            return myAxios.post('/respo/manifest/path-tree', {
                 identifie: this.identifie,
                 version: this.version_id
             }).then(res => {
@@ -425,7 +425,7 @@ export default {
                 content: '确定要删除"' + row.label + '"吗',
                 confirmButtonText: "确定",
                 cancelButtonText: "取消",
-                onOk: () => myAxios.post('/respo/file', {
+                onOk: () => myAxios.post('/respo/manifest/file', {
                     identifie: this.identifie,
                     filename: row.label,
                     content: '',

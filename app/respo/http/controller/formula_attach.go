@@ -48,6 +48,12 @@ func (c FormulaAttach) SaveManifestFile(ctx *gin.Context) {
 	if !c.Validate(ctx, &params) {
 		return
 	}
+	normalizedFilename, err := logic.NormalizeFormulaFilePath(params.Filename)
+	if err != nil {
+		c.JsonResponseWithError(ctx, err, 500)
+		return
+	}
+	params.Filename = normalizedFilename
 	if !logic.IsFormulaManifestPath(params.Filename) {
 		c.JsonResponseWithError(ctx, fmt.Errorf("manifest 接口不支持文件: %s", params.Filename), 500)
 		return
@@ -60,52 +66,54 @@ func (c FormulaAttach) SaveManifestFile(ctx *gin.Context) {
 		return
 	}
 
-	manifest := &logic2.Manifest{}
-	err = yaml.Unmarshal([]byte(params.Content), manifest)
-	if err != nil {
-		c.JsonResponseWithError(ctx, errors.New("manifest 解析失败"+err.Error()), 500)
-		return
-	}
-	if manifest.Source.Url != "" && !strings.HasSuffix(manifest.Source.Url, ".git") && !strings.HasSuffix(manifest.Source.Url, ".zip") {
-		c.JsonResponseWithError(ctx, errors.New("zip_url 必须以 .git 或是 .zip 结尾"), 500)
-		return
-	}
-	if manifest.Application.Identifie == "" {
-		manifest.Application.Identifie = manifest.Platform.BaseInfo.Identifie
-	}
-	if manifest.Application.Identifie != formula.Name {
-		c.JsonResponseWithError(ctx, errors.New("manifest 中标识与仓库不一致"), 500)
-		return
-	}
-
-	if formula.Manifest.Source.Url != manifest.Source.Url {
-		if strings.HasPrefix(formula.Manifest.Source.Url, "file://") {
-			file, err := logic.GetLocalClient().GetFile(formula.ZipPath)
-			if err == nil {
-				os.Remove(file.Name())
-			}
-		}
-	}
-	formula.ApplyBaseInfo(manifest)
-	if formula.Setting != nil && formula.Setting.BaseInfo != nil {
-		content, marshalErr := yaml.Marshal(manifest)
-		if marshalErr != nil {
-			c.JsonResponseWithError(ctx, errors.New("manifest 生成失败"+marshalErr.Error()), 500)
+	if params.Filename == "manifest.yaml" {
+		manifest := &logic2.Manifest{}
+		err = yaml.Unmarshal([]byte(params.Content), manifest)
+		if err != nil {
+			c.JsonResponseWithError(ctx, errors.New("manifest 解析失败"+err.Error()), 500)
 			return
 		}
-		params.Content = string(content)
-	}
+		if manifest.Source.Url != "" && !strings.HasSuffix(manifest.Source.Url, ".git") && !strings.HasSuffix(manifest.Source.Url, ".zip") {
+			c.JsonResponseWithError(ctx, errors.New("zip_url 必须以 .git 或是 .zip 结尾"), 500)
+			return
+		}
+		if manifest.Application.Identifie == "" {
+			manifest.Application.Identifie = manifest.Platform.BaseInfo.Identifie
+		}
+		if manifest.Application.Identifie != formula.Name {
+			c.JsonResponseWithError(ctx, errors.New("manifest 中标识与仓库不一致"), 500)
+			return
+		}
 
-	title := manifest.Application.Name
-	if formula.Setting != nil && formula.Setting.BaseInfo != nil {
-		title = formula.Setting.BaseInfo.Name
-	}
-	_, err = dao.Q.Formula.Where(dao.Formula.ID.Eq(formula.ID)).Updates(entity.Formula{
-		Title: title,
-	})
-	if err != nil {
-		c.JsonResponseWithError(ctx, errors.New("更新 title 失败"), 500)
-		return
+		if formula.Manifest.Source.Url != manifest.Source.Url {
+			if strings.HasPrefix(formula.Manifest.Source.Url, "file://") {
+				file, err := logic.GetLocalClient().GetFile(formula.ZipPath)
+				if err == nil {
+					os.Remove(file.Name())
+				}
+			}
+		}
+		formula.ApplyBaseInfo(manifest)
+		if formula.Setting != nil && formula.Setting.BaseInfo != nil {
+			content, marshalErr := yaml.Marshal(manifest)
+			if marshalErr != nil {
+				c.JsonResponseWithError(ctx, errors.New("manifest 生成失败"+marshalErr.Error()), 500)
+				return
+			}
+			params.Content = string(content)
+		}
+
+		title := manifest.Application.Name
+		if formula.Setting != nil && formula.Setting.BaseInfo != nil {
+			title = formula.Setting.BaseInfo.Name
+		}
+		_, err = dao.Q.Formula.Where(dao.Formula.ID.Eq(formula.ID)).Updates(entity.Formula{
+			Title: title,
+		})
+		if err != nil {
+			c.JsonResponseWithError(ctx, errors.New("更新 title 失败"), 500)
+			return
+		}
 	}
 
 	err = depot.SaveManifestFile(formula, params.Filename, params.Content)

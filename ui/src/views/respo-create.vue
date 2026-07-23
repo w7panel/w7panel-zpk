@@ -105,7 +105,7 @@ export default {
                 content: yaml,
                 version: this.version_id,
             }).then((res) => {
-                if (this.tree.find(i => i.label == path)) { return }
+                if (this.tree.find(i => i.label == data.file)) { return }
                 myAxios.post('/respo/manifest/file', {
                     identifie: this.identifie,
                     filename: data.file,

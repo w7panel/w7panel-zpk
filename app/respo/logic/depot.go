@@ -233,9 +233,9 @@ func (self *Depot) GetFormula(name string, version string, user *entity.Registry
 		}
 	}
 
-	err := self.unPackFilesFromOci(result)
+	err := self.unPackManifestFilesFromOci(result)
 	if err != nil {
-		slog.Error("unPackFilesFromOci err", "formula_name", result.Name, "version", result.Version, "err", err)
+		slog.Error("unPackManifestFilesFromOci err", "formula_name", result.Name, "version", result.Version, "err", err)
 		return nil, err
 	}
 
@@ -352,6 +352,10 @@ func (self *Depot) DeleteFormula(formula *Formula) error {
 }
 
 func (self *Depot) SaveManifestFile(formula *Formula, filename string, content string) error {
+	filename, err := NormalizeFormulaFilePath(filename)
+	if err != nil {
+		return err
+	}
 	if !IsFormulaManifestPath(filename) {
 		return fmt.Errorf("只允许保存 manifest 文件: %s", filename)
 	}
@@ -359,6 +363,10 @@ func (self *Depot) SaveManifestFile(formula *Formula, filename string, content s
 }
 
 func (self *Depot) SaveSharedFile(formula *Formula, filename string, content string) error {
+	filename, err := NormalizeFormulaFilePath(filename)
+	if err != nil {
+		return err
+	}
 	if IsFormulaManifestPath(filename) {
 		return fmt.Errorf("manifest 文件必须保存到版本目录: %s", filename)
 	}
@@ -391,12 +399,7 @@ func (self *Depot) saveFile(filesDir, filename, content string) error {
 }
 
 func resolveFormulaFilePath(filesDir, filename string) (string, error) {
-	normalizedFilename := strings.ReplaceAll(filename, "\\", "/")
-	if strings.HasPrefix(normalizedFilename, "/") {
-		return "", fmt.Errorf("非法文件路径: %s", filename)
-	}
-
-	cleanFilename, err := function.CleanZipFilePath(normalizedFilename)
+	cleanFilename, err := NormalizeFormulaFilePath(filename)
 	if err != nil {
 		return "", err
 	}
@@ -406,6 +409,19 @@ func resolveFormulaFilePath(filesDir, filename string) (string, error) {
 	}
 
 	return filePath, nil
+}
+
+func NormalizeFormulaFilePath(filename string) (string, error) {
+	normalizedFilename := strings.ReplaceAll(filename, "\\", "/")
+	if strings.HasPrefix(normalizedFilename, "/") {
+		return "", fmt.Errorf("非法文件路径: %s", filename)
+	}
+
+	cleanFilename, err := function.CleanZipFilePath(normalizedFilename)
+	if err != nil {
+		return "", err
+	}
+	return cleanFilename, nil
 }
 
 func (self *Depot) GetManifestFileList(formula *Formula) (map[string]string, error) {
@@ -710,53 +726,56 @@ func (self *Depot) packToOci(formula *Formula) error {
 	return err
 }
 
-func (self *Depot) unPackFilesFromOci(formula *Formula) error {
+func (self *Depot) unPackManifestFilesFromOci(formula *Formula) error {
 	filesDir := filepath.Join(self.basePath, formula.GetFilesRelativeDir())
 	if !function.FileExists(filesDir) || function.IsDirEmpty(filesDir) {
 		function.CreateDirIfNotExist(filesDir, os.ModePerm)
-
-		remoteOci, manifest, err := self.getOciManifest(formula)
-		if err != nil {
-			if errors.Is(err, logic.OciManifestNotFoundErr) {
-				return nil
-			}
-			return err
-		}
-
-		return logic.UnPackOciToLocal(remoteOci, manifest, []string{logic.MediaTypeFilesJson}, func(mediaType string, savePath string, reader io.Reader) error {
-			readAll, err := io.ReadAll(reader)
-			if err != nil {
-				return err
-			}
-			files := map[string]string{}
-			err = json.Unmarshal(readAll, &files)
-			if err != nil {
-				return err
-			}
-
-			for name, content := range files {
-				targetDir := filesDir
-				if !IsFormulaManifestPath(name) {
-					targetDir = self.getSharedFilesDir(formula.Name)
-				}
-				tempPath := filepath.Join(targetDir, name)
-				function.CreateDirIfNotExist(filepath.Dir(tempPath), os.ModePerm)
-				file, err := os.Create(tempPath)
-				if err != nil {
-					return err
-				}
-				_, err = file.WriteString(content)
-				if err != nil {
-					return err
-				}
-				file.Close()
-			}
-
-			return nil
-		})
+		return self.unPackFormulaFileListFromOci(formula, filesDir, IsFormulaManifestPath, true)
 	}
 
 	return nil
+}
+
+func (self *Depot) seedSharedFilesFromOci(formula *Formula) error {
+	return self.unPackFormulaFileListFromOci(formula, self.getSharedFilesDir(formula.Name), func(name string) bool {
+		return !IsFormulaManifestPath(name)
+	}, false)
+}
+
+func (self *Depot) unPackFormulaFileListFromOci(formula *Formula, targetDir string, include func(string) bool, overwrite bool) error {
+	remoteOci, manifest, err := self.getOciManifest(formula)
+	if err != nil {
+		if errors.Is(err, logic.OciManifestNotFoundErr) {
+			return nil
+		}
+		return err
+	}
+
+	return logic.UnPackOciToLocal(remoteOci, manifest, []string{logic.MediaTypeFilesJson}, func(mediaType string, savePath string, reader io.Reader) error {
+		files := map[string]string{}
+		if err := json.NewDecoder(reader).Decode(&files); err != nil {
+			return err
+		}
+		for name, content := range files {
+			if !include(name) {
+				continue
+			}
+			targetPath, err := resolveFormulaFilePath(targetDir, name)
+			if err != nil {
+				return err
+			}
+			if !overwrite && function.FileExists(targetPath) {
+				continue
+			}
+			if err = os.MkdirAll(filepath.Dir(targetPath), os.ModePerm); err != nil {
+				return err
+			}
+			if err = os.WriteFile(targetPath, []byte(content), 0o644); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 func (self *Depot) unPackSourceCodeFromOCI(formula *Formula) error {

@@ -26,7 +26,7 @@ func BuildArtifactMarketExternalServices(baseURL string, goodsID int32, orderSN 
 	if marketURL.Path == "" {
 		marketURL.Path = "/"
 	}
-	marketURL.Fragment = "/orders?tab=orders&order_sn=" + url.QueryEscape(orderSN)
+	marketURL.Fragment = "/user-orders?tab=orders&order_sn=" + url.QueryEscape(orderSN)
 
 	return []externalService{{
 		Key:      "billing",

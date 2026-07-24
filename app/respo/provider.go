@@ -2,6 +2,7 @@ package respo
 
 import (
 	"log/slog"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/w7panel/w7panel-zpk/app/respo/command"
@@ -174,9 +175,14 @@ func (provider *Provider) Register(httpServer *http_server.Server, console conso
 	if err != nil {
 		panic(err)
 	}
-	if err = depot.MigrateFormulaFiles(); err != nil {
-		slog.Error("migration fail", "err", err)
-	}
+
+	go func() {
+		time.Sleep(time.Second * 15)
+		if err = depot.MigrateFormulaFiles(); err != nil {
+			slog.Error("migration fail", "err", err)
+		}
+	}()
+
 	go depot.PackLoop()
 
 	logic.InitFormulaPublishLoop()

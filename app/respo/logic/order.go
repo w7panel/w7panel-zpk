@@ -18,31 +18,31 @@ func (l Order) DiscardUsedOrder(ticketInfo TicketInfo) error {
 	return w7.ZpkMarketSdk.DiscardUsedOrder(ticketInfo.ConsoleUid, ticketInfo.OrderSn)
 }
 
-func (l Order) UseOrder(ticketInfo TicketInfo, panelDeviceSN, panelURL, appIdentify string) error {
+func (l Order) UseOrder(ticketInfo TicketInfo, panelDeviceSN, panelURL string) error {
 	if ticketInfo.ConsoleUid <= 0 || ticketInfo.OrderSn == "" {
 		return nil
 	}
-	return w7.ZpkMarketSdk.UseOrder(ticketInfo.ConsoleUid, ticketInfo.OrderSn, ticketInfo.FormulaVersion, ticketInfo.IsUpgrade, ticketInfo.Reinstall, panelDeviceSN, panelURL, appIdentify)
+	return w7.ZpkMarketSdk.UseOrder(ticketInfo.ConsoleUid, ticketInfo.OrderSn, ticketInfo.FormulaVersion, ticketInfo.IsUpgrade, ticketInfo.Reinstall, panelDeviceSN, panelURL, ticketInfo.AppIdentify, ticketInfo.Domain)
 }
 
-func (l Order) CheckFormulaCanInstallOrUpgrade(formula Formula, consoleUid int32, orderSn string, isUpgrade bool, reinstall bool) (bool, string, string) {
-	slog.Info("check order permission can install", "formula_name", formula.Name, "version", formula.Version, "consoleuid", consoleUid, "orderSn", orderSn, "isUpgrade", isUpgrade, "reinstall", reinstall)
+func (l Order) CheckFormulaCanInstallOrUpgrade(formula Formula, consoleUid int32, orderSn string, isUpgrade, reinstall bool, domain, appIdentify string) (bool, string, string, string, string, string, string) {
+	slog.Info("check order permission can install", "formula_name", formula.Name, "version", formula.Version, "consoleuid", consoleUid, "orderSn", orderSn, "isUpgrade", isUpgrade, "reinstall", reinstall, "domain", domain, "appIdentify", appIdentify)
 	if formula.GoodsId <= 0 || formula.ConsoleUid == consoleUid {
-		return true, formula.Name, orderSn
+		return true, formula.Name, orderSn, "", "", "", ""
 	}
 	if isUpgrade && formula.IsFreeUpgrade == FORMULA_FREE_UPGRADE {
-		return true, formula.Name, orderSn
+		return true, formula.Name, orderSn, "", "", "", ""
 	}
 
-	ok, formulaIdentify, actualOrderSn, err := w7.ZpkMarketSdk.CheckFormulaCanInstallOrUpgrade(formula.GoodsId, consoleUid, orderSn, isUpgrade, reinstall)
+	ok, formulaIdentify, actualOrderSn, panelURL, panelDeviceSN, conflictReason, conflictDomain, err := w7.ZpkMarketSdk.CheckFormulaCanInstallOrUpgrade(formula.GoodsId, consoleUid, orderSn, isUpgrade, reinstall, domain, appIdentify)
 	if err != nil {
 		slog.Error("check formula can install or upgrade failed", "formula", formula.Name, "orderSn", orderSn, "err", err)
-		return false, formula.Name, orderSn
+		return false, formula.Name, orderSn, "", "", "", ""
 	}
 	if formulaIdentify == "" {
 		formulaIdentify = formula.Name
 	}
-	return ok, formulaIdentify, actualOrderSn
+	return ok, formulaIdentify, actualOrderSn, panelURL, panelDeviceSN, conflictReason, conflictDomain
 }
 
 func (l Order) GetFormulaCanUpgradeVersion(formula Formula, consoleUid int32, orderSn string) (string, bool, string, string, error) {

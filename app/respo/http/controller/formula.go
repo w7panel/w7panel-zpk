@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"net/url"
 
 	"github.com/gin-gonic/gin"
@@ -16,6 +17,7 @@ import (
 	"github.com/w7panel/w7panel-zpk/common/service/w7"
 	"github.com/w7panel/w7panel-zpk/common/service/w7/devcenter"
 	"github.com/w7panel/w7panel-zpk/common/service/w7/ip"
+	zpk_market "github.com/w7panel/w7panel-zpk/common/service/w7/zpk-market"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/core/err_handler"
 	"gorm.io/gen/field"
@@ -79,6 +81,8 @@ func (c Formula) Info(ctx *gin.Context) {
 		Token        string `form:"token" json:"token"`
 		OrderSn      string `form:"order_sn" json:"order_sn"`
 		ConsoleUid   int32  `form:"console_uid" json:"console_uid"`
+		Domain       string `form:"domain" json:"domain"`
+		AppIdentify  string `form:"app_identify" json:"app_identify"`
 		Reinstall    bool   `form:"reinstall" json:"reinstall"`
 	}
 	params := ParamsValidate{}
@@ -116,9 +120,23 @@ func (c Formula) Info(ctx *gin.Context) {
 				return
 			}
 		} else {
-			ok, formulaIdentify, actualOrderSn := logic.Order{}.CheckFormulaCanInstallOrUpgrade(*formula, consoleUid, params.OrderSn, params.IsUpgrade > 0, params.Reinstall)
+			ok, formulaIdentify, actualOrderSn, checkedPanelURL, checkedPanelDeviceSN, conflictReason, conflictDomain := logic.Order{}.CheckFormulaCanInstallOrUpgrade(*formula, consoleUid, params.OrderSn, params.IsUpgrade > 0, params.Reinstall, params.Domain, params.AppIdentify)
 			if !ok {
-				c.JsonResponseWithError(ctx, errors.New("请先购买后再安装"), 500)
+				switch conflictReason {
+				case zpk_market.InstallConflictDomainMismatch, zpk_market.InstallConflictAppIdentifyExists:
+					ctx.JSON(http.StatusConflict, gin.H{
+						"code":  http.StatusConflict,
+						"error": "制品安装绑定冲突",
+						"data": gin.H{
+							"conflict_reason": conflictReason,
+							"domain":          conflictDomain,
+							"panel_url":       checkedPanelURL,
+							"panel_device_sn": checkedPanelDeviceSN,
+						},
+					})
+				default:
+					c.JsonResponseWithError(ctx, errors.New("请先购买后再安装"), 500)
+				}
 				return
 			}
 			if actualOrderSn != "" {
@@ -284,6 +302,8 @@ func (c Formula) Info(ctx *gin.Context) {
 		OrderSn:        params.OrderSn,
 		IsUpgrade:      params.IsUpgrade > 0,
 		Reinstall:      params.Reinstall,
+		Domain:         params.Domain,
+		AppIdentify:    params.AppIdentify,
 	})
 
 	responseManifest.Version = 3
@@ -614,7 +634,6 @@ func (c Formula) InstallComplete(ctx *gin.Context) {
 		Ticket        string `form:"ticket" binding:"required"`
 		PanelDeviceSN string `form:"panel_device_sn" json:"panel_device_sn"`
 		PanelURL      string `form:"panel_url" json:"panel_url"`
-		AppIdentify   string `form:"app_identify" json:"app_identify"`
 	}
 	params := ParamsValidate{}
 	if !c.Validate(ctx, &params) {
@@ -627,7 +646,7 @@ func (c Formula) InstallComplete(ctx *gin.Context) {
 		c.JsonResponseWithError(ctx, err, 500)
 		return
 	}
-	err = logic.Order{}.UseOrder(*ticketInfo, params.PanelDeviceSN, params.PanelURL, params.AppIdentify)
+	err = logic.Order{}.UseOrder(*ticketInfo, params.PanelDeviceSN, params.PanelURL)
 	slog.Info("核销订单完成", "ticket", params.Ticket, "info", ticketInfo, "err", err)
 	if err != nil {
 		c.JsonResponseWithError(ctx, err, 500)

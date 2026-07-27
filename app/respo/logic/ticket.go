@@ -15,6 +15,8 @@ type TicketInfo struct {
 	OrderSn        string `json:"order_sn"`
 	IsUpgrade      bool   `json:"is_upgrade"`
 	Reinstall      bool   `json:"reinstall"`
+	Domain         string `json:"domain"`
+	AppIdentify    string `json:"app_identify"`
 }
 
 type Ticket struct {

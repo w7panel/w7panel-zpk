@@ -34,6 +34,7 @@ metadata:
     {{- end }}
   annotations:
     w7.cc/version: "__APPLICATION_VERSION__"
+    w7.cc/manifest-type: "__MANIFEST_TYPE__"
 spec:
   title: __APP_TITLE__
   {{ if or (ne $applicationType "gateway-plugin") (and .Values.gatewayPlugin .Values.gatewayPlugin.hasFrontend) }}

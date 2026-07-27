@@ -1204,6 +1204,10 @@ func (hc *HelmPack) generateMicroAppTemplate(rootDir string, manifest logic2.Man
 	if appName == "" {
 		appName = manifest.Application.Identifie
 	}
+	manifestType := manifest.Application.Type
+	if manifestType == logic2.Docker_App {
+		manifestType = "native"
+	}
 
 	microAppTemplate, err := loadHelmTemplate("microapp.yaml.tpl")
 	if err != nil {
@@ -1213,6 +1217,7 @@ func (hc *HelmPack) generateMicroAppTemplate(rootDir string, manifest logic2.Man
 		"__APPLICATION_TYPE__":     manifest.Application.Type,
 		"__APPLICATION_IDENTIFY__": manifest.Application.Identifie,
 		"__APPLICATION_VERSION__":  manifest.Application.Version,
+		"__MANIFEST_TYPE__":        manifestType,
 		"__APP_TITLE__":            strconv.Quote(appName),
 	})
 

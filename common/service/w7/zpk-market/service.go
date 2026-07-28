@@ -54,7 +54,7 @@ func (s ZpkMarketService) DiscardUsedOrder(consoleUid int32, orderSn string) err
 	}, nil)
 }
 
-func (s ZpkMarketService) CheckFormulaCanInstallOrUpgrade(goodsId, consoleUid int32, orderSn string, isUpgrade, reinstall bool, domain, appIdentify string) (bool, string, string, string, string, string, string, error) {
+func (s ZpkMarketService) CheckFormulaCanInstallOrUpgrade(goodsId, consoleUid int32, orderSn string, isUpgrade, reinstall bool, domain, appIdentify string) (bool, string, string, string, string, string, string, string, error) {
 	type result struct {
 		CanInstallOrUpgrade bool   `json:"can_install_or_upgrade"`
 		FormulaIdentify     string `json:"formula_identify"`
@@ -63,6 +63,7 @@ func (s ZpkMarketService) CheckFormulaCanInstallOrUpgrade(goodsId, consoleUid in
 		PanelDeviceSN       string `json:"panel_device_sn"`
 		ConflictReason      string `json:"conflict_reason"`
 		Domain              string `json:"domain"`
+		AppIdentify         string `json:"app_identify"`
 	}
 
 	ret := result{}
@@ -76,10 +77,10 @@ func (s ZpkMarketService) CheckFormulaCanInstallOrUpgrade(goodsId, consoleUid in
 		"app_identify": appIdentify,
 	}, &ret)
 	if err != nil {
-		return false, "", "", "", "", "", "", err
+		return false, "", "", "", "", "", "", "", err
 	}
 
-	return ret.CanInstallOrUpgrade, ret.FormulaIdentify, ret.OrderSn, ret.PanelURL, ret.PanelDeviceSN, ret.ConflictReason, ret.Domain, nil
+	return ret.CanInstallOrUpgrade, ret.FormulaIdentify, ret.OrderSn, ret.PanelURL, ret.PanelDeviceSN, ret.ConflictReason, ret.Domain, ret.AppIdentify, nil
 }
 
 func (s ZpkMarketService) GetFormulaCanUpgradeVersion(goodsId, consoleUid int32, orderSn string) (string, bool, string, string, error) {

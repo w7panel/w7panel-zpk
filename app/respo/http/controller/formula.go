@@ -120,7 +120,7 @@ func (c Formula) Info(ctx *gin.Context) {
 				return
 			}
 		} else {
-			ok, formulaIdentify, actualOrderSn, checkedPanelURL, checkedPanelDeviceSN, conflictReason, conflictDomain := logic.Order{}.CheckFormulaCanInstallOrUpgrade(*formula, consoleUid, params.OrderSn, params.IsUpgrade > 0, params.Reinstall, params.Domain, params.AppIdentify)
+			ok, formulaIdentify, actualOrderSn, checkedPanelURL, checkedPanelDeviceSN, conflictReason, conflictDomain, conflictAppIdentify := logic.Order{}.CheckFormulaCanInstallOrUpgrade(*formula, consoleUid, params.OrderSn, params.IsUpgrade > 0, params.Reinstall, params.Domain, params.AppIdentify)
 			if !ok {
 				switch conflictReason {
 				case zpk_market.InstallConflictDomainMismatch, zpk_market.InstallConflictAppIdentifyExists:
@@ -132,6 +132,7 @@ func (c Formula) Info(ctx *gin.Context) {
 							"domain":          conflictDomain,
 							"panel_url":       checkedPanelURL,
 							"panel_device_sn": checkedPanelDeviceSN,
+							"app_identify":    conflictAppIdentify,
 						},
 					})
 				default:

@@ -32,8 +32,7 @@ func (ImportHigressPlugins) GetDescription() string {
 
 func (ImportHigressPlugins) Configure(cmd *cobra.Command) {
 	cmd.Flags().Int("user-id", 0, "console UID used when publishing artifacts")
-	cmd.Flags().Bool("publish", false, "publish imported artifacts after creation")
-	_ = cmd.MarkFlagRequired("user-id")
+	cmd.Flags().Bool("auto-publish-to-zpk-market", false, "enable automatic publishing to the ZPK market")
 }
 
 func (ImportHigressPlugins) Handle(cmd *cobra.Command, _ []string) {
@@ -41,7 +40,7 @@ func (ImportHigressPlugins) Handle(cmd *cobra.Command, _ []string) {
 	if err != nil {
 		panic(err)
 	}
-	publish, err := cmd.Flags().GetBool("publish")
+	autoPublishToZpkMarket, err := cmd.Flags().GetBool("auto-publish-to-zpk-market")
 	if err != nil {
 		panic(err)
 	}
@@ -102,11 +101,13 @@ func (ImportHigressPlugins) Handle(cmd *cobra.Command, _ []string) {
 		if err = depot.SaveSharedFile(formula, "readme.md", plugin.Readme); err != nil {
 			panic(fmt.Errorf("save %s readme: %w", plugin.Identifie, err))
 		}
-		if _, err = dao.Q.Formula.Where(dao.Q.Formula.ID.Eq(formulaRow.ID)).Updates(map[string]interface{}{
-			"title": plugin.Title,
-			"setting": &accessor.FormulaSettingOption{
-				SupportAutoPublishToZpkMarket: true,
-			},
+		if formulaRow.Setting == nil {
+			formulaRow.Setting = &accessor.FormulaSettingOption{}
+		}
+		formulaRow.Setting.SupportAutoPublishToZpkMarket = autoPublishToZpkMarket
+		if _, err = dao.Q.Formula.Where(dao.Q.Formula.ID.Eq(formulaRow.ID)).Updates(entity.Formula{
+			Title:   plugin.Title,
+			Setting: formulaRow.Setting,
 		}); err != nil {
 			panic(fmt.Errorf("update %s title: %w", plugin.Identifie, err))
 		}
@@ -122,14 +123,12 @@ func (ImportHigressPlugins) Handle(cmd *cobra.Command, _ []string) {
 				panic(fmt.Errorf("tag %s: %w", plugin.Identifie, err))
 			}
 		}
-		if publish {
-			publishFormula, err := depot.GetFormula(plugin.Identifie, higressBuiltinPluginVersion, user)
-			if err != nil {
-				panic(fmt.Errorf("load %s for publish: %w", plugin.Identifie, err))
-			}
-			if err = (logic.Version{}).PublishFormula(int32(consoleUID), publishFormula); err != nil {
-				panic(fmt.Errorf("publish %s: %w", plugin.Identifie, err))
-			}
+		publishFormula, err := depot.GetFormula(plugin.Identifie, higressBuiltinPluginVersion, user)
+		if err != nil {
+			panic(fmt.Errorf("load %s for publish: %w", plugin.Identifie, err))
+		}
+		if err = (logic.Version{}).PublishFormula(int32(consoleUID), publishFormula); err != nil {
+			panic(fmt.Errorf("publish %s: %w", plugin.Identifie, err))
 		}
 
 		if isOverwrite {

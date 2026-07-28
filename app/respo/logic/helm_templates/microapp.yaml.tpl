@@ -37,9 +37,7 @@ metadata:
     w7.cc/manifest-type: "__MANIFEST_TYPE__"
 spec:
   title: __APP_TITLE__
-  {{ if or (ne $applicationType "gateway-plugin") (and .Values.gatewayPlugin .Values.gatewayPlugin.hasFrontend) }}
   frontendUrl: /ui/microapp/__APPLICATION_IDENTIFY__/__APPLICATION_VERSION__/index.html
-  {{ end }}
   
   config-v2:
     props:

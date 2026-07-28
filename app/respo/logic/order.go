@@ -30,9 +30,6 @@ func (l Order) CheckFormulaCanInstallOrUpgrade(formula Formula, consoleUid int32
 	if formula.GoodsId <= 0 || formula.ConsoleUid == consoleUid {
 		return true, formula.Name, orderSn, "", "", "", "", ""
 	}
-	if isUpgrade && formula.IsFreeUpgrade == FORMULA_FREE_UPGRADE {
-		return true, formula.Name, orderSn, "", "", "", "", ""
-	}
 
 	ok, formulaIdentify, actualOrderSn, panelURL, panelDeviceSN, conflictReason, conflictDomain, conflictAppIdentify, err := w7.ZpkMarketSdk.CheckFormulaCanInstallOrUpgrade(formula.GoodsId, consoleUid, orderSn, isUpgrade, reinstall, domain, appIdentify)
 	if err != nil {

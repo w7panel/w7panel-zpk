@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/w7panel/w7panel-zpk/app/respo/logic"
@@ -120,7 +121,7 @@ func (c Formula) Info(ctx *gin.Context) {
 				return
 			}
 		} else {
-			ok, formulaIdentify, actualOrderSn, checkedPanelURL, checkedPanelDeviceSN, conflictReason, conflictDomain, conflictAppIdentify := logic.Order{}.CheckFormulaCanInstallOrUpgrade(*formula, consoleUid, params.OrderSn, params.IsUpgrade > 0, params.Reinstall, params.Domain, params.AppIdentify)
+			ok, checkedPanelURL, checkedPanelDeviceSN, conflictReason, conflictDomain, conflictAppIdentify := logic.Order{}.CheckFormulaCanInstallOrUpgrade(*formula, consoleUid, params.OrderSn, params.IsUpgrade > 0, params.Reinstall, params.Domain, params.AppIdentify)
 			if !ok {
 				switch conflictReason {
 				case zpk_market.InstallConflictDomainMismatch, zpk_market.InstallConflictAppIdentifyExists:
@@ -140,9 +141,8 @@ func (c Formula) Info(ctx *gin.Context) {
 				}
 				return
 			}
-			if actualOrderSn != "" {
-				params.OrderSn = actualOrderSn
-			}
+			formulaIdentify := ""
+			actualOrderSn := ""
 			canUpgradeVersion, formulaExpire, formulaIdentify, actualOrderSn, err = logic.Order{}.GetFormulaCanUpgradeVersion(*formula, consoleUid, params.OrderSn)
 			slog.Info("formula can upgrade version", "formula", formula.Name, "consoleUid", consoleUid, "version", canUpgradeVersion, "formulaIdentify", formulaIdentify, "err", err)
 			if err != nil {
@@ -317,7 +317,8 @@ func (c Formula) Info(ctx *gin.Context) {
 	}
 	tmpContent, _ = yaml.Marshal(responseManifestMap)
 	manifestContent := string(tmpContent)
-	infoURL := fmt.Sprintf("%s%s%s", schemaHttp, domain, ctx.Request.URL.Path)
+	infoPath := replaceFormulaIdentifieInInfoPath(ctx.Request.URL.Path, params.Identifie, formula.Name)
+	infoURL := fmt.Sprintf("%s%s%s", schemaHttp, domain, infoPath)
 	if params.OrderSn != "" {
 		query := url.Values{}
 		query.Set("order_sn", params.OrderSn)
@@ -678,4 +679,19 @@ func (c Formula) UnInstallComplete(ctx *gin.Context) {
 		return
 	}
 	c.JsonSuccessResponse(ctx)
+}
+
+func replaceFormulaIdentifieInInfoPath(path, requestedIdentifie, currentIdentifie string) string {
+	if requestedIdentifie == "" || currentIdentifie == "" || requestedIdentifie == currentIdentifie {
+		return path
+	}
+
+	segments := strings.Split(path, "/")
+	for index, segment := range segments {
+		if segment == requestedIdentifie {
+			segments[index] = currentIdentifie
+			break
+		}
+	}
+	return strings.Join(segments, "/")
 }

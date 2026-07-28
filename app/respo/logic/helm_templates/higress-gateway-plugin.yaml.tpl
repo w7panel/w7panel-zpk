@@ -11,9 +11,6 @@ metadata:
     w7.cc/plugin-enabled: "true"
     w7.cc/plugin-support-global: {{ $plugin.supportGlobal | quote }}
     w7.cc/plugin-support-rule: {{ $plugin.supportRule | quote }}
-    {{ if $plugin.hasFrontend }}
-    w7.cc/plugin-microapp: {{ .Release.Name | quote }}
-    {{ end }}
   labels:
     w7.cc/group-name: {{ .Release.Name }}
     higress.io/wasm-plugin-name: "__APPLICATION_IDENTIFY__"

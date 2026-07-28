@@ -13,3 +13,5 @@ openssl req -new -x509 -key registry-key.pem -out registry-cert.pem -days 365 -s
 订单安装或升级预检会返回已绑定的 `panel_url`、`panel_device_sn` 和 `app_identify`；校验失败时通过 `conflict_reason` 区分 `domain_mismatch`（域名不一致）和 `app_identify_exists`（已有应用标识绑定）。
 
 绑定冲突使用 HTTP 409 返回结构化 `data`，其中包含 `conflict_reason`、原绑定 `domain`、`panel_url`、`panel_device_sn` 和 `app_identify`，供面板安装接口生成可操作的错误提示，并支持跳转原面板定位原应用。用户确认强制覆盖后可通过 `reinstall=true` 重新安装；该标记只允许非升级安装跳过旧绑定，升级仍严格校验应用标识。
+
+网关插件 WasmPlugin 与配置 MicroApp 统一写入相同的 `metadata.labels["w7.cc/group-name"]` 归组关联，不再生成 `w7.cc/plugin-microapp` 注解。

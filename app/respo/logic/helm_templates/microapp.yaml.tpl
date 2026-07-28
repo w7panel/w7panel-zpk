@@ -29,6 +29,7 @@ metadata:
   labels:
     w7.cc/identifie: "__APPLICATION_IDENTIFY__"
     w7.cc/version: "__APPLICATION_VERSION__"
+    w7.cc/group-name: {{ $releaseName }}
     {{- range .Values.backend_config }}
     role.w7.cc/{{ .role }}: "true"
     {{- end }}

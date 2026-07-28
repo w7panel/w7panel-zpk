@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/go-version"
 	"github.com/w7panel/w7panel-zpk/common/dao"
 	"github.com/w7panel/w7panel-zpk/common/entity"
+	"github.com/w7panel/w7panel-zpk/common/service/w7/devcenter"
 )
 
 type Version struct {
@@ -108,4 +109,31 @@ func (l Version) FindNextUpgrade(formula *Formula, currentVerStr string, maxVers
 	}
 
 	return versionMap[sortVersionNames[nextVersionIndex]], nil
+}
+
+func (c Version) PublishFormula(consoleUid int32, formula *Formula) error {
+	// 如果没有zip包，只有镜像时，不需要打包发布
+	// 将文件打包到 Storage 目录，需要同步的再进行同步
+	depot, _ := NewDepot()
+	err := depot.Pack(formula, false)
+	if err != nil {
+		return err
+	}
+
+	if formula.Setting != nil && formula.Setting.SupportAutoPublishToZpkMarket {
+		if consoleUid <= 0 {
+			return errors.New("请先在面板绑定微擎云端账号")
+		}
+		if formula.ConsoleUid > 0 && formula.ConsoleUid != consoleUid {
+			return errors.New("请先在面板绑定微擎云端账号")
+		}
+		err = FormulaGoods{}.PublishGoods(formula, devcenter.PublishGoodsReq{
+			ConsoleUid: int(consoleUid),
+		})
+		if err != nil {
+			return err
+		}
+	}
+
+	return AddFormulaPublishTask(formula.Name, formula.Version, formula.VersionId)
 }

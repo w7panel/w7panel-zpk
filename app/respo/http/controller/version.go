@@ -9,7 +9,6 @@ import (
 	"github.com/w7panel/w7panel-zpk/common/dao"
 	"github.com/w7panel/w7panel-zpk/common/entity"
 	logic2 "github.com/w7panel/w7panel-zpk/common/logic"
-	"github.com/w7panel/w7panel-zpk/common/service/w7/devcenter"
 	"gorm.io/gen"
 )
 
@@ -94,7 +93,7 @@ func (c Version) Publish(ctx *gin.Context) {
 	}
 
 	consoleUid := logic2.User{}.GetConsoleUid(ctx)
-	err = c.publishFormula(consoleUid, formula)
+	err = logic.Version{}.PublishFormula(consoleUid, formula)
 	if err != nil {
 		c.JsonResponseWithServerError(ctx, err)
 		return
@@ -169,7 +168,7 @@ func (c Version) Unpublish(ctx *gin.Context) {
 	}
 
 	consoleUid := logic2.User{}.GetConsoleUid(ctx)
-	err = c.publishFormula(consoleUid, prevVersionFormula)
+	err = logic.Version{}.PublishFormula(consoleUid, prevVersionFormula)
 	if err != nil {
 		c.JsonResponseWithServerError(ctx, errors.New("顺延版本发布失败, 请尝试手动发布，err:"+err.Error()))
 		return
@@ -227,32 +226,6 @@ func (c Version) GetList(ctx *gin.Context) {
 		"page":  params.Page,
 		"list":  list,
 	})
-}
-
-func (c Version) publishFormula(consoleUid int32, formula *logic.Formula) error {
-	// 如果没有zip包，只有镜像时，不需要打包发布
-	// 将文件打包到 Storage 目录，需要同步的再进行同步
-	err := c.getDepot().Pack(formula, false)
-	if err != nil {
-		return err
-	}
-
-	if formula.Setting != nil && formula.Setting.SupportAutoPublishToZpkMarket {
-		if consoleUid <= 0 {
-			return errors.New("请先在面板绑定微擎云端账号")
-		}
-		if formula.ConsoleUid > 0 && formula.ConsoleUid != consoleUid {
-			return errors.New("请先在面板绑定微擎云端账号")
-		}
-		err = logic.FormulaGoods{}.PublishGoods(formula, devcenter.PublishGoodsReq{
-			ConsoleUid: int(consoleUid),
-		})
-		if err != nil {
-			return err
-		}
-	}
-
-	return logic.AddFormulaPublishTask(formula.Name, formula.Version, formula.VersionId)
 }
 
 func (c Version) formatVersionCreatedAt(createdAt time.Time) string {

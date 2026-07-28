@@ -13,6 +13,7 @@ import (
 	"github.com/w7panel/w7panel-zpk/common/accessor"
 	"github.com/w7panel/w7panel-zpk/common/dao"
 	"github.com/w7panel/w7panel-zpk/common/entity"
+	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/console"
 	"sigs.k8s.io/yaml"
 )
@@ -20,8 +21,6 @@ import (
 type ImportHigressPlugins struct {
 	console.Abstract
 }
-
-const higressBuiltinPluginConsoleUID int32 = 76052
 
 func (ImportHigressPlugins) GetName() string {
 	return "respo:import-higress-plugins"
@@ -32,13 +31,13 @@ func (ImportHigressPlugins) GetDescription() string {
 }
 
 func (ImportHigressPlugins) Configure(cmd *cobra.Command) {
-	cmd.Flags().Int("user-id", 0, "artifact owner registry user ID")
+	cmd.Flags().Int("user-id", 0, "console UID used when publishing artifacts")
 	cmd.Flags().Bool("publish", false, "publish imported artifacts after creation")
 	_ = cmd.MarkFlagRequired("user-id")
 }
 
 func (ImportHigressPlugins) Handle(cmd *cobra.Command, _ []string) {
-	userID, err := cmd.Flags().GetInt("user-id")
+	consoleUID, err := cmd.Flags().GetInt("user-id")
 	if err != nil {
 		panic(err)
 	}
@@ -46,9 +45,10 @@ func (ImportHigressPlugins) Handle(cmd *cobra.Command, _ []string) {
 	if err != nil {
 		panic(err)
 	}
-	user, err := dao.Q.RegistryUser.Where(dao.Q.RegistryUser.ID.Eq(int32(userID))).First()
+	registryUsername := facade.GetConfig().GetString("registry_cli.default.username")
+	user, err := dao.Q.RegistryUser.Where(dao.Q.RegistryUser.Username.Eq(registryUsername)).First()
 	if err != nil || user == nil {
-		panic(fmt.Errorf("registry user %d not found", userID))
+		panic(fmt.Errorf("default registry user %q not found", registryUsername))
 	}
 
 	depot, err := logic.NewDepot()
@@ -127,7 +127,7 @@ func (ImportHigressPlugins) Handle(cmd *cobra.Command, _ []string) {
 			if err != nil {
 				panic(fmt.Errorf("load %s for publish: %w", plugin.Identifie, err))
 			}
-			if err = (logic.Version{}).PublishFormula(higressBuiltinPluginConsoleUID, publishFormula); err != nil {
+			if err = (logic.Version{}).PublishFormula(int32(consoleUID), publishFormula); err != nil {
 				panic(fmt.Errorf("publish %s: %w", plugin.Identifie, err))
 			}
 		}

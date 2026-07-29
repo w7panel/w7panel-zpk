@@ -42,7 +42,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: create-site-job
-          image: zpk.w7.cc/public/site-manager:v1.2.14
+          image: zpk.w7.cc/public/site-manager:v1.2.15
           command:
             - sh
             - -c
@@ -53,8 +53,6 @@ spec:
               PANEL_TOKEN="{{ .Values.global.panel.panelRealToken }}"
               PANEL_ACCESSTOKEN="{{ .Values.global.panel.panelAccessToken }}"
               NAMESPACE="{{ .Release.Namespace }}"
-              SITE_MANAGER_NAMESPACE="{{ default .Release.Namespace .Values.global.siteManagerNamespace }}"
-              SITE_MANAGER_URL="http://w7-sitemanager-site-manager.$SITE_MANAGER_NAMESPACE.svc.cluster.local:8000"
               OPERATION='{{ ternary "upgrade" "install" .Release.IsUpgrade }}'
               ENV_TITLE=__ENV_TITLE__
               ENV_GROUP=__ENV_GROUP__
@@ -123,15 +121,6 @@ spec:
               }
               trap cleanup_created_resources EXIT
               k8s_delete "/api/v1/namespaces/$NAMESPACE/configmaps/$STATE_CONFIG" >/dev/null 2>&1 || true
-
-              sm_post_maybe() {
-                path="$1"
-                data="$2"
-                curl -sS -X POST \
-                  -H "Content-Type: application/json" \
-                  -d "$data" \
-                  "$SITE_MANAGER_URL$path" || true
-              }
 
               query_deploy() {
                 deploy_name="$1"
@@ -292,9 +281,11 @@ spec:
               }
 
               get_site_env_app_name() {
-                info_payload=$(jq -n --arg domain "$DOMAIN" '{domain:$domain}')
-                site_info=$(sm_post_maybe "/api/site/info" "$info_payload")
-                printf '%s' "$site_info" | jq -r '.data.site_environment.app_name // empty' 2>/dev/null || true
+                site_info=$(/home/rangine info:site \
+                  --token="$PANEL_ACCESSTOKEN" \
+                  --domain="$DOMAIN" \
+                  -f /home/config.yaml 2>/dev/null || true)
+                printf '%s' "$site_info" | jq -r '.site_environment.app_name // empty' 2>/dev/null || true
               }
 
               get_nginx_vhost_template() {

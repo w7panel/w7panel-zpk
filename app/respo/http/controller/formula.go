@@ -121,19 +121,19 @@ func (c Formula) Info(ctx *gin.Context) {
 				return
 			}
 		} else {
-			ok, checkedPanelURL, checkedPanelDeviceSN, conflictReason, conflictDomain, conflictAppIdentify := logic.Order{}.CheckFormulaCanInstallOrUpgrade(*formula, consoleUid, params.OrderSn, params.IsUpgrade > 0, params.Reinstall, params.Domain, params.AppIdentify)
-			if !ok {
-				switch conflictReason {
+			checkResult := logic.Order{}.CheckFormulaCanInstallOrUpgrade(*formula, consoleUid, params.OrderSn, params.IsUpgrade > 0, params.Reinstall, params.Domain, params.AppIdentify)
+			if !checkResult.CanInstallOrUpgrade {
+				switch checkResult.ConflictReason {
 				case zpk_market.InstallConflictDomainMismatch, zpk_market.InstallConflictAppIdentifyExists:
 					ctx.JSON(http.StatusConflict, gin.H{
 						"code":  http.StatusConflict,
 						"error": "制品安装绑定冲突",
 						"data": gin.H{
-							"conflict_reason": conflictReason,
-							"domain":          conflictDomain,
-							"panel_url":       checkedPanelURL,
-							"panel_device_sn": checkedPanelDeviceSN,
-							"app_identify":    conflictAppIdentify,
+							"conflict_reason": checkResult.ConflictReason,
+							"domain":          checkResult.ConflictDomain,
+							"panel_url":       checkResult.PanelURL,
+							"panel_device_sn": checkResult.PanelDeviceSN,
+							"app_identify":    checkResult.ConflictAppIdentify,
 						},
 					})
 				default:
@@ -141,25 +141,35 @@ func (c Formula) Info(ctx *gin.Context) {
 				}
 				return
 			}
-			formulaIdentify := ""
-			actualOrderSn := ""
-			canUpgradeVersion, formulaExpire, formulaIdentify, actualOrderSn, err = logic.Order{}.GetFormulaCanUpgradeVersion(*formula, consoleUid, params.OrderSn)
-			slog.Info("formula can upgrade version", "formula", formula.Name, "consoleUid", consoleUid, "version", canUpgradeVersion, "formulaIdentify", formulaIdentify, "err", err)
-			if err != nil {
-				c.JsonResponseWithError(ctx, err, 500)
+			if checkResult.OrderSn != "" {
+				params.OrderSn = checkResult.OrderSn
+			}
+			upgradeResult, checkErr := logic.Order{}.GetFormulaCanUpgradeVersion(*formula, consoleUid, params.OrderSn)
+			slog.Info("formula upgrade result resolved",
+				"upgrade_result", upgradeResult,
+				"err", checkErr,
+			)
+			if checkErr != nil {
+				c.JsonResponseWithError(ctx, checkErr, 500)
 				return
 			}
-			if actualOrderSn != "" {
-				params.OrderSn = actualOrderSn
+			canUpgradeVersion = upgradeResult.Version
+			formulaExpire = upgradeResult.FormulaExpire
+			if upgradeResult.OrderSn != "" {
+				params.OrderSn = upgradeResult.OrderSn
 			}
-			if formulaIdentify != "" && formulaIdentify != formula.Name {
-				targetFormulaIdentify = formulaIdentify
+			if upgradeResult.FormulaIdentify != "" && upgradeResult.FormulaIdentify != formula.Name {
+				targetFormulaIdentify = upgradeResult.FormulaIdentify
 			}
 		}
 	}
 
 	if targetFormulaIdentify != "" {
-		slog.Info("switch formula by order formula identify", "from", formula.Name, "to", targetFormulaIdentify, "orderSn", params.OrderSn)
+		slog.Info("switch formula by order binding",
+			"requested_formula_identify", formula.Name,
+			"target_formula_identify", targetFormulaIdentify,
+			"order_sn", params.OrderSn,
+		)
 		formula, err = depotLogin.GetFormula(targetFormulaIdentify, params.Version, nil)
 		if err != nil {
 			c.JsonResponseWithError(ctx, err, 500)

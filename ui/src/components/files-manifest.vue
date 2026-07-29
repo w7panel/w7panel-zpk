@@ -569,15 +569,15 @@
             </div>
         </a-modal>
 
-        <a-drawer v-model:visible="domainConfig.show" title="配置域名" placement="right" :width="1000"
-            :mask="false" :body-style="{ padding: 0 }" unmount-on-close @ok="saveDomainConfig"
+        <a-modal v-model:visible="domainConfig.show" title="配置域名" :width="1000"
+            :body-style="{ padding: 0 }" unmount-on-close @ok="saveDomainConfig"
             @cancel="resetDomainConfig" @close="resetDomainConfig">
-            <div class="domain-config-drawer-content">
+            <div class="domain-config-modal-content">
                 <form-ingress v-if="domainConfig.show" v-model="domainConfig.ingress"
                     :app-names="app_names" :app-ports="app_ports"
                     :mainapp="option && option.mainapp" :identifie="identifie" />
             </div>
-        </a-drawer>
+        </a-modal>
 
         <a-modal v-model:visible="dependPicker.show" title="选择安装依赖" :width="840" :footer="false"
                     modal-class="depend-picker-modal" @close="closeDependPicker">
@@ -2357,7 +2357,7 @@ platform:
     min-width: 0;
 }
 
-.domain-config-drawer-content {
+.domain-config-modal-content {
     min-width: 0;
     padding: 24px;
 }

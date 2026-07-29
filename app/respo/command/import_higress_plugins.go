@@ -123,7 +123,7 @@ func (ImportHigressPlugins) Handle(cmd *cobra.Command, _ []string) {
 				panic(fmt.Errorf("tag %s: %w", plugin.Identifie, err))
 			}
 		}
-		publishFormula, err := depot.GetFormula(plugin.Identifie, higressBuiltinPluginVersion, user)
+		publishFormula, err := depot.GetFormula(plugin.Identifie, higressBuiltinPluginVersion, nil)
 		if err != nil {
 			panic(fmt.Errorf("load %s for publish: %w", plugin.Identifie, err))
 		}

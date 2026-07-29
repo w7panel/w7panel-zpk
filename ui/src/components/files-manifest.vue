@@ -92,8 +92,10 @@
                                         </a-form-item>
                                         <a-form-item label="全局默认启用" style="margin-bottom:18px;">
                                             <div class="df df-c">
-                                                <a-switch v-model="form.gatewayPluginDefaultEnabled"
-                                                    :disabled="!form.gatewayPluginSupportGlobal" @change="changeForm" />
+                                                <div>
+                                                    <a-switch v-model="form.gatewayPluginDefaultEnabled"
+                                                        :disabled="!form.gatewayPluginSupportGlobal" @change="changeForm" />
+                                                </div>
                                                 <span class="c-99 mt-6">仅作用于全局配置；关闭后可先完善配置，再到网关插件列表手动启用。</span>
                                             </div>
                                         </a-form-item>

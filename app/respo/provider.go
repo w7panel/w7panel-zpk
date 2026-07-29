@@ -2,6 +2,7 @@ package respo
 
 import (
 	"log/slog"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/w7panel/w7panel-zpk/app/respo/command"
@@ -81,6 +82,7 @@ func (provider *Provider) Register(httpServer *http_server.Server, console conso
 	console.RegisterCommand(new(command.Pack))
 	console.RegisterCommand(new(command.Sqlite))
 	console.RegisterCommand(new(command.ResetTags))
+	console.RegisterCommand(new(command.ImportHigressPlugins))
 
 	// 注册一些路由
 	httpServer.RegisterRouters(func(engine *gin.Engine) {

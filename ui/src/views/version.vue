@@ -65,6 +65,10 @@
                             </div>
                             <div v-if="crossUpgrade.enabled" class="cross-upgrade-panel">
                                 <div class="cross-upgrade-title">跨应用升级配置</div>
+                                <a-alert type="info" show-icon class="zpk-primary-alert cross-upgrade-alert"
+                                    title="配置说明" :closable="false">
+                                    跨应用升级仅支持从当前应用升级到已配置的目标应用，目标应用之间不会自动互通。例如：当前应用配置了 A、B 后，只能从当前应用升级到 A 或 B；如需从 A 升级到 B，请进入 A 的制品详情，将 B 配置为目标应用。
+                                </a-alert>
                                 <div class="cross-upgrade-flow">
                                     <div class="cross-upgrade-app">
                                         <div class="cross-upgrade-icon">
@@ -1158,6 +1162,10 @@ export default {
 .cross-upgrade-title {
     color: #333;
     font-weight: 600;
+    margin-bottom: 14px;
+}
+
+.cross-upgrade-alert {
     margin-bottom: 22px;
 }
 

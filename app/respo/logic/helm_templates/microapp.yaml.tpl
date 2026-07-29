@@ -29,16 +29,16 @@ metadata:
   labels:
     w7.cc/identifie: "__APPLICATION_IDENTIFY__"
     w7.cc/version: "__APPLICATION_VERSION__"
+    w7.cc/group-name: {{ $releaseName }}
     {{- range .Values.backend_config }}
     role.w7.cc/{{ .role }}: "true"
     {{- end }}
   annotations:
     w7.cc/version: "__APPLICATION_VERSION__"
+    w7.cc/manifest-type: "__MANIFEST_TYPE__"
 spec:
   title: __APP_TITLE__
-  {{ if or (ne $applicationType "gateway-plugin") (and .Values.gatewayPlugin .Values.gatewayPlugin.hasFrontend) }}
   frontendUrl: /ui/microapp/__APPLICATION_IDENTIFY__/__APPLICATION_VERSION__/index.html
-  {{ end }}
   
   config-v2:
     props:

@@ -4,6 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
+	"net/url"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/w7panel/w7panel-zpk/app/respo/logic"
@@ -15,6 +18,7 @@ import (
 	"github.com/w7panel/w7panel-zpk/common/service/w7"
 	"github.com/w7panel/w7panel-zpk/common/service/w7/devcenter"
 	"github.com/w7panel/w7panel-zpk/common/service/w7/ip"
+	zpk_market "github.com/w7panel/w7panel-zpk/common/service/w7/zpk-market"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/core/err_handler"
 	"gorm.io/gen/field"
@@ -78,6 +82,8 @@ func (c Formula) Info(ctx *gin.Context) {
 		Token        string `form:"token" json:"token"`
 		OrderSn      string `form:"order_sn" json:"order_sn"`
 		ConsoleUid   int32  `form:"console_uid" json:"console_uid"`
+		Domain       string `form:"domain" json:"domain"`
+		AppIdentify  string `form:"app_identify" json:"app_identify"`
 		Reinstall    bool   `form:"reinstall" json:"reinstall"`
 	}
 	params := ParamsValidate{}
@@ -115,25 +121,55 @@ func (c Formula) Info(ctx *gin.Context) {
 				return
 			}
 		} else {
-			ok, formulaIdentify := logic.Order{}.CheckFormulaCanInstallOrUpgrade(*formula, consoleUid, params.OrderSn, params.IsUpgrade > 0, params.Reinstall)
-			if !ok {
-				c.JsonResponseWithError(ctx, errors.New("请先购买后再安装"), 500)
+			checkResult := logic.Order{}.CheckFormulaCanInstallOrUpgrade(*formula, consoleUid, params.OrderSn, params.IsUpgrade > 0, params.Reinstall, params.Domain, params.AppIdentify)
+			if !checkResult.CanInstallOrUpgrade {
+				switch checkResult.ConflictReason {
+				case zpk_market.InstallConflictDomainMismatch, zpk_market.InstallConflictAppIdentifyExists:
+					ctx.JSON(http.StatusConflict, gin.H{
+						"code":  http.StatusConflict,
+						"error": "制品安装绑定冲突",
+						"data": gin.H{
+							"conflict_reason": checkResult.ConflictReason,
+							"domain":          checkResult.ConflictDomain,
+							"panel_url":       checkResult.PanelURL,
+							"panel_device_sn": checkResult.PanelDeviceSN,
+							"app_identify":    checkResult.ConflictAppIdentify,
+						},
+					})
+				default:
+					c.JsonResponseWithError(ctx, errors.New("请先购买后再安装"), 500)
+				}
 				return
 			}
-			canUpgradeVersion, formulaExpire, formulaIdentify, err = logic.Order{}.GetFormulaCanUpgradeVersion(*formula, consoleUid, params.OrderSn)
-			slog.Info("formula can upgrade version", "formula", formula.Name, "consoleUid", consoleUid, "version", canUpgradeVersion, "formulaIdentify", formulaIdentify, "err", err)
-			if err != nil {
-				c.JsonResponseWithError(ctx, err, 500)
+			if checkResult.OrderSn != "" {
+				params.OrderSn = checkResult.OrderSn
+			}
+			upgradeResult, checkErr := logic.Order{}.GetFormulaCanUpgradeVersion(*formula, consoleUid, params.OrderSn)
+			slog.Info("formula upgrade result resolved",
+				"upgrade_result", upgradeResult,
+				"err", checkErr,
+			)
+			if checkErr != nil {
+				c.JsonResponseWithError(ctx, checkErr, 500)
 				return
 			}
-			if formulaIdentify != "" && formulaIdentify != formula.Name {
-				targetFormulaIdentify = formulaIdentify
+			canUpgradeVersion = upgradeResult.Version
+			formulaExpire = upgradeResult.FormulaExpire
+			if upgradeResult.OrderSn != "" {
+				params.OrderSn = upgradeResult.OrderSn
+			}
+			if upgradeResult.FormulaIdentify != "" && upgradeResult.FormulaIdentify != formula.Name {
+				targetFormulaIdentify = upgradeResult.FormulaIdentify
 			}
 		}
 	}
 
 	if targetFormulaIdentify != "" {
-		slog.Info("switch formula by order formula identify", "from", formula.Name, "to", targetFormulaIdentify, "orderSn", params.OrderSn)
+		slog.Info("switch formula by order binding",
+			"requested_formula_identify", formula.Name,
+			"target_formula_identify", targetFormulaIdentify,
+			"order_sn", params.OrderSn,
+		)
 		formula, err = depotLogin.GetFormula(targetFormulaIdentify, params.Version, nil)
 		if err != nil {
 			c.JsonResponseWithError(ctx, err, 500)
@@ -277,6 +313,8 @@ func (c Formula) Info(ctx *gin.Context) {
 		OrderSn:        params.OrderSn,
 		IsUpgrade:      params.IsUpgrade > 0,
 		Reinstall:      params.Reinstall,
+		Domain:         params.Domain,
+		AppIdentify:    params.AppIdentify,
 	})
 
 	responseManifest.Version = 3
@@ -289,8 +327,21 @@ func (c Formula) Info(ctx *gin.Context) {
 	}
 	tmpContent, _ = yaml.Marshal(responseManifestMap)
 	manifestContent := string(tmpContent)
+	infoPath := replaceFormulaIdentifieInInfoPath(ctx.Request.URL.Path, params.Identifie, formula.Name)
+	infoURL := fmt.Sprintf("%s%s%s", schemaHttp, domain, infoPath)
+	if params.OrderSn != "" {
+		query := url.Values{}
+		query.Set("order_sn", params.OrderSn)
+		infoURL += "?" + query.Encode()
+	}
+	externalServices := logic.BuildArtifactMarketExternalServices(
+		facade.GetConfig().GetString("setting.depot_market.frontend_url"),
+		formula.GoodsId,
+		params.OrderSn,
+	)
 
 	c.JsonResponseWithoutError(ctx, gin.H{
+		"info_url":               infoURL,
 		"zip_url":                zipUrl,
 		"manifest":               manifestContent,
 		"version":                version,
@@ -307,6 +358,7 @@ func (c Formula) Info(ctx *gin.Context) {
 		"tags":                   formula.Tags,
 		"install_formulas":       installFormulas,
 		"formula_type":           formula.Manifest.Application.Type,
+		"external_services":      externalServices,
 	})
 }
 
@@ -637,4 +689,19 @@ func (c Formula) UnInstallComplete(ctx *gin.Context) {
 		return
 	}
 	c.JsonSuccessResponse(ctx)
+}
+
+func replaceFormulaIdentifieInInfoPath(path, requestedIdentifie, currentIdentifie string) string {
+	if requestedIdentifie == "" || currentIdentifie == "" || requestedIdentifie == currentIdentifie {
+		return path
+	}
+
+	segments := strings.Split(path, "/")
+	for index, segment := range segments {
+		if segment == requestedIdentifie {
+			segments[index] = currentIdentifie
+			break
+		}
+	}
+	return strings.Join(segments, "/")
 }

@@ -217,7 +217,6 @@ func (self *Depot) GetFormula(name string, version string, user *entity.Registry
 		ServicePackages:      row.ServicePackages,
 		VersionPrices:        row.VersionPrices,
 		CrossUpgradeFormulas: row.CrossUpgradeFormulas,
-		IsFreeUpgrade:        row.IsFreeUpgrade,
 		Setting:              row.Setting,
 	}
 

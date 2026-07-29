@@ -15,10 +15,32 @@ type ZpkMarketService struct {
 	base.Base
 }
 
+const (
+	InstallConflictDomainMismatch    = "domain_mismatch"
+	InstallConflictAppIdentifyExists = "app_identify_exists"
+)
+
 type apiResponse[T any] struct {
 	Code int    `json:"code"`
 	Data T      `json:"data"`
 	Err  string `json:"error"`
+}
+
+type FormulaInstallCheckResult struct {
+	CanInstallOrUpgrade bool   `json:"can_install_or_upgrade"`
+	OrderSn             string `json:"order_sn"`
+	PanelURL            string `json:"panel_url"`
+	PanelDeviceSN       string `json:"panel_device_sn"`
+	ConflictReason      string `json:"conflict_reason"`
+	ConflictDomain      string `json:"domain"`
+	ConflictAppIdentify string `json:"app_identify"`
+}
+
+type FormulaUpgradeVersionResult struct {
+	Version         string `json:"formula_version"`
+	FormulaExpire   bool   `json:"is_expire"`
+	FormulaIdentify string `json:"formula_identify"`
+	OrderSn         string `json:"order_sn"`
 }
 
 func (s ZpkMarketService) CheckToken(token, formulaIdentify string) error {
@@ -28,7 +50,7 @@ func (s ZpkMarketService) CheckToken(token, formulaIdentify string) error {
 	}, nil)
 }
 
-func (s ZpkMarketService) UseOrder(consoleUid int32, orderSn, formulaVersion string, isUpgrade, reinstall bool, panelDeviceSN, panelURL string) error {
+func (s ZpkMarketService) UseOrder(consoleUid int32, orderSn, formulaVersion string, isUpgrade, reinstall bool, panelDeviceSN, panelURL, appIdentify, domain string) error {
 	return postSigned[any](s, "/zpk-market/order/use-order", map[string]interface{}{
 		"order_sn":        orderSn,
 		"formula_version": formulaVersion,
@@ -37,6 +59,8 @@ func (s ZpkMarketService) UseOrder(consoleUid int32, orderSn, formulaVersion str
 		"console_uid":     consoleUid,
 		"panel_device_sn": panelDeviceSN,
 		"panel_url":       panelURL,
+		"app_identify":    appIdentify,
+		"domain":          domain,
 	}, nil)
 }
 
@@ -47,45 +71,36 @@ func (s ZpkMarketService) DiscardUsedOrder(consoleUid int32, orderSn string) err
 	}, nil)
 }
 
-func (s ZpkMarketService) CheckFormulaCanInstallOrUpgrade(goodsId, consoleUid int32, orderSn string, isUpgrade bool, reinstall bool) (bool, string, error) {
-	type result struct {
-		CanInstallOrUpgrade bool   `json:"can_install_or_upgrade"`
-		FormulaIdentify     string `json:"formula_identify"`
-	}
-
-	ret := result{}
+func (s ZpkMarketService) CheckFormulaCanInstallOrUpgrade(goodsId, consoleUid int32, orderSn string, isUpgrade, reinstall bool, domain, appIdentify string) (FormulaInstallCheckResult, error) {
+	ret := FormulaInstallCheckResult{}
 	err := postSigned(s, "/zpk-market/order/check-formula-can-install-or-upgrade", map[string]interface{}{
-		"goods_id":    goodsId,
-		"console_uid": consoleUid,
-		"order_sn":    orderSn,
-		"is_upgrade":  isUpgrade,
-		"reinstall":   reinstall,
+		"goods_id":     goodsId,
+		"console_uid":  consoleUid,
+		"order_sn":     orderSn,
+		"is_upgrade":   isUpgrade,
+		"reinstall":    reinstall,
+		"domain":       domain,
+		"app_identify": appIdentify,
 	}, &ret)
 	if err != nil {
-		return false, "", err
+		return FormulaInstallCheckResult{}, err
 	}
 
-	return ret.CanInstallOrUpgrade, ret.FormulaIdentify, nil
+	return ret, nil
 }
 
-func (s ZpkMarketService) GetFormulaCanUpgradeVersion(goodsId, consoleUid int32, orderSn string) (string, bool, string, error) {
-	type result struct {
-		FormulaVersion  string `json:"formula_version"`
-		IsUpgrade       bool   `json:"is_upgrade"`
-		FormulaIdentify string `json:"formula_identify"`
-	}
-
-	ret := result{}
+func (s ZpkMarketService) GetFormulaCanUpgradeVersion(goodsId, consoleUid int32, orderSn string) (FormulaUpgradeVersionResult, error) {
+	ret := FormulaUpgradeVersionResult{}
 	err := postSigned(s, "/zpk-market/order/get-formula-can-upgrade-version", map[string]interface{}{
 		"goods_id":    goodsId,
 		"console_uid": consoleUid,
 		"order_sn":    orderSn,
 	}, &ret)
 	if err != nil {
-		return "", false, "", err
+		return FormulaUpgradeVersionResult{}, err
 	}
 
-	return ret.FormulaVersion, ret.IsUpgrade, ret.FormulaIdentify, nil
+	return ret, nil
 }
 
 func postSigned[T any](s ZpkMarketService, path string, params map[string]interface{}, result *T) error {

@@ -8,7 +8,6 @@ metadata:
   annotations:
     higress.io/wasm-plugin-title: {{ .Values.app.title | quote }}
     higress.io/wasm-plugin-description: __APPLICATION_DESCRIPTION__
-    w7.cc/plugin-enabled: "true"
     w7.cc/plugin-support-global: {{ $plugin.supportGlobal | quote }}
     w7.cc/plugin-support-rule: {{ $plugin.supportRule | quote }}
   labels:
@@ -20,7 +19,7 @@ spec:
   phase: {{ $runtime.phase | quote }}
   priority: {{ $runtime.priority }}
   failStrategy: FAIL_OPEN
-  defaultConfigDisable: {{ not $plugin.supportGlobal }}
+  defaultConfigDisable: {{ or (not $plugin.supportGlobal) (not $plugin.defaultEnabled) }}
   defaultConfig:
     {{ toYaml $plugin.defaultConfig | nindent 4 }}
   matchRules: []

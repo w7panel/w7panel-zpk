@@ -35,10 +35,11 @@ type Manifest struct {
 }
 
 type GatewayPlugin struct {
-	Supports      GatewayPluginSupports  `yaml:"supports" json:"supports"`
-	DefaultConfig map[string]interface{} `yaml:"defaultConfig" json:"defaultConfig"`
-	ConfigSchema  map[string]interface{} `yaml:"configSchema,omitempty" json:"configSchema,omitempty"`
-	Runtime       GatewayPluginRuntime   `yaml:"runtime" json:"runtime"`
+	Supports       GatewayPluginSupports  `yaml:"supports" json:"supports"`
+	DefaultEnabled *bool                  `yaml:"defaultEnabled,omitempty" json:"defaultEnabled,omitempty"`
+	DefaultConfig  map[string]interface{} `yaml:"defaultConfig" json:"defaultConfig"`
+	ConfigSchema   map[string]interface{} `yaml:"configSchema,omitempty" json:"configSchema,omitempty"`
+	Runtime        GatewayPluginRuntime   `yaml:"runtime" json:"runtime"`
 }
 
 type GatewayPluginSupports struct {
@@ -53,6 +54,10 @@ type GatewayPluginRuntime struct {
 
 func (plugin GatewayPlugin) IsSupportGlobal() bool {
 	return plugin.Supports.Global
+}
+
+func (plugin GatewayPlugin) IsEnabledByDefault() bool {
+	return plugin.DefaultEnabled == nil || *plugin.DefaultEnabled
 }
 
 func (plugin GatewayPlugin) Normalize() GatewayPlugin {

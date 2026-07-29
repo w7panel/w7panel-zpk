@@ -8,6 +8,7 @@ metadata:
     helm.sh/hook-delete-policy: before-hook-creation
 spec:
   host: {{ .Values.DOMAIN_URL }}
+  userName: {{ .Values.global.panel.userName | quote }}
   siteIdentifier: __APPLICATION_IDENTIFIER__
   target:
     apiVersion: w7panel.w7.com/v1alpha1

@@ -42,7 +42,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: create-site-job
-          image: zpk.w7.cc/public/site-manager:v1.2.15
+          image: zpk.w7.cc/public/site-manager:v1.2.16
           command:
             - sh
             - -c
@@ -65,11 +65,6 @@ spec:
               NEW_ENV_K8S_APP='__NEW_ENV_K8S_APP__'
               CODE_DOWNLOAD_URL=__CODE_DOWNLOAD_URL__
               STATE_CONFIG='{{ $fullName }}-site-state'
-
-              K8S_ENV_APP_NAME="$NEW_ENV_K8S_APP"
-              CREATED_ENV_APP=""
-              CREATED_INGRESS_NAME=""
-              CREATE_SITE_SUCCESS="false"
 
               panel_safe_name() {
                 echo "$1" | tr '_' '-'
@@ -108,176 +103,11 @@ spec:
                   "https://kubernetes.default.svc$path"
               }
 
-              cleanup_created_resources() {
-                if [ "$CREATE_SITE_SUCCESS" = "true" ]; then
-                  return 0
-                fi
-                if [ -n "$CREATED_INGRESS_NAME" ]; then
-                  k8s_delete "/apis/networking.k8s.io/v1/namespaces/$NAMESPACE/ingresses/$CREATED_INGRESS_NAME" >/dev/null 2>&1 || true
-                fi
-                if [ -n "$CREATED_ENV_APP" ]; then
-                  k8s_delete "/apis/apps/v1/namespaces/$NAMESPACE/deployments/$(panel_safe_name "$CREATED_ENV_APP")" >/dev/null 2>&1 || true
-                fi
-              }
-              trap cleanup_created_resources EXIT
               k8s_delete "/api/v1/namespaces/$NAMESPACE/configmaps/$STATE_CONFIG" >/dev/null 2>&1 || true
 
               query_deploy() {
                 deploy_name="$1"
                 k8s_get "/apis/apps/v1/namespaces/$NAMESPACE/deployments/$(panel_safe_name "$deploy_name")"
-              }
-
-              create_ingress_if_needed() {
-                if [ "$OPERATION" != "install" ]; then
-                  return 0
-                fi
-                ingress_name="ing-$(date +%s)-$RANDOM"
-                ingress_name=$(printf '%s' "$ingress_name" | tr '[:upper:]_' '[:lower:]-' | cut -c1-63 | sed 's/-$//')
-                ingress_json=$(jq -n \
-                  --arg ingressName "$ingress_name" \
-                  --arg domain "$DOMAIN" \
-                  --arg enableSsl "$ENABLE_SSL" \
-                  --arg namespace "$NAMESPACE" \
-                  '{
-                    apiVersion: "networking.k8s.io/v1",
-                    kind: "Ingress",
-                    metadata: {
-                      name: $ingressName,
-                      namespace: $namespace,
-                      annotations: ({
-                        "kubernetes.io/ingress.class": "higress",
-                        "higress.io/resource-definer": "higress"
-                      } + (if $enableSsl == "true" then {
-                        "higress.io/ssl-redirect": "false",
-                        "w7.cc/ssl-redirect": "false",
-                        "cert-manager.io/cluster-issuer": "w7-letsencrypt-prod",
-                        "cert-manager.io/renew-before": "30m"
-                      } else {} end)),
-                      labels: {
-                        "higress.io/resource-definer": "higress",
-                        "app": "w7-sitemanager-site-manager-nginx",
-                        "group": "w7-sitemanager",
-                        "w7.cc/group-name": "w7-sitemanager",
-                        "w7.cc/group-names": "{{ .Release.Name }}"
-                      }
-                    },
-                    spec: {
-                      rules: [
-                        {
-                          host: $domain,
-                          http: {
-                            paths: [
-                              {
-                                path: "/",
-                                pathType: "Prefix",
-                                backend: {
-                                  service: {
-                                    name: "w7-sitemanager-site-manager-nginx",
-                                    port: { number: 80 }
-                                  }
-                                }
-                              }
-                            ]
-                          }
-                        }
-                      ]
-                    }
-                  }
-                  | if $enableSsl == "true" then .spec.tls = [{hosts: [$domain], secretName: ($domain + "-tls-secret")}] else . end')
-                k8s_post "/apis/networking.k8s.io/v1/namespaces/$NAMESPACE/ingresses" "$ingress_json" >/dev/null
-                CREATED_INGRESS_NAME="$ingress_name"
-              }
-
-              create_environment_app() {
-                source_deploy_json="$1"
-                safe_new_env_app=$(panel_safe_name "$NEW_ENV_K8S_APP")
-                if k8s_get "/apis/apps/v1/namespaces/$NAMESPACE/deployments/$safe_new_env_app" >/dev/null 2>&1; then
-                  echo "environment deployment already exists, reuse: $safe_new_env_app"
-                  K8S_ENV_APP_NAME="$NEW_ENV_K8S_APP"
-                  CREATED_ENV_APP=""
-                  return 0
-                fi
-
-                yaml_copy_rules=$(printf '%s' "$source_deploy_json" | jq -r '.spec.template.metadata.annotations["w7.cc/yaml_copy"] // ""')
-                if [ -n "$yaml_copy_rules" ] && [ "$yaml_copy_rules" != "null" ]; then
-                  site_manager_deploy_json=$(query_deploy "w7-sitemanager-site-manager")
-                  source_deploy_json=$(printf '%s' "$source_deploy_json" | jq -c \
-                    --argjson sourceDeploy "$site_manager_deploy_json" \
-                    --argjson copyRules "$yaml_copy_rules" \
-                    '
-                    def path_parts($p):
-                      $p
-                      | split(".")
-                      | map(
-                          capture("^(?<name>[^\\[]+)(?:\\[(?<idx>[0-9]+)\\])?$") as $m
-                          | if $m.idx == null then [$m.name] else [$m.name, ($m.idx | tonumber)] end
-                        )
-                      | add;
-
-                    reduce ($copyRules // [])[] as $rule
-                      (.;
-                        setpath(
-                          path_parts($rule.target);
-                          ($sourceDeploy | getpath(path_parts($rule.source)))
-                        )
-                      )
-                    ')
-                fi
-                new_deploy_json=$(printf '%s' "$source_deploy_json" | jq \
-                  --arg newName "$NEW_ENV_K8S_APP" \
-                  --arg version "$ENV_VERSION" \
-                  --arg releaseName "{{ .Release.Name }}" \
-                  --arg namespace "$NAMESPACE" \
-                  '
-                  del(.metadata.resourceVersion, .metadata.uid, .metadata.creationTimestamp, .metadata.managedFields, .metadata.ownerReferences, .status)
-                  | .metadata.name = $newName
-                  | .metadata.namespace = $namespace
-                  | .metadata.generation = 0
-                  | .metadata.annotations = (.metadata.annotations // {})
-                  | .metadata.labels = (.metadata.labels // {})
-                  | .metadata.annotations["w7.cc/create-svc"] = "true"
-                  | .metadata.annotations["title"] = $newName
-                  | .metadata.annotations["w7.cc/parent-group-name"] = $releaseName
-                  | .metadata.labels["w7.cc/parent-group-name"] = $releaseName
-                  | .metadata.labels["app"] = $newName
-                  | .spec.selector.matchLabels = (.spec.selector.matchLabels // {})
-                  | .spec.selector.matchLabels["app"] = $newName
-                  | .spec.template.metadata.labels = (.spec.template.metadata.labels // {})
-                  | .spec.template.metadata.labels["app"] = $newName
-                  | .spec.template.spec.containers[0].name = $newName
-                  | ( .spec.template.metadata.annotations["w7.cc/image_template"] // "" ) as $tpl
-                  | if $tpl != "" then .spec.template.spec.containers[0].image = ($tpl | gsub("\\{version\\}"; $version)) else . end
-                  | .spec.template.spec.containers[0].env = (
-                      (.spec.template.spec.containers[0].env // [])
-                      | map(if .name == "METADATA_NAME" then .value = $newName | del(.valueFrom) else . end)
-                    )
-                  | .spec.template.spec.affinity = {
-                      podAffinity: {
-                        requiredDuringSchedulingIgnoredDuringExecution: [
-                          {
-                            labelSelector: {
-                              matchExpressions: [
-                                {
-                                  key: "w7.cc/identifie",
-                                  operator: "In",
-                                  values: ["w7-sitemanager"]
-                                }
-                              ]
-                            },
-                            topologyKey: "kubernetes.io/hostname"
-                          }
-                        ]
-                      }
-                    }')
-                k8s_post "/apis/apps/v1/namespaces/$NAMESPACE/deployments" "$new_deploy_json" >/dev/null
-
-                K8S_ENV_APP_NAME="$NEW_ENV_K8S_APP"
-                CREATED_ENV_APP="$NEW_ENV_K8S_APP"
-              }
-
-              resolve_target_env() {
-                source_deploy_json=$(query_deploy "$ENV_GROUP")
-                create_environment_app "$source_deploy_json"
               }
 
               get_site_env_app_name() {
@@ -288,15 +118,10 @@ spec:
                 printf '%s' "$site_info" | jq -r '.site_environment.app_name // empty' 2>/dev/null || true
               }
 
-              get_nginx_vhost_template() {
-                deploy_json=$(query_deploy "$K8S_ENV_APP_NAME")
-                printf '%s' "$deploy_json" | jq -r '.spec.template.metadata.annotations["w7.cc/nginx_vhost_template"] // .metadata.annotations["w7.cc/nginx_vhost_template"] // ""'
-              }
-
               save_state() {
                 target_env_deploy=$(get_site_env_app_name)
                 if [ -z "$target_env_deploy" ]; then
-                  target_env_deploy="$K8S_ENV_APP_NAME"
+                  target_env_deploy="$NEW_ENV_K8S_APP"
                 fi
                 target_deploy_json=$(query_deploy "$target_env_deploy")
                 target_env_image=$(printf '%s' "$target_deploy_json" | jq -r '.spec.template.spec.containers[0].image // ""')
@@ -344,12 +169,13 @@ spec:
                   || k8s_patch "/api/v1/namespaces/$NAMESPACE/configmaps/$STATE_CONFIG" "$state_json" >/dev/null
               }
 
-              resolve_target_env
-              create_ingress_if_needed
-              NGINX_VHOST_TEMPLATE=$(get_nginx_vhost_template)
-
-              /home/rangine create:site \
-                --token="$PANEL_ACCESSTOKEN" \
+              /home/rangine provision:site \
+                --panel-url="$PANEL_URL" \
+                --panel-token="$PANEL_TOKEN" \
+                --panel-access-token="$PANEL_ACCESSTOKEN" \
+                --namespace="$NAMESPACE" \
+                --operation="$OPERATION" \
+                --release="{{ .Release.Name }}" \
                 --title="$ENV_TITLE" \
                 --name="$ENV_GROUP" \
                 --language="$ENV_LANGUAGE" \
@@ -357,11 +183,9 @@ spec:
                 --domain="$DOMAIN" \
                 --ssl="$ENABLE_SSL" \
                 --code-download-url="$CODE_DOWNLOAD_URL" \
-                --app_name="$APP_IDENTIFY" \
-                --k8s-app-name="$SITE_K8S_APP" \
-                --k8s-env-app-name="$K8S_ENV_APP_NAME" \
-                --nginx-vhost-template="$NGINX_VHOST_TEMPLATE" \
+                --app-name="$APP_IDENTIFY" \
+                --site-k8s-app-name="$SITE_K8S_APP" \
+                --target-env-app-name="$NEW_ENV_K8S_APP" \
                 -f /home/config.yaml
 
-              CREATE_SITE_SUCCESS="true"
               save_state

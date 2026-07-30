@@ -14,6 +14,7 @@ const (
 	Docker_App       = "docker"
 	Help_App         = "helm"
 	GatewayPluginApp = "gateway-plugin"
+	EnvironmentApp   = "environment"
 
 	GatewayPluginDriverHigressWasmV1 = "higress-wasm/v1"
 )

@@ -98,7 +98,7 @@ func (ImportHigressPlugins) Handle(cmd *cobra.Command, _ []string) {
 		if err = saveHigressPluginIcon(formula, plugin.IconURL); err != nil {
 			panic(fmt.Errorf("save %s icon: %w", plugin.Identifie, err))
 		}
-		if err = depot.SaveSharedFile(formula, "readme.md", plugin.Readme); err != nil {
+		if err = depot.PersistSharedFile(formula, "readme.md", plugin.Readme); err != nil {
 			panic(fmt.Errorf("save %s readme: %w", plugin.Identifie, err))
 		}
 		if formulaRow.Setting == nil {

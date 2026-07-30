@@ -9,7 +9,7 @@ type Tag struct {
 }
 
 func (l Tag) ResetTags() error {
-	defaultTags := []string{"云原生运维", "开发工具", "运行环境", "数据库/中间件", "业务应用", "游戏", "AI"}
+	defaultTags := []string{"云原生运维", "开发工具", "运行环境", "数据库/中间件", "业务应用", "游戏", "AI", "网关插件"}
 	count, err := dao.Q.Tag.Where(dao.Q.Tag.Name.In(defaultTags...)).Count()
 	if err != nil {
 		return err

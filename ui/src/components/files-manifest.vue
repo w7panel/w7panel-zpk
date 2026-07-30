@@ -90,12 +90,21 @@
                                                 <span class="c-99 mt-6">全局配置默认开启；规则配置会显示在应用域名管理的“更多”中。</span>
                                             </div>
                                         </a-form-item>
+                                        <a-form-item label="全局默认启用" style="margin-bottom:18px;">
+                                            <div class="df df-c">
+                                                <div>
+                                                    <a-switch v-model="form.gatewayPluginDefaultEnabled"
+                                                        :disabled="!form.gatewayPluginSupportGlobal" @change="changeForm" />
+                                                </div>
+                                                <span class="c-99 mt-6">仅作用于全局配置；关闭后可先完善配置，再到网关插件列表手动启用。</span>
+                                            </div>
+                                        </a-form-item>
                                         <a-form-item label="默认配置" style="margin-bottom:0;">
                                             <div class="df df-c">
                                                 <a-textarea v-model="form.gatewayPluginDefaultConfig" :rows="8"
-                                                    :spellcheck="false" placeholder="请输入 YAML 配置，默认为 {}"
+                                                    :spellcheck="false" placeholder="请输入 JSON 配置，默认为 {}"
                                                     style="width:500px;" @change="changeForm" />
-                                                <span class="c-99 mt-6">安装后写入 WasmPlugin 的全局默认配置，字段由插件自身定义，请以插件文档为准。</span>
+                                                <span class="c-99 mt-6">请提供不含真实密钥的初始 JSON；安装后用户仍可在网关插件列表中修改。</span>
                                             </div>
                                         </a-form-item>
                                     </div>
@@ -715,6 +724,7 @@ export default {
                 gatewayPluginPriority: 0,
                 gatewayPluginSupportGlobal: true,
                 gatewayPluginSupportRule: false,
+                gatewayPluginDefaultEnabled: true,
                 gatewayPluginDefaultConfig: '{}',
                 startParams: [],
                 dependsIn: [],
@@ -1893,10 +1903,8 @@ platform:
             this.form.gatewayPluginPriority = Number(gatewayPluginRuntimeConfig.priority || 0);
             this.form.gatewayPluginSupportGlobal = gatewayPluginSupports.global !== false;
             this.form.gatewayPluginSupportRule = gatewayPluginSupports.rule === true;
-            this.form.gatewayPluginDefaultConfig = jsyaml.dump(gatewayPlugin.defaultConfig || {}, {
-                lineWidth: -1,
-                noRefs: true,
-            }).trim();
+            this.form.gatewayPluginDefaultEnabled = gatewayPlugin.defaultEnabled !== false;
+            this.form.gatewayPluginDefaultConfig = JSON.stringify(gatewayPlugin.defaultConfig || {}, null, 2);
 
             if (!this.option?.pureManifest && this.form.type != 'gateway-plugin') {
                 this.form.name = j?.platform?.baseInfo?.name || '';
@@ -2032,14 +2040,14 @@ platform:
         },
         parseGatewayPluginDefaultConfig(showMessage = false) {
             try {
-                const config = jsyaml.load(this.form.gatewayPluginDefaultConfig || '{}') || {};
-                if (typeof config !== 'object' || Array.isArray(config)) {
-                    throw new Error('默认配置必须是 YAML 对象');
+                const config = JSON.parse(this.form.gatewayPluginDefaultConfig || '{}');
+                if (config === null || typeof config !== 'object' || Array.isArray(config)) {
+                    throw new Error('默认配置必须是 JSON 对象');
                 }
                 return config;
             } catch (error) {
                 if (showMessage) {
-                    messageWarning(error?.message || '默认配置 YAML 格式错误');
+                    messageWarning(error?.message || '默认配置 JSON 格式错误');
                 }
                 return null;
             }
@@ -2166,6 +2174,7 @@ platform:
                     || {};
                 j.platform = {
                     gatewayPlugin: {
+                        defaultEnabled: Boolean(this.form.gatewayPluginDefaultEnabled),
                         supports: {
                             global: Boolean(this.form.gatewayPluginSupportGlobal),
                             rule: Boolean(this.form.gatewayPluginSupportRule),

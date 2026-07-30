@@ -143,6 +143,7 @@ func higressPluginTitle(name string) string {
 }
 
 func newHigressBuiltinPluginManifest(plugin higressBuiltinPlugin) commonlogic.Manifest {
+	defaultEnabled := false
 	return commonlogic.Manifest{
 		Application: commonlogic.Application{
 			Name:            plugin.Title,
@@ -158,6 +159,7 @@ func newHigressBuiltinPluginManifest(plugin higressBuiltinPlugin) commonlogic.Ma
 		},
 		Platform: commonlogic.Platform{
 			GatewayPlugin: commonlogic.GatewayPlugin{
+				DefaultEnabled: &defaultEnabled,
 				Supports: commonlogic.GatewayPluginSupports{
 					Global: true,
 					Rule:   true,

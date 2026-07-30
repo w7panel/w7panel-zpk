@@ -1131,12 +1131,13 @@ func (hc *HelmPack) generateGatewayPluginValuesYaml(rootDir string, renderer gat
 			"identify": hc.Manifest.Application.Identifie,
 		},
 		"gatewayPlugin": map[string]interface{}{
-			"supportGlobal": plugin.IsSupportGlobal(),
-			"supportRule":   plugin.Supports.Rule,
-			"defaultConfig": defaultConfig,
-			"configSchema":  plugin.ConfigSchema,
-			"hasFrontend":   strings.TrimSpace(hc.Manifest.Web.Url) != "",
-			"runtime":       renderer.RuntimeValues(plugin),
+			"defaultEnabled": plugin.IsEnabledByDefault(),
+			"supportGlobal":  plugin.IsSupportGlobal(),
+			"supportRule":    plugin.Supports.Rule,
+			"defaultConfig":  defaultConfig,
+			"configSchema":   plugin.ConfigSchema,
+			"hasFrontend":    strings.TrimSpace(hc.Manifest.Web.Url) != "",
+			"runtime":        renderer.RuntimeValues(plugin),
 		},
 	}
 	return writeYAMLFile(filepath.Join(rootDir, "values.yaml"), values)

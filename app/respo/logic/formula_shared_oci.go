@@ -21,7 +21,7 @@ func (d *Depot) PersistSharedFile(formula *Formula, filename, content string) er
 	if err := d.SaveSharedFile(formula, filename, content); err != nil {
 		return err
 	}
-	if err := d.packSharedFilesToOci(formula); err != nil {
+	if err := d.PackSharedFilesToOci(formula); err != nil {
 		return fmt.Errorf("保存共享文件到 OCI 失败: %w", err)
 	}
 	return nil
@@ -30,10 +30,6 @@ func (d *Depot) PersistSharedFile(formula *Formula, filename, content string) er
 // PackSharedFilesToOci packs the local shared working directory into the
 // dedicated OCI tag. Version tags intentionally do not contain these files.
 func (d *Depot) PackSharedFilesToOci(formula *Formula) error {
-	return d.packSharedFilesToOci(formula)
-}
-
-func (d *Depot) packSharedFilesToOci(formula *Formula) error {
 	files, err := d.GetSharedFileList(formula)
 	if err != nil {
 		return err
@@ -49,8 +45,7 @@ func (d *Depot) packSharedFilesToOci(formula *Formula) error {
 	return commonlogic.PushOciToRemote(remoteOci, FormulaSharedOciTag, descriptors, nil)
 }
 
-// unPackSharedFilesFromOci restores the local working directory. Repositories
-// created before the shared tag existed fall back to the latest version OCI.
+// unPackSharedFilesFromOci restores the local shared working directory.
 func (d *Depot) unPackSharedFilesFromOci(formula *Formula) error {
 	remoteOci, err := commonlogic.GetDefaultRemoteOci(commonlogic.GetFormulaOciName(formula.Name))
 	if err != nil {
@@ -58,7 +53,7 @@ func (d *Depot) unPackSharedFilesFromOci(formula *Formula) error {
 	}
 	manifest, err := commonlogic.GetOciManifest(remoteOci, FormulaSharedOciTag)
 	if errors.Is(err, commonlogic.OciManifestNotFoundErr) {
-		return d.seedSharedFilesFromOci(formula)
+		return nil
 	}
 	if err != nil {
 		return err

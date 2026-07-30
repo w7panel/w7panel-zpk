@@ -388,20 +388,11 @@ func (self *Depot) saveFile(filesDir, filename, content string) error {
 		if err := os.Remove(filePath); err != nil && !os.IsNotExist(err) {
 			return err
 		}
-	} else {
-		function.CreateDirIfNotExist(filepath.Dir(filePath), os.ModePerm)
-		file, err := os.Create(filePath)
-		if err != nil {
-			return err
-		}
-		defer file.Close()
-		_, err = file.Write([]byte(content))
-		if err != nil {
-			return err
-		}
+		return nil
 	}
 
-	return nil
+	function.CreateDirIfNotExist(filepath.Dir(filePath), os.ModePerm)
+	return os.WriteFile(filePath, []byte(content), 0o666)
 }
 
 func resolveFormulaFilePath(filesDir, filename string) (string, error) {
@@ -413,7 +404,6 @@ func resolveFormulaFilePath(filesDir, filename string) (string, error) {
 	if !function.IsPathInDir(filePath, filesDir) {
 		return "", fmt.Errorf("非法文件路径: %s", filename)
 	}
-
 	return filePath, nil
 }
 
@@ -473,23 +463,19 @@ func (self *Depot) getFileList(dir string) (map[string]string, error) {
 		if err != nil {
 			return err
 		}
-		if !info.IsDir() {
-			file, err := os.Open(path)
-			if err != nil {
-				return err
-			}
-			content, err := io.ReadAll(file)
-			if err != nil {
-				return err
-			}
-			files[path[len(dir)+1:]] = string(content)
+		if info.IsDir() {
+			return nil
 		}
+		content, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		files[path[len(dir)+1:]] = string(content)
 		return nil
 	})
 	if err != nil {
 		return nil, err
 	}
-
 	return files, nil
 }
 
@@ -742,21 +728,9 @@ func (self *Depot) packToOci(formula *Formula) error {
 
 func (self *Depot) unPackManifestFilesFromOci(formula *Formula) error {
 	filesDir := filepath.Join(self.basePath, formula.GetFilesRelativeDir())
-	if !function.FileExists(filesDir) || function.IsDirEmpty(filesDir) {
-		function.CreateDirIfNotExist(filesDir, os.ModePerm)
-		return self.unPackFormulaFileListFromOci(formula, filesDir, IsFormulaManifestPath, true)
+	if function.FileExists(filesDir) && !function.IsDirEmpty(filesDir) {
+		return nil
 	}
-
-	return nil
-}
-
-func (self *Depot) seedSharedFilesFromOci(formula *Formula) error {
-	return self.unPackFormulaFileListFromOci(formula, self.getSharedFilesDir(formula.Name), func(name string) bool {
-		return !IsFormulaManifestPath(name)
-	}, false)
-}
-
-func (self *Depot) unPackFormulaFileListFromOci(formula *Formula, targetDir string, include func(string) bool, overwrite bool) error {
 	remoteOci, manifest, err := self.getOciManifest(formula)
 	if err != nil {
 		if errors.Is(err, logic.OciManifestNotFoundErr) {
@@ -771,15 +745,12 @@ func (self *Depot) unPackFormulaFileListFromOci(formula *Formula, targetDir stri
 			return err
 		}
 		for name, content := range files {
-			if !include(name) {
+			if !IsFormulaManifestPath(name) {
 				continue
 			}
-			targetPath, err := resolveFormulaFilePath(targetDir, name)
+			targetPath, err := resolveFormulaFilePath(filesDir, name)
 			if err != nil {
 				return err
-			}
-			if !overwrite && function.FileExists(targetPath) {
-				continue
 			}
 			if err = os.MkdirAll(filepath.Dir(targetPath), os.ModePerm); err != nil {
 				return err

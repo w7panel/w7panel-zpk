@@ -197,7 +197,7 @@ func (c FormulaAttach) SaveSharedFile(ctx *gin.Context) {
 		c.JsonResponseWithError(ctx, err, 500)
 		return
 	}
-	if err = depot.SaveSharedFile(formula, params.Filename, sanitizeFormulaAttachContent(params.Content)); err != nil {
+	if err = depot.PersistSharedFile(formula, params.Filename, sanitizeFormulaAttachContent(params.Content)); err != nil {
 		c.JsonResponseWithError(ctx, err, 500)
 		return
 	}

@@ -243,12 +243,11 @@ func (self *Depot) getFormula(name string, version string, user *entity.Registry
 	}
 	sharedFilesDir := self.getSharedFilesDir(result.Name)
 	if seedSharedFiles && (!function.FileExists(sharedFilesDir) || function.IsDirEmpty(sharedFilesDir)) {
-		if err = self.seedSharedFilesFromOci(result); err != nil {
-			slog.Error("seedSharedFilesFromOci err", "formula_name", result.Name, "version", result.Version, "err", err)
+		if err = self.unPackSharedFilesFromOci(result); err != nil {
+			slog.Error("unPackSharedFilesFromOci err", "formula_name", result.Name, "version", result.Version, "err", err)
 			return nil, err
 		}
 	}
-
 	//load all manifest
 	list, _ := self.GetManifestFileList(result)
 	for key, value := range list {
@@ -575,7 +574,7 @@ func (self Depot) OnRepositoryPushed(payload registry.RegistryRepositoryWebHookP
 		return
 	}
 	tag := payload.Event.Target.Tag
-	if tag == "" {
+	if tag == "" || tag == FormulaSharedOciTag {
 		return
 	}
 
@@ -651,6 +650,11 @@ func (self *Depot) PackLoop() {
 
 func (self *Depot) packToOci(formula *Formula) error {
 	slog.Info("开始打包项目:", "info", formula)
+	// Persist the shared working directory separately before replacing a version
+	// tag. Version manifests intentionally no longer contain shared files.
+	if err := self.PackSharedFilesToOci(formula); err != nil {
+		return err
+	}
 	remoteOci, err := logic.GetDefaultRemoteOci(logic.GetFormulaOciName(formula.Name))
 	if err != nil {
 		return err
@@ -683,13 +687,6 @@ func (self *Depot) packToOci(formula *Formula) error {
 			}
 			fileList["manifest.yaml"] = string(content)
 		}
-	}
-	sharedFiles, err := self.GetSharedFileList(formula)
-	if err != nil {
-		return err
-	}
-	for path, content := range sharedFiles {
-		fileList[path] = content
 	}
 	slog.Info("打包 filelist 文件", "name", formula.Name, "filelist", fileList, "err", err)
 	fileListDescriptors, err := logic.PackFileListToOci(fileList)

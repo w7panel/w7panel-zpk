@@ -22,12 +22,14 @@
             <a-form-item label="标签" style="margin-bottom:10px;">
 
                 <div class="df df-ww">
-                    <a-tag color="blue" v-for="(item, index) in form.tags" :key="index"
-                        :closable="edit.type == 'tags'" @close="deleteTag(index)" class="tag">{{ item.name }}</a-tag>
+                    <a-tag color="blue" v-for="(item, index) in form.tags" :key="item.id || item.name"
+                        :visible="true"
+                        :closable="edit.type == 'tags' && item.name != requiredTagName"
+                        @close="deleteTag(index)" class="tag">{{ item.name }}</a-tag>
                     <div v-if="edit.type == 'tags'" class="df">
                         <a-select v-model="form.taginput" multiple :max-tag-count="1" style="width:140px;"
                             placeholder="添加新标签">
-                            <a-option v-for="item in tags" :disabled="Boolean(form.tags.find(i => i.name == item.name))"
+                            <a-option v-for="item in editableTags" :disabled="Boolean(form.tags.find(i => i.name == item.name))"
                                 :key="item.id" :label="item.name" :value="item.id"></a-option>
                         </a-select>
                         <a-button type="primary" @click="addTag" style="margin-left:10px;">确定</a-button>
@@ -56,7 +58,8 @@
             </a-form-item>
             <a-form-item label="属性">
                 <div class="version-info-checks">
-                    <a-checkbox v-model="edit.once" @change="changeForm('once')">仅安装一次</a-checkbox>
+                    <a-checkbox v-model="edit.once" :disabled="isEnvironmentType"
+                        @change="changeForm('once')">仅安装一次</a-checkbox>
                     <a-checkbox v-model="edit.clusterPrivileges"
                         @change="changeForm('clusterPrivileges')">集群特权</a-checkbox>
                     <a-checkbox v-model="edit.registerSite" @change="changeForm('registerSite')">创建站点</a-checkbox>
@@ -143,6 +146,7 @@ export default {
                 list: [],
             },
             tags: [],
+            ensuringRequiredTags: {},
         }
     },
     created() {
@@ -170,13 +174,13 @@ export default {
             this.annotationEdit.list = this.json.application?.annotation || [];
 
             if (this.json.application) {
-                this.form.once = this.json.application?.once || false;
+                this.form.once = this.isEnvironmentType ? true : (this.json.application?.once || false);
                 this.form.name = this.json.application?.name || '';
                 this.form.description = this.json?.application?.description || '';
                 this.form.clusterPrivileges = this.json?.application?.clusterPrivileges || false;
                 this.form.registerSite = this.json?.application?.registerSite || false;
             }
-            this.edit.once = this.json?.application?.once || false;
+            this.edit.once = this.isEnvironmentType ? true : (this.json?.application?.once || false);
             this.edit.clusterPrivileges = this.json?.application?.clusterPrivileges || false;
             this.edit.registerSite = this.json?.application?.registerSite || false;
 
@@ -187,7 +191,31 @@ export default {
             if (this.logoimg && this.iconCacheKey) {
                 this.logoimg += (this.logoimg.includes('?') ? '&' : '?') + 'time=' + this.iconCacheKey;
             }
-            this.form.tags = this.info?.tags || [];
+            let tags = [...(this.info?.tags || [])];
+            if (this.requiredTagName) {
+                let requiredTagIndex = tags.findIndex(item => item.name == this.requiredTagName);
+                let requiredTag = requiredTagIndex >= 0
+                    ? tags.splice(requiredTagIndex, 1)[0]
+                    : { name: this.requiredTagName };
+                tags.unshift(requiredTag);
+                if (requiredTagIndex < 0) {
+                    this.ensureRequiredTag(this.requiredTagName);
+                }
+            }
+            this.form.tags = tags;
+        },
+
+        ensureRequiredTag(name) {
+            if (!name || !this.identifie || this.ensuringRequiredTags[name]) { return }
+            this.ensuringRequiredTags[name] = true;
+            myAxios.post('/respo/tag/add', {
+                identifie: this.identifie,
+                name,
+            }).then(() => {
+                this.$emit('refresh');
+            }).catch(() => undefined).finally(() => {
+                delete this.ensuringRequiredTags[name];
+            });
         },
 
         async getTag() {
@@ -200,14 +228,19 @@ export default {
         },
 
         deleteTag(index) {
+            let tag = this.form.tags[index];
+            if (!tag?.id || tag.name == this.requiredTagName) { return }
             let formulaId = this.info?.version?.formula_id;
             if (!formulaId) { return }
             myAxios.post('/respo/tag/delete', {
-                tagId: this.form.tags[index].id,
+                tagId: tag.id,
                 formulaId: formulaId,
-            }).then(res => {
+            }).then(() => {
                 messageSuccess('删除成功');
-                this.form.tags.splice(index, 1);
+                let deletedIndex = this.form.tags.findIndex(item => item.id == tag.id);
+                if (deletedIndex >= 0) {
+                    this.form.tags.splice(deletedIndex, 1);
+                }
                 this.edit.type = '';
                 this.$emit('refresh');
             })
@@ -234,7 +267,8 @@ export default {
             this.$emit('refresh');
         },
         openAnnotationEdit() {
-            let list = Object.entries(this.json?.application?.annotation || {}).map(([k, v]) => ({ key: k, value: v }))
+            let list = Object.entries(this.json?.application?.annotation || {})
+                .map(([k, v]) => ({ key: k, value: v }))
             this.annotationEdit = {
                 show: true,
                 list: list,
@@ -250,6 +284,10 @@ export default {
             this.submit();
         },
         changeForm(type) {
+            if (type == 'once' && this.isEnvironmentType) {
+                this.edit.once = true;
+                return;
+            }
             if (this.edit[type] == this.form[type]) {
                 this.edit.type = '';
                 return;
@@ -263,14 +301,17 @@ export default {
                 identifie: this.identifie,
             });
             let baseInfo = settingRes?.data?.data?.base_info || {};
+            let annotation = {
+                ...(this.json?.application?.annotation || {}),
+            };
             await myAxios.post('/respo/setting/set', {
                 identifie: this.identifie,
                 base_info: {
                     ...baseInfo,
                     name: this.json?.application?.name || this.form.name || '',
                     description: this.json?.application?.description || this.form.description || '',
-                    annotation: this.json?.application?.annotation || {},
-                    once: Boolean(this.json?.application?.once),
+                    annotation,
+                    once: this.isEnvironmentType ? true : Boolean(this.json?.application?.once),
                     cluster_privileges: Boolean(this.json?.application?.clusterPrivileges),
                     register_site: Boolean(this.json?.application?.registerSite),
                 },
@@ -281,11 +322,25 @@ export default {
         },
     },
     computed: {
+        applicationType() {
+            return this.json?.application?.type || '';
+        },
+        isEnvironmentType() {
+            return this.applicationType == 'environment';
+        },
+        requiredTagName() {
+            if (this.applicationType == 'environment') { return '运行环境' }
+            if (this.applicationType == 'gateway-plugin') { return '网关插件' }
+            return '';
+        },
+        editableTags() {
+            return this.tags.filter(item => item.name != this.requiredTagName);
+        },
         annotationKeys() {
             const keys = Object.keys(this.json?.application?.annotation || []);
             return keys.length === 0 ? '-' : keys.join(',');
-        }
-    }
+        },
+    },
 }
 </script>
 <style scoped>

@@ -54,10 +54,10 @@ func (ImportHigressPlugins) Handle(cmd *cobra.Command, _ []string) {
 	if err != nil {
 		panic(err)
 	}
-	operationsTag, _ := dao.Q.Tag.Where(dao.Q.Tag.Name.Eq("云原生运维")).First()
-	if operationsTag == nil {
-		operationsTag = &entity.Tag{Name: "云原生运维"}
-		if err = dao.Q.Tag.Create(operationsTag); err != nil {
+	pluginTag, _ := dao.Q.Tag.Where(dao.Q.Tag.Name.Eq("网关插件")).First()
+	if pluginTag == nil {
+		pluginTag = &entity.Tag{Name: "网关插件"}
+		if err = dao.Q.Tag.Create(pluginTag); err != nil {
 			panic(fmt.Errorf("create artifact tag: %w", err))
 		}
 	}
@@ -112,12 +112,12 @@ func (ImportHigressPlugins) Handle(cmd *cobra.Command, _ []string) {
 			panic(fmt.Errorf("update %s title: %w", plugin.Identifie, err))
 		}
 		formulaTag, _ := dao.Q.TagFormula.Where(
-			dao.Q.TagFormula.TagID.Eq(operationsTag.ID),
+			dao.Q.TagFormula.TagID.Eq(pluginTag.ID),
 			dao.Q.TagFormula.FormulaID.Eq(formulaRow.ID),
 		).First()
 		if formulaTag == nil {
 			if err = dao.Q.TagFormula.Create(&entity.TagFormula{
-				TagID:     operationsTag.ID,
+				TagID:     pluginTag.ID,
 				FormulaID: formulaRow.ID,
 			}); err != nil {
 				panic(fmt.Errorf("tag %s: %w", plugin.Identifie, err))

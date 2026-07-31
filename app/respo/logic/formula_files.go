@@ -63,6 +63,11 @@ func (d *Depot) migrateFormulaFiles(formula *Formula) error {
 			return err
 		}
 	}
+	// Shared files are formula-level data. Persist them to the dedicated tag
+	// during migration instead of relying on a later version publish.
+	if err = d.PackSharedFilesToOci(formula); err != nil {
+		return fmt.Errorf("迁移共享文件到 OCI 失败: %w", err)
+	}
 
 	versions, err := dao.Q.Version.Where(dao.Q.Version.FormulaID.Eq(formula.ID)).Find()
 	if err != nil {

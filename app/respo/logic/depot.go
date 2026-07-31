@@ -650,11 +650,6 @@ func (self *Depot) PackLoop() {
 
 func (self *Depot) packToOci(formula *Formula) error {
 	slog.Info("开始打包项目:", "info", formula)
-	// Persist the shared working directory separately before replacing a version
-	// tag. Version manifests intentionally no longer contain shared files.
-	if err := self.PackSharedFilesToOci(formula); err != nil {
-		return err
-	}
 	remoteOci, err := logic.GetDefaultRemoteOci(logic.GetFormulaOciName(formula.Name))
 	if err != nil {
 		return err

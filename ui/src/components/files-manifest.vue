@@ -145,24 +145,18 @@
                                             <a-form-item label="Nginx 模板" field="environmentNginxVhostTemplate" required
                                                 style="margin-bottom:0;">
                                                 <div class="nginx-template-field">
-                                                    <div class="nginx-template-shortcuts" aria-label="Nginx 模板快捷输入">
-                                                        <span class="nginx-template-shortcuts-label">内置占位符</span>
-                                                        <a-button v-for="placeholder in nginxTemplatePlaceholders"
-                                                            :key="placeholder" size="mini" type="outline"
-                                                            class="nginx-template-shortcut"
-                                                            @mousedown.prevent
-                                                            @click="insertNginxTemplatePlaceholder(placeholder)">
-                                                            {{ placeholder }}
+                                                    <div class="nginx-template-input">
+                                                        <a-textarea v-model="form.environmentNginxVhostTemplate"
+                                                            class="nginx-template-textarea"
+                                                            :auto-size="{minRows:10, maxRows:20}"
+                                                            :spellcheck="false" placeholder="请输入 Nginx vhost 模板"
+                                                            style="width:500px;" />
+                                                        <a-button size="mini" type="text"
+                                                            class="nginx-template-example-entry"
+                                                            @click="nginxTemplateExampleVisible = true">
+                                                            查看完整示例
                                                         </a-button>
                                                     </div>
-                                                    <a-textarea ref="nginxTemplateInput"
-                                                        v-model="form.environmentNginxVhostTemplate" :auto-size="{minRows:10, maxRows:20}"
-                                                        :spellcheck="false" placeholder="请输入 Nginx vhost 模板"
-                                                        style="width:500px;"
-                                                        @click="rememberNginxTemplateSelection"
-                                                        @keyup="rememberNginxTemplateSelection"
-                                                        @select="rememberNginxTemplateSelection"
-                                                        @blur="rememberNginxTemplateSelection" />
                                                 </div>
                                             </a-form-item>
                                         </div>
@@ -568,6 +562,31 @@
             </div>
         </a-drawer>
 
+        <a-drawer v-model:visible="nginxTemplateExampleVisible" :width="720" title="Nginx 模板示例"
+            unmount-on-close>
+            <div class="nginx-template-example-panel">
+                <a-alert type="info" show-icon :closable="false">
+                    示例包含 PHP-FPM、静态资源缓存和前端控制器路由配置。使用前请根据实际应用检查端口和规则。
+                </a-alert>
+                <div class="nginx-template-example-placeholders">
+                    <span>系统将自动替换：</span>
+                    <a-button v-for="placeholder in nginxTemplatePlaceholders" :key="placeholder"
+                        size="mini" type="outline" class="nginx-template-example-placeholder"
+                        title="点击复制" @click="onekeyCopy(placeholder)">
+                        {{ placeholder }}
+                    </a-button>
+                </div>
+                <pre class="nginx-template-example-code"><code>{{ nginxTemplateExample }}</code></pre>
+            </div>
+            <template #footer>
+                <div class="nginx-template-example-footer">
+                    <a-button @click="nginxTemplateExampleVisible = false">关闭</a-button>
+                    <a-button @click="onekeyCopy(nginxTemplateExample)">复制示例</a-button>
+                    <a-button type="primary" @click="useNginxTemplateExample">使用此示例</a-button>
+                </div>
+            </template>
+        </a-drawer>
+
         <a-modal v-model:visible="dependForm.show" :title="dependForm.editIndex >= 0 ? '修改子应用' : '添加子应用'" :width="640"
             :footer="false"
             @close="dependForm = { show: false, editIndex: -1, identifie_before: '', identifie_last: '', identifie: '', name: '', required: false, from: '' };">
@@ -735,6 +754,68 @@ const nginxTemplatePlaceholders = [
     '{ROOT_DIR}',
     '{K8S_DOMAIN}',
 ];
+
+const nginxTemplateExample = String.raw`server {
+    listen 80;
+    server_name {SERVER_NAME};
+
+    root {ROOT_DIR};
+    index index.php index.html index.htm;
+
+    access_log /dev/stdout;
+    error_log /dev/stderr;
+
+    # 静态文件处理
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2)$ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+        try_files $uri =404;
+    }
+
+    # 隐藏文件保护
+    location ~ /\. {
+        deny all;
+        access_log off;
+        log_not_found off;
+    }
+
+    # PHP 代理配置
+    location ~ ^/(.+\.php)(/.*)?$ {
+        # 使用 FastCGI 连接到 PHP-FPM
+        fastcgi_pass {K8S_DOMAIN}:9000;
+
+        set $real_scheme $http_x_forwarded_proto;
+        if ($real_scheme = "") {
+            set $real_scheme $scheme;
+        }
+
+        # 关键 FastCGI 参数
+        include fastcgi_params;
+        fastcgi_split_path_info ^(.+\.php)(/.+)$;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        fastcgi_param SCRIPT_NAME $fastcgi_script_name;
+        fastcgi_param PATH_INFO $fastcgi_path_info;
+        fastcgi_param PATH_TRANSLATED $document_root$fastcgi_path_info;
+        fastcgi_index index.php;
+
+        # 必要的请求头
+        fastcgi_param HTTP_X_REAL_IP $remote_addr;
+        fastcgi_param HTTP_X_FORWARDED_FOR $proxy_add_x_forwarded_for;
+        fastcgi_param HTTP_X_FORWARDED_PROTO $real_scheme;
+        fastcgi_param REQUEST_SCHEME $real_scheme;
+        fastcgi_param HTTPS $real_scheme;
+
+        # FastCGI 超时设置
+        fastcgi_connect_timeout 30s;
+        fastcgi_send_timeout 60s;
+        fastcgi_read_timeout 60s;
+    }
+
+    # 主路由配置（支持前端控制器）
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+}`;
 
 export default {
     emits: ['writefile'],
@@ -1050,10 +1131,8 @@ export default {
             environmentPreviousDepends: null,
             initialApplicationType: '',
             nginxTemplatePlaceholders,
-            nginxTemplateSelection: {
-                start: null,
-                end: null,
-            },
+            nginxTemplateExample,
+            nginxTemplateExampleVisible: false,
         }
     },
     created() {
@@ -1230,50 +1309,25 @@ export default {
         } catch { }
     },
     methods: {
-        getNginxTemplateTextarea() {
-            let input = this.$refs.nginxTemplateInput;
-            let element = input?.$el || input;
-            if (element?.tagName == 'TEXTAREA') { return element }
-            return element?.querySelector?.('textarea') || null;
-        },
-        rememberNginxTemplateSelection(event) {
-            let textarea = event?.target?.tagName == 'TEXTAREA'
-                ? event.target
-                : this.getNginxTemplateTextarea();
-            if (!textarea) { return }
-            this.nginxTemplateSelection = {
-                start: textarea.selectionStart,
-                end: textarea.selectionEnd,
+        useNginxTemplateExample() {
+            const applyExample = () => {
+                this.form.environmentNginxVhostTemplate = this.nginxTemplateExample;
+                this.nginxTemplateExampleVisible = false;
+                messageSuccess('已填入 Nginx 模板示例');
             };
-        },
-        insertNginxTemplatePlaceholder(placeholder) {
-            let value = String(this.form.environmentNginxVhostTemplate || '');
-            let textarea = this.getNginxTemplateTextarea();
-            let start = this.nginxTemplateSelection.start;
-            let end = this.nginxTemplateSelection.end;
+            const currentTemplate = String(this.form.environmentNginxVhostTemplate || '').trim();
 
-            if (textarea && document.activeElement == textarea) {
-                start = textarea.selectionStart;
-                end = textarea.selectionEnd;
-            }
-            if (!Number.isInteger(start) || !Number.isInteger(end)) {
-                start = value.length;
-                end = value.length;
+            if (!currentTemplate || currentTemplate == this.nginxTemplateExample.trim()) {
+                applyExample();
+                return;
             }
 
-            start = Math.min(Math.max(start, 0), value.length);
-            end = Math.min(Math.max(end, start), value.length);
-            this.form.environmentNginxVhostTemplate = value.slice(0, start) + placeholder + value.slice(end);
-
-            let cursorPosition = start + placeholder.length;
-            this.nginxTemplateSelection = {
-                start: cursorPosition,
-                end: cursorPosition,
-            };
-            this.$nextTick(() => {
-                let nextTextarea = this.getNginxTemplateTextarea();
-                nextTextarea?.focus?.();
-                nextTextarea?.setSelectionRange?.(cursorPosition, cursorPosition);
+            confirm({
+                title: '使用 Nginx 模板示例',
+                content: '当前模板内容将被示例覆盖，是否继续？',
+                confirmButtonText: '覆盖并使用',
+                cancelButtonText: '取消',
+                onOk: applyExample,
             });
         },
         validateEnvironmentImageLanguage(value, callback) {
@@ -2721,21 +2775,65 @@ platform:
     width: 500px;
 }
 
-.nginx-template-shortcuts {
+.nginx-template-input {
+    position: relative;
+    width: 500px;
+}
+
+.nginx-template-example-entry {
+    position: absolute;
+    z-index: 2;
+    top: 0;
+    right: 0;
+    padding: 6px 6px;
+    height: 30px;
+    background: var(--color-fill-2);
+}
+
+.nginx-template-example-entry:hover {
+    background: var(--color-fill-3);
+}
+
+.nginx-template-example-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.nginx-template-example-placeholders {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: 8px;
-    margin-bottom: 8px;
-}
-
-.nginx-template-shortcuts-label {
     color: #86909c;
-    font-size: 12px;
+    font-size: 13px;
 }
 
-.nginx-template-shortcut {
+.nginx-template-example-placeholder {
     font-family: SFMono-Regular, Consolas, "Liberation Mono", monospace;
+}
+
+.nginx-template-example-code {
+    box-sizing: border-box;
+    min-height: 480px;
+    margin: 0;
+    padding: 16px;
+    overflow: auto;
+    border: 1px solid #e5e6eb;
+    border-radius: 6px;
+    color: #1d2129;
+    background: #f7f8fa;
+    font-family: SFMono-Regular, Consolas, "Liberation Mono", monospace;
+    font-size: 13px;
+    line-height: 1.65;
+    tab-size: 4;
+    white-space: pre;
+}
+
+.nginx-template-example-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
 }
 
 .env-sel .env-item {

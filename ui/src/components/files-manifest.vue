@@ -116,12 +116,14 @@
                                             <div class="greybox-title">运行环境配置</div>
                                             <a-form-item label="环境语言" field="environmentImageLanguage" required
                                                 style="margin-bottom:18px;">
-                                                <div class="df df-c">
-                                                    <a-input v-model="form.environmentImageLanguage" size="large"
-                                                        :max-length="32" style="width:500px;"
-                                                        placeholder="例如 php、python、nodejs" />
-                                                    <span class="c-99 mt-6">以字母开头，可使用字母、数字、点、加号、下划线和中划线。</span>
-                                                </div>
+                                                <a-select v-model="form.environmentImageLanguage" size="large"
+                                                    style="width:500px;" placeholder="请选择环境语言" allow-search>
+                                                    <a-option v-for="option in environmentLanguageOptions"
+                                                        :key="option.value" :value="option.value"
+                                                        :label="option.label">
+                                                        {{ option.label }}
+                                                    </a-option>
+                                                </a-select>
                                             </a-form-item>
                                             <a-form-item label="镜像名称模板" field="environmentImageTemplate" required
                                                 style="margin-bottom:18px;">
@@ -304,7 +306,7 @@
                             </a-form-item>
 
                             <a-form-item
-                                v-if="form.type != 'gateway-plugin' && (!option || !option.pureManifest && form.type != 'docker' && form.type != 'light' && form.type != 'helm')"
+                                v-if="form.type != 'environment' && form.type != 'gateway-plugin' && (!option || !option.pureManifest && form.type != 'docker' && form.type != 'light' && form.type != 'helm')"
                                 label="代码包">
                                 <div class="df ai-e">
                                     <files-upload @success="uploadSuccess" @testDockerfile="v => zip.hasDockerfile = v">
@@ -749,6 +751,17 @@ const environmentAnnotationKeys = {
     nginxVhostTemplate: 'w7.cc/nginx_vhost_template',
 };
 
+const environmentLanguagePresets = [
+    { label: 'PHP', value: 'php' },
+    { label: 'Java', value: 'java' },
+    { label: 'Node.js', value: 'nodejs' },
+    { label: 'Python', value: 'python' },
+    { label: 'Go', value: 'go' },
+    { label: '.NET', value: 'dotnet' },
+    { label: 'Ruby', value: 'ruby' },
+    { label: 'Rust', value: 'rust' },
+];
+
 const nginxTemplatePlaceholders = [
     '{SERVER_NAME}',
     '{ROOT_DIR}',
@@ -997,9 +1010,8 @@ export default {
                 environmentImageLanguage: [
                     {
                         required: true,
-                        message: '请输入环境语言',
-                        trigger: 'blur',
-                        validator: (value, callback) => this.validateEnvironmentImageLanguage(value, callback),
+                        message: '请选择环境语言',
+                        trigger: 'change',
                     },
                 ],
                 environmentImageTemplate: [
@@ -1176,6 +1188,16 @@ export default {
     },
 
     computed: {
+        environmentLanguageOptions() {
+            let currentLanguage = String(this.form.environmentImageLanguage || '').trim();
+            if (currentLanguage && !environmentLanguagePresets.some(option => option.value == currentLanguage)) {
+                return [
+                    { label: `${currentLanguage}（已有值）`, value: currentLanguage },
+                    ...environmentLanguagePresets,
+                ];
+            }
+            return environmentLanguagePresets;
+        },
         helmChartOptions() {
             return this.filterAutocompleteOptions(this.helmCharts, this.helmChartKeyword);
         },
@@ -1329,18 +1351,6 @@ export default {
                 cancelButtonText: '取消',
                 onOk: applyExample,
             });
-        },
-        validateEnvironmentImageLanguage(value, callback) {
-            let language = String(value || '').trim();
-            if (!language) {
-                callback('请输入环境语言');
-                return;
-            }
-            if (!/^[A-Za-z][A-Za-z0-9.+_-]{0,31}$/.test(language)) {
-                callback('请以字母开头，仅使用字母、数字、点、加号、下划线或中划线（最多 32 个字符）');
-                return;
-            }
-            callback();
         },
         validateEnvironmentImageTemplate(value, callback) {
             let template = String(value || '').trim();

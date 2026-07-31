@@ -125,7 +125,7 @@ func (c Version) PublishFormula(consoleUid int32, formula *Formula) error {
 			return errors.New("请先在面板绑定微擎云端账号")
 		}
 		if formula.ConsoleUid > 0 && formula.ConsoleUid != consoleUid {
-			return errors.New("请先在面板绑定微擎云端账号")
+			return errors.New("当前面板绑定的微擎云端账号与该制品所属账号不一致，请切换账号后重试")
 		}
 		err = FormulaGoods{}.PublishGoods(formula, devcenter.PublishGoodsReq{
 			ConsoleUid: int(consoleUid),

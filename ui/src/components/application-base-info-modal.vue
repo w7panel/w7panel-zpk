@@ -60,9 +60,11 @@
                 </a-form-item>
                 <a-form-item label="属性">
                     <div class="application-property-list">
-                        <a-checkbox v-model="form.once" :disabled="isEnvironmentType">仅安装一次</a-checkbox>
+                        <a-checkbox v-model="form.once" :disabled="isInstallOnlyOnceType">仅安装一次</a-checkbox>
                         <a-checkbox v-model="form.clusterPrivileges">集群特权</a-checkbox>
                         <a-checkbox v-model="form.registerSite">创建站点</a-checkbox>
+                        <a-checkbox v-model="form.officialApp">官方应用</a-checkbox>
+                        <a-checkbox v-model="form.denyDelete">禁止卸载</a-checkbox>
                     </div>
                 </a-form-item>
                 <a-form-item label="应用介绍" class="application-introduction-item">
@@ -87,6 +89,10 @@ import jsyaml from 'js-yaml';
 import ManifestConfigTable from '@/components/manifest-config-table.vue';
 import ManifestConfigTableColumn from '@/components/manifest-config-table-column.vue';
 import { messageError, messageSuccess } from '@/utils/ui-feedback';
+
+const officialAppAnnotationKey = 'w7.cc/official-app';
+const denyDeleteAnnotationKey = 'w7.cc/deny-delete';
+const baseInfoPropertyAnnotationKeys = [officialAppAnnotationKey, denyDeleteAnnotationKey];
 
 export default {
     name: 'ApplicationBaseInfoModal',
@@ -133,6 +139,8 @@ export default {
                 once: false,
                 clusterPrivileges: false,
                 registerSite: false,
+                officialApp: false,
+                denyDelete: false,
             },
             editorToolbars: {
                 bold: true,
@@ -180,8 +188,8 @@ export default {
         this.resetSelectedIcon();
     },
     computed: {
-        isEnvironmentType() {
-            return this.applicationType == 'environment';
+        isInstallOnlyOnceType() {
+            return ['environment', 'gateway-plugin'].includes(this.applicationType);
         },
         requiredTagName() {
             if (this.applicationType == 'environment') { return '运行环境' }
@@ -226,9 +234,13 @@ export default {
                 this.applicationType = this.getApplicationType(latestInfo);
                 this.form.name = baseInfo.name || '';
                 this.form.description = baseInfo.description || '';
-                this.form.annotations = Object.entries(baseInfo.annotation || {})
+                let annotation = baseInfo.annotation || {};
+                this.form.annotations = Object.entries(annotation)
+                    .filter(([key]) => !baseInfoPropertyAnnotationKeys.includes(key))
                     .map(([key, value]) => ({ key, value: String(value) }));
-                this.form.once = this.isEnvironmentType ? true : Boolean(baseInfo.once);
+                this.form.officialApp = String(annotation[officialAppAnnotationKey]).toLowerCase() == 'true';
+                this.form.denyDelete = String(annotation[denyDeleteAnnotationKey]).toLowerCase() == 'true';
+                this.form.once = this.isInstallOnlyOnceType ? true : Boolean(baseInfo.once);
                 this.form.clusterPrivileges = Boolean(baseInfo.cluster_privileges);
                 this.form.registerSite = Boolean(baseInfo.register_site);
                 this.iconPreview = this.getIconUrl(latestInfo?.icon_url || this.info?.icon_url || '');
@@ -289,6 +301,12 @@ export default {
                     }
                     return result;
                 }, {});
+                if (this.form.officialApp) {
+                    annotation[officialAppAnnotationKey] = 'true';
+                }
+                if (this.form.denyDelete) {
+                    annotation[denyDeleteAnnotationKey] = 'true';
+                }
 
                 await myAxios.post('/respo/setting/set', {
                     identifie: this.identifie,
@@ -296,7 +314,7 @@ export default {
                         name,
                         description: this.form.description || '',
                         annotation,
-                        once: this.isEnvironmentType ? true : Boolean(this.form.once),
+                        once: this.isInstallOnlyOnceType ? true : Boolean(this.form.once),
                         cluster_privileges: Boolean(this.form.clusterPrivileges),
                         register_site: Boolean(this.form.registerSite),
                     },

@@ -58,11 +58,13 @@
             </a-form-item>
             <a-form-item label="属性">
                 <div class="version-info-checks">
-                    <a-checkbox v-model="edit.once" :disabled="isEnvironmentType"
+                    <a-checkbox v-model="edit.once" :disabled="isInstallOnlyOnceType"
                         @change="changeForm('once')">仅安装一次</a-checkbox>
                     <a-checkbox v-model="edit.clusterPrivileges"
                         @change="changeForm('clusterPrivileges')">集群特权</a-checkbox>
                     <a-checkbox v-model="edit.registerSite" @change="changeForm('registerSite')">创建站点</a-checkbox>
+                    <a-checkbox v-model="edit.officialApp" @change="changeForm('officialApp')">官方应用</a-checkbox>
+                    <a-checkbox v-model="edit.denyDelete" @change="changeForm('denyDelete')">禁止卸载</a-checkbox>
                 </div>
             </a-form-item>
         </a-form>
@@ -113,6 +115,11 @@ const defaultManifest = `application:
 v: 2
 `
 
+const propertyAnnotationKeys = {
+    officialApp: 'w7.cc/official-app',
+    denyDelete: 'w7.cc/deny-delete',
+};
+
 export default {
     components: {
         ManifestConfigTable,
@@ -132,6 +139,8 @@ export default {
                 once: false,
                 clusterPrivileges: false,
                 registerSite: false,
+                officialApp: false,
+                denyDelete: false,
                 description: '',
                 taginput: [],
             },
@@ -140,6 +149,8 @@ export default {
                 once: false,
                 clusterPrivileges: false,
                 registerSite: false,
+                officialApp: false,
+                denyDelete: false,
             },
             annotationEdit: {
                 show: false,
@@ -172,17 +183,22 @@ export default {
             this.json = jsyaml.load(manifest);
             this.json.application.identifie = this.identifie;
             this.annotationEdit.list = this.json.application?.annotation || [];
+            const annotation = this.json.application?.annotation || {};
 
             if (this.json.application) {
-                this.form.once = this.isEnvironmentType ? true : (this.json.application?.once || false);
+                this.form.once = this.isInstallOnlyOnceType ? true : (this.json.application?.once || false);
                 this.form.name = this.json.application?.name || '';
                 this.form.description = this.json?.application?.description || '';
                 this.form.clusterPrivileges = this.json?.application?.clusterPrivileges || false;
                 this.form.registerSite = this.json?.application?.registerSite || false;
+                this.form.officialApp = String(annotation[propertyAnnotationKeys.officialApp]).toLowerCase() == 'true';
+                this.form.denyDelete = String(annotation[propertyAnnotationKeys.denyDelete]).toLowerCase() == 'true';
             }
-            this.edit.once = this.isEnvironmentType ? true : (this.json?.application?.once || false);
+            this.edit.once = this.isInstallOnlyOnceType ? true : (this.json?.application?.once || false);
             this.edit.clusterPrivileges = this.json?.application?.clusterPrivileges || false;
             this.edit.registerSite = this.json?.application?.registerSite || false;
+            this.edit.officialApp = this.form.officialApp;
+            this.edit.denyDelete = this.form.denyDelete;
 
             this.logoimg = this.info?.icon_url;
             if (this.logoimg && !/^https?:\/\//.test(this.logoimg)) {
@@ -268,6 +284,7 @@ export default {
         },
         openAnnotationEdit() {
             let list = Object.entries(this.json?.application?.annotation || {})
+                .filter(([key]) => !Object.values(propertyAnnotationKeys).includes(key))
                 .map(([k, v]) => ({ key: k, value: v }))
             this.annotationEdit = {
                 show: true,
@@ -275,7 +292,13 @@ export default {
             }
         },
         submitAnnotation() {
-            let obj = {};
+            let currentAnnotation = this.json?.application?.annotation || {};
+            let obj = Object.values(propertyAnnotationKeys).reduce((result, key) => {
+                if (currentAnnotation[key] !== undefined) {
+                    result[key] = currentAnnotation[key];
+                }
+                return result;
+            }, {});
             this.annotationEdit.list.filter(i => i.key && i.value).map(i => {
                 obj[i.key] = String(i.value);
             })
@@ -284,12 +307,23 @@ export default {
             this.submit();
         },
         changeForm(type) {
-            if (type == 'once' && this.isEnvironmentType) {
+            if (type == 'once' && this.isInstallOnlyOnceType) {
                 this.edit.once = true;
                 return;
             }
             if (this.edit[type] == this.form[type]) {
                 this.edit.type = '';
+                return;
+            }
+            if (propertyAnnotationKeys[type]) {
+                this.json.application.annotation = this.json.application.annotation || {};
+                if (this.edit[type]) {
+                    this.json.application.annotation[propertyAnnotationKeys[type]] = 'true';
+                } else {
+                    delete this.json.application.annotation[propertyAnnotationKeys[type]];
+                }
+                this.edit.type = '';
+                this.submit();
                 return;
             }
             this.json.application[type] = this.edit[type];
@@ -311,7 +345,7 @@ export default {
                     name: this.json?.application?.name || this.form.name || '',
                     description: this.json?.application?.description || this.form.description || '',
                     annotation,
-                    once: this.isEnvironmentType ? true : Boolean(this.json?.application?.once),
+                    once: this.isInstallOnlyOnceType ? true : Boolean(this.json?.application?.once),
                     cluster_privileges: Boolean(this.json?.application?.clusterPrivileges),
                     register_site: Boolean(this.json?.application?.registerSite),
                 },
@@ -325,8 +359,8 @@ export default {
         applicationType() {
             return this.json?.application?.type || '';
         },
-        isEnvironmentType() {
-            return this.applicationType == 'environment';
+        isInstallOnlyOnceType() {
+            return ['environment', 'gateway-plugin'].includes(this.applicationType);
         },
         requiredTagName() {
             if (this.applicationType == 'environment') { return '运行环境' }
@@ -337,7 +371,8 @@ export default {
             return this.tags.filter(item => item.name != this.requiredTagName);
         },
         annotationKeys() {
-            const keys = Object.keys(this.json?.application?.annotation || []);
+            const keys = Object.keys(this.json?.application?.annotation || [])
+                .filter(key => !Object.values(propertyAnnotationKeys).includes(key));
             return keys.length === 0 ? '-' : keys.join(',');
         },
     },

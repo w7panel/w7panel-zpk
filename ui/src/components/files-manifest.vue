@@ -24,7 +24,6 @@
                                         placeholder="请输入应用描述" @change="changeForm"></a-input>
                                 </div>
                             </a-form-item>
-
                             <a-form-item v-if="option.pureManifest" label="可选安装">
                                 <a-switch v-model="otherData.required" :checked-value="false"
                                     :unchecked-value="true"></a-switch>
@@ -112,7 +111,17 @@
 
                                     <a-spin v-if="form.type == 'environment'" :loading="formulaSettingLoading"
                                         class="environment-config-spin">
-                                        <div class="greybox mt-20" style="margin-bottom:0;">
+                                        <a-alert type="info" show-icon class="zpk-primary-alert mt-20 mb-20"
+                                            title="说明" :closable="false">
+                                            <div class="registry-alert-item">1. 安装此制品后，系统会把这里的应用配置保存为运行环境模板；应用配置中的运行方式须使用 Deployment。</div>
+                                            <div class="registry-alert-item mt-6">2. 新建或升级站点并选择此运行环境时，系统会根据模板准备站点需要的运行环境。这里的修改只会用于之后新建的环境，已创建的环境不会自动更新。</div>
+                                            <div class="registry-alert-item mt-6">3. 创建新环境时，系统会复制整个 Deployment，并将第一个应用容器作为主运行环境；该容器镜像中的 {version} 会替换为所选版本。其他容器也会一并保留</div>
+                                            <div class="registry-alert-item mt-6">4. 如果需要配置启动脚本或自定义存储，请进入“应用配置”编辑：启动脚本配置在第一个应用容器中；自定义存储需先添加存储卷，再挂载到该容器。</div>
+                                            <div class="registry-alert-item mt-6">5. 容器的环境变量、端口、检查规则和挂载等配置会一起复制。系统会自动挂载站点代码目录 /www/wwwroot 和服务目录 /www/server，请勿将自定义存储挂载到这两个目录。</div>
+                                            <div class="registry-alert-item mt-6">6. 页面下方“脚本配置”中的安装、升级脚本只在安装或升级此制品时执行，站点管理新建环境时不会再次执行。</div>
+                                            <div class="registry-alert-item mt-6">7. 环境准备完成后，系统会使用 Nginx 模板配置站点并完成绑定。请将实际运行环境容器放在应用配置首位。</div>
+                                        </a-alert>
+                                        <div class="greybox" style="margin-bottom:0;">
                                             <div class="greybox-title">运行环境配置</div>
                                             <a-form-item label="环境语言" field="environmentImageLanguage" required
                                                 style="margin-bottom:18px;">
@@ -136,13 +145,17 @@
                                             <a-form-item label="环境版本" field="environmentImageVersion" required
                                                 style="margin-bottom:18px;">
                                                 <div class="df df-c">
-                                                    <a-input v-model="form.environmentImageVersion" size="large"
-                                                        style="width:500px;" placeholder="例如 7.4,8.0,8.1" />
-                                                    <span class="c-99 mt-6">多个版本使用逗号分隔；版本需符合镜像 Tag 格式，保存时会自动去重。</span>
+                                                    <a-input-tag v-model="form.environmentImageVersion" size="large"
+                                                        style="width:500px;" placeholder="输入版本后按回车，例如 8.1"
+                                                        allow-clear unique-value />
+                                                    <span class="c-99 mt-6">每次输入一个语言版本并按回车，可添加多个版本，例如 7.4、8.1。</span>
                                                 </div>
                                             </a-form-item>
                                             <a-form-item label="是否共享" style="margin-bottom:18px;">
-                                                <a-switch v-model="form.environmentImageIsShare" />
+                                                <div class="df df-c" style="align-items:flex-start;">
+                                                    <a-switch v-model="form.environmentImageIsShare" />
+                                                    <span class="c-99 mt-6">开启后，站点可共享已有环境或新建环境；关闭后，每个站点使用独立环境。共享环境统一使用制品预设的启动配置。</span>
+                                                </div>
                                             </a-form-item>
                                             <a-form-item label="Nginx 模板" field="environmentNginxVhostTemplate" required
                                                 style="margin-bottom:0;">
@@ -159,6 +172,7 @@
                                                             查看完整示例
                                                         </a-button>
                                                     </div>
+                                                    <span class="c-99 mt-6">用于为使用此运行环境的站点生成访问配置。</span>
                                                 </div>
                                             </a-form-item>
                                         </div>
@@ -412,7 +426,6 @@
 
                     <div v-if="form.type != 'helm' && form.type != 'tradition' && form.type != 'gateway-plugin'" class="bg-white com-line mt-20">
                         <div class="mt-16">
-
                             <a-form-item label="应用配置">
                                 <div v-if="form.containers && form.containers.length">
                                     {{form.containers.map(i => i.name).join(', ')}}</div>
@@ -751,6 +764,9 @@ const environmentAnnotationKeys = {
     nginxVhostTemplate: 'w7.cc/nginx_vhost_template',
 };
 
+const gatewayPluginAnnotationPrefix = 'w7.cc/plugin-';
+const gatewayPluginAnnotationKeys = ['w7.cc/official-app'];
+
 const environmentLanguagePresets = [
     { label: 'PHP', value: 'php' },
     { label: 'Java', value: 'java' },
@@ -899,7 +915,7 @@ export default {
                 gatewayPluginDefaultConfig: '{}',
                 environmentImageLanguage: '',
                 environmentImageTemplate: '',
-                environmentImageVersion: '',
+                environmentImageVersion: [],
                 environmentImageIsShare: false,
                 environmentNginxVhostTemplate: '',
                 startParams: [],
@@ -1026,7 +1042,7 @@ export default {
                     {
                         required: true,
                         message: '请输入环境版本',
-                        trigger: 'blur',
+                        trigger: 'change',
                         validator: (value, callback) => this.validateEnvironmentImageVersions(value, callback),
                     },
                 ],
@@ -1375,10 +1391,7 @@ export default {
             callback();
         },
         validateEnvironmentImageVersions(value, callback) {
-            let versions = String(value || '')
-                .split(/[,，\n]/)
-                .map(item => item.trim())
-                .filter(Boolean);
+            let versions = this.normalizeEnvironmentVersions(value);
             if (!versions.length) {
                 callback('请输入至少一个环境版本');
                 return;
@@ -1387,7 +1400,7 @@ export default {
             if (invalidVersions.length) {
                 let invalidText = invalidVersions.slice(0, 3).join('、');
                 if (invalidVersions.length > 3) { invalidText += ' 等' }
-                callback('以下版本不符合镜像 Tag 格式：' + invalidText);
+                callback('以下语言版本格式不正确：' + invalidText);
                 return;
             }
             callback();
@@ -1413,7 +1426,7 @@ export default {
                 }
                 this.formulaBaseInfo = JSON.parse(JSON.stringify(baseInfo));
                 this.applyEnvironmentAnnotationForm(baseInfo.annotation || {});
-                if (this.form.type == 'environment') {
+                if (['environment', 'gateway-plugin'].includes(this.form.type)) {
                     this.form.once = true;
                 }
                 this.formulaSettingLoaded = true;
@@ -1427,16 +1440,17 @@ export default {
         applyEnvironmentAnnotationForm(annotation = {}) {
             this.form.environmentImageLanguage = String(annotation[environmentAnnotationKeys.imageLanguage] || '');
             this.form.environmentImageTemplate = String(annotation[environmentAnnotationKeys.imageTemplate] || '');
-            this.form.environmentImageVersion = String(annotation[environmentAnnotationKeys.imageVersion] || '');
+            this.form.environmentImageVersion = this.normalizeEnvironmentVersions(annotation[environmentAnnotationKeys.imageVersion]);
             this.form.environmentImageIsShare = String(annotation[environmentAnnotationKeys.imageIsShare]).toLowerCase() == 'true';
             this.form.environmentNginxVhostTemplate = String(annotation[environmentAnnotationKeys.nginxVhostTemplate] || '');
         },
         normalizeEnvironmentVersions(value) {
-            return [...new Set(String(value || '')
-                .split(/[,，\n]/)
+            let values = Array.isArray(value) ? value : String(value || '').split(/[,，\n]/);
+            return [...new Set(values
+                .map(item => String(item || ''))
+                .flatMap(item => item.split(/[,，\n]/))
                 .map(item => item.trim())
-                .filter(Boolean))]
-                .join(',');
+                .filter(Boolean))];
         },
         getEnvironmentAnnotations() {
             let versions = this.normalizeEnvironmentVersions(this.form.environmentImageVersion);
@@ -1444,30 +1458,52 @@ export default {
             return {
                 [environmentAnnotationKeys.imageLanguage]: String(this.form.environmentImageLanguage || '').trim(),
                 [environmentAnnotationKeys.imageTemplate]: String(this.form.environmentImageTemplate || '').trim(),
-                [environmentAnnotationKeys.imageVersion]: versions,
+                [environmentAnnotationKeys.imageVersion]: versions.join(','),
                 [environmentAnnotationKeys.imageIsShare]: String(Boolean(this.form.environmentImageIsShare)),
                 [environmentAnnotationKeys.nginxVhostTemplate]: String(this.form.environmentNginxVhostTemplate || ''),
             };
         },
-        async saveEnvironmentFormulaSetting() {
-            if (this.form.type != 'environment' || this.option?.pureManifest) { return }
+        filterAnnotationsForType(annotation = {}, type = this.form.type) {
+            let filtered = { ...(annotation || {}) };
+            if (type != 'environment') {
+                Object.values(environmentAnnotationKeys).forEach(key => delete filtered[key]);
+            }
+            if (type != 'gateway-plugin') {
+                Object.keys(filtered)
+                    .filter(key => gatewayPluginAnnotationKeys.includes(key)
+                        || key.startsWith(gatewayPluginAnnotationPrefix))
+                    .forEach(key => delete filtered[key]);
+            }
+            if (type == 'environment') {
+                Object.assign(filtered, this.getEnvironmentAnnotations());
+            }
+            return filtered;
+        },
+        shouldSaveFormulaTypeSetting() {
+            if (['environment', 'gateway-plugin'].includes(this.form.type)) { return true }
+            return ['environment', 'gateway-plugin'].includes(this.initialApplicationType)
+                && this.form.type != this.initialApplicationType;
+        },
+        async saveFormulaTypeSetting() {
+            if (this.option?.pureManifest || !this.shouldSaveFormulaTypeSetting()) { return }
             let baseInfo = await this.loadFormulaSetting();
             if (!baseInfo) {
-                throw new Error('运行环境基础信息加载失败');
+                throw new Error('制品基础信息加载失败');
             }
             let nextBaseInfo = {
                 ...baseInfo,
-                annotation: {
-                    ...(baseInfo.annotation || {}),
-                    ...this.getEnvironmentAnnotations(),
-                },
-                once: true,
+                annotation: this.filterAnnotationsForType(baseInfo.annotation || {}),
+                once: ['environment', 'gateway-plugin'].includes(this.form.type)
+                    ? true
+                    : Boolean(baseInfo.once),
             };
             await myAxios.post('/respo/setting/set', {
                 identifie: this.identifie,
                 base_info: nextBaseInfo,
             });
-            this.form.once = true;
+            if (['environment', 'gateway-plugin'].includes(this.form.type)) {
+                this.form.once = true;
+            }
             this.formulaBaseInfo = JSON.parse(JSON.stringify(nextBaseInfo));
         },
         getDefaultTypeTagName(type = this.form.type) {
@@ -2311,7 +2347,6 @@ platform:
             }
 
             this.form.description = j?.application?.description;
-
             const gatewayPlugin = j?.platform?.gatewayPlugin || {};
             const gatewayPluginRuntime = gatewayPlugin.runtime || {};
             const gatewayPluginRuntimeConfig = gatewayPluginRuntime.config || {};
@@ -2495,9 +2530,14 @@ platform:
 
                 try {
                     this.syncEnvironmentDependency();
-                    await this.saveEnvironmentFormulaSetting();
+                    await this.saveFormulaTypeSetting();
                     await this.ensureDefaultTypeTags();
                     this.changeForm();
+                    if (this.json.application) {
+                        this.json.application.annotation = this.filterAnnotationsForType(
+                            this.json.application.annotation || {},
+                        );
+                    }
                 } catch (error) {
                     messageError(error?.response?.data?.error || error?.message || '制品配置保存失败');
                     return;
@@ -2541,6 +2581,9 @@ platform:
             });
         },
         changeFormtype() {
+            if (['environment', 'gateway-plugin'].includes(this.form.type)) {
+                this.form.once = true;
+            }
             if (this.form.type == 'environment') {
                 this.loadFormulaSetting().catch(() => { });
             }
@@ -2601,6 +2644,9 @@ platform:
                 j.application.author = this.form.author;
                 j.application.theme = this.form.theme;
                 j.application.type = this.form.type;
+                if (['environment', 'gateway-plugin'].includes(this.form.type)) {
+                    this.form.once = true;
+                }
                 j.application.once = Boolean(this.form.once);
                 if (this.form.type != 'tradition') {
                     this.form.language = '';

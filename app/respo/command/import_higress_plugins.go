@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -136,7 +137,7 @@ func (ImportHigressPlugins) Handle(cmd *cobra.Command, _ []string) {
 			panic(fmt.Errorf("load %s for publish: %w", plugin.Identifie, err))
 		}
 		if err = (logic.Version{}).PublishFormula(int32(consoleUID), publishFormula); err != nil {
-			panic(fmt.Errorf("publish %s: %w", plugin.Identifie, err))
+			slog.Error("publish %s formula", plugin.Identifie, err)
 		}
 
 		if isOverwrite {

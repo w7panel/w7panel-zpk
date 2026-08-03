@@ -50,7 +50,7 @@
                     {{ annotationKeys }}
                 </span>
                 <a-tooltip content="编辑">
-                    <a-button class="inline-icon-action" type="text" shape="circle" size="mini"
+                    <a-button class="editbtn" type="text" shape="circle" size="mini"
                         @click="openAnnotationEdit">
                         <template #icon><icon-edit /></template>
                     </a-button>

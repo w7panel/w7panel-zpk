@@ -105,6 +105,14 @@ func (ImportHigressPlugins) Handle(cmd *cobra.Command, _ []string) {
 			formulaRow.Setting = &accessor.FormulaSettingOption{}
 		}
 		formulaRow.Setting.SupportAutoPublishToZpkMarket = autoPublishToZpkMarket
+		formulaRow.Setting.BaseInfo = &accessor.FormulaBaseInfoOption{
+			Name:              manifest.Application.Name,
+			Description:       manifest.Application.Description,
+			Annotation:        manifest.Application.Annotation,
+			InstallOnlyOnce:   manifest.Application.InstallOnlyOnce,
+			ClusterPrivileged: manifest.Application.ClusterPrivileged,
+			RegisterSite:      manifest.Application.RegisterSite,
+		}
 		if _, err = dao.Q.Formula.Where(dao.Q.Formula.ID.Eq(formulaRow.ID)).Updates(entity.Formula{
 			Title:   plugin.Title,
 			Setting: formulaRow.Setting,

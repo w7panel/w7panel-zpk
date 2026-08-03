@@ -14,13 +14,17 @@ const (
 )
 
 type higressBuiltinPlugin struct {
-	Name        string
-	Identifie   string
-	Title       string
-	Description string
-	Image       string
-	IconURL     string
-	Readme      string
+	Name         string
+	Identifie    string
+	Title        string
+	Description  string
+	Category     string
+	Image        string
+	IconURL      string
+	Readme       string
+	Phase        string
+	Priority     int
+	SupportsRule bool
 }
 
 // higressBuiltinPlugins returns the plugins listed by Higress Console's
@@ -78,14 +82,19 @@ func higressBuiltinPlugins() []higressBuiltinPlugin {
 			continue
 		}
 		metadata := higressPluginMetadata(name)
+		properties := higressPluginProperties(name)
 		plugins = append(plugins, higressBuiltinPlugin{
-			Name:        name,
-			Identifie:   higressPluginIdentifie(name),
-			Title:       metadata.Title,
-			Description: metadata.Description,
-			Image:       fmt.Sprintf("oci://%s/%s:%s", higressBuiltinPluginRegistry, name, higressBuiltinPluginImageVersion),
-			IconURL:     metadata.IconURL,
-			Readme:      higressPluginReadme(name, metadata.Title, metadata.Description),
+			Name:         name,
+			Identifie:    higressPluginIdentifie(name),
+			Title:        metadata.Title,
+			Description:  metadata.Description,
+			Category:     properties.Category,
+			Image:        fmt.Sprintf("oci://%s/%s:%s", higressBuiltinPluginRegistry, name, higressBuiltinPluginImageVersion),
+			IconURL:      metadata.IconURL,
+			Readme:       higressPluginReadme(name, metadata.Title, metadata.Description),
+			Phase:        properties.Phase,
+			Priority:     properties.Priority,
+			SupportsRule: properties.SupportsRule,
 		})
 	}
 	return plugins
@@ -144,6 +153,9 @@ func higressPluginTitle(name string) string {
 
 func newHigressBuiltinPluginManifest(plugin higressBuiltinPlugin) commonlogic.Manifest {
 	defaultEnabled := false
+	annotation := map[string]interface{}{
+		"w7.cc/official-app": "true",
+	}
 	return commonlogic.Manifest{
 		Application: commonlogic.Application{
 			Name:            plugin.Title,
@@ -153,24 +165,23 @@ func newHigressBuiltinPluginManifest(plugin higressBuiltinPlugin) commonlogic.Ma
 			InstallOnlyOnce: true,
 			Type:            commonlogic.GatewayPluginApp,
 			Version:         higressBuiltinPluginVersion,
-			Annotation: map[string]interface{}{
-				"w7.cc/official-app": "true",
-			},
+			Annotation:      annotation,
 		},
 		Platform: commonlogic.Platform{
 			GatewayPlugin: commonlogic.GatewayPlugin{
+				Category:       plugin.Category,
 				DefaultEnabled: &defaultEnabled,
 				Supports: commonlogic.GatewayPluginSupports{
 					Global: true,
-					Rule:   true,
+					Rule:   plugin.SupportsRule,
 				},
 				DefaultConfig: higressPluginDefaultConfig(plugin.Name),
 				Runtime: commonlogic.GatewayPluginRuntime{
 					Driver: commonlogic.GatewayPluginDriverHigressWasmV1,
-					Config: map[string]interface{}{
-						"url":      plugin.Image,
-						"phase":    "UNSPECIFIED_PHASE",
-						"priority": 0,
+					Config: commonlogic.GatewayPluginRuntimeConfig{
+						URL:      plugin.Image,
+						Phase:    plugin.Phase,
+						Priority: plugin.Priority,
 					},
 				},
 			},

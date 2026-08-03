@@ -36,6 +36,7 @@ type Manifest struct {
 }
 
 type GatewayPlugin struct {
+	Category       string                 `yaml:"category,omitempty" json:"category,omitempty"`
 	Supports       GatewayPluginSupports  `yaml:"supports" json:"supports"`
 	DefaultEnabled *bool                  `yaml:"defaultEnabled,omitempty" json:"defaultEnabled,omitempty"`
 	DefaultConfig  map[string]interface{} `yaml:"defaultConfig" json:"defaultConfig"`
@@ -49,8 +50,14 @@ type GatewayPluginSupports struct {
 }
 
 type GatewayPluginRuntime struct {
-	Driver string                 `yaml:"driver" json:"driver"`
-	Config map[string]interface{} `yaml:"config" json:"config"`
+	Driver string                     `yaml:"driver" json:"driver"`
+	Config GatewayPluginRuntimeConfig `yaml:"config" json:"config"`
+}
+
+type GatewayPluginRuntimeConfig struct {
+	URL      string `yaml:"url" json:"url"`
+	Phase    string `yaml:"phase" json:"phase"`
+	Priority int    `yaml:"priority" json:"priority"`
 }
 
 func (plugin GatewayPlugin) IsSupportGlobal() bool {
@@ -62,9 +69,6 @@ func (plugin GatewayPlugin) IsEnabledByDefault() bool {
 }
 
 func (plugin GatewayPlugin) Normalize() GatewayPlugin {
-	if plugin.Runtime.Config == nil {
-		plugin.Runtime.Config = make(map[string]interface{})
-	}
 	if plugin.DefaultConfig == nil {
 		plugin.DefaultConfig = make(map[string]interface{})
 	}

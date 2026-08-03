@@ -49,6 +49,14 @@
                                     <div v-if="form.type == 'gateway-plugin'" class="greybox mt-20"
                                         style="margin-bottom:0;">
                                         <div class="greybox-title">网关插件配置</div>
+                                        <a-form-item label="插件分类" field="gatewayPluginCategory"
+                                            style="margin-bottom:18px;">
+                                            <a-select v-model="form.gatewayPluginCategory" style="width:240px;"
+                                                @change="changeForm">
+                                                <a-option v-for="item in gatewayPluginCategoryOptions" :key="item.value"
+                                                    :value="item.value">{{ item.label }}</a-option>
+                                            </a-select>
+                                        </a-form-item>
                                         <a-form-item label="运行时驱动" field="gatewayPluginDriver"
                                             style="margin-bottom:18px;">
                                             <a-select v-model="form.gatewayPluginDriver" style="width:240px;"
@@ -767,6 +775,17 @@ const environmentAnnotationKeys = {
 const gatewayPluginAnnotationPrefix = 'w7.cc/plugin-';
 const gatewayPluginAnnotationKeys = ['w7.cc/official-app'];
 
+const gatewayPluginCategoryOptions = [
+    { label: '路由', value: 'route' },
+    { label: 'AI', value: 'ai' },
+    { label: '认证', value: 'auth' },
+    { label: '安全', value: 'security' },
+    { label: '流量', value: 'traffic' },
+    { label: '转换', value: 'transform' },
+    { label: '可观测性', value: 'o11y' },
+    { label: '自定义', value: 'custom' },
+];
+
 const environmentLanguagePresets = [
     { label: 'PHP', value: 'php' },
     { label: 'Java', value: 'java' },
@@ -905,6 +924,7 @@ export default {
                 author: "",
                 description: "",
                 identifie: "",
+                gatewayPluginCategory: 'custom',
                 gatewayPluginDriver: 'higress-wasm/v1',
                 gatewayPluginUrl: '',
                 gatewayPluginPhase: 'UNSPECIFIED_PHASE',
@@ -1013,6 +1033,9 @@ export default {
                 ],
                 gatewayPluginUrl: [
                     { required: true, message: '请输入插件镜像地址', trigger: 'blur' },
+                ],
+                gatewayPluginCategory: [
+                    { required: true, message: '请选择插件分类', trigger: 'change' },
                 ],
                 gatewayPluginDriver: [
                     { required: true, message: '请选择运行时驱动', trigger: 'change' },
@@ -1158,6 +1181,7 @@ export default {
             formulaBaseInfo: null,
             environmentPreviousDepends: null,
             initialApplicationType: '',
+            gatewayPluginCategoryOptions,
             nginxTemplatePlaceholders,
             nginxTemplateExample,
             nginxTemplateExampleVisible: false,
@@ -1171,7 +1195,7 @@ export default {
         this.init(this.data);
         if (!this.option?.pureManifest) {
             this.getTag();
-            if (this.form.type == 'environment') {
+            if (['environment', 'gateway-plugin'].includes(this.form.type)) {
                 this.loadFormulaSetting().catch(() => { });
             }
         } else {
@@ -1274,7 +1298,7 @@ export default {
 
         data() {
             this.init(this.data);
-            if (!this.option?.pureManifest && this.form.type == 'environment') {
+            if (!this.option?.pureManifest && ['environment', 'gateway-plugin'].includes(this.form.type)) {
                 this.loadFormulaSetting().catch(() => { });
             }
         },
@@ -1468,12 +1492,10 @@ export default {
             if (type != 'environment') {
                 Object.values(environmentAnnotationKeys).forEach(key => delete filtered[key]);
             }
-            if (type != 'gateway-plugin') {
-                Object.keys(filtered)
-                    .filter(key => gatewayPluginAnnotationKeys.includes(key)
-                        || key.startsWith(gatewayPluginAnnotationPrefix))
-                    .forEach(key => delete filtered[key]);
-            }
+            Object.keys(filtered)
+                .filter(key => key.startsWith(gatewayPluginAnnotationPrefix)
+                    || (type != 'gateway-plugin' && gatewayPluginAnnotationKeys.includes(key)))
+                .forEach(key => delete filtered[key]);
             if (type == 'environment') {
                 Object.assign(filtered, this.getEnvironmentAnnotations());
             }
@@ -2351,6 +2373,7 @@ platform:
             const gatewayPluginRuntime = gatewayPlugin.runtime || {};
             const gatewayPluginRuntimeConfig = gatewayPluginRuntime.config || {};
             const gatewayPluginSupports = gatewayPlugin.supports || {};
+            this.form.gatewayPluginCategory = gatewayPlugin.category || 'custom';
             this.form.gatewayPluginDriver = gatewayPluginRuntime.driver || 'higress-wasm/v1';
             this.form.gatewayPluginUrl = gatewayPluginRuntimeConfig.url || '';
             this.form.gatewayPluginPhase = gatewayPluginRuntimeConfig.phase || 'UNSPECIFIED_PHASE';
@@ -2584,7 +2607,7 @@ platform:
             if (['environment', 'gateway-plugin'].includes(this.form.type)) {
                 this.form.once = true;
             }
-            if (this.form.type == 'environment') {
+            if (['environment', 'gateway-plugin'].includes(this.form.type)) {
                 this.loadFormulaSetting().catch(() => { });
             }
             if (this.form.type !== 'light' && this.zip.url) {
@@ -2660,6 +2683,7 @@ platform:
                     || {};
                 j.platform = {
                     gatewayPlugin: {
+                        category: this.form.gatewayPluginCategory || 'custom',
                         defaultEnabled: Boolean(this.form.gatewayPluginDefaultEnabled),
                         supports: {
                             global: Boolean(this.form.gatewayPluginSupportGlobal),

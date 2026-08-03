@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"errors"
+	"log/slog"
 
 	"github.com/gin-gonic/gin"
 	"github.com/w7panel/w7panel-zpk/common/logic"
@@ -27,6 +28,7 @@ func (m Auth) Process(ctx *gin.Context) {
 	}
 
 	sessionUser, err := logic.Session{}.GetUserInfo(ctx, zpkToken)
+	slog.Info("auth middleware GetUserInfo", "token", zpkToken, "user", sessionUser, "err", err)
 	if err != nil {
 		m.JsonResponseWithServerError(ctx, err)
 		ctx.Abort()

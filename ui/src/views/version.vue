@@ -104,12 +104,10 @@
                         </div>
                         <div class="white-box version-base-card">
                             <div class="c-16 b">基础信息</div>
-                            <a-tooltip content="编辑基础信息" position="top">
-                                <a-button class="version-base-edit-button" type="text" shape="circle"
-                                    aria-label="编辑基础信息" @click="baseInfoEdit.visible = true">
-                                    <template #icon><icon-edit /></template>
-                                </a-button>
-                            </a-tooltip>
+                            <a-button class="version-base-edit-button" type="text"
+                                aria-label="编辑基础信息" @click="baseInfoEdit.visible = true">
+                                <template #icon><icon-edit /></template>编辑
+                            </a-button>
                             <div class="mt-20">
                                 <version-info :identifie="identifie" :info="info"
                                     :icon-cache-key="baseInfoEdit.iconCacheKey"
@@ -1392,17 +1390,13 @@ export default {
 .version-base-edit-button {
     position: absolute;
     top: 14px;
-    right: 14px;
-    width: 30px;
+    right: 6px;
     height: 30px;
     color: #3370ff;
-    opacity: 0;
-    transition: opacity .2s;
 }
 
-.version-base-card:hover .version-base-edit-button,
-.version-base-edit-button:focus-visible {
-    opacity: 1;
+.version-base-edit-button.arco-btn-size-medium:not(.arco-btn-only-icon) :deep(.arco-btn-icon) {
+    margin-right: 4px;
 }
 
 .version-current-content {

@@ -9,6 +9,7 @@ metadata:
 spec:
   host: {{ .Values.DOMAIN_URL }}
   userName: {{ .Values.global.panel.userName | quote }}
+  siteName: __SITE_NAME__
   siteIdentifier: __APPLICATION_IDENTIFIER__
   target:
     apiVersion: w7panel.w7.com/v1alpha1

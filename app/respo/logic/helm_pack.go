@@ -1110,7 +1110,14 @@ func (hc *HelmPack) generateRegisterSiteJobTemplate(rootDir string, manifest log
 	if err != nil {
 		return err
 	}
-	siteTemplate = strings.ReplaceAll(siteTemplate, "__APPLICATION_IDENTIFIER__", manifest.Application.Identifie)
+	siteName := manifest.Application.Name
+	if siteName == "" {
+		siteName = manifest.Application.Identifie
+	}
+	siteTemplate = renderHelmTemplatePlaceholders(siteTemplate, map[string]string{
+		"__APPLICATION_IDENTIFIER__": manifest.Application.Identifie,
+		"__SITE_NAME__":              strconv.Quote(siteName),
+	})
 
 	return writeFile(siteFilePath, siteTemplate)
 }

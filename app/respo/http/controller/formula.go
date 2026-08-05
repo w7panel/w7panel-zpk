@@ -217,8 +217,6 @@ func (c Formula) Info(ctx *gin.Context) {
 			webzipUrl[k] = dUrl
 		}
 	}
-	helmPackageUrl := depotLogin.GetFormulaHelmDownloadUrl(formula)
-
 	responseManifest := *formula.Manifest
 	if params.CName != "" {
 		for _, item := range formula.AllManifest {
@@ -334,11 +332,16 @@ func (c Formula) Info(ctx *gin.Context) {
 		query.Set("order_sn", params.OrderSn)
 		infoURL += "?" + query.Encode()
 	}
-	externalServices := logic.BuildArtifactMarketExternalServices(
+	marketBindings := logic.BuildArtifactMarketBindings(
 		facade.GetConfig().GetString("setting.depot_market.frontend_url"),
 		formula.GoodsId,
 		params.OrderSn,
 	)
+	helmPackageUrl, err := depotLogin.GetFormulaHelmDownloadURLWithMarketBindings(formula, marketBindings)
+	if err != nil {
+		c.JsonResponseWithError(ctx, err, 500)
+		return
+	}
 
 	c.JsonResponseWithoutError(ctx, gin.H{
 		"info_url":               infoURL,
@@ -358,7 +361,6 @@ func (c Formula) Info(ctx *gin.Context) {
 		"tags":                   formula.Tags,
 		"install_formulas":       installFormulas,
 		"formula_type":           formula.Manifest.Application.Type,
-		"external_services":      externalServices,
 	})
 }
 

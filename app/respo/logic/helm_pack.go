@@ -1169,30 +1169,7 @@ func (hc *HelmPack) generateMicroAppTemplate(rootDir string, manifest logic2.Man
 		return nil
 	}
 
-	menuConfigValues := make([]map[string]interface{}, 0)
-	backendConfigValues := make([]map[string]interface{}, 0)
-	for _, item := range manifest.Bindings {
-		conf := map[string]interface{}{
-			"role":         item.Name,
-			"load_mode":    item.LoadMode,
-			"type":         item.BackendConfig.Type,
-			"backend_url":  renderHelmValuesPlaceholders(item.BackendConfig.BackendUrl),
-			"backend_port": item.BackendConfig.BackendPort,
-			"proxy_request": logic2.RequestProxy{
-				Headers: renderHelmValuesPlaceholdersMap(item.BackendConfig.RequestProxy.Headers),
-				Query:   renderHelmValuesPlaceholdersMap(item.BackendConfig.RequestProxy.Query),
-			},
-			"frontend_props": renderHelmValuesPlaceholdersMap(item.BackendConfig.FrontendProps),
-		}
-		menuConfigValues = append(menuConfigValues, map[string]interface{}{
-			"title":   item.Title,
-			"name":    item.Name,
-			"status":  item.Status,
-			"support": item.Support,
-			"menu":    item.Menu,
-		})
-		backendConfigValues = append(backendConfigValues, conf)
-	}
+	menuConfigValues, backendConfigValues := buildMicroAppValues(manifest.Bindings)
 	configMap := map[string]interface{}{
 		"backend_config": backendConfigValues,
 		"bindings":       menuConfigValues,

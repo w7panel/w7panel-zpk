@@ -341,6 +341,32 @@ func (self *Depot) GetFormulaHelmDownloadUrl(formula *Formula) string {
 	return ""
 }
 
+func (self *Depot) GetFormulaHelmDownloadURLWithMarketBindings(formula *Formula, bindings []logic.Bindings) (string, error) {
+	if len(bindings) == 0 {
+		return self.GetFormulaHelmDownloadUrl(formula), nil
+	}
+	helmPath, err := PackFormulaToHelmAndPack(*formula, false)
+	if err != nil {
+		return "", fmt.Errorf("生成 Helm 包失败: %w", err)
+	}
+	if helmPath == "" {
+		return "", errors.New("生成 Helm 包失败: 文件路径为空")
+	}
+
+	dynamicPackagePath, err := BuildDynamicHelmPackage(
+		helmPath,
+		WithMicroAppBindings([]string{"zpk-market"}, bindings),
+	)
+	if err != nil {
+		return "", err
+	}
+
+	token := function.GetRandomString(20)
+	domain := facade.GetConfig().GetString("setting.depot.external_domain")
+	self.DownloadMapping.Store(token, strings.TrimPrefix(dynamicPackagePath, self.GetBasePath()))
+	return fmt.Sprintf("https://%s/zpk/zip/download/%s", domain, token), nil
+}
+
 func (self *Depot) DeleteFormula(formula *Formula) error {
 	err := dao.Q.Transaction(func(tx *dao.Query) error {
 		return deleteFormulaData(tx, formula.ID)

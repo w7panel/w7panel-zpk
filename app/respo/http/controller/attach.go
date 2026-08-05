@@ -116,6 +116,7 @@ func (c Attach) Download(ctx *gin.Context) {
 			c.JsonResponseWithServerError(ctx, err)
 			return
 		}
+		defer file.Close()
 
 		fileInfo, _ := file.Stat()
 		ctx.Header("Content-Length", strconv.FormatInt(fileInfo.Size(), 10))

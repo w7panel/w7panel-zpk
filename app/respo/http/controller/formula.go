@@ -332,16 +332,12 @@ func (c Formula) Info(ctx *gin.Context) {
 		query.Set("order_sn", params.OrderSn)
 		infoURL += "?" + query.Encode()
 	}
+
 	marketBindings := logic.BuildArtifactMarketBindings(
 		facade.GetConfig().GetString("setting.depot_market.frontend_url"),
 		formula.GoodsId,
 		params.OrderSn,
 	)
-	helmPackageUrl, err := depotLogin.GetFormulaHelmDownloadURLWithMarketBindings(formula, marketBindings)
-	if err != nil {
-		c.JsonResponseWithError(ctx, err, 500)
-		return
-	}
 
 	c.JsonResponseWithoutError(ctx, gin.H{
 		"info_url":               infoURL,
@@ -357,7 +353,7 @@ func (c Formula) Info(ctx *gin.Context) {
 		"ticket":                 ticket,
 		"service_expire":         formulaExpire,
 		"goods_id":               formula.GoodsId,
-		"helm_url":               helmPackageUrl,
+		"helm_url":               depotLogin.GetFormulaHelmDownloadURLWithMarketBindings(formula, marketBindings),
 		"tags":                   formula.Tags,
 		"install_formulas":       installFormulas,
 		"formula_type":           formula.Manifest.Application.Type,

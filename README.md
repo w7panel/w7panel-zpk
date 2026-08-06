@@ -8,6 +8,8 @@ openssl req -new -x509 -key registry-key.pem -out registry-cert.pem -days 365 -s
 
 `market` 菜单默认只对 `founder` 显示，使用现有 MicroApp 字段，不新增 `external_services`、`roles`、`icon` 或 `key` 协议字段。
 
+市场域名只写入 `backend_config[role=zpk-market].backend_url`，菜单 `do` 仅写入 `#/user-orders?...` 路由；应用详情页通过 Binding 名称选择同名运行配置。
+
 市场前端地址通过环境变量 `DEPOT_MARKET_FRONTEND_URL` 配置，默认值为 `https://zm.w7.com`。
 
 面板在安装阶段调用制品 `info` 时传入应用域名和规范化应用标识，ZPK 将二者写入加密 ticket。安装完成通知不再单独传递应用标识，ZPK 解票后再把 ticket 中的 `domain` 和 `app_identify` 传给制品市场订单核销接口。

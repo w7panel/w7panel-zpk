@@ -334,7 +334,7 @@ func (self *Depot) GetFormulaHelmDownloadURLWithMarketBindings(formula *Formula,
 	if helmPath != "" && len(bindings) > 0 {
 		dynamicPackagePath, err := BuildDynamicHelmPackage(
 			helmPath,
-			WithMicroAppBindings([]string{"zpk-market"}, bindings),
+			WithMicroAppBindings([]string{"other"}, bindings),
 		)
 		if err != nil {
 			slog.Error("pack dynamic helm err", "formula", formula, "err", err)

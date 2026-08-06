@@ -5,7 +5,23 @@ import (
 	logic2 "github.com/w7panel/w7panel-zpk/common/logic"
 )
 
-const yamlCopyAnnotationKey = "w7.cc/yaml_copy"
+const (
+	yamlCopyAnnotationKey          = "w7.cc/yaml_copy"
+	rootCAInjectionAnnotationKey   = "w7.cc/inject-root-ca"
+	rootCAInjectionAnnotationValue = "true"
+)
+
+func syncRegisterSiteAnnotation(annotation map[string]interface{}, registerSite bool) map[string]interface{} {
+	if !registerSite {
+		delete(annotation, rootCAInjectionAnnotationKey)
+		return annotation
+	}
+	if annotation == nil {
+		annotation = make(map[string]interface{})
+	}
+	annotation[rootCAInjectionAnnotationKey] = rootCAInjectionAnnotationValue
+	return annotation
+}
 
 func filterFormulaAnnotations(annotation map[string]interface{}) map[string]interface{} {
 	if annotation == nil {
@@ -26,6 +42,7 @@ func (f *Formula) GetBaseInfo() *accessor.FormulaBaseInfoOption {
 	if f.Setting != nil && f.Setting.BaseInfo != nil {
 		baseInfo := *f.Setting.BaseInfo
 		baseInfo.Annotation = filterFormulaAnnotations(baseInfo.Annotation)
+		baseInfo.Annotation = syncRegisterSiteAnnotation(baseInfo.Annotation, baseInfo.RegisterSite)
 		return &baseInfo
 	}
 
@@ -50,6 +67,7 @@ func (f *Formula) GetBaseInfo() *accessor.FormulaBaseInfoOption {
 	baseInfo.InstallOnlyOnce = f.Manifest.Application.InstallOnlyOnce
 	baseInfo.ClusterPrivileged = f.Manifest.Application.ClusterPrivileged
 	baseInfo.RegisterSite = f.Manifest.Application.RegisterSite
+	baseInfo.Annotation = syncRegisterSiteAnnotation(baseInfo.Annotation, baseInfo.RegisterSite)
 	return baseInfo
 }
 
@@ -63,7 +81,10 @@ func (f *Formula) ApplyBaseInfo(manifest *logic2.Manifest) {
 	baseInfo := f.Setting.BaseInfo
 	manifest.Application.Name = baseInfo.Name
 	manifest.Application.Description = baseInfo.Description
-	manifest.Application.Annotation = filterFormulaAnnotations(baseInfo.Annotation)
+	manifest.Application.Annotation = syncRegisterSiteAnnotation(
+		filterFormulaAnnotations(baseInfo.Annotation),
+		baseInfo.RegisterSite,
+	)
 	manifest.Application.InstallOnlyOnce = baseInfo.InstallOnlyOnce
 	manifest.Application.ClusterPrivileged = baseInfo.ClusterPrivileged
 	manifest.Application.RegisterSite = baseInfo.RegisterSite

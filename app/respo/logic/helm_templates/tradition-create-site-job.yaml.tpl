@@ -12,6 +12,28 @@
 {{- end }}
 
 {{- $fullName := include "__cur__.fullname" . -}}
+{{- $sidecarContainers := list -}}
+{{- $sidecarInitContainers := list -}}
+{{- $sidecarVolumes := list -}}
+{{- range $sidecar := .Values.w7panelSidecars -}}
+  {{- $sidecarContext := index $.Subcharts $sidecar.chart -}}
+  {{- if $sidecar.containerTemplate -}}
+    {{- $sidecarContainers = concat $sidecarContainers (include $sidecar.containerTemplate $sidecarContext | fromYamlArray) -}}
+  {{- end -}}
+  {{- if $sidecar.initTemplate -}}
+    {{- $sidecarInitContainers = concat $sidecarInitContainers (include $sidecar.initTemplate $sidecarContext | fromYamlArray) -}}
+  {{- end -}}
+  {{- if $sidecar.volumesTemplate -}}
+    {{- $sidecarVolumes = concat $sidecarVolumes (include $sidecar.volumesTemplate $sidecarContext | fromYamlArray) -}}
+  {{- end -}}
+{{- end -}}
+{{- $targetPodAnnotations := dict -}}
+{{- range $key, $value := (.Values.annotations | default dict) -}}
+  {{- $_ := set $targetPodAnnotations $key $value -}}
+{{- end -}}
+{{- range $key, $value := (.Values.podAnnotations | default dict) -}}
+  {{- $_ := set $targetPodAnnotations $key $value -}}
+{{- end -}}
 
 apiVersion: batch/v1
 kind: Job
@@ -37,6 +59,12 @@ spec:
       {{- if .Values.podAnnotations }}
       annotations:
         {{- toYaml .Values.podAnnotations | nindent 8 }}
+        {{- if .Values.annotations }}
+        {{- toYaml .Values.annotations | nindent 8 }}
+        {{- end }}
+      {{- else if .Values.annotations }}
+      annotations:
+        {{- toYaml .Values.annotations | nindent 8 }}
       {{- end }}
     spec:
       restartPolicy: Never
@@ -65,6 +93,10 @@ spec:
               NEW_ENV_K8S_APP='__NEW_ENV_K8S_APP__'
               CODE_DOWNLOAD_URL=__CODE_DOWNLOAD_URL__
               STATE_CONFIG='{{ $fullName }}-site-state'
+              SIDECAR_CONTAINERS_B64='{{ if $sidecarContainers }}{{ $sidecarContainers | toJson | b64enc }}{{ end }}'
+              SIDECAR_INIT_CONTAINERS_B64='{{ if $sidecarInitContainers }}{{ $sidecarInitContainers | toJson | b64enc }}{{ end }}'
+              SIDECAR_VOLUMES_B64='{{ if $sidecarVolumes }}{{ $sidecarVolumes | toJson | b64enc }}{{ end }}'
+              POD_ANNOTATIONS_B64='{{ if $targetPodAnnotations }}{{ $targetPodAnnotations | toJson | b64enc }}{{ end }}'
 
               panel_safe_name() {
                 echo "$1" | tr '_' '-'
@@ -186,6 +218,10 @@ spec:
                 --app-name="$APP_IDENTIFY" \
                 --site-k8s-app-name="$SITE_K8S_APP" \
                 --target-env-app-name="$NEW_ENV_K8S_APP" \
+                --sidecar-containers="$SIDECAR_CONTAINERS_B64" \
+                --sidecar-init-containers="$SIDECAR_INIT_CONTAINERS_B64" \
+                --sidecar-volumes="$SIDECAR_VOLUMES_B64" \
+                --pod-annotations="$POD_ANNOTATIONS_B64" \
                 -f /home/config.yaml
 
               save_state

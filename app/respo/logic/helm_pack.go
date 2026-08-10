@@ -67,6 +67,7 @@ type HelmPack struct {
 	ChartVersion           string
 	IsSubFormula           bool
 	SharedStorageTargetApp string
+	Sidecars               []HelmSidecar
 }
 
 func NewHelmPack(manifest logic2.Manifest, subManifests []*logic2.Manifest, outputDir, chartVersion string, isSubFormula bool, sharedStorageTargetApp string) *HelmPack {
@@ -132,6 +133,9 @@ func (hc *HelmPack) PackToHelm() error {
 	function.CreateDirIfNotExist(filesDir, os.ModePerm)
 
 	if err := hc.generateSubCharts(chartsDir); err != nil {
+		return err
+	}
+	if err := hc.prepareSidecarCharts(chartsDir); err != nil {
 		return err
 	}
 
@@ -745,6 +749,15 @@ func (hc *HelmPack) generateValuesYaml(rootDir string) error {
 		"sharedStorageAffinity": map[string]interface{}{
 			"targetSelectorApp": hc.SharedStorageTargetApp,
 		},
+		"w7panelSidecars": hc.Sidecars,
+	}
+	for _, sidecar := range hc.Sidecars {
+		if sidecar.TargetPortValue == "" || defaultPort == 0 {
+			continue
+		}
+		sidecarValues := make(map[string]interface{})
+		setNestedSidecarValue(sidecarValues, sidecar.TargetPortValue, defaultPort)
+		values[sidecar.Chart] = sidecarValues
 	}
 	values["jobs"] = hc.getJobsValues(hc.Manifest.Platform)
 	helmContainers := make([]map[string]interface{}, 0, len(hc.Manifest.Platform.ContainerV2s))

@@ -36,6 +36,16 @@ spec:
         {{- toYaml $root.Values.annotations | nindent 12 }}
         {{- end }}
     spec:
+      {{- $hasJobSidecars := false }}
+      {{- $hasJobSidecarVolumes := false }}
+      {{- range $sidecar := $root.Values.w7panelSidecars }}
+        {{- if $sidecar.jobContainerTemplate }}
+          {{- $hasJobSidecars = true }}
+          {{- if $sidecar.volumesTemplate }}
+            {{- $hasJobSidecarVolumes = true }}
+          {{- end }}
+        {{- end }}
+      {{- end }}
       restartPolicy: Never
       serviceAccountName: {{ include "common.serviceAccountName" $root }}
       affinity:
@@ -48,9 +58,29 @@ spec:
                     values:
                       - {{ $root.Values.app.identify | quote }}
               topologyKey: kubernetes.io/hostname
-      {{- if $root.Values.volumes }}
+      {{- if or $root.Values.volumes $hasJobSidecarVolumes }}
       volumes:
+        {{- if $root.Values.volumes }}
         {{- include "common.volumesToYaml" (dict "root" $root "volumes" $root.Values.volumes) | nindent 8 }}
+        {{- end }}
+        {{- range $sidecar := $root.Values.w7panelSidecars }}
+        {{- if and $sidecar.jobContainerTemplate $sidecar.volumesTemplate }}
+        {{- $sidecarContext := index $root.Subcharts $sidecar.chart }}
+        {{- include $sidecar.volumesTemplate $sidecarContext | nindent 8 }}
+        {{- end }}
+        {{- end }}
+      {{- end }}
+      {{- if $hasJobSidecars }}
+      initContainers:
+        {{- range $sidecar := $root.Values.w7panelSidecars }}
+        {{- if $sidecar.jobContainerTemplate }}
+        {{- $sidecarContext := index $root.Subcharts $sidecar.chart }}
+        {{- if $sidecar.initTemplate }}
+        {{- include $sidecar.initTemplate $sidecarContext | nindent 8 }}
+        {{- end }}
+        {{- include $sidecar.jobContainerTemplate $sidecarContext | nindent 8 }}
+        {{- end }}
+        {{- end }}
       {{- end }}
       containers:
         - name: {{ $job.name }}

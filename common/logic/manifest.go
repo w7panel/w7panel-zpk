@@ -15,6 +15,7 @@ const (
 	Help_App         = "helm"
 	GatewayPluginApp = "gateway-plugin"
 	EnvironmentApp   = "environment"
+	SidecarApp       = "sidecar"
 
 	GatewayPluginDriverHigressWasmV1 = "higress-wasm/v1"
 )

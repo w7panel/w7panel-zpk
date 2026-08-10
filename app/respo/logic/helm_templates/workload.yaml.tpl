@@ -40,11 +40,19 @@ spec:
         {{- include "common.selectorLabels" . | nindent 8 }}
         w7.cc/identifie: {{ .Values.app.identify | quote }}
     spec:
+      {{- $root := . }}
+      {{- $rootCtx := $ }}
       {{- if .Values.gpu.enable }}
       runtimeClassName: {{ .Values.gpu.driver }}
       {{- end }}
 
       {{- $podVolumes := .Values.volumes }}
+      {{- $hasSidecarVolumes := false }}
+      {{- range $sidecar := .Values.w7panelSidecars }}
+        {{- if $sidecar.volumesTemplate }}
+          {{- $hasSidecarVolumes = true }}
+        {{- end }}
+      {{- end }}
       {{- if .Values.workload.isStatefulSet }}
       {{- $claimTemplateNames := dict }}
       {{- range .Values.volumeClaimTemplates }}
@@ -58,9 +66,17 @@ spec:
       {{- end }}
       {{- $podVolumes = $filteredVolumes }}
       {{- end }}
-      {{- if $podVolumes }}
+      {{- if or $podVolumes $hasSidecarVolumes }}
       volumes:
+        {{- if $podVolumes }}
         {{- include "common.volumesToYaml" (dict "root" . "volumes" $podVolumes) | nindent 8 }}
+        {{- end }}
+        {{- range $sidecar := .Values.w7panelSidecars }}
+        {{- if $sidecar.volumesTemplate }}
+        {{- $sidecarContext := index $root.Subcharts $sidecar.chart }}
+        {{- include $sidecar.volumesTemplate $sidecarContext | nindent 8 }}
+        {{- end }}
+        {{- end }}
       {{- end }}
 
       {{- with .Values.imagePullSecrets }}
@@ -81,8 +97,6 @@ spec:
               topologyKey: kubernetes.io/hostname
       {{- end }}
 
-      {{- $root := . }}
-      {{- $rootCtx := $ }}
       containers:
       {{- range .Values.containers }}
       {{- if not .isInitContainer }}
@@ -128,10 +142,21 @@ spec:
           {{- end }}
       {{- end }}
       {{- end }}
+      {{- range $sidecar := .Values.w7panelSidecars }}
+      {{- if $sidecar.containerTemplate }}
+      {{- $sidecarContext := index $root.Subcharts $sidecar.chart }}
+      {{- include $sidecar.containerTemplate $sidecarContext | nindent 8 }}
+      {{- end }}
+      {{- end }}
 
       {{- $hasInit := false }}
       {{- range .Values.containers }}
         {{- if .isInitContainer }}
+          {{- $hasInit = true }}
+        {{- end }}
+      {{- end }}
+      {{- range $sidecar := .Values.w7panelSidecars }}
+        {{- if $sidecar.initTemplate }}
           {{- $hasInit = true }}
         {{- end }}
       {{- end }}
@@ -169,6 +194,12 @@ spec:
           {{- end }}
       {{- end }}
       {{- end }}
+        {{- range $sidecar := .Values.w7panelSidecars }}
+        {{- if $sidecar.initTemplate }}
+        {{- $sidecarContext := index $root.Subcharts $sidecar.chart }}
+        {{- include $sidecar.initTemplate $sidecarContext | nindent 8 }}
+        {{- end }}
+        {{- end }}
   {{- end }}
   {{- if and .Values.workload.isStatefulSet .Values.volumeClaimTemplates }}
   volumeClaimTemplates:

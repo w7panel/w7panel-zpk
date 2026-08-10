@@ -154,9 +154,12 @@ func (hc *HelmPack) PackToHelm() error {
 		if err := hc.generateGatewayPluginTemplate(templatesDir, renderer); err != nil {
 			return err
 		}
-	} else if hc.Manifest.Platform.Helm.ChartName != "" || hc.Manifest.Platform.Helm.Repository != "" || (hc.Manifest.Platform.Helm.DependYamls != nil && len(hc.Manifest.Platform.Helm.DependYamls) > 0) {
+	} else if hc.isHelmPackage() {
 		err := hc.processHelmPkg(helmDir)
 		if err != nil {
+			return err
+		}
+		if err := hc.configureHelmSidecarHost(helmDir); err != nil {
 			return err
 		}
 	} else if hc.Manifest.Application.Type == logic2.Tradition_App {
@@ -208,6 +211,13 @@ func (hc *HelmPack) PackToHelm() error {
 		}
 	}
 
+	if err := hc.generateSidecarHelpersTemplate(templatesDir); err != nil {
+		return err
+	}
+	if err := hc.generateSidecarResourcesTemplate(templatesDir); err != nil {
+		return err
+	}
+
 	if !hc.IsSubFormula {
 		if err := hc.generateMicroAppTemplate(templatesDir, hc.Manifest); err != nil {
 			return err
@@ -224,6 +234,12 @@ func (hc *HelmPack) PackToHelm() error {
 	}
 
 	return nil
+}
+
+func (hc *HelmPack) isHelmPackage() bool {
+	return hc.Manifest.Platform.Helm.ChartName != "" ||
+		hc.Manifest.Platform.Helm.Repository != "" ||
+		len(hc.Manifest.Platform.Helm.DependYamls) > 0
 }
 
 func (hc *HelmPack) processHelmPkg(rootDir string) error {

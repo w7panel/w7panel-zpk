@@ -12,28 +12,10 @@
 {{- end }}
 
 {{- $fullName := include "__cur__.fullname" . -}}
-{{- $sidecarContainers := list -}}
-{{- $sidecarInitContainers := list -}}
-{{- $sidecarVolumes := list -}}
-{{- range $sidecar := .Values.w7panelSidecars -}}
-  {{- $sidecarContext := index $.Subcharts $sidecar.chart -}}
-  {{- if $sidecar.containerTemplate -}}
-    {{- $sidecarContainers = concat $sidecarContainers (include $sidecar.containerTemplate $sidecarContext | fromYamlArray) -}}
-  {{- end -}}
-  {{- if $sidecar.initTemplate -}}
-    {{- $sidecarInitContainers = concat $sidecarInitContainers (include $sidecar.initTemplate $sidecarContext | fromYamlArray) -}}
-  {{- end -}}
-  {{- if $sidecar.volumesTemplate -}}
-    {{- $sidecarVolumes = concat $sidecarVolumes (include $sidecar.volumesTemplate $sidecarContext | fromYamlArray) -}}
-  {{- end -}}
-{{- end -}}
-{{- $targetPodAnnotations := dict -}}
-{{- range $key, $value := (.Values.annotations | default dict) -}}
-  {{- $_ := set $targetPodAnnotations $key $value -}}
-{{- end -}}
-{{- range $key, $value := (.Values.podAnnotations | default dict) -}}
-  {{- $_ := set $targetPodAnnotations $key $value -}}
-{{- end -}}
+{{- $sidecarContainers := include "w7panel.sidecars.containers" . | fromYamlArray | default list -}}
+{{- $sidecarInitContainers := include "w7panel.sidecars.initContainers" . | fromYamlArray | default list -}}
+{{- $sidecarVolumes := include "w7panel.sidecars.volumes" . | fromYamlArray | default list -}}
+{{- $targetPodAnnotations := include "w7panel.podAnnotations" . | fromYaml | default dict -}}
 
 apiVersion: batch/v1
 kind: Job

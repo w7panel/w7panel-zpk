@@ -29,13 +29,11 @@ spec:
       {{- include "common.selectorLabels" . | nindent 6 }}
   template:
     metadata:
+      {{- $podAnnotations := include "w7panel.podAnnotations" . }}
+      {{- if $podAnnotations }}
       annotations:
-      {{- if .Values.podAnnotations }}
-        {{- toYaml .Values.podAnnotations | nindent 8 }}
+        {{- $podAnnotations | nindent 8 }}
       {{- end }}
-        {{- if .Values.annotations }}
-        {{- toYaml .Values.annotations | nindent 12 }}
-        {{- end }}
       labels:
         {{- include "common.selectorLabels" . | nindent 8 }}
         w7.cc/identifie: {{ .Values.app.identify | quote }}
@@ -47,12 +45,7 @@ spec:
       {{- end }}
 
       {{- $podVolumes := .Values.volumes }}
-      {{- $hasSidecarVolumes := false }}
-      {{- range $sidecar := .Values.w7panelSidecars }}
-        {{- if $sidecar.volumesTemplate }}
-          {{- $hasSidecarVolumes = true }}
-        {{- end }}
-      {{- end }}
+      {{- $sidecarVolumes := include "w7panel.sidecars.volumes" . }}
       {{- if .Values.workload.isStatefulSet }}
       {{- $claimTemplateNames := dict }}
       {{- range .Values.volumeClaimTemplates }}
@@ -66,17 +59,12 @@ spec:
       {{- end }}
       {{- $podVolumes = $filteredVolumes }}
       {{- end }}
-      {{- if or $podVolumes $hasSidecarVolumes }}
+      {{- if or $podVolumes $sidecarVolumes }}
       volumes:
         {{- if $podVolumes }}
         {{- include "common.volumesToYaml" (dict "root" . "volumes" $podVolumes) | nindent 8 }}
         {{- end }}
-        {{- range $sidecar := .Values.w7panelSidecars }}
-        {{- if $sidecar.volumesTemplate }}
-        {{- $sidecarContext := index $root.Subcharts $sidecar.chart }}
-        {{- include $sidecar.volumesTemplate $sidecarContext | nindent 8 }}
-        {{- end }}
-        {{- end }}
+        {{- $sidecarVolumes | nindent 8 }}
       {{- end }}
 
       {{- with .Values.imagePullSecrets }}
@@ -142,12 +130,7 @@ spec:
           {{- end }}
       {{- end }}
       {{- end }}
-      {{- range $sidecar := .Values.w7panelSidecars }}
-      {{- if $sidecar.containerTemplate }}
-      {{- $sidecarContext := index $root.Subcharts $sidecar.chart }}
-      {{- include $sidecar.containerTemplate $sidecarContext | nindent 8 }}
-      {{- end }}
-      {{- end }}
+      {{- include "w7panel.sidecars.containers" . | nindent 8 }}
 
       {{- $hasInit := false }}
       {{- range .Values.containers }}
@@ -155,12 +138,8 @@ spec:
           {{- $hasInit = true }}
         {{- end }}
       {{- end }}
-      {{- range $sidecar := .Values.w7panelSidecars }}
-        {{- if $sidecar.initTemplate }}
-          {{- $hasInit = true }}
-        {{- end }}
-      {{- end }}
-      {{- if $hasInit }}
+      {{- $sidecarInitContainers := include "w7panel.sidecars.initContainers" . }}
+      {{- if or $hasInit $sidecarInitContainers }}
       initContainers:
         {{- range .Values.containers }}
         {{- if .isInitContainer }}
@@ -194,12 +173,7 @@ spec:
           {{- end }}
       {{- end }}
       {{- end }}
-        {{- range $sidecar := .Values.w7panelSidecars }}
-        {{- if $sidecar.initTemplate }}
-        {{- $sidecarContext := index $root.Subcharts $sidecar.chart }}
-        {{- include $sidecar.initTemplate $sidecarContext | nindent 8 }}
-        {{- end }}
-        {{- end }}
+        {{- $sidecarInitContainers | nindent 8 }}
   {{- end }}
   {{- if and .Values.workload.isStatefulSet .Values.volumeClaimTemplates }}
   volumeClaimTemplates:

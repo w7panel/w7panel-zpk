@@ -36,7 +36,12 @@ spec:
     spec:
       {{- $jobSidecarVolumes := include "w7panel.sidecars.jobVolumes" $root }}
       {{- $jobSidecarInitContainers := include "w7panel.sidecars.jobInitContainers" $root }}
+      {{- $jobSidecarHostAliases := include "w7panel.sidecars.jobHostAliases" $root }}
       restartPolicy: Never
+      {{- if $jobSidecarHostAliases }}
+      hostAliases:
+        {{- $jobSidecarHostAliases | nindent 8 }}
+      {{- end }}
       serviceAccountName: {{ include "common.serviceAccountName" $root }}
       affinity:
         podAffinity:

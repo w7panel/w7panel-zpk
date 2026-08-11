@@ -20,6 +20,7 @@ const (
 	sidecarHostTargetPortValueAnnotation    = "w7.cc/sidecar-host-target-port-value"
 	sidecarHostContractV1                   = "v1"
 	sidecarPodAnnotationsTemplateAnnotation = "w7.cc/sidecar-pod-annotations-template"
+	sidecarHostAliasesTemplateAnnotation    = "w7.cc/sidecar-host-aliases-template"
 	sidecarInitTemplateAnnotation           = "w7.cc/sidecar-init-template"
 	sidecarContainerTemplateAnnotation      = "w7.cc/sidecar-container-template"
 	sidecarJobContainerTemplateAnnotation   = "w7.cc/sidecar-job-container-template"
@@ -33,6 +34,7 @@ const (
 type HelmSidecar struct {
 	Chart                  string `yaml:"chart" json:"chart"`
 	PodAnnotationsTemplate string `yaml:"podAnnotationsTemplate,omitempty" json:"podAnnotationsTemplate,omitempty"`
+	HostAliasesTemplate    string `yaml:"hostAliasesTemplate,omitempty" json:"hostAliasesTemplate,omitempty"`
 	InitTemplate           string `yaml:"initTemplate" json:"initTemplate"`
 	ContainerTemplate      string `yaml:"containerTemplate" json:"containerTemplate"`
 	JobContainerTemplate   string `yaml:"jobContainerTemplate" json:"jobContainerTemplate"`
@@ -122,6 +124,7 @@ func loadHelmSidecar(chartDir string) (HelmSidecar, error) {
 	sidecar := HelmSidecar{
 		Chart:                  metadata.Name,
 		PodAnnotationsTemplate: metadata.Annotations[sidecarPodAnnotationsTemplateAnnotation],
+		HostAliasesTemplate:    metadata.Annotations[sidecarHostAliasesTemplateAnnotation],
 		InitTemplate:           metadata.Annotations[sidecarInitTemplateAnnotation],
 		ContainerTemplate:      metadata.Annotations[sidecarContainerTemplateAnnotation],
 		JobContainerTemplate:   metadata.Annotations[sidecarJobContainerTemplateAnnotation],
@@ -216,6 +219,7 @@ func validateHelmSidecarHostSlots(templatesDir string, sidecars []HelmSidecar) e
 	required := map[string]bool{"w7panel.sidecars.containers": true}
 	for _, sidecar := range sidecars {
 		required["w7panel.sidecars.podAnnotations"] = required["w7panel.sidecars.podAnnotations"] || sidecar.PodAnnotationsTemplate != ""
+		required["w7panel.sidecars.hostAliases"] = required["w7panel.sidecars.hostAliases"] || sidecar.HostAliasesTemplate != ""
 		required["w7panel.sidecars.volumes"] = required["w7panel.sidecars.volumes"] || sidecar.VolumesTemplate != ""
 		required["w7panel.sidecars.initContainers"] = required["w7panel.sidecars.initContainers"] || sidecar.InitTemplate != ""
 	}

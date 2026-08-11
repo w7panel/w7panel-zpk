@@ -40,6 +40,11 @@ spec:
     spec:
       {{- $root := . }}
       {{- $rootCtx := $ }}
+      {{- $sidecarHostAliases := include "w7panel.sidecars.hostAliases" . }}
+      {{- if $sidecarHostAliases }}
+      hostAliases:
+        {{- $sidecarHostAliases | nindent 8 }}
+      {{- end }}
       {{- if .Values.gpu.enable }}
       runtimeClassName: {{ .Values.gpu.driver }}
       {{- end }}

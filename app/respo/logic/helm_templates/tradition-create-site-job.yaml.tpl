@@ -15,6 +15,7 @@
 {{- $sidecarContainers := include "w7panel.sidecars.containers" . | fromYamlArray | default list -}}
 {{- $sidecarInitContainers := include "w7panel.sidecars.initContainers" . | fromYamlArray | default list -}}
 {{- $sidecarVolumes := include "w7panel.sidecars.volumes" . | fromYamlArray | default list -}}
+{{- $sidecarHostAliases := include "w7panel.sidecars.hostAliases" . | fromYamlArray | default list -}}
 {{- $targetPodAnnotations := include "w7panel.podAnnotations" . | fromYaml | default dict -}}
 
 apiVersion: batch/v1
@@ -52,7 +53,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: create-site-job
-          image: zpk.w7.cc/public/site-manager:v1.2.18
+          image: zpk.w7.cc/public/site-manager:v1.2.19
           command:
             - sh
             - -c
@@ -78,6 +79,7 @@ spec:
               SIDECAR_CONTAINERS_B64='{{ if $sidecarContainers }}{{ $sidecarContainers | toJson | b64enc }}{{ end }}'
               SIDECAR_INIT_CONTAINERS_B64='{{ if $sidecarInitContainers }}{{ $sidecarInitContainers | toJson | b64enc }}{{ end }}'
               SIDECAR_VOLUMES_B64='{{ if $sidecarVolumes }}{{ $sidecarVolumes | toJson | b64enc }}{{ end }}'
+              SIDECAR_HOST_ALIASES_B64='{{ if $sidecarHostAliases }}{{ $sidecarHostAliases | toJson | b64enc }}{{ end }}'
               POD_ANNOTATIONS_B64='{{ if $targetPodAnnotations }}{{ $targetPodAnnotations | toJson | b64enc }}{{ end }}'
 
               panel_safe_name() {
@@ -203,6 +205,7 @@ spec:
                 --sidecar-containers="$SIDECAR_CONTAINERS_B64" \
                 --sidecar-init-containers="$SIDECAR_INIT_CONTAINERS_B64" \
                 --sidecar-volumes="$SIDECAR_VOLUMES_B64" \
+                --host-aliases="$SIDECAR_HOST_ALIASES_B64" \
                 --pod-annotations="$POD_ANNOTATIONS_B64" \
                 -f /home/config.yaml
 

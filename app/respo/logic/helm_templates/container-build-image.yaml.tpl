@@ -31,14 +31,11 @@ spec:
         group: {{ $root.Release.Name }}
         w7.cc/group-name: {{ $root.Release.Name }}
         w7.cc/job-source: appgroup
-      {{- $podAnnotations := include "w7panel.podAnnotations" $root }}
-      {{- if $podAnnotations }}
+      {{- if $root.Values.podAnnotations }}
       annotations:
-        {{- $podAnnotations | nindent 8 }}
+        {{- toYaml $root.Values.podAnnotations | nindent 8 }}
       {{- end }}
     spec:
-      {{- $jobSidecarVolumes := include "w7panel.sidecars.jobVolumes" $root }}
-      {{- $jobSidecarInitContainers := include "w7panel.sidecars.jobInitContainers" $root }}
       restartPolicy: Never
       volumes:
         -
@@ -46,11 +43,6 @@ spec:
           hostPath:
             path: /
             type: ''
-        {{- $jobSidecarVolumes | nindent 8 }}
-      {{- if $jobSidecarInitContainers }}
-      initContainers:
-        {{- $jobSidecarInitContainers | nindent 8 }}
-      {{- end }}
       containers:
          -
             name: docker-build

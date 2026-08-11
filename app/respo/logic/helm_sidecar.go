@@ -17,7 +17,6 @@ import (
 
 const (
 	sidecarHostContractAnnotation           = "w7.cc/sidecar-host-contract"
-	sidecarHostTargetPortValueAnnotation    = "w7.cc/sidecar-host-target-port-value"
 	sidecarHostContractV1                   = "v1"
 	sidecarPodAnnotationsTemplateAnnotation = "w7.cc/sidecar-pod-annotations-template"
 	sidecarHostAliasesTemplateAnnotation    = "w7.cc/sidecar-host-aliases-template"
@@ -26,7 +25,6 @@ const (
 	sidecarJobContainerTemplateAnnotation   = "w7.cc/sidecar-job-container-template"
 	sidecarVolumesTemplateAnnotation        = "w7.cc/sidecar-volumes-template"
 	sidecarResourcesTemplateAnnotation      = "w7.cc/sidecar-resources-template"
-	sidecarTargetPortValueAnnotation        = "w7.cc/sidecar-target-port-value"
 )
 
 // HelmSidecar describes the named-template contract exported by a sidecar
@@ -40,7 +38,6 @@ type HelmSidecar struct {
 	JobContainerTemplate   string `yaml:"jobContainerTemplate" json:"jobContainerTemplate"`
 	VolumesTemplate        string `yaml:"volumesTemplate" json:"volumesTemplate"`
 	ResourcesTemplate      string `yaml:"resourcesTemplate,omitempty" json:"resourcesTemplate,omitempty"`
-	TargetPortValue        string `yaml:"targetPortValue,omitempty" json:"targetPortValue,omitempty"`
 }
 
 func (hc *HelmPack) prepareSidecarCharts(chartsDir string) error {
@@ -130,7 +127,6 @@ func loadHelmSidecar(chartDir string) (HelmSidecar, error) {
 		JobContainerTemplate:   metadata.Annotations[sidecarJobContainerTemplateAnnotation],
 		VolumesTemplate:        metadata.Annotations[sidecarVolumesTemplateAnnotation],
 		ResourcesTemplate:      metadata.Annotations[sidecarResourcesTemplateAnnotation],
-		TargetPortValue:        metadata.Annotations[sidecarTargetPortValueAnnotation],
 	}
 	if sidecar.Chart == "" || sidecar.ContainerTemplate == "" {
 		return HelmSidecar{}, fmt.Errorf("Chart 缺少必需的 sidecar container 模板契约注解")
@@ -183,35 +179,7 @@ func (hc *HelmPack) configureHelmSidecarHost(chartDir string) error {
 		return fmt.Errorf("读取宿主 Helm values.yaml 失败: %w", readErr)
 	}
 
-	targetPortPath := metadata.Annotations[sidecarHostTargetPortValueAnnotation]
-	var targetPort interface{}
-	for _, sidecar := range hc.Sidecars {
-		if sidecar.TargetPortValue == "" {
-			continue
-		}
-		if targetPortPath == "" {
-			return fmt.Errorf("sidecar %s 需要应用端口，宿主 Helm Chart 未声明 %s", sidecar.Chart, sidecarHostTargetPortValueAnnotation)
-		}
-		var ok bool
-		targetPort, ok = nestedHelmValue(values, targetPortPath)
-		if !ok {
-			return fmt.Errorf("宿主 Helm values.yaml 缺少 sidecar 目标端口路径 %s", targetPortPath)
-		}
-		break
-	}
-
 	values["w7panelSidecars"] = hc.Sidecars
-	for _, sidecar := range hc.Sidecars {
-		if sidecar.TargetPortValue == "" {
-			continue
-		}
-		sidecarValues, _ := values[sidecar.Chart].(map[string]interface{})
-		if sidecarValues == nil {
-			sidecarValues = make(map[string]interface{})
-			values[sidecar.Chart] = sidecarValues
-		}
-		setNestedSidecarValue(sidecarValues, sidecar.TargetPortValue, targetPort)
-	}
 	return writeYAMLFile(valuesPath, values)
 }
 
@@ -250,36 +218,4 @@ func validateHelmSidecarHostSlots(templatesDir string, sidecars []HelmSidecar) e
 		}
 	}
 	return nil
-}
-
-func nestedHelmValue(values map[string]interface{}, path string) (interface{}, bool) {
-	var current interface{} = values
-	for _, part := range strings.Split(strings.Trim(path, "."), ".") {
-		object, ok := current.(map[string]interface{})
-		if !ok {
-			return nil, false
-		}
-		current, ok = object[part]
-		if !ok {
-			return nil, false
-		}
-	}
-	return current, true
-}
-
-func setNestedSidecarValue(values map[string]interface{}, path string, value interface{}) {
-	parts := strings.Split(strings.Trim(path, "."), ".")
-	if len(parts) == 0 || parts[0] == "" {
-		return
-	}
-	current := values
-	for _, part := range parts[:len(parts)-1] {
-		next, ok := current[part].(map[string]interface{})
-		if !ok {
-			next = make(map[string]interface{})
-			current[part] = next
-		}
-		current = next
-	}
-	current[parts[len(parts)-1]] = value
 }

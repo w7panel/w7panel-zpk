@@ -767,14 +767,6 @@ func (hc *HelmPack) generateValuesYaml(rootDir string) error {
 		},
 		"w7panelSidecars": hc.Sidecars,
 	}
-	for _, sidecar := range hc.Sidecars {
-		if sidecar.TargetPortValue == "" || defaultPort == 0 {
-			continue
-		}
-		sidecarValues := make(map[string]interface{})
-		setNestedSidecarValue(sidecarValues, sidecar.TargetPortValue, defaultPort)
-		values[sidecar.Chart] = sidecarValues
-	}
 	values["jobs"] = hc.getJobsValues(hc.Manifest.Platform)
 	helmContainers := make([]map[string]interface{}, 0, len(hc.Manifest.Platform.ContainerV2s))
 	for _, container := range hc.Manifest.Platform.ContainerV2s {

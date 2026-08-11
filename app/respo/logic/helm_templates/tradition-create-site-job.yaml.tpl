@@ -53,7 +53,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: create-site-job
-          image: zpk.w7.cc/public/site-manager:v1.2.20
+          image: zpk.w7.cc/public/site-manager:v1.3.0
           command:
             - sh
             - -c

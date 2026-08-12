@@ -63,7 +63,9 @@ func (hc *HelmPack) prepareSidecarCharts(chartsDir string) error {
 		}
 		targetDir := filepath.Join(chartsDir, sidecar.Chart)
 		if function.FileExists(targetDir) {
-			return fmt.Errorf("sidecar Chart %s 与已有依赖冲突", sidecar.Chart)
+			if err := os.RemoveAll(targetDir); err != nil {
+				return fmt.Errorf("清理已有 sidecar Chart %s 失败: %w", sidecar.Chart, err)
+			}
 		}
 		if err := copy2.Copy(sourceDir, targetDir); err != nil {
 			return fmt.Errorf("复制 sidecar Chart %s 失败: %w", sidecar.Chart, err)
@@ -161,7 +163,7 @@ func (hc *HelmPack) configureHelmSidecarHost(chartDir string) error {
 		return fmt.Errorf("解析宿主 Helm Chart.yaml 失败: %w", err)
 	}
 	if metadata.Annotations[sidecarHostContractAnnotation] != sidecarHostContractV1 {
-		return fmt.Errorf("Helm 制品需要 sidecar，但未声明 %s=%s", sidecarHostContractAnnotation, sidecarHostContractV1)
+		return nil
 	}
 	if err := validateHelmSidecarHostSlots(filepath.Join(chartDir, "templates"), hc.Sidecars); err != nil {
 		return err

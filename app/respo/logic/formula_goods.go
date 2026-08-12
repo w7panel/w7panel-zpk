@@ -218,6 +218,7 @@ func buildApplicationTypeExtra(manifest commonlogic.Manifest) map[string]interfa
 	}
 	if manifest.Application.Type == commonlogic.EnvironmentApp {
 		extra["support_version"] = manifest.Application.Annotation["w7.cc/image_version"]
+		extra["env_language"] = manifest.Application.Annotation["w7.cc/image_language"]
 	}
 	return extra
 }

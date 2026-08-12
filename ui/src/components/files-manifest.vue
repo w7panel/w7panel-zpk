@@ -169,7 +169,7 @@
                                             <a-form-item label="系统重启还原" style="margin-bottom:18px;">
                                                 <div class="df df-c" style="align-items:flex-start;">
                                                     <a-switch v-model="form.environmentSystemRebootRestore" />
-                                                    <span class="c-99 mt-6">默认开启；关闭后使用持久存储保留容器系统层。</span>
+                                                    <span class="c-99 mt-6">关闭后使用持久存储保留容器系统层。</span>
                                                 </div>
                                             </a-form-item>
                                             <a-form-item label="Nginx 模板" field="environmentNginxVhostTemplate" required
@@ -315,10 +315,10 @@
 
                             <a-form-item v-if="form.type == 'tradition'" label="环境类型">
                                 <div class="df df-ww env-sel">
-                                    <div v-for="(item, index) in environmentList" :key="index"
+                                    <div v-for="item in environmentList" :key="item.identifie"
                                         :class="{ 'active': form.environmentName == item.identifie }"
                                         @click="changeEnv(item)" class="env-item df df-c ai-c cursor">
-                                        <img :src="'http://zpk.w7.cc' + item.icon" class="img" alt="" />
+                                        <img :src="environmentIcon(item.icon)" class="img" alt="" />
                                         <div class="lh-1">{{ item.name }}</div>
                                         <input type="radio" v-model="form.environmentName" :value="item.identifie"
                                             style="display:none;" />
@@ -1286,6 +1286,12 @@ export default {
         defaultShellContainer() {
             return this.hasShellContainerOptions ? this.shellContainerOptions[0].value : '';
         },
+        environmentIcon() {
+            return icon => {
+                if (!icon) return '';
+                return /^https?:\/\//i.test(icon) ? icon : `https://img.w7.cc${icon.startsWith('/') ? '' : '/'}${icon}`;
+            };
+        },
         dependPickerCurrentList() {
             return this.dependPicker.lists?.[this.dependPicker.activeTab] || [];
         },
@@ -1766,7 +1772,7 @@ export default {
             this.disabledDomainStartParams = !!v;
         },
         async changeEnv(item) {
-            if (item.identifie == this.form.environmentName) { return }
+            if (!item.identifie || item.identifie == this.form.environmentName) { return }
 
             this.form.depends = this.form.depends?.filter?.(i => !i.temporary) || []
             let findIndex = this.form.depends?.findIndex(i => i.identifie == item.identifie && i.name == item.name)
@@ -1805,24 +1811,33 @@ export default {
             this.changeForm();
         },
         getEnvironmentList() {
-            myAxios.get('https://zpk.w7.cc/zpk/respo/list?status=2&status=99&page=1&limit=9&tag=运行环境').then(res => {
-                const environmentList = res.data?.data?.list
-                let arr = environmentList || [];
-                this.environmentList = arr.map(i => {
-                    let versions = [];
-                    try {
-                        versions = i.annotation['w7.cc/image_version'].split(',')
-                    } catch { }
-                    let imageIsShare = false;
-                    try {
-                        imageIsShare = String(i.annotation['w7.cc/image_is_share']).toLowerCase() == 'true';
-                    } catch {
-                        imageIsShare = false;
-                    }
-                    i.versions = versions;
-                    i.image_is_share = imageIsShare;
-                    return i
-                })
+            // 运行环境列表由制品市场提供，支持版本使用接口返回的 support_version 字段。
+            // 该接口与市场前端（zm.w7.com）使用同一 API，避免继续依赖旧的 zpk.w7.cc 数据源。
+            const listUrl = 'https://api.zm.w7.com/zpk-market/formula/list';
+            myAxios.post(listUrl, {
+                status: [2, 99],
+                page: 1,
+                limit: 99,
+                tag: '运行环境',
+            }, { dontalert: true }).then(res => {
+                const environmentList = res.data?.data?.list || [];
+                this.environmentList = environmentList.map(item => {
+                    const identifie = item.identifie || item.identify || item.identifier
+                        || item.formula_identifie || item.formula_identify || '';
+                    const environmentLanguage = String(item.environment_language || '').trim();
+                    const versions = String(item.support_version || '')
+                        .split(',')
+                        .map(version => version.trim())
+                        .filter(Boolean);
+                    const imageIsShare = String(item.image_is_share || '').toLowerCase() == 'true';
+                    return {
+                        ...item,
+                        identifie,
+                        environment_language: environmentLanguage,
+                        versions,
+                        image_is_share: imageIsShare,
+                    };
+                }).filter(item => item.identifie);
                 this.normalizeCommandByEnvironment();
 
                 this.form.depends?.map?.((item, index) => {
@@ -1835,7 +1850,9 @@ export default {
                         }
                     }
                 })
-            })
+            }).catch(() => {
+                this.environmentList = [];
+            });
         },
         getChartInfo() {
             this.getChartInfoLoading = true;
@@ -2730,7 +2747,9 @@ platform:
             if (this.form.type == 'tradition') {
                 let environmentLanguage = j.platform?.tradition?.environmentLanguage || '';
                 try {
-                    environmentLanguage = this.environmentList?.find?.(i => i.identifie == this.form.environmentName)?.annotation?.['w7.cc/image_language'] || environmentLanguage;
+                    environmentLanguage = this.environmentList
+                        ?.find?.(i => i.identifie == this.form.environmentName)
+                        ?.environment_language || environmentLanguage;
                 } catch { }
                 this.normalizeCommandByEnvironment();
                 j.platform.tradition = {

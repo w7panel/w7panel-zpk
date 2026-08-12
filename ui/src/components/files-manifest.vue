@@ -371,7 +371,7 @@
 
                             <slot></slot>
 
-                            <a-form-item v-if="form.type == 'tradition' && !isTraditionCommandDisabled" label="CMD">
+                            <a-form-item v-if="form.type == 'tradition'" label="CMD">
                                 <div class="df df-c">
                                     <div v-for="(item, index) in form.cmd" :key="index" class="df ai-e"
                                         :style="{ marginTop: index == 0 ? 0 : '10px' }">
@@ -775,7 +775,6 @@ const environmentAnnotationKeys = {
     imageLanguage: 'w7.cc/image_language',
     imageTemplate: 'w7.cc/image_template',
     imageVersion: 'w7.cc/image_version',
-    imageIsShare: 'w7.cc/image_is_share',
     nginxVhostTemplate: 'w7.cc/nginx_vhost_template',
     systemRebootRestore: 'w7.cc/system-reboot-restore',
 };
@@ -1256,9 +1255,6 @@ export default {
         selectedEnvironment() {
             return this.environmentList?.find?.(i => i.identifie == this.form.environmentName) || null;
         },
-        isTraditionCommandDisabled() {
-            return this.form.type == 'tradition' && this.selectedEnvironment?.image_is_share === true;
-        },
         shellTypeOptions() {
             return [
                 { label: '安装前执行', value: 'requireinstall' },
@@ -1719,9 +1715,6 @@ export default {
             }));
         },
         normalizeCommandByEnvironment() {
-            if (this.isTraditionCommandDisabled) {
-                this.form.cmd = [''];
-            }
         },
         openAppset() {
             let volumes = this.json?.platform?.volumes;
@@ -1772,13 +1765,14 @@ export default {
             this.disabledDomainStartParams = !!v;
         },
         async changeEnv(item) {
+            const environmentFrom = this.getEnvironmentDependencyFrom(item);
             if (!item.identifie || item.identifie == this.form.environmentName) { return }
 
             this.form.depends = this.form.depends?.filter?.(i => !i.temporary) || []
             let findIndex = this.form.depends?.findIndex(i => i.identifie == item.identifie && i.name == item.name)
             if (findIndex != -1) {
                 this.form.depends[findIndex].temporary = true;
-                this.form.depends[findIndex].from = 'https://zpk.w7.cc';
+                this.form.depends[findIndex].from = environmentFrom;
             } else {
                 this.form.depends.push({
                     identifie: item.identifie,
@@ -1787,7 +1781,7 @@ export default {
                     required: true,
                     type: 'out',
                     temporary: true,
-                    from: 'https://zpk.w7.cc',
+                    from: environmentFrom,
                 })
             }
 
@@ -1810,6 +1804,15 @@ export default {
 
             this.changeForm();
         },
+        getEnvironmentDependencyFrom(item) {
+            const formulaURL = String(item?.formula_url || '').trim();
+            if (!formulaURL) { return ''; }
+            try {
+                return new URL(formulaURL, window.location.origin).origin;
+            } catch {
+                return '';
+            }
+        },
         getEnvironmentList() {
             // 运行环境列表由制品市场提供，支持版本使用接口返回的 support_version 字段。
             // 该接口与市场前端（zm.w7.com）使用同一 API，避免继续依赖旧的 zpk.w7.cc 数据源。
@@ -1829,13 +1832,12 @@ export default {
                         .split(',')
                         .map(version => version.trim())
                         .filter(Boolean);
-                    const imageIsShare = String(item.image_is_share || '').toLowerCase() == 'true';
                     return {
                         ...item,
                         identifie,
+                        name: item.name || item.formula_name || item.title || identifie,
                         environment_language: environmentLanguage,
                         versions,
-                        image_is_share: imageIsShare,
                     };
                 }).filter(item => item.identifie);
                 this.normalizeCommandByEnvironment();
@@ -2616,7 +2618,7 @@ platform:
                         delete this.json.platform.runtimeClassName
                     } catch { }
                     if (this.json.platform?.tradition) {
-                        this.json.platform.tradition.cmd = this.isTraditionCommandDisabled ? [] : this.form.cmd;
+                        this.json.platform.tradition.cmd = this.form.cmd;
                     }
                     this.applyPlatformShells();
                 } else if (this.form.type == 'docker') {
@@ -2756,7 +2758,7 @@ platform:
                     environmentName: this.form.environmentName,
                     environmentVersion: this.form.environmentVersion,
                     environmentLanguage: environmentLanguage,
-                    cmd: this.isTraditionCommandDisabled ? [] : this.form.cmd,
+                    cmd: this.form.cmd,
                 }
             }
 

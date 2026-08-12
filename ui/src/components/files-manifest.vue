@@ -134,7 +134,8 @@
                                             <a-form-item label="环境语言" field="environmentImageLanguage" required
                                                 style="margin-bottom:18px;">
                                                 <a-select v-model="form.environmentImageLanguage" size="large"
-                                                    style="width:500px;" placeholder="请选择环境语言" allow-search>
+                                                    style="width:500px;" placeholder="请选择环境语言" allow-search
+                                                    @change="changeEnvironmentLanguage">
                                                     <a-option v-for="option in environmentLanguageOptions"
                                                         :key="option.value" :value="option.value"
                                                         :label="option.label">
@@ -163,6 +164,12 @@
                                                 <div class="df df-c" style="align-items:flex-start;">
                                                     <a-switch v-model="form.environmentImageIsShare" />
                                                     <span class="c-99 mt-6">开启后，站点可共享已有环境或新建环境；关闭后，每个站点使用独立环境。共享环境统一使用制品预设的启动配置。</span>
+                                                </div>
+                                            </a-form-item>
+                                            <a-form-item label="系统重启还原" style="margin-bottom:18px;">
+                                                <div class="df df-c" style="align-items:flex-start;">
+                                                    <a-switch v-model="form.environmentSystemRebootRestore" />
+                                                    <span class="c-99 mt-6">默认开启；关闭后使用持久存储保留容器系统层。</span>
                                                 </div>
                                             </a-form-item>
                                             <a-form-item label="Nginx 模板" field="environmentNginxVhostTemplate" required
@@ -770,6 +777,7 @@ const environmentAnnotationKeys = {
     imageVersion: 'w7.cc/image_version',
     imageIsShare: 'w7.cc/image_is_share',
     nginxVhostTemplate: 'w7.cc/nginx_vhost_template',
+    systemRebootRestore: 'w7.cc/system-reboot-restore',
 };
 
 const gatewayPluginAnnotationPrefix = 'w7.cc/plugin-';
@@ -937,6 +945,7 @@ export default {
                 environmentImageTemplate: '',
                 environmentImageVersion: [],
                 environmentImageIsShare: false,
+                environmentSystemRebootRestore: true,
                 environmentNginxVhostTemplate: '',
                 startParams: [],
                 dependsIn: [],
@@ -1467,6 +1476,10 @@ export default {
             this.form.environmentImageVersion = this.normalizeEnvironmentVersions(annotation[environmentAnnotationKeys.imageVersion]);
             this.form.environmentImageIsShare = String(annotation[environmentAnnotationKeys.imageIsShare]).toLowerCase() == 'true';
             this.form.environmentNginxVhostTemplate = String(annotation[environmentAnnotationKeys.nginxVhostTemplate] || '');
+            const restoreValue = annotation[environmentAnnotationKeys.systemRebootRestore];
+            this.form.environmentSystemRebootRestore = restoreValue === undefined || restoreValue === null || restoreValue === ''
+                ? String(this.form.environmentImageLanguage || '').toLowerCase() != 'php'
+                : String(restoreValue).toLowerCase() == 'true';
         },
         normalizeEnvironmentVersions(value) {
             let values = Array.isArray(value) ? value : String(value || '').split(/[,，\n]/);
@@ -1475,6 +1488,9 @@ export default {
                 .flatMap(item => item.split(/[,，\n]/))
                 .map(item => item.trim())
                 .filter(Boolean))];
+        },
+        changeEnvironmentLanguage(value) {
+            this.form.environmentSystemRebootRestore = String(value || '').toLowerCase() != 'php';
         },
         getEnvironmentAnnotations() {
             let versions = this.normalizeEnvironmentVersions(this.form.environmentImageVersion);
@@ -1485,6 +1501,7 @@ export default {
                 [environmentAnnotationKeys.imageVersion]: versions.join(','),
                 [environmentAnnotationKeys.imageIsShare]: String(Boolean(this.form.environmentImageIsShare)),
                 [environmentAnnotationKeys.nginxVhostTemplate]: String(this.form.environmentNginxVhostTemplate || ''),
+                [environmentAnnotationKeys.systemRebootRestore]: String(Boolean(this.form.environmentSystemRebootRestore)),
             };
         },
         filterAnnotationsForType(annotation = {}, type = this.form.type) {

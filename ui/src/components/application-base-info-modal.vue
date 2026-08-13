@@ -62,7 +62,7 @@
                     <div class="application-property-list">
                         <a-checkbox v-model="form.once" :disabled="isInstallOnlyOnceType">仅安装一次</a-checkbox>
                         <a-checkbox v-model="form.clusterPrivileges">集群特权</a-checkbox>
-                        <a-checkbox v-model="form.registerSite">创建站点</a-checkbox>
+                        <a-checkbox v-model="form.registerSite" :disabled="isRegisterSiteDisabled">创建站点</a-checkbox>
                         <a-checkbox v-model="form.officialApp">官方应用</a-checkbox>
                         <a-checkbox v-model="form.denyDelete">禁止卸载</a-checkbox>
                     </div>
@@ -191,6 +191,9 @@ export default {
         isInstallOnlyOnceType() {
             return ['environment', 'gateway-plugin'].includes(this.applicationType);
         },
+        isRegisterSiteDisabled() {
+            return ['environment', 'gateway-plugin'].includes(this.applicationType);
+        },
         requiredTagName() {
             if (this.applicationType == 'environment') { return '运行环境' }
             if (this.applicationType == 'gateway-plugin') { return '网关插件' }
@@ -242,7 +245,7 @@ export default {
                 this.form.denyDelete = String(annotation[denyDeleteAnnotationKey]).toLowerCase() == 'true';
                 this.form.once = this.isInstallOnlyOnceType ? true : Boolean(baseInfo.once);
                 this.form.clusterPrivileges = Boolean(baseInfo.cluster_privileges);
-                this.form.registerSite = Boolean(baseInfo.register_site);
+                this.form.registerSite = this.isRegisterSiteDisabled ? false : Boolean(baseInfo.register_site);
                 this.iconPreview = this.getIconUrl(latestInfo?.icon_url || this.info?.icon_url || '');
 
                 this.form.introduction = filesRes?.data?.data?.list?.['readme.md'] || '';
@@ -316,7 +319,7 @@ export default {
                         annotation,
                         once: this.isInstallOnlyOnceType ? true : Boolean(this.form.once),
                         cluster_privileges: Boolean(this.form.clusterPrivileges),
-                        register_site: Boolean(this.form.registerSite),
+                        register_site: this.isRegisterSiteDisabled ? false : Boolean(this.form.registerSite),
                     },
                 });
                 await myAxios.post('/respo/share-file/file', {

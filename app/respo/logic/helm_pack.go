@@ -219,10 +219,12 @@ func (hc *HelmPack) PackToHelm() error {
 	}
 
 	if !hc.IsSubFormula {
-		if err := hc.generateMicroAppTemplate(templatesDir, hc.Manifest); err != nil {
-			return err
+		if shouldPackageMicroApp(hc.Manifest) {
+			if err := hc.generateMicroAppTemplate(templatesDir, hc.Manifest); err != nil {
+				return err
+			}
 		}
-		if hc.Manifest.Application.Type != logic2.GatewayPluginApp {
+		if hc.Manifest.Application.Type != logic2.GatewayPluginApp && hc.Manifest.Application.Type != logic2.EnvironmentApp {
 			if err := hc.generateRegisterSiteJobTemplate(templatesDir, hc.Manifest); err != nil {
 				return err
 			}
@@ -1182,6 +1184,18 @@ func (hc *HelmPack) generateGatewayPluginTemplate(rootDir string, renderer gatew
 		"__APPLICATION_VERSION__":     hc.Manifest.Application.Version,
 	})
 	return writeFile(filepath.Join(rootDir, renderer.OutputName()), template)
+}
+
+func shouldPackageMicroApp(manifest logic2.Manifest) bool {
+	if strings.TrimSpace(manifest.Web.Url) != "" {
+		return true
+	}
+	for _, binding := range manifest.Bindings {
+		if len(binding.Menu) > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func (hc *HelmPack) generateMicroAppTemplate(rootDir string, manifest logic2.Manifest) error {

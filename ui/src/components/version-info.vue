@@ -62,7 +62,8 @@
                         @change="changeForm('once')">仅安装一次</a-checkbox>
                     <a-checkbox v-model="edit.clusterPrivileges"
                         @change="changeForm('clusterPrivileges')">集群特权</a-checkbox>
-                    <a-checkbox v-model="edit.registerSite" @change="changeForm('registerSite')">创建站点</a-checkbox>
+                    <a-checkbox v-model="edit.registerSite" :disabled="isRegisterSiteDisabled"
+                        @change="changeForm('registerSite')">创建站点</a-checkbox>
                     <a-checkbox v-model="edit.officialApp" @change="changeForm('officialApp')">官方应用</a-checkbox>
                     <a-checkbox v-model="edit.denyDelete" @change="changeForm('denyDelete')">禁止卸载</a-checkbox>
                 </div>
@@ -190,13 +191,13 @@ export default {
                 this.form.name = this.json.application?.name || '';
                 this.form.description = this.json?.application?.description || '';
                 this.form.clusterPrivileges = this.json?.application?.clusterPrivileges || false;
-                this.form.registerSite = this.json?.application?.registerSite || false;
+                this.form.registerSite = this.isRegisterSiteDisabled ? false : (this.json?.application?.registerSite || false);
                 this.form.officialApp = String(annotation[propertyAnnotationKeys.officialApp]).toLowerCase() == 'true';
                 this.form.denyDelete = String(annotation[propertyAnnotationKeys.denyDelete]).toLowerCase() == 'true';
             }
             this.edit.once = this.isInstallOnlyOnceType ? true : (this.json?.application?.once || false);
             this.edit.clusterPrivileges = this.json?.application?.clusterPrivileges || false;
-            this.edit.registerSite = this.json?.application?.registerSite || false;
+            this.edit.registerSite = this.isRegisterSiteDisabled ? false : (this.json?.application?.registerSite || false);
             this.edit.officialApp = this.form.officialApp;
             this.edit.denyDelete = this.form.denyDelete;
 
@@ -311,6 +312,10 @@ export default {
                 this.edit.once = true;
                 return;
             }
+            if (type == 'registerSite' && this.isRegisterSiteDisabled) {
+                this.edit.registerSite = false;
+                return;
+            }
             if (this.edit[type] == this.form[type]) {
                 this.edit.type = '';
                 return;
@@ -347,7 +352,7 @@ export default {
                     annotation,
                     once: this.isInstallOnlyOnceType ? true : Boolean(this.json?.application?.once),
                     cluster_privileges: Boolean(this.json?.application?.clusterPrivileges),
-                    register_site: Boolean(this.json?.application?.registerSite),
+                    register_site: this.isRegisterSiteDisabled ? false : Boolean(this.json?.application?.registerSite),
                 },
             }).then(() => {
                 messageSuccess('操作成功');
@@ -360,6 +365,9 @@ export default {
             return this.json?.application?.type || '';
         },
         isInstallOnlyOnceType() {
+            return ['environment', 'gateway-plugin'].includes(this.applicationType);
+        },
+        isRegisterSiteDisabled() {
             return ['environment', 'gateway-plugin'].includes(this.applicationType);
         },
         requiredTagName() {

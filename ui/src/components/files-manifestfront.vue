@@ -1970,7 +1970,7 @@ export default {
                 itemObj.menu = menu;
                 this.normalizeBuiltMenuDefault(itemObj.menu, this.hasIncompleteDefaultMenu(r.menu));
 
-                if (itemObj.menu.length > 0 || r.load_mode == 'iframe') {
+                if (itemObj.menu.length > 0 || r.load_mode == 'iframe' || this.form.type == 'environment') {
                     role.push(itemObj);
                 }
             });

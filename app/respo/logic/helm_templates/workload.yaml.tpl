@@ -40,13 +40,16 @@ spec:
     spec:
       {{- $root := . }}
       {{- $rootCtx := $ }}
+      {{- if ne .Values.hostUsers nil }}
+      hostUsers: {{ .Values.hostUsers }}
+      {{- end }}
       {{- $sidecarHostAliases := include "w7panel.sidecars.hostAliases" . }}
       {{- if $sidecarHostAliases }}
       hostAliases:
         {{- $sidecarHostAliases | nindent 8 }}
       {{- end }}
-      {{- if .Values.gpu.enable }}
-      runtimeClassName: {{ .Values.gpu.driver }}
+      {{- if .Values.runtimeClass.enable }}
+      runtimeClassName: {{ .Values.runtimeClass.name }}
       {{- end }}
 
       {{- $podVolumes := .Values.volumes }}
@@ -94,7 +97,7 @@ spec:
       {{- range .Values.containers }}
       {{- if not .isInitContainer }}
         - name: {{ .name }}
-          image: "{{ .image.repository }}:{{ .image.tag }}"
+          image: "{{ .image.repository }}:{{ tpl .image.tag $rootCtx }}"
           imagePullPolicy: {{ .image.pullPolicy }}
           {{- with .command }}
           command: {{- toYaml . | nindent 12 }}
@@ -149,7 +152,7 @@ spec:
         {{- range .Values.containers }}
         {{- if .isInitContainer }}
         - name: {{ .name }}
-          image: "{{ .image.repository }}:{{ .image.tag }}"
+          image: "{{ .image.repository }}:{{ tpl .image.tag $rootCtx }}"
           imagePullPolicy: {{ .image.pullPolicy }}
           {{- with .command }}
           command: {{- toYaml . | nindent 12 }}

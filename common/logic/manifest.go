@@ -15,6 +15,7 @@ const (
 	Help_App         = "helm"
 	GatewayPluginApp = "gateway-plugin"
 	EnvironmentApp   = "environment"
+	SystemImageApp   = "system-image"
 	SidecarApp       = "sidecar"
 
 	GatewayPluginDriverHigressWasmV1 = "higress-wasm/v1"
@@ -102,7 +103,8 @@ type Platform struct {
 	Ingress              []Ingress                  `yaml:"ingress" json:"ingress"`
 	Depends              []Depend                   `yaml:"depends" json:"depends"`
 	StartParams          []StartParams              `yaml:"startParams" json:"startParams"`
-	Gpu                  string                     `yaml:"runtimeClassName" json:"runtimeClassName"`
+	RuntimeClassName     string                     `yaml:"runtimeClassName" json:"runtimeClassName"`
+	HostUsers            *bool                      `yaml:"hostUsers,omitempty" json:"hostUsers,omitempty"`
 	Shells               []Shell                    `yaml:"shells" json:"shells"`
 }
 
@@ -185,23 +187,23 @@ type StartParams struct {
 }
 
 type Container struct {
-	BaseInfo      BaseInfo      `yaml:"baseInfo" json:"baseInfo"`
-	ContainerPort int           `yaml:"containerPort" json:"containerPort"`
-	MinNum        int           `yaml:"minNum" json:"minNum"`
-	MaxNum        int           `yaml:"maxNum" json:"maxNum"`
-	Cpu           int           `yaml:"cpu" json:"cpu"`
-	Mem           int           `yaml:"mem" json:"mem"`
-	Gpu           string        `yaml:"runtimeClassName" json:"runtimeClassName"`
-	Image         string        `yaml:"image" json:"image"`
-	Volumes       []Volumes     `yaml:"volumes" json:"volumes"`
-	StartParams   []StartParams `yaml:"startParams" json:"startParams"`
-	Shells        []Shell       `yaml:"shells" json:"shells"`
-	Build         Build         `yaml:"build" json:"build"`
-	Env           []Env         `yaml:"env" json:"env"`
-	Ports         []Port        `yaml:"ports" json:"ports"`
-	Privileged    bool          `yaml:"privileged" json:"privileged"`
-	Cmd           []string      `yaml:"cmd" json:"cmd"`
-	Hook          struct {
+	BaseInfo         BaseInfo      `yaml:"baseInfo" json:"baseInfo"`
+	ContainerPort    int           `yaml:"containerPort" json:"containerPort"`
+	MinNum           int           `yaml:"minNum" json:"minNum"`
+	MaxNum           int           `yaml:"maxNum" json:"maxNum"`
+	Cpu              int           `yaml:"cpu" json:"cpu"`
+	Mem              int           `yaml:"mem" json:"mem"`
+	RuntimeClassName string        `yaml:"runtimeClassName" json:"runtimeClassName"`
+	Image            string        `yaml:"image" json:"image"`
+	Volumes          []Volumes     `yaml:"volumes" json:"volumes"`
+	StartParams      []StartParams `yaml:"startParams" json:"startParams"`
+	Shells           []Shell       `yaml:"shells" json:"shells"`
+	Build            Build         `yaml:"build" json:"build"`
+	Env              []Env         `yaml:"env" json:"env"`
+	Ports            []Port        `yaml:"ports" json:"ports"`
+	Privileged       bool          `yaml:"privileged" json:"privileged"`
+	Cmd              []string      `yaml:"cmd" json:"cmd"`
+	Hook             struct {
 		RequireInstall string `yaml:"requireInstall" json:"requireInstall"`
 	} `yaml:"hook" json:"hook"`
 	SecurityContext struct {
@@ -397,8 +399,8 @@ func GetManifestV2(manifest Manifest) Manifest {
 	//兼容面板
 	manifest.Platform.Container.StartParams = manifest.Platform.StartParams
 
-	if manifest.Platform.Gpu == "" {
-		manifest.Platform.Gpu = manifest.Platform.Container.Gpu
+	if manifest.Platform.RuntimeClassName == "" {
+		manifest.Platform.RuntimeClassName = manifest.Platform.Container.RuntimeClassName
 	}
 
 	if manifest.Platform.Workload.Type == "" {

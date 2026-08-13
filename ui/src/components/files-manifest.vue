@@ -43,6 +43,7 @@
                                         <a-radio value="tradition">传统应用</a-radio>
                                         <a-radio value="helm">K8sYaml</a-radio>
                                         <a-radio value="environment">运行环境</a-radio>
+                                        <a-radio value="system-image">系统镜像</a-radio>
                                         <a-radio value="gateway-plugin">网关插件</a-radio>
                                     </a-radio-group>
 
@@ -160,12 +161,6 @@
                                                     <span class="c-99 mt-6">每次输入一个语言版本并按回车，可添加多个版本，例如 7.4、8.1。</span>
                                                 </div>
                                             </a-form-item>
-                                            <a-form-item label="是否共享" style="margin-bottom:18px;">
-                                                <div class="df df-c" style="align-items:flex-start;">
-                                                    <a-switch v-model="form.environmentImageIsShare" />
-                                                    <span class="c-99 mt-6">开启后，站点可共享已有环境或新建环境；关闭后，每个站点使用独立环境。共享环境统一使用制品预设的启动配置。</span>
-                                                </div>
-                                            </a-form-item>
                                             <a-form-item label="系统重启还原" style="margin-bottom:18px;">
                                                 <div class="df df-c" style="align-items:flex-start;">
                                                     <a-switch v-model="form.environmentSystemRebootRestore" />
@@ -192,6 +187,44 @@
                                             </a-form-item>
                                         </div>
                                     </a-spin>
+
+                                    <a-alert v-if="form.type == 'system-image'" type="info" show-icon
+                                        class="zpk-primary-alert mt-20 mb-20" title="系统镜像说明"
+                                        :closable="false">
+                                        <div class="registry-alert-item">1. 系统镜像用于创建具备完整系统环境的轻量虚拟机，可以像普通主机一样运行系统服务。</div>
+                                        <div class="registry-alert-item mt-6">2. 底层系统数据会持久保存，实例重启后已安装的软件、系统配置和用户数据不会丢失。</div>
+                                    </a-alert>
+                                    <div v-if="form.type == 'system-image'" class="greybox"
+                                        style="margin-bottom:0;">
+                                        <div class="greybox-title">系统镜像配置</div>
+                                        <a-form-item label="分类" field="systemImageCategory" required
+                                            style="margin-bottom:18px;">
+                                            <a-select v-model="form.systemImageCategory" size="large"
+                                                style="width:500px;" @change="changeForm">
+                                                <a-option value="operating-system">操作系统</a-option>
+                                                <a-option value="site-management">建站管理</a-option>
+                                                <a-option value="enterprise-app">企业应用</a-option>
+                                            </a-select>
+                                        </a-form-item>
+                                        <a-form-item label="镜像地址" field="systemImageTemplate" required
+                                            style="margin-bottom:18px;">
+                                            <div class="df df-c">
+                                                <a-input v-model="form.systemImageTemplate" size="large"
+                                                    style="width:500px;" placeholder="例如 ubuntu:{version}"
+                                                    @change="syncSystemImageConfig" />
+                                                <span class="c-99 mt-6">使用 {version} 作为安装时所选系统版本的占位符。</span>
+                                            </div>
+                                        </a-form-item>
+                                        <a-form-item label="系统版本" field="systemImageVersions" required
+                                            style="margin-bottom:0;">
+                                            <div class="df df-c">
+                                                <a-input-tag v-model="form.systemImageVersions" size="large"
+                                                    style="width:500px;" placeholder="输入版本后按回车，例如 22.04"
+                                                    allow-clear unique-value @change="syncSystemImageConfig" />
+                                                <span class="c-99 mt-6">安装时用户从这里配置的版本中选择，所选版本会替换镜像地址中的 {version}。</span>
+                                            </div>
+                                        </a-form-item>
+                                    </div>
 
                                     <a-form-item v-if="form.type == 'helm'" class="mt-20" style="margin-bottom:10px;"
                                         label="启用helm配置">
@@ -335,7 +368,7 @@
                             </a-form-item>
 
                             <a-form-item
-                                v-if="form.type != 'environment' && form.type != 'gateway-plugin' && (!option || !option.pureManifest && form.type != 'docker' && form.type != 'light' && form.type != 'helm')"
+                                v-if="form.type != 'environment' && form.type != 'system-image' && form.type != 'gateway-plugin' && (!option || !option.pureManifest && form.type != 'docker' && form.type != 'light' && form.type != 'helm')"
                                 label="代码包">
                                 <div class="df ai-e">
                                     <files-upload @success="uploadSuccess" @testDockerfile="v => zip.hasDockerfile = v">
@@ -444,7 +477,7 @@
                         </div>
                     </div>
 
-                    <div v-if="form.type != 'helm' && form.type != 'tradition' && form.type != 'gateway-plugin'" class="bg-white com-line mt-20">
+                    <div v-if="form.type != 'helm' && form.type != 'tradition' && form.type != 'gateway-plugin' && form.type != 'system-image'" class="bg-white com-line mt-20">
                         <div class="mt-16">
                             <a-form-item label="应用配置">
                                 <div v-if="form.containers && form.containers.length">
@@ -454,7 +487,7 @@
                             </a-form-item>
 
 
-                            <a-form-item v-if="form.type != 'helm' && form.type != 'environment'" label="域名设置" class="mt-16">
+                            <a-form-item v-if="form.type != 'helm' && form.type != 'environment' && form.type != 'system-image'" label="域名设置" class="mt-16">
                                 <div v-if="form.ingress && form.ingress.length">
                                     {{ form.ingress.map(item => item.name || '未命名配置').join(', ') }}
                                 </div>
@@ -467,7 +500,7 @@
                     <div class="bg-white com-line mt-20">
                         <a-form-item v-if="form.type != 'gateway-plugin'" class="mt-16" label="启动参数" field="startParams">
                             <div class="manifest-field-stack">
-                                <div class="start-param-head">
+                                <div v-if="form.type != 'system-image'" class="start-param-head">
                                     <div class="start-param-services">
                                         <a-checkbox v-model="form.mysql8">mysql8.0</a-checkbox>
                                         <a-checkbox v-model="form.mysql5">mysql5.6</a-checkbox>
@@ -476,7 +509,8 @@
                                     </div>
                                     <a-button @click="openSpEdit">批量修改</a-button>
                                 </div>
-                                <manifest-config-table class="mt-10" :rows="form.startParams" add-text="添加启动参数"
+                                <manifest-config-table class="mt-10" :rows="form.startParams"
+                                    add-text="添加启动参数"
                                     @add="form.startParams.push({ name: '', title: '', required: true, values_text: '', module_name: '', description: '' })">
                                     <template #columns>
                                         <manifest-config-table-column data-index="name" title="标识">
@@ -515,8 +549,8 @@
                                         </manifest-config-table-column>
                                         <manifest-config-table-column title="操作" width="100px">
                                             <template #cell="{ record, index }">
-                                                <span class="c-blue cursor handle" @click="openSpDesc(record)">编辑描述</span>
-                                                <span class="c-blue cursor handle"
+                                                <span v-if="!isSystemImageFixedStartParam(record)" class="c-blue cursor handle" @click="openSpDesc(record)">编辑描述</span>
+                                                <span v-if="!isSystemImageFixedStartParam(record)" class="c-blue cursor handle"
                                                     @click="form.startParams.splice(index, 1); getStart();">删除</span>
                                             </template>
                                         </manifest-config-table-column>
@@ -784,6 +818,12 @@ const environmentAnnotationKeys = {
     systemRebootRestore: 'w7.cc/system-reboot-restore',
 };
 
+const systemImageAnnotationKeys = {
+    category: 'w7.cc/system_image_category',
+    versions: environmentAnnotationKeys.imageVersion,
+    rootfs: 'sysbox/rootfs-rw-layer',
+};
+
 const gatewayPluginAnnotationPrefix = 'w7.cc/plugin-';
 const gatewayPluginAnnotationKeys = ['w7.cc/official-app'];
 
@@ -948,9 +988,11 @@ export default {
                 environmentImageLanguage: '',
                 environmentImageTemplate: '',
                 environmentImageVersion: [],
-                environmentImageIsShare: false,
                 environmentSystemRebootRestore: true,
                 environmentNginxVhostTemplate: '',
+                systemImageCategory: 'operating-system',
+                systemImageTemplate: '',
+                systemImageVersions: [],
                 startParams: [],
                 dependsIn: [],
                 depends: [],
@@ -1089,6 +1131,23 @@ export default {
                         trigger: 'blur',
                     },
                 ],
+                systemImageCategory: [
+                    { required: true, message: '请选择系统镜像分类', trigger: 'change' },
+                ],
+                systemImageTemplate: [
+                    {
+                        required: true,
+                        trigger: 'blur',
+                        validator: (value, callback) => this.validateSystemImageTemplate(value, callback),
+                    },
+                ],
+                systemImageVersions: [
+                    {
+                        required: true,
+                        trigger: 'change',
+                        validator: (value, callback) => this.validateSystemImageVersions(value, callback),
+                    },
+                ],
             },
             addRules: {
                 identifie: [
@@ -1193,7 +1252,9 @@ export default {
             formulaSettingLoaded: false,
             formulaBaseInfo: null,
             environmentPreviousDepends: null,
+            systemImageDependencyManaged: false,
             initialApplicationType: '',
+            currentApplicationType: '',
             gatewayPluginCategoryOptions,
             nginxTemplatePlaceholders,
             nginxTemplateExample,
@@ -1314,7 +1375,7 @@ export default {
 
         data() {
             this.init(this.data);
-            if (!this.option?.pureManifest && ['environment', 'gateway-plugin'].includes(this.form.type)) {
+            if (!this.option?.pureManifest && ['environment', 'gateway-plugin', 'system-image'].includes(this.form.type)) {
                 this.loadFormulaSetting().catch(() => { });
             }
         },
@@ -1445,6 +1506,92 @@ export default {
             }
             callback();
         },
+        validateSystemImageTemplate(value, callback) {
+            let template = String(value || '').trim();
+            if (!template) { callback('请输入镜像地址'); return; }
+            if (/\s/.test(template)) { callback('镜像地址不能包含空格或换行'); return; }
+            if (!template.includes('{version}')) { callback('镜像地址必须包含 {version} 占位符'); return; }
+            let unsupported = [...new Set(template.match(/\{[^{}]+\}/g) || [])]
+                .filter(item => item != '{version}');
+            if (unsupported.length) {
+                callback('镜像地址包含不支持的占位符：' + unsupported.join('、'));
+                return;
+            }
+            callback();
+        },
+        validateSystemImageVersions(value, callback) {
+            let versions = this.normalizeEnvironmentVersions(value);
+            if (!versions.length) { callback('请输入至少一个系统版本'); return; }
+            let invalid = versions.filter(version => !/^[A-Za-z0-9_][A-Za-z0-9._-]{0,127}$/.test(version));
+            if (invalid.length) { callback('系统版本格式不正确：' + invalid.slice(0, 3).join('、')); return; }
+            callback();
+        },
+        systemImageStartParams() {
+            let versions = this.normalizeEnvironmentVersions(this.form.systemImageVersions);
+            let fixedNames = new Set([
+                'IMAGE_VERSION',
+                'global.cluster.storageRWmode',
+                'global.cluster.storageSize',
+                'global.cluster.storageClassName',
+            ]);
+            let customParams = (this.form.startParams || []).filter(item => !fixedNames.has(item?.name));
+            return [
+                { mark: 'system-image', name: 'IMAGE_VERSION', title: '镜像版本', required: true, values_text: versions.join('|'), module_name: '', description: '选择要安装的镜像版本', type: 'select' },
+                { mark: 'storage', name: 'global.cluster.storageRWmode', title: '读写模式', required: true, values_text: '%STORAGE_RW_MODE%', module_name: '', description: '', type: 'text' },
+                { mark: 'storage', name: 'global.cluster.storageSize', title: '存储大小', required: true, values_text: '%STORAGE_SIZE%', module_name: '', description: '', type: 'text' },
+                { mark: 'storage', name: 'global.cluster.storageClassName', title: '存储类', required: true, values_text: '%STORAGE_CLASS_NAME%', module_name: '', description: '', type: 'text' },
+                ...customParams,
+            ];
+        },
+        syncSystemImageConfig() {
+            if (this.form.type != 'system-image') { return; }
+            this.form.systemImageVersions = this.normalizeEnvironmentVersions(this.form.systemImageVersions);
+            this.form.startParams = this.systemImageStartParams();
+            this.form.storage = true;
+            this.json.platform = this.json.platform || {};
+            this.ensureSystemImageContainer();
+            this.changeForm();
+        },
+        ensureSystemImageContainer() {
+            if (this.form.type != 'system-image') { return; }
+            this.json.platform = this.json.platform || {};
+            delete this.json.platform.container;
+            let containers = this.json.platform['container-v2'] || [];
+            if (!containers.length) {
+                containers.push({
+                    name: (this.form.author && this.form.identifie)
+                        ? `${this.form.author}-${this.form.identifie}` : 'system-image',
+                    image: String(this.form.systemImageTemplate || '').trim(),
+                    imagePullPolicy: 'IfNotPresent',
+                });
+            }
+            containers[0].image = String(this.form.systemImageTemplate || '').trim();
+            this.json.platform['container-v2'] = containers;
+            this.form.containers = containers;
+            this.json.platform.workload = { ...(this.json.platform.workload || {}), type: 'Deployment' };
+            this.containerPluginData.kind = 'Deployment';
+            this.json.platform.runtimeClassName = 'sysbox-runc';
+            this.json.platform.hostUsers = false;
+            this.json.platform.volumes = [{
+                name: 'system-rootfs',
+                persistentVolumeClaim: { claimName: '' },
+            }];
+            containers[0].volumeMounts = [{
+                name: 'system-rootfs',
+                mountPath: '/system-rootfs',
+            }];
+            let containerName = String(containers[0].name || '').replaceAll('_', '-');
+            this.json.application = this.json.application || {};
+            this.json.application.annotation = {
+                ...(this.json.application.annotation || {}),
+                'sysbox/rootfs-rw-layer': JSON.stringify([{
+                    name: containerName,
+                    volumeName: 'system-rootfs',
+                    path: `www/server/${containerName}/system`,
+                    persistentSpecialMounts: true,
+                }]),
+            };
+        },
         loadFormulaSetting() {
             if (this.option?.pureManifest || !this.identifie) {
                 return Promise.resolve(null);
@@ -1466,6 +1613,7 @@ export default {
                 }
                 this.formulaBaseInfo = JSON.parse(JSON.stringify(baseInfo));
                 this.applyEnvironmentAnnotationForm(baseInfo.annotation || {});
+                this.applySystemImageAnnotationForm(baseInfo.annotation || {});
                 if (['environment', 'gateway-plugin'].includes(this.form.type)) {
                     this.form.once = true;
                 }
@@ -1481,12 +1629,15 @@ export default {
             this.form.environmentImageLanguage = String(annotation[environmentAnnotationKeys.imageLanguage] || '');
             this.form.environmentImageTemplate = String(annotation[environmentAnnotationKeys.imageTemplate] || '');
             this.form.environmentImageVersion = this.normalizeEnvironmentVersions(annotation[environmentAnnotationKeys.imageVersion]);
-            this.form.environmentImageIsShare = String(annotation[environmentAnnotationKeys.imageIsShare]).toLowerCase() == 'true';
             this.form.environmentNginxVhostTemplate = String(annotation[environmentAnnotationKeys.nginxVhostTemplate] || '');
             const restoreValue = annotation[environmentAnnotationKeys.systemRebootRestore];
             this.form.environmentSystemRebootRestore = restoreValue === undefined || restoreValue === null || restoreValue === ''
                 ? String(this.form.environmentImageLanguage || '').toLowerCase() != 'php'
                 : String(restoreValue).toLowerCase() == 'true';
+        },
+        applySystemImageAnnotationForm(annotation = {}) {
+            this.form.systemImageCategory = String(annotation[systemImageAnnotationKeys.category] || 'operating-system');
+            this.form.systemImageVersions = this.normalizeEnvironmentVersions(annotation[systemImageAnnotationKeys.versions]);
         },
         normalizeEnvironmentVersions(value) {
             let values = Array.isArray(value) ? value : String(value || '').split(/[,，\n]/);
@@ -1506,28 +1657,101 @@ export default {
                 [environmentAnnotationKeys.imageLanguage]: String(this.form.environmentImageLanguage || '').trim(),
                 [environmentAnnotationKeys.imageTemplate]: String(this.form.environmentImageTemplate || '').trim(),
                 [environmentAnnotationKeys.imageVersion]: versions.join(','),
-                [environmentAnnotationKeys.imageIsShare]: String(Boolean(this.form.environmentImageIsShare)),
                 [environmentAnnotationKeys.nginxVhostTemplate]: String(this.form.environmentNginxVhostTemplate || ''),
                 [environmentAnnotationKeys.systemRebootRestore]: String(Boolean(this.form.environmentSystemRebootRestore)),
             };
         },
         filterAnnotationsForType(annotation = {}, type = this.form.type) {
             let filtered = { ...(annotation || {}) };
-            if (type != 'environment') {
+            if (type != 'environment' && type != 'system-image') {
                 Object.values(environmentAnnotationKeys).forEach(key => delete filtered[key]);
+            } else if (type == 'system-image') {
+                Object.values(environmentAnnotationKeys)
+                    .filter(key => key != environmentAnnotationKeys.imageVersion)
+                    .forEach(key => delete filtered[key]);
             }
             Object.keys(filtered)
-                .filter(key => key.startsWith(gatewayPluginAnnotationPrefix)
-                    || (type != 'gateway-plugin' && gatewayPluginAnnotationKeys.includes(key)))
+                .filter(key => type != 'gateway-plugin'
+                    && (key.startsWith(gatewayPluginAnnotationPrefix)
+                        || gatewayPluginAnnotationKeys.includes(key)))
                 .forEach(key => delete filtered[key]);
             if (type == 'environment') {
                 Object.assign(filtered, this.getEnvironmentAnnotations());
             }
+            if (type != 'system-image') {
+                Object.values(systemImageAnnotationKeys)
+                    .filter(key => type != 'environment' || key != environmentAnnotationKeys.imageVersion)
+                    .forEach(key => delete filtered[key]);
+            } else {
+                let versions = this.normalizeEnvironmentVersions(this.form.systemImageVersions);
+                Object.assign(filtered, {
+                    [systemImageAnnotationKeys.category]: this.form.systemImageCategory || 'operating-system',
+                    [systemImageAnnotationKeys.versions]: versions.join(','),
+                });
+            }
             return filtered;
         },
+        cleanupTypeSpecificManifest(previousType, nextType) {
+            this.json.application = this.json.application || {};
+            this.json.platform = this.json.platform || {};
+            this.json.application.annotation = this.filterAnnotationsForType(
+                this.json.application.annotation || {},
+                nextType,
+            );
+
+            if (previousType == 'system-image' && nextType != 'system-image') {
+                const fixedNames = new Set([
+                    'IMAGE_VERSION',
+                    'global.cluster.storageRWmode',
+                    'global.cluster.storageSize',
+                    'global.cluster.storageClassName',
+                ]);
+                this.form.startParams = (this.form.startParams || [])
+                    .filter(item => !fixedNames.has(item?.name));
+                this.json.platform.startParams = this.serializeStartParams();
+                delete this.json.platform.hostUsers;
+                if (this.json.platform.runtimeClassName == 'sysbox-runc') {
+                    delete this.json.platform.runtimeClassName;
+                }
+                this.json.platform.volumes = (this.json.platform.volumes || [])
+                    .filter(item => item?.name != 'system-rootfs');
+                if (!this.json.platform.volumes.length) {
+                    delete this.json.platform.volumes;
+                }
+                (this.json.platform['container-v2'] || []).forEach(container => {
+                    container.volumeMounts = (container.volumeMounts || [])
+                        .filter(item => item?.name != 'system-rootfs');
+                    if (!container.volumeMounts.length) {
+                        delete container.volumeMounts;
+                    }
+                });
+                delete this.json.platform['container-v2'];
+                this.form.containers = [];
+            }
+            if (previousType != 'system-image' && nextType == 'system-image') {
+                delete this.json.source;
+                delete this.json.web;
+                delete this.json.platform.ingress;
+                delete this.json.platform.volumeClaimTemplates;
+                delete this.json.platform.container;
+                this.json.platform['container-v2'] = [];
+                this.form.containers = [];
+                this.form.ingress = [];
+                this.form.domain = false;
+            }
+            if (previousType == 'tradition' && nextType != 'tradition') {
+                delete this.json.platform.tradition;
+            }
+            if (previousType == 'helm' && nextType != 'helm') {
+                delete this.json.platform.helm;
+            }
+            if (previousType == 'gateway-plugin' && nextType != 'gateway-plugin') {
+                delete this.json.platform.gatewayPlugin;
+            }
+        },
         shouldSaveFormulaTypeSetting() {
-            if (['environment', 'gateway-plugin'].includes(this.form.type)) { return true }
-            return ['environment', 'gateway-plugin'].includes(this.initialApplicationType)
+            if (['environment', 'gateway-plugin', 'system-image'].includes(this.form.type)) { return true }
+            return ['environment', 'gateway-plugin', 'system-image'].includes(this.initialApplicationType)
                 && this.form.type != this.initialApplicationType;
         },
         async saveFormulaTypeSetting() {
@@ -1569,7 +1793,8 @@ export default {
             })));
         },
         isEnvironmentFixedDependency(record) {
-            return this.form.type == 'environment' && record?.identifie == 'w7-sitemanager';
+            return (this.form.type == 'environment' && record?.identifie == 'w7-sitemanager')
+                || (this.form.type == 'system-image' && record?.identifie == 'w7panel-sysbox');
         },
         syncEnvironmentDependency() {
             if (this.form.type != 'environment') {
@@ -1583,8 +1808,12 @@ export default {
             }
             if (this.environmentPreviousDepends === null) {
                 let depends = JSON.parse(JSON.stringify(this.form.depends || []));
+                if (this.systemImageDependencyManaged) {
+                    depends = depends.filter(item => item?.identifie != 'w7panel-sysbox');
+                    this.systemImageDependencyManaged = false;
+                }
                 this.environmentPreviousDepends = this._initializing
-                    ? depends.filter(item => item?.identifie != 'w7-sitemanager')
+                    ? depends.filter(item => !['w7-sitemanager', 'w7panel-sysbox'].includes(item?.identifie))
                     : depends;
             }
             this.form.once = true;
@@ -1597,6 +1826,40 @@ export default {
                 type: 'out',
                 from: 'https://zpk.w7.cc',
             }];
+        },
+        syncSystemImageDependency() {
+            let depends = Array.isArray(this.form.depends) ? this.form.depends : [];
+            if (this.form.type != 'system-image') {
+                if (this.systemImageDependencyManaged) {
+                    this.form.depends = depends.filter(item => item?.identifie != 'w7panel-sysbox');
+                    this.systemImageDependencyManaged = false;
+                }
+                return;
+            }
+
+            this.systemImageDependencyManaged = true;
+            let dependency = {
+                identifie: 'w7panel-sysbox',
+                name: '微擎sysbox',
+                subidentifie: '',
+                subname: '',
+                required: true,
+                type: 'out',
+                from: 'https://zpk.w7.cc',
+            };
+            let inserted = false;
+            this.form.depends = depends.reduce((result, item) => {
+                if (item?.identifie != dependency.identifie) {
+                    result.push(item);
+                } else if (!inserted) {
+                    result.push({ ...item, ...dependency });
+                    inserted = true;
+                }
+                return result;
+            }, []);
+            if (!inserted) {
+                this.form.depends.unshift(dependency);
+            }
         },
         filterAutocompleteOptions(list = [], keyword = '') {
             let normalizedKeyword = String(keyword || '').toLowerCase();
@@ -1688,8 +1951,17 @@ export default {
             return item?.mark === 'domain'
                 || (item?.name === 'DOMAIN_URL' && ['%DOMAIN_URL%', '%DOMAIN_SSL_URL%'].includes(item?.values_text));
         },
+        isSystemImageFixedStartParam(item) {
+            return this.form.type == 'system-image' && [
+                'IMAGE_VERSION',
+                'global.cluster.storageRWmode',
+                'global.cluster.storageSize',
+                'global.cluster.storageClassName',
+            ].includes(item?.name);
+        },
         computedSpDisabled(item) {
-            return ((this.disabledDomainStartParams || this.form.type == 'tradition') && this.isDomainStartParam(item))
+            return this.isSystemImageFixedStartParam(item)
+                || ((this.disabledDomainStartParams || this.form.type == 'tradition') && this.isDomainStartParam(item))
                 || (this.json?.platform?.['volumeClaimTemplates']?.length && item.mark === 'storage')
         },
         serializeStartParams() {
@@ -1748,7 +2020,9 @@ export default {
                 this.form.storage = Boolean(data?.volumeClaimTemplates?.length);
 
 
-                this.json.platform.runtimeClassName = data?.pluginData?.gpu ? 'nvidia' : '';
+                this.json.platform.runtimeClassName = this.form.type == 'system-image'
+                    ? 'sysbox-runc'
+                    : (data?.pluginData?.gpu ? 'nvidia' : '');
 
                 this.json.platform.workload = this.json?.platform?.workload || {};
                 this.json.platform.workload.type = data?.pluginData?.kind || 'deployments';
@@ -2387,6 +2661,7 @@ platform:
                 this.form.type = j.application.type === 'front' ? 'docker' : (j.application.type || 'docker');
             }
             this.initialApplicationType = this.form.type;
+            this.currentApplicationType = this.form.type;
             for (let i in j.bindings) {
                 let o = j.bindings[i];
                 if (!o?.menu?.length) {
@@ -2423,6 +2698,8 @@ platform:
             this.form.gatewayPluginSupportRule = gatewayPluginSupports.rule === true;
             this.form.gatewayPluginDefaultEnabled = gatewayPlugin.defaultEnabled !== false;
             this.form.gatewayPluginDefaultConfig = JSON.stringify(gatewayPlugin.defaultConfig || {}, null, 2);
+            this.applySystemImageAnnotationForm(j?.application?.annotation || {});
+            this.form.systemImageTemplate = j?.platform?.['container-v2']?.[0]?.image || '';
 
             if (!this.option?.pureManifest && this.form.type != 'gateway-plugin') {
                 this.form.name = j?.platform?.baseInfo?.name || '';
@@ -2462,6 +2739,12 @@ platform:
 
                 let startParams = j?.platform?.startParams;
                 this.form.startParams = JSON.parse(JSON.stringify(startParams?.length ? startParams : []));
+
+                if (this.form.type == 'system-image') {
+                    this.form.startParams = this.systemImageStartParams();
+                    this.form.storage = true;
+                    this.ensureSystemImageContainer();
+                }
 
                 if (this.form.startParams?.length) {
                     this.form.startParams.forEach((i, index) => {
@@ -2534,6 +2817,7 @@ platform:
             }
             this.environmentPreviousDepends = null;
             this.syncEnvironmentDependency();
+            this.syncSystemImageDependency();
             this._initializing = false;
         },
         getPanelData() {
@@ -2594,6 +2878,7 @@ platform:
 
                 try {
                     this.syncEnvironmentDependency();
+                    this.syncSystemImageDependency();
                     await this.saveFormulaTypeSetting();
                     await this.ensureDefaultTypeTags();
                     this.changeForm();
@@ -2637,6 +2922,9 @@ platform:
                 }
 
                 if (this.form.type != 'gateway-plugin') {
+                    if (this.form.type == 'system-image') {
+                        this.ensureSystemImageContainer();
+                    }
                     this.json.platform.startParams = this.serializeStartParams();
                 }
                 this.yaml = jsyaml.dump(this.json);
@@ -2644,11 +2932,39 @@ platform:
                 this.$emit('complete', this.json, this.yaml, otherData, callback);
             });
         },
-        changeFormtype() {
+        changeFormtype(nextType) {
+            const previousType = this.currentApplicationType || this.initialApplicationType;
+            if (!nextType || nextType == previousType) { return }
+            const typeNames = {
+                docker: '原生应用',
+                tradition: '传统应用',
+                helm: 'K8sYaml',
+                environment: '运行环境',
+                'system-image': '系统镜像',
+                'gateway-plugin': '网关插件',
+            };
+            this.form.type = previousType;
+            confirm({
+                title: '切换应用类型',
+                content: `切换为“${typeNames[nextType] || nextType}”后，当前类型的专属配置将被清理，且无法通过再次切换恢复。是否继续？`,
+                confirmButtonText: '继续切换',
+                cancelButtonText: '取消',
+                onOk: () => this.applyFormTypeChange(previousType, nextType),
+            });
+        },
+        applyFormTypeChange(previousType, nextType) {
+            this.form.type = nextType;
+            this.cleanupTypeSpecificManifest(previousType, nextType);
+            this.json.application = this.json.application || {};
+            this.json.application.annotation = this.filterAnnotationsForType(
+                this.json.application.annotation || {},
+                nextType,
+            );
+            this.currentApplicationType = nextType;
             if (['environment', 'gateway-plugin'].includes(this.form.type)) {
                 this.form.once = true;
             }
-            if (['environment', 'gateway-plugin'].includes(this.form.type)) {
+            if (['environment', 'gateway-plugin', 'system-image'].includes(this.form.type)) {
                 this.loadFormulaSetting().catch(() => { });
             }
             if (this.form.type !== 'light' && this.zip.url) {
@@ -2679,7 +2995,11 @@ platform:
 
                 if (this.json.web) { delete this.json.web; }
             }
+            if (this.form.type == 'system-image') {
+                this.syncSystemImageConfig();
+            }
             this.syncEnvironmentDependency();
+            this.syncSystemImageDependency();
 
             this.changeForm();
         },
@@ -2750,6 +3070,17 @@ platform:
                 if (j.platform) { delete j.platform.gatewayPlugin; }
             }
             j.platform = j.platform || {};
+
+            if (this.form.type == 'system-image') {
+                this.form.systemImageVersions = this.normalizeEnvironmentVersions(this.form.systemImageVersions);
+                this.form.startParams = this.systemImageStartParams();
+                this.ensureSystemImageContainer();
+            } else {
+                delete j.platform.hostUsers;
+                if (j.platform.runtimeClassName == 'sysbox-runc') {
+                    delete j.platform.runtimeClassName;
+                }
+            }
 
             if (this.form.type == 'tradition') {
                 let environmentLanguage = j.platform?.tradition?.environmentLanguage || '';

@@ -364,6 +364,11 @@
                                         </div>
                                     </files-upload>
                                     <div class="c-blue cursor ml-20" @click="deleteUpload">删除</div>
+                                    <a-tooltip v-if="form.type == 'tradition'"
+                                        content="压缩包根目录就是应用代码目录，请进入代码目录后压缩，不要把外层项目目录一起压入。例如：cd 项目目录 && zip -r app.zip .。安装后解压到 /www/wwwroot/&lt;站点域名&gt;。"
+                                        position="top">
+                                        <icon-exclamation-circle-fill class="fs-16 c-99 ml-4" />
+                                    </a-tooltip>
                                 </div>
                                 <div v-if="zip.hasDockerfile === false" class="c-red mt-10">没有检测到Dockerfile文件，请重新上传
                                 </div>

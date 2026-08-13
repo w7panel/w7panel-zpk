@@ -37,6 +37,17 @@
                         <div class="manifest-front-panel-body">
                             <div class="roles-box">
                                 <a-form-item label="前端包上传">
+                                    <template #label>
+                                        <div class="df ai-c">
+                                            前端包上传
+                                            <a-tooltip position="tl"
+                                                :content="form.type == 'environment'
+                                                    ? '压缩包根目录就是前端构建产物目录，请进入构建产物目录后压缩，不要把外层目录一起压入。例如：cd dist && zip -r frontend.zip .。环境应用的菜单配置可以不设置。'
+                                                    : '压缩包根目录就是前端构建产物目录，请进入构建产物目录后压缩，不要把外层目录一起压入。例如：cd dist && zip -r frontend.zip .'">
+                                                <ArcoIcon name="icon-41" :size="16" />
+                                            </a-tooltip>
+                                        </div>
+                                    </template>
                                     <div class="manifest-front-upload-section">
                                         <files-upload @success="webUploadSuccess">
                                             <div v-if="web.name" class="upfilebox df df-c ai-c jc-c">

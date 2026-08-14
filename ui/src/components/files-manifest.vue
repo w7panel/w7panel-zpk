@@ -1552,6 +1552,19 @@ export default {
             this.ensureSystemImageContainer();
             this.changeForm();
         },
+        getSystemImageRootfsAnnotation() {
+            let containerName = this.json?.platform?.['container-v2']?.[0]?.name
+                || ((this.form.author && this.form.identifie)
+                    ? `${this.form.author}-${this.form.identifie}`
+                    : 'system-image');
+            containerName = String(containerName).replaceAll('_', '-');
+            return JSON.stringify([{
+                name: containerName,
+                volumeName: 'system-rootfs',
+                path: `${containerName}/system`,
+                persistentSpecialMounts: true,
+            }]);
+        },
         ensureSystemImageContainer() {
             if (this.form.type != 'system-image') { return; }
             this.json.platform = this.json.platform || {};
@@ -1582,16 +1595,10 @@ export default {
                 name: 'system-rootfs',
                 mountPath: '/system-rootfs',
             }];
-            let containerName = String(containers[0].name || '').replaceAll('_', '-');
             this.json.application = this.json.application || {};
             this.json.application.annotation = {
                 ...(this.json.application.annotation || {}),
-                'sysbox/rootfs-rw-layer': JSON.stringify([{
-                    name: containerName,
-                    volumeName: 'system-rootfs',
-                    path: `${containerName}/system`,
-                    persistentSpecialMounts: true,
-                }]),
+                [systemImageAnnotationKeys.rootfs]: this.getSystemImageRootfsAnnotation(),
             };
         },
         loadFormulaSetting() {
@@ -1689,6 +1696,7 @@ export default {
                 Object.assign(filtered, {
                     [systemImageAnnotationKeys.category]: this.form.systemImageCategory || 'operating-system',
                     [systemImageAnnotationKeys.versions]: versions.join(','),
+                    [systemImageAnnotationKeys.rootfs]: this.getSystemImageRootfsAnnotation(),
                 });
             }
             return filtered;

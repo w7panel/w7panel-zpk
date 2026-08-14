@@ -126,10 +126,24 @@ func (l Session) injectRequestToken(ctx *gin.Context, token string) {
 	if token == "" {
 		return
 	}
-	ctx.Request.AddCookie(&http.Cookie{
+	replaceRequestCookie(ctx.Request, &http.Cookie{
 		Name:  l.SessionName(),
 		Value: token,
 	})
+}
+
+// replaceRequestCookie ensures Request.Cookie returns the supplied value even
+// when the client sent an older cookie with the same name.
+func replaceRequestCookie(request *http.Request, replacement *http.Cookie) {
+	cookies := request.Cookies()
+	request.Header.Del("Cookie")
+	for _, cookie := range cookies {
+		if cookie.Name == replacement.Name {
+			continue
+		}
+		request.AddCookie(cookie)
+	}
+	request.AddCookie(replacement)
 }
 
 func (l Session) SessionName() string {

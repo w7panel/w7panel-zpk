@@ -1,4 +1,7 @@
-const ZPK_ORIGIN = 'https://zpk.w7.cc';
+const OFFICIAL_ZPK_ORIGINS = new Set([
+    'https://zpk.w7.cc',
+    'https://api.zm.w7.com',
+]);
 const ZPK_AUTH_HEADERS = ['X-Zpk-Token', 'X-W7Panel-Token'];
 
 function getRequestUrl(config = {}) {
@@ -16,7 +19,7 @@ function getRequestUrl(config = {}) {
 
 export function isOfficialZpkRequest(config = {}) {
     try {
-        return new URL(getRequestUrl(config), window.location.origin).origin === ZPK_ORIGIN;
+        return OFFICIAL_ZPK_ORIGINS.has(new URL(getRequestUrl(config), window.location.origin).origin);
     } catch {
         return false;
     }

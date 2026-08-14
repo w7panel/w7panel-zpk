@@ -2,9 +2,13 @@
 openssl genpkey -algorithm RSA -out registry-key.pem -pkeyopt rsa_keygen_bits:4096
 openssl req -new -x509 -key registry-key.pem -out registry-cert.pem -days 365 -subj "/CN=registry.w7.com"
 
-## 制品市场服务入口
+## 制品市场菜单
 
-制品存在商品订单时，仓库信息接口会返回 `external_services`，供面板安装后写入 AppGroup 并展示“授权与续费”入口。
+制品存在商品订单菜单时，仓库 `info` 接口会基于当前 Helm 包状态和 Bindings 内容生成缓存键，覆盖包内 MicroApp 的 `name: market` 菜单及独立的外部 iframe `backend_config`。没有市场 Binding 时直接返回原 Helm 包地址，不解包或重打；相同基础包和 Bindings 复用已有动态包，内容变化时才重新生成。动态包与 `PackFormulaToHelmAndPack` 产物位于同一目录，文件名格式为 `{原文件名去扩展名}-{hash}.tgz`，空闲 24 小时后清理。
+
+`market` 菜单默认只对 `founder` 显示，使用现有 MicroApp 字段，不新增 `external_services`、`roles`、`icon` 或 `key` 协议字段。
+
+市场域名只写入 `backend_config[role=zpk-market].backend_url`，菜单 `do` 仅写入 `#/user-orders?...` 路由；应用详情页通过 Binding 名称选择同名运行配置。
 
 市场前端地址通过环境变量 `DEPOT_MARKET_FRONTEND_URL` 配置，默认值为 `https://zm.w7.com`。
 

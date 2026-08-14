@@ -26,9 +26,15 @@
                         show-word-limit :auto-size="{ minRows: 2, maxRows: 5 }" />
                 </a-form-item>
                 <a-form-item label="标签">
-                    <a-select v-model="form.tagIds" multiple allow-search placeholder="请选择标签">
-                        <a-option v-for="item in tags" :key="item.id" :value="item.id" :label="item.name" />
-                    </a-select>
+                    <div class="application-tag-field">
+                        <a-tag v-if="requiredTagName" color="blue" class="application-required-tag">
+                            {{ requiredTagName }}
+                        </a-tag>
+                        <a-select v-model="form.tagIds" multiple allow-search placeholder="请选择标签" style="flex:1;">
+                            <a-option v-for="item in editableTags" :key="item.id" :value="item.id"
+                                :label="item.name" />
+                        </a-select>
+                    </div>
                 </a-form-item>
                 <a-form-item label="注解" class="application-annotation-item">
                     <manifest-config-table :rows="form.annotations" add-text="添加注解"
@@ -54,9 +60,11 @@
                 </a-form-item>
                 <a-form-item label="属性">
                     <div class="application-property-list">
-                        <a-checkbox v-model="form.once">仅安装一次</a-checkbox>
+                        <a-checkbox v-model="form.once" :disabled="isInstallOnlyOnceType">仅安装一次</a-checkbox>
                         <a-checkbox v-model="form.clusterPrivileges">集群特权</a-checkbox>
-                        <a-checkbox v-model="form.registerSite">创建站点</a-checkbox>
+                        <a-checkbox v-model="form.registerSite" :disabled="isRegisterSiteDisabled">创建站点</a-checkbox>
+                        <a-checkbox v-model="form.officialApp">官方应用</a-checkbox>
+                        <a-checkbox v-model="form.denyDelete">禁止卸载</a-checkbox>
                     </div>
                 </a-form-item>
                 <a-form-item label="应用介绍" class="application-introduction-item">
@@ -77,9 +85,14 @@
 
 <script>
 import myAxios from '@/utils';
+import jsyaml from 'js-yaml';
 import ManifestConfigTable from '@/components/manifest-config-table.vue';
 import ManifestConfigTableColumn from '@/components/manifest-config-table-column.vue';
 import { messageError, messageSuccess } from '@/utils/ui-feedback';
+
+const officialAppAnnotationKey = 'w7.cc/official-app';
+const denyDeleteAnnotationKey = 'w7.cc/deny-delete';
+const baseInfoPropertyAnnotationKeys = [officialAppAnnotationKey, denyDeleteAnnotationKey];
 
 export default {
     name: 'ApplicationBaseInfoModal',
@@ -116,6 +129,7 @@ export default {
             iconPreview: '',
             tags: [],
             initialTagIds: [],
+            applicationType: '',
             form: {
                 name: '',
                 description: '',
@@ -125,6 +139,8 @@ export default {
                 once: false,
                 clusterPrivileges: false,
                 registerSite: false,
+                officialApp: false,
+                denyDelete: false,
             },
             editorToolbars: {
                 bold: true,
@@ -171,7 +187,30 @@ export default {
     beforeUnmount() {
         this.resetSelectedIcon();
     },
+    computed: {
+        isInstallOnlyOnceType() {
+            return ['environment', 'gateway-plugin'].includes(this.applicationType);
+        },
+        isRegisterSiteDisabled() {
+            return ['environment', 'gateway-plugin'].includes(this.applicationType);
+        },
+        requiredTagName() {
+            if (this.applicationType == 'environment') { return '运行环境' }
+            if (this.applicationType == 'gateway-plugin') { return '网关插件' }
+            return '';
+        },
+        editableTags() {
+            return this.tags.filter(item => item.name != this.requiredTagName);
+        },
+    },
     methods: {
+        getApplicationType(info = {}) {
+            try {
+                return jsyaml.load(info?.manifest || '')?.application?.type || '';
+            } catch {
+                return '';
+            }
+        },
         getIconUrl(icon = '') {
             if (!icon) { return '' }
             let url = /^https?:\/\//.test(icon)
@@ -195,18 +234,25 @@ export default {
                 ]);
                 let latestInfo = infoRes?.data?.data || this.info || {};
                 let baseInfo = settingRes?.data?.data?.base_info || {};
+                this.applicationType = this.getApplicationType(latestInfo);
                 this.form.name = baseInfo.name || '';
                 this.form.description = baseInfo.description || '';
-                this.form.annotations = Object.entries(baseInfo.annotation || {})
+                let annotation = baseInfo.annotation || {};
+                this.form.annotations = Object.entries(annotation)
+                    .filter(([key]) => !baseInfoPropertyAnnotationKeys.includes(key))
                     .map(([key, value]) => ({ key, value: String(value) }));
-                this.form.once = Boolean(baseInfo.once);
+                this.form.officialApp = String(annotation[officialAppAnnotationKey]).toLowerCase() == 'true';
+                this.form.denyDelete = String(annotation[denyDeleteAnnotationKey]).toLowerCase() == 'true';
+                this.form.once = this.isInstallOnlyOnceType ? true : Boolean(baseInfo.once);
                 this.form.clusterPrivileges = Boolean(baseInfo.cluster_privileges);
-                this.form.registerSite = Boolean(baseInfo.register_site);
+                this.form.registerSite = this.isRegisterSiteDisabled ? false : Boolean(baseInfo.register_site);
                 this.iconPreview = this.getIconUrl(latestInfo?.icon_url || this.info?.icon_url || '');
 
                 this.form.introduction = filesRes?.data?.data?.list?.['readme.md'] || '';
                 this.tags = tagsRes?.data?.data?.list || [];
-                this.initialTagIds = (latestInfo?.tags || this.info?.tags || []).map(item => Number(item.id));
+                this.initialTagIds = (latestInfo?.tags || this.info?.tags || [])
+                    .filter(item => item.name != this.requiredTagName)
+                    .map(item => Number(item.id));
                 this.form.tagIds = [...this.initialTagIds];
             } catch (error) {
                 this.loadFailed = true;
@@ -258,6 +304,12 @@ export default {
                     }
                     return result;
                 }, {});
+                if (this.form.officialApp) {
+                    annotation[officialAppAnnotationKey] = 'true';
+                }
+                if (this.form.denyDelete) {
+                    annotation[denyDeleteAnnotationKey] = 'true';
+                }
 
                 await myAxios.post('/respo/setting/set', {
                     identifie: this.identifie,
@@ -265,9 +317,9 @@ export default {
                         name,
                         description: this.form.description || '',
                         annotation,
-                        once: Boolean(this.form.once),
+                        once: this.isInstallOnlyOnceType ? true : Boolean(this.form.once),
                         cluster_privileges: Boolean(this.form.clusterPrivileges),
-                        register_site: Boolean(this.form.registerSite),
+                        register_site: this.isRegisterSiteDisabled ? false : Boolean(this.form.registerSite),
                     },
                 });
                 await myAxios.post('/respo/share-file/file', {
@@ -280,6 +332,12 @@ export default {
                 let deletedTagIds = this.initialTagIds.filter(id => !nextTagIds.includes(id));
                 let addedTagIds = nextTagIds.filter(id => !this.initialTagIds.includes(id));
                 let formulaId = latestInfo?.version?.formula_id || this.info?.version?.formula_id;
+                if (this.requiredTagName) {
+                    await myAxios.post('/respo/tag/add', {
+                        identifie: this.identifie,
+                        name: this.requiredTagName,
+                    });
+                }
                 for (let tagId of deletedTagIds) {
                     await myAxios.post('/respo/tag/delete', { tagId, formulaId });
                 }
@@ -380,6 +438,21 @@ export default {
 
 .application-annotation-item :deep(.arco-form-item-content-flex) {
     display: block;
+}
+
+.application-tag-field {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+}
+
+.application-tag-field :deep(.arco-select-view) {
+    flex: 1;
+}
+
+.application-required-tag {
+    flex: 0 0 auto;
 }
 
 .application-property-list {

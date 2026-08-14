@@ -3,7 +3,6 @@ package logic
 import (
 	"errors"
 	"fmt"
-	"strconv"
 	"strings"
 
 	commonlogic "github.com/w7panel/w7panel-zpk/common/logic"
@@ -35,11 +34,11 @@ func getGatewayPluginRenderer(plugin commonlogic.GatewayPlugin) (gatewayPluginRe
 type higressWasmV1Renderer struct{}
 
 func (higressWasmV1Renderer) Validate(plugin commonlogic.GatewayPlugin) error {
-	url := runtimeString(plugin.Runtime.Config, "url")
+	url := plugin.Runtime.Config.URL
 	if strings.TrimSpace(url) == "" {
 		return errors.New("Higress Wasm 插件镜像地址不能为空")
 	}
-	phase := runtimeString(plugin.Runtime.Config, "phase")
+	phase := plugin.Runtime.Config.Phase
 	if phase == "" {
 		phase = "UNSPECIFIED_PHASE"
 	}
@@ -52,7 +51,7 @@ func (higressWasmV1Renderer) Validate(plugin commonlogic.GatewayPlugin) error {
 	if _, ok := validPhases[phase]; !ok {
 		return fmt.Errorf("不支持的 Higress Wasm 插件执行阶段: %s", phase)
 	}
-	priority := runtimeInt(plugin.Runtime.Config, "priority")
+	priority := plugin.Runtime.Config.Priority
 	if priority < 0 || priority > 1000 {
 		return errors.New("Higress Wasm 插件优先级必须在 0 到 1000 之间")
 	}
@@ -60,14 +59,14 @@ func (higressWasmV1Renderer) Validate(plugin commonlogic.GatewayPlugin) error {
 }
 
 func (higressWasmV1Renderer) RuntimeValues(plugin commonlogic.GatewayPlugin) map[string]interface{} {
-	phase := runtimeString(plugin.Runtime.Config, "phase")
+	phase := plugin.Runtime.Config.Phase
 	if phase == "" {
 		phase = "UNSPECIFIED_PHASE"
 	}
 	return map[string]interface{}{
-		"url":      runtimeString(plugin.Runtime.Config, "url"),
+		"url":      plugin.Runtime.Config.URL,
 		"phase":    phase,
-		"priority": runtimeInt(plugin.Runtime.Config, "priority"),
+		"priority": plugin.Runtime.Config.Priority,
 	}
 }
 
@@ -77,39 +76,4 @@ func (higressWasmV1Renderer) TemplateName() string {
 
 func (higressWasmV1Renderer) OutputName() string {
 	return "higress-gateway-plugin.yaml"
-}
-
-func runtimeString(config map[string]interface{}, key string) string {
-	value, ok := config[key]
-	if !ok || value == nil {
-		return ""
-	}
-	if result, ok := value.(string); ok {
-		return result
-	}
-	return fmt.Sprint(value)
-}
-
-func runtimeInt(config map[string]interface{}, key string) int {
-	value, ok := config[key]
-	if !ok || value == nil {
-		return 0
-	}
-	switch current := value.(type) {
-	case int:
-		return current
-	case int32:
-		return int(current)
-	case int64:
-		return int(current)
-	case float32:
-		return int(current)
-	case float64:
-		return int(current)
-	case string:
-		result, _ := strconv.Atoi(current)
-		return result
-	default:
-		return 0
-	}
 }

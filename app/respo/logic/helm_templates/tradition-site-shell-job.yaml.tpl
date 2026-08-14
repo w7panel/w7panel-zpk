@@ -12,6 +12,10 @@
 {{- end }}
 
 {{- $fullName := include "__cur__.fullname" . -}}
+{{- $jobSidecarInitContainers := include "w7panel.sidecars.jobInitContainers" . | fromYamlArray | default list -}}
+{{- $jobSidecarVolumes := include "w7panel.sidecars.jobVolumes" . | fromYamlArray | default list -}}
+{{- $jobSidecarHostAliases := include "w7panel.sidecars.jobHostAliases" . | fromYamlArray | default list -}}
+{{- $targetPodAnnotations := include "w7panel.podAnnotations" . | fromYaml | default dict -}}
 
 apiVersion: batch/v1
 kind: Job
@@ -37,12 +41,18 @@ spec:
       {{- if .Values.podAnnotations }}
       annotations:
         {{- toYaml .Values.podAnnotations | nindent 8 }}
+        {{- if .Values.annotations }}
+        {{- toYaml .Values.annotations | nindent 8 }}
+        {{- end }}
+      {{- else if .Values.annotations }}
+      annotations:
+        {{- toYaml .Values.annotations | nindent 8 }}
       {{- end }}
     spec:
       restartPolicy: Never
       containers:
         - name: site-shell-job
-          image: zpk.w7.cc/public/site-manager:v1.2.15
+          image: zpk.w7.cc/public/site-manager:v1.3.3
           command:
             - sh
             - -c
@@ -56,6 +66,10 @@ spec:
               CMD_B64='__CMD_B64__'
               SHELLS_B64='__SHELLS_B64__'
               START_PARAMS_ENV_B64='__START_PARAMS_ENV_B64__'
+              SIDECAR_INIT_CONTAINERS_B64='{{ if $jobSidecarInitContainers }}{{ $jobSidecarInitContainers | toJson | b64enc }}{{ end }}'
+              SIDECAR_VOLUMES_B64='{{ if $jobSidecarVolumes }}{{ $jobSidecarVolumes | toJson | b64enc }}{{ end }}'
+              SIDECAR_HOST_ALIASES_B64='{{ if $jobSidecarHostAliases }}{{ $jobSidecarHostAliases | toJson | b64enc }}{{ end }}'
+              POD_ANNOTATIONS_B64='{{ if $targetPodAnnotations }}{{ $targetPodAnnotations | toJson | b64enc }}{{ end }}'
 
               panel_safe_name() {
                 echo "$1" | tr '_' '-'
@@ -213,6 +227,10 @@ spec:
                   --argjson affinity "$TARGET_ENV_AFFINITY" \
                   --argjson resources "$TARGET_ENV_RESOURCES" \
                   --argjson securityContext "$TARGET_ENV_SECURITY_CONTEXT" \
+                  --argjson sidecarInitContainers "$SIDECAR_INIT_CONTAINERS" \
+                  --argjson sidecarVolumes "$SIDECAR_VOLUMES" \
+                  --argjson hostAliases "$SIDECAR_HOST_ALIASES" \
+                  --argjson podAnnotations "$POD_ANNOTATIONS" \
                   '
                   {
                       apiVersion: "batch/v1",
@@ -237,9 +255,9 @@ spec:
                         ttlSecondsAfterFinished: 60,
                         template: {
                           metadata: {
-                            annotations: {
-                              "w7.cc/group-name": $releaseName,
-                            },
+                            annotations: ($podAnnotations + {
+                              "w7.cc/group-name": $releaseName
+                            }),
                             labels: {
                               app: $jobName,
                               group: $releaseName,
@@ -250,7 +268,9 @@ spec:
                           spec: {
                             restartPolicy: "Never",
                             affinity: $affinity,
-                            volumes: $volumes,
+                            volumes: (($volumes + $sidecarVolumes) | unique_by(.name)),
+                            hostAliases: $hostAliases,
+                            initContainers: $sidecarInitContainers,
                             containers: [
                               {
                                 name: $containerName,
@@ -372,6 +392,10 @@ spec:
               TARGET_ENV_IMAGE_PULL_POLICY=$(printf '%s' "$state_json" | jq -r '.data.target_env_image_pull_policy // "IfNotPresent"')
               OPERATION=$(printf '%s' "$state_json" | jq -r '.data.operation')
               DOMAIN=$(printf '%s' "$state_json" | jq -r '.data.domain')
+              SIDECAR_INIT_CONTAINERS=$(decode_b64_json "$SIDECAR_INIT_CONTAINERS_B64" "[]")
+              SIDECAR_VOLUMES=$(decode_b64_json "$SIDECAR_VOLUMES_B64" "[]")
+              SIDECAR_HOST_ALIASES=$(decode_b64_json "$SIDECAR_HOST_ALIASES_B64" "[]")
+              POD_ANNOTATIONS=$(decode_b64_json "$POD_ANNOTATIONS_B64" "{}")
 
               start_params_json=$(decode_b64_json "$START_PARAMS_ENV_B64" "{}")
               user_shells_json=$(decode_b64_json "$SHELLS_B64" "[]")

@@ -67,6 +67,7 @@ type HelmPack struct {
 	ChartVersion           string
 	IsSubFormula           bool
 	SharedStorageTargetApp string
+	Sidecars               []HelmSidecar
 }
 
 func NewHelmPack(manifest logic2.Manifest, subManifests []*logic2.Manifest, outputDir, chartVersion string, isSubFormula bool, sharedStorageTargetApp string) *HelmPack {
@@ -134,6 +135,9 @@ func (hc *HelmPack) PackToHelm() error {
 	if err := hc.generateSubCharts(chartsDir); err != nil {
 		return err
 	}
+	if err := hc.prepareSidecarCharts(chartsDir); err != nil {
+		return err
+	}
 
 	traditionSiteName := ""
 	if hc.Manifest.Application.Type == logic2.Tradition_App {
@@ -150,9 +154,12 @@ func (hc *HelmPack) PackToHelm() error {
 		if err := hc.generateGatewayPluginTemplate(templatesDir, renderer); err != nil {
 			return err
 		}
-	} else if hc.Manifest.Platform.Helm.ChartName != "" || hc.Manifest.Platform.Helm.Repository != "" || (hc.Manifest.Platform.Helm.DependYamls != nil && len(hc.Manifest.Platform.Helm.DependYamls) > 0) {
+	} else if hc.isHelmPackage() {
 		err := hc.processHelmPkg(helmDir)
 		if err != nil {
+			return err
+		}
+		if err := hc.configureHelmSidecarHost(helmDir); err != nil {
 			return err
 		}
 	} else if hc.Manifest.Application.Type == logic2.Tradition_App {
@@ -204,11 +211,20 @@ func (hc *HelmPack) PackToHelm() error {
 		}
 	}
 
+	if err := hc.generateSidecarHelpersTemplate(templatesDir); err != nil {
+		return err
+	}
+	if err := hc.generateSidecarResourcesTemplate(templatesDir); err != nil {
+		return err
+	}
+
 	if !hc.IsSubFormula {
-		if err := hc.generateMicroAppTemplate(templatesDir, hc.Manifest); err != nil {
-			return err
+		if shouldPackageMicroApp(hc.Manifest) {
+			if err := hc.generateMicroAppTemplate(templatesDir, hc.Manifest); err != nil {
+				return err
+			}
 		}
-		if hc.Manifest.Application.Type != logic2.GatewayPluginApp {
+		if hc.Manifest.Application.Type != logic2.GatewayPluginApp && hc.Manifest.Application.Type != logic2.EnvironmentApp {
 			if err := hc.generateRegisterSiteJobTemplate(templatesDir, hc.Manifest); err != nil {
 				return err
 			}
@@ -220,6 +236,12 @@ func (hc *HelmPack) PackToHelm() error {
 	}
 
 	return nil
+}
+
+func (hc *HelmPack) isHelmPackage() bool {
+	return hc.Manifest.Platform.Helm.ChartName != "" ||
+		hc.Manifest.Platform.Helm.Repository != "" ||
+		len(hc.Manifest.Platform.Helm.DependYamls) > 0
 }
 
 func (hc *HelmPack) processHelmPkg(rootDir string) error {
@@ -741,10 +763,12 @@ func (hc *HelmPack) generateValuesYaml(rootDir string) error {
 		"volumeClaimTemplates": hc.getVolumeClaimTemplateValues(hc.Manifest.Platform),
 		"defaultPort":          defaultPort,
 		"startParams":          hc.getStartParamsEnvValues(hc.Manifest.Platform),
-		"gpu":                  hc.getGpuValues(hc.Manifest.Platform),
+		"runtimeClass":         hc.getRuntimeClassValues(hc.Manifest.Platform),
+		"hostUsers":            hc.Manifest.Platform.HostUsers,
 		"sharedStorageAffinity": map[string]interface{}{
 			"targetSelectorApp": hc.SharedStorageTargetApp,
 		},
+		"w7panelSidecars": hc.Sidecars,
 	}
 	values["jobs"] = hc.getJobsValues(hc.Manifest.Platform)
 	helmContainers := make([]map[string]interface{}, 0, len(hc.Manifest.Platform.ContainerV2s))
@@ -866,12 +890,13 @@ func (hc *HelmPack) generateContainerV2Values(container logic2.ContainerV2, appl
 	}
 
 	return map[string]interface{}{
-		"name":            strings.ReplaceAll(container.Name, "_", "-"),
-		"image":           hc.getImageValues(container),
-		"command":         container.Command,
-		"args":            container.Args,
-		"ports":           ports,
-		"env":             container.Env,
+		"name":    strings.ReplaceAll(container.Name, "_", "-"),
+		"image":   hc.getImageValues(container),
+		"command": container.Command,
+		"args":    container.Args,
+		"ports":   ports,
+		"env":     container.Env,
+		// 制品中配置的资源限制暂不写入 Helm，由安装/调度侧统一设置。
 		"resources":       v1.ResourceRequirements{},
 		"volumeMounts":    container.VolumeMounts,
 		"livenessProbe":   container.LivenessProbe,
@@ -1110,7 +1135,14 @@ func (hc *HelmPack) generateRegisterSiteJobTemplate(rootDir string, manifest log
 	if err != nil {
 		return err
 	}
-	siteTemplate = strings.ReplaceAll(siteTemplate, "__APPLICATION_IDENTIFIER__", manifest.Application.Identifie)
+	siteName := manifest.Application.Name
+	if siteName == "" {
+		siteName = manifest.Application.Identifie
+	}
+	siteTemplate = renderHelmTemplatePlaceholders(siteTemplate, map[string]string{
+		"__APPLICATION_IDENTIFIER__": manifest.Application.Identifie,
+		"__SITE_NAME__":              strconv.Quote(siteName),
+	})
 
 	return writeFile(siteFilePath, siteTemplate)
 }
@@ -1156,36 +1188,25 @@ func (hc *HelmPack) generateGatewayPluginTemplate(rootDir string, renderer gatew
 	return writeFile(filepath.Join(rootDir, renderer.OutputName()), template)
 }
 
+func shouldPackageMicroApp(manifest logic2.Manifest) bool {
+	if strings.TrimSpace(manifest.Web.Url) != "" {
+		return true
+	}
+	for _, binding := range manifest.Bindings {
+		if len(binding.Menu) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
 func (hc *HelmPack) generateMicroAppTemplate(rootDir string, manifest logic2.Manifest) error {
 	microAppFilePath := filepath.Join(rootDir, "microapp.yaml")
 	if function.FileExists(microAppFilePath) {
 		return nil
 	}
 
-	menuConfigValues := make([]map[string]interface{}, 0)
-	backendConfigValues := make([]map[string]interface{}, 0)
-	for _, item := range manifest.Bindings {
-		conf := map[string]interface{}{
-			"role":         item.Name,
-			"load_mode":    item.LoadMode,
-			"type":         item.BackendConfig.Type,
-			"backend_url":  renderHelmValuesPlaceholders(item.BackendConfig.BackendUrl),
-			"backend_port": item.BackendConfig.BackendPort,
-			"proxy_request": logic2.RequestProxy{
-				Headers: renderHelmValuesPlaceholdersMap(item.BackendConfig.RequestProxy.Headers),
-				Query:   renderHelmValuesPlaceholdersMap(item.BackendConfig.RequestProxy.Query),
-			},
-			"frontend_props": renderHelmValuesPlaceholdersMap(item.BackendConfig.FrontendProps),
-		}
-		menuConfigValues = append(menuConfigValues, map[string]interface{}{
-			"title":   item.Title,
-			"name":    item.Name,
-			"status":  item.Status,
-			"support": item.Support,
-			"menu":    item.Menu,
-		})
-		backendConfigValues = append(backendConfigValues, conf)
-	}
+	menuConfigValues, backendConfigValues := buildMicroAppValues(manifest.Bindings)
 	configMap := map[string]interface{}{
 		"backend_config": backendConfigValues,
 		"bindings":       menuConfigValues,
@@ -1247,12 +1268,16 @@ func (hc *HelmPack) getImageValues(container logic2.ContainerV2) map[string]inte
 	if imageName == "" {
 		imageName = GetBuildImageName(hc.Manifest.Application)
 	}
-	imageParts := strings.Split(imageName, ":")
+	if hc.Manifest.Application.Type == logic2.SystemImageApp {
+		imageName = strings.ReplaceAll(imageName, "{version}", "{{ .Values.IMAGE_VERSION }}")
+	}
 	repository := imageName
 	tag := "latest"
-	if len(imageParts) > 1 {
-		tag = imageParts[1]
-		repository = imageParts[0]
+	lastSlash := strings.LastIndex(imageName, "/")
+	lastColon := strings.LastIndex(imageName, ":")
+	if lastColon > lastSlash {
+		tag = imageName[lastColon+1:]
+		repository = imageName[:lastColon]
 	}
 
 	return map[string]interface{}{
@@ -1593,11 +1618,11 @@ func (hc *HelmPack) addIngressRewriteAnnotations(annotations map[string]interfac
 	}
 }
 
-func (hc *HelmPack) getGpuValues(platform logic2.Platform) map[string]interface{} {
-	if platform.Gpu != "" {
+func (hc *HelmPack) getRuntimeClassValues(platform logic2.Platform) map[string]interface{} {
+	if platform.RuntimeClassName != "" {
 		return map[string]interface{}{
 			"enable": true,
-			"driver": platform.Gpu,
+			"name":   platform.RuntimeClassName,
 		}
 	}
 

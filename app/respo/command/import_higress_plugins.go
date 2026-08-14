@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -54,10 +55,10 @@ func (ImportHigressPlugins) Handle(cmd *cobra.Command, _ []string) {
 	if err != nil {
 		panic(err)
 	}
-	operationsTag, _ := dao.Q.Tag.Where(dao.Q.Tag.Name.Eq("云原生运维")).First()
-	if operationsTag == nil {
-		operationsTag = &entity.Tag{Name: "云原生运维"}
-		if err = dao.Q.Tag.Create(operationsTag); err != nil {
+	pluginTag, _ := dao.Q.Tag.Where(dao.Q.Tag.Name.Eq("网关插件")).First()
+	if pluginTag == nil {
+		pluginTag = &entity.Tag{Name: "网关插件"}
+		if err = dao.Q.Tag.Create(pluginTag); err != nil {
 			panic(fmt.Errorf("create artifact tag: %w", err))
 		}
 	}
@@ -105,6 +106,14 @@ func (ImportHigressPlugins) Handle(cmd *cobra.Command, _ []string) {
 			formulaRow.Setting = &accessor.FormulaSettingOption{}
 		}
 		formulaRow.Setting.SupportAutoPublishToZpkMarket = autoPublishToZpkMarket
+		formulaRow.Setting.BaseInfo = &accessor.FormulaBaseInfoOption{
+			Name:              manifest.Application.Name,
+			Description:       manifest.Application.Description,
+			Annotation:        manifest.Application.Annotation,
+			InstallOnlyOnce:   manifest.Application.InstallOnlyOnce,
+			ClusterPrivileged: manifest.Application.ClusterPrivileged,
+			RegisterSite:      manifest.Application.RegisterSite,
+		}
 		if _, err = dao.Q.Formula.Where(dao.Q.Formula.ID.Eq(formulaRow.ID)).Updates(entity.Formula{
 			Title:   plugin.Title,
 			Setting: formulaRow.Setting,
@@ -112,12 +121,12 @@ func (ImportHigressPlugins) Handle(cmd *cobra.Command, _ []string) {
 			panic(fmt.Errorf("update %s title: %w", plugin.Identifie, err))
 		}
 		formulaTag, _ := dao.Q.TagFormula.Where(
-			dao.Q.TagFormula.TagID.Eq(operationsTag.ID),
+			dao.Q.TagFormula.TagID.Eq(pluginTag.ID),
 			dao.Q.TagFormula.FormulaID.Eq(formulaRow.ID),
 		).First()
 		if formulaTag == nil {
 			if err = dao.Q.TagFormula.Create(&entity.TagFormula{
-				TagID:     operationsTag.ID,
+				TagID:     pluginTag.ID,
 				FormulaID: formulaRow.ID,
 			}); err != nil {
 				panic(fmt.Errorf("tag %s: %w", plugin.Identifie, err))
@@ -128,7 +137,7 @@ func (ImportHigressPlugins) Handle(cmd *cobra.Command, _ []string) {
 			panic(fmt.Errorf("load %s for publish: %w", plugin.Identifie, err))
 		}
 		if err = (logic.Version{}).PublishFormula(int32(consoleUID), publishFormula); err != nil {
-			panic(fmt.Errorf("publish %s: %w", plugin.Identifie, err))
+			slog.Error("publish %s formula", plugin.Identifie, err)
 		}
 
 		if isOverwrite {

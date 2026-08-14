@@ -29,22 +29,31 @@ spec:
       {{- include "common.selectorLabels" . | nindent 6 }}
   template:
     metadata:
+      {{- $podAnnotations := include "w7panel.podAnnotations" . }}
+      {{- if $podAnnotations }}
       annotations:
-      {{- if .Values.podAnnotations }}
-        {{- toYaml .Values.podAnnotations | nindent 8 }}
+        {{- $podAnnotations | nindent 8 }}
       {{- end }}
-        {{- if .Values.annotations }}
-        {{- toYaml .Values.annotations | nindent 12 }}
-        {{- end }}
       labels:
         {{- include "common.selectorLabels" . | nindent 8 }}
         w7.cc/identifie: {{ .Values.app.identify | quote }}
     spec:
-      {{- if .Values.gpu.enable }}
-      runtimeClassName: {{ .Values.gpu.driver }}
+      {{- $root := . }}
+      {{- $rootCtx := $ }}
+      {{- if ne .Values.hostUsers nil }}
+      hostUsers: {{ .Values.hostUsers }}
+      {{- end }}
+      {{- $sidecarHostAliases := include "w7panel.sidecars.hostAliases" . }}
+      {{- if $sidecarHostAliases }}
+      hostAliases:
+        {{- $sidecarHostAliases | nindent 8 }}
+      {{- end }}
+      {{- if .Values.runtimeClass.enable }}
+      runtimeClassName: {{ .Values.runtimeClass.name }}
       {{- end }}
 
       {{- $podVolumes := .Values.volumes }}
+      {{- $sidecarVolumes := include "w7panel.sidecars.volumes" . }}
       {{- if .Values.workload.isStatefulSet }}
       {{- $claimTemplateNames := dict }}
       {{- range .Values.volumeClaimTemplates }}
@@ -58,9 +67,12 @@ spec:
       {{- end }}
       {{- $podVolumes = $filteredVolumes }}
       {{- end }}
-      {{- if $podVolumes }}
+      {{- if or $podVolumes $sidecarVolumes }}
       volumes:
+        {{- if $podVolumes }}
         {{- include "common.volumesToYaml" (dict "root" . "volumes" $podVolumes) | nindent 8 }}
+        {{- end }}
+        {{- $sidecarVolumes | nindent 8 }}
       {{- end }}
 
       {{- with .Values.imagePullSecrets }}
@@ -81,13 +93,11 @@ spec:
               topologyKey: kubernetes.io/hostname
       {{- end }}
 
-      {{- $root := . }}
-      {{- $rootCtx := $ }}
       containers:
       {{- range .Values.containers }}
       {{- if not .isInitContainer }}
         - name: {{ .name }}
-          image: "{{ .image.repository }}:{{ .image.tag }}"
+          image: "{{ .image.repository }}:{{ tpl .image.tag $rootCtx }}"
           imagePullPolicy: {{ .image.pullPolicy }}
           {{- with .command }}
           command: {{- toYaml . | nindent 12 }}
@@ -128,6 +138,7 @@ spec:
           {{- end }}
       {{- end }}
       {{- end }}
+      {{- include "w7panel.sidecars.containers" . | nindent 8 }}
 
       {{- $hasInit := false }}
       {{- range .Values.containers }}
@@ -135,12 +146,13 @@ spec:
           {{- $hasInit = true }}
         {{- end }}
       {{- end }}
-      {{- if $hasInit }}
+      {{- $sidecarInitContainers := include "w7panel.sidecars.initContainers" . }}
+      {{- if or $hasInit $sidecarInitContainers }}
       initContainers:
         {{- range .Values.containers }}
         {{- if .isInitContainer }}
         - name: {{ .name }}
-          image: "{{ .image.repository }}:{{ .image.tag }}"
+          image: "{{ .image.repository }}:{{ tpl .image.tag $rootCtx }}"
           imagePullPolicy: {{ .image.pullPolicy }}
           {{- with .command }}
           command: {{- toYaml . | nindent 12 }}
@@ -169,6 +181,7 @@ spec:
           {{- end }}
       {{- end }}
       {{- end }}
+        {{- $sidecarInitContainers | nindent 8 }}
   {{- end }}
   {{- if and .Values.workload.isStatefulSet .Values.volumeClaimTemplates }}
   volumeClaimTemplates:

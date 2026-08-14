@@ -10,6 +10,7 @@ import (
 	"github.com/w7panel/w7panel-zpk/common/accessor"
 	"github.com/w7panel/w7panel-zpk/common/dao"
 	"github.com/w7panel/w7panel-zpk/common/entity"
+	commonlogic "github.com/w7panel/w7panel-zpk/common/logic"
 	"github.com/w7panel/w7panel-zpk/common/service/w7"
 	"github.com/w7panel/w7panel-zpk/common/service/w7/devcenter"
 	"github.com/w7panel/w7panel-zpk/common/service/w7/ip"
@@ -158,7 +159,7 @@ func (l FormulaGoods) PublishGoods(formula *Formula, publishGoodsReq devcenter.P
 	publishGoodsReq.GoodsType = devcenter.W7ZpkGoodsCategoryId
 	publishGoodsReq.Enable = 1
 	publishGoodsReq.Water = 2
-	publishGoodsReq.Extra = map[string]interface{}{
+	publishGoodsExtra := map[string]interface{}{
 		"respo_identify":         formula.Name,
 		"respo_latest_version":   formula.Version,
 		"service_packages":       string(servicePackagesContent),
@@ -166,6 +167,10 @@ func (l FormulaGoods) PublishGoods(formula *Formula, publishGoodsReq devcenter.P
 		"support_cross_upgrade":  supportCrossUpgrade,
 		"cross_upgrade_formulas": string(crossUpgradeFormulaContent),
 	}
+	for key, value := range buildApplicationTypeExtra(*formula.Manifest) {
+		publishGoodsExtra[key] = value
+	}
+	publishGoodsReq.Extra = publishGoodsExtra
 	publishGoodsReq.RespoUrl = fmt.Sprintf("https://%s/zpk/respo/info/%s", facade.GetConfig().GetString("setting.depot.external_domain"), formula.Name)
 
 	goods, err := w7.DevCenterGoodsSdk.PublishGoods(publishGoodsReq)
@@ -202,4 +207,18 @@ func (l FormulaGoods) PublishGoods(formula *Formula, publishGoodsReq devcenter.P
 		RemoteUID:      int32(publishGoodsReq.ConsoleUid),
 	})
 	return err
+}
+
+func buildApplicationTypeExtra(manifest commonlogic.Manifest) map[string]interface{} {
+	extra := map[string]interface{}{
+		"application_type": manifest.Application.Type,
+	}
+	if manifest.Application.Type == commonlogic.GatewayPluginApp {
+		extra["plugin_type"] = manifest.Platform.GatewayPlugin.Category
+	}
+	if manifest.Application.Type == commonlogic.EnvironmentApp {
+		extra["support_version"] = manifest.Application.Annotation["w7.cc/image_version"]
+		extra["env_language"] = manifest.Application.Annotation["w7.cc/image_language"]
+	}
+	return extra
 }

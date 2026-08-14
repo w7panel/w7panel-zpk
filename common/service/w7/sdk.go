@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -90,8 +91,12 @@ func InitW7Sdk(config *viper.Viper) error {
 
 func resolveAppCredential(config *viper.Viper) (appCredential, error) {
 	credential, err := fetchAppCredential("http://api.w7.cc/api/app/info")
+	slog.Info("resolveAppCredential", "credential", credential, "err", err)
 	if err != nil && strings.Contains(err.Error(), "Route not found") {
-		return appCredential{}, nil
+		return appCredential{
+			Appid:  config.GetString("zpk.appid"),
+			Secret: config.GetString("zpk.secret"),
+		}, nil
 	}
 	if err != nil {
 		return appCredential{}, fmt.Errorf("fetch w7 app info: %w", err)

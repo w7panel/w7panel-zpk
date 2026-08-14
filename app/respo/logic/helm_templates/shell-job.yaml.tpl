@@ -28,15 +28,20 @@ spec:
         group: {{ $root.Release.Name }}
         w7.cc/group-name: {{ $root.Release.Name }}
         w7.cc/job-source: appgroup
+      {{- $podAnnotations := include "w7panel.podAnnotations" $root }}
+      {{- if $podAnnotations }}
       annotations:
-      {{- if $root.Values.podAnnotations }}
-        {{- toYaml $root.Values.podAnnotations | nindent 8 }}
+        {{- $podAnnotations | nindent 8 }}
       {{- end }}
-        {{- if $root.Values.annotations }}
-        {{- toYaml $root.Values.annotations | nindent 12 }}
-        {{- end }}
     spec:
+      {{- $jobSidecarVolumes := include "w7panel.sidecars.jobVolumes" $root }}
+      {{- $jobSidecarInitContainers := include "w7panel.sidecars.jobInitContainers" $root }}
+      {{- $jobSidecarHostAliases := include "w7panel.sidecars.jobHostAliases" $root }}
       restartPolicy: Never
+      {{- if $jobSidecarHostAliases }}
+      hostAliases:
+        {{- $jobSidecarHostAliases | nindent 8 }}
+      {{- end }}
       serviceAccountName: {{ include "common.serviceAccountName" $root }}
       affinity:
         podAffinity:
@@ -48,9 +53,16 @@ spec:
                     values:
                       - {{ $root.Values.app.identify | quote }}
               topologyKey: kubernetes.io/hostname
-      {{- if $root.Values.volumes }}
+      {{- if or $root.Values.volumes $jobSidecarVolumes }}
       volumes:
+        {{- if $root.Values.volumes }}
         {{- include "common.volumesToYaml" (dict "root" $root "volumes" $root.Values.volumes) | nindent 8 }}
+        {{- end }}
+        {{- $jobSidecarVolumes | nindent 8 }}
+      {{- end }}
+      {{- if $jobSidecarInitContainers }}
+      initContainers:
+        {{- $jobSidecarInitContainers | nindent 8 }}
       {{- end }}
       containers:
         - name: {{ $job.name }}

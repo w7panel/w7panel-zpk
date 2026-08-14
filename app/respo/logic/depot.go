@@ -323,11 +323,22 @@ func (self *Depot) GetFormulaBackendZipDownloadUrlByApplication(application logi
 	return zipUrl, token
 }
 
-func (self *Depot) GetFormulaHelmDownloadUrl(formula *Formula) string {
+func (self *Depot) GetFormulaHelmDownloadURLWithMarketBindings(formula *Formula, bindings []logic.Bindings) string {
 	helmPath, err := PackFormulaToHelmAndPack(*formula, false)
 	if err != nil {
 		slog.Error("pack helm err", "formula", formula, "err", err)
 	}
+	if helmPath != "" && len(bindings) > 0 {
+		dynamicPackagePath, err := BuildDynamicHelmPackage(
+			helmPath,
+			WithMicroAppBindings([]string{"other"}, bindings),
+		)
+		if err != nil {
+			slog.Error("pack dynamic helm err", "formula", formula, "err", err)
+		}
+		helmPath = dynamicPackagePath
+	}
+
 	if helmPath != "" {
 		token := function.GetRandomString(20)
 		domain := facade.GetConfig().GetString("setting.depot.external_domain")
@@ -643,11 +654,6 @@ func (self *Depot) PackLoop() {
 
 func (self *Depot) packToOci(formula *Formula) error {
 	slog.Info("开始打包项目:", "info", formula)
-	// Persist the shared working directory separately before replacing a version
-	// tag. Version manifests intentionally no longer contain shared files.
-	if err := self.PackSharedFilesToOci(formula); err != nil {
-		return err
-	}
 	remoteOci, err := logic.GetDefaultRemoteOci(logic.GetFormulaOciName(formula.Name))
 	if err != nil {
 		return err

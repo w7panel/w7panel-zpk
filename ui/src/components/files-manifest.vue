@@ -409,7 +409,7 @@
 
                             <slot></slot>
 
-                            <a-form-item v-if="form.type == 'tradition'" label="CMD">
+                            <a-form-item v-if="['tradition', 'system-image'].includes(form.type)" label="CMD">
                                 <div class="df df-c">
                                     <div v-for="(item, index) in form.cmd" :key="index" class="df ai-e"
                                         :style="{ marginTop: index == 0 ? 0 : '10px' }">
@@ -422,7 +422,9 @@
                                             <span class="ml-10 cursor c-blue" v-if="index + 1 == form.cmd.length"
                                                 @click="form.cmd.push('')">添加</span>
                                             <a-tooltip v-if="index + 1 == form.cmd.length"
-                                                content="容器的启动参数。该参数为可选参数，如果不填写，则默认使用 Dockerfile 中的 CMD。输入规范，以“空格”作为参数的分割标识，例如 -u app.py"
+                                                :content="form.type == 'system-image'
+                                                    ? '系统镜像的启动命令。该配置可选，留空时使用镜像自身的 ENTRYPOINT/CMD。例如 /sbin/init。'
+                                                    : '容器的启动参数。该参数为可选参数，如果不填写，则默认使用 Dockerfile 中的 CMD。输入规范，以“空格”作为参数的分割标识，例如 -u app.py'"
                                                 position="top">
                                                 <icon-exclamation-circle-fill class="fs-16 c-99 ml-4" />
                                             </a-tooltip>
@@ -1025,6 +1027,7 @@ export default {
                 entry: 'public',
                 environmentName: '',
                 environmentVersion: '',
+                cmd: [''],
 
             },
 
@@ -1581,6 +1584,14 @@ export default {
                 });
             }
             containers[0].image = String(this.form.systemImageTemplate || '').trim();
+            let command = (this.form.cmd || [])
+                .map(item => String(item || '').trim())
+                .filter(Boolean);
+            if (command.length) {
+                containers[0].command = command;
+            } else {
+                delete containers[0].command;
+            }
             this.json.platform['container-v2'] = containers;
             this.form.containers = containers;
             this.json.platform.workload = { ...(this.json.platform.workload || {}), type: 'Deployment' };
@@ -1737,6 +1748,7 @@ export default {
                 });
                 delete this.json.platform['container-v2'];
                 this.form.containers = [];
+                this.form.cmd = [''];
             }
             if (previousType != 'system-image' && nextType == 'system-image') {
                 delete this.json.source;
@@ -1746,6 +1758,7 @@ export default {
                 delete this.json.platform.container;
                 this.json.platform['container-v2'] = [];
                 this.form.containers = [];
+                this.form.cmd = [''];
                 this.form.ingress = [];
                 this.form.domain = false;
             }
@@ -2733,7 +2746,14 @@ platform:
 
                 this.form.environmentName = j.platform?.tradition?.environmentName || '';
                 this.form.environmentVersion = j.platform?.tradition?.environmentVersion || '';
-                this.form.cmd = j.platform?.tradition?.cmd || [''];
+                if (this.form.type == 'system-image') {
+                    let command = j.platform?.['container-v2']?.[0]?.command;
+                    this.form.cmd = Array.isArray(command) && command.length
+                        ? command.map(item => String(item))
+                        : [''];
+                } else {
+                    this.form.cmd = j.platform?.tradition?.cmd || [''];
+                }
 
                 this.form.ingress = JSON.parse(JSON.stringify(j.platform?.ingress || []));
                 this.form.shell = JSON.parse(JSON.stringify(j.platform?.shells || j.platform?.['container-v2']?.[0]?.shells || []));

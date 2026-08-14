@@ -144,7 +144,7 @@
                                                     </a-option>
                                                 </a-select>
                                             </a-form-item>
-                                            <a-form-item label="镜像名称模板" field="environmentImageTemplate" required
+                                            <a-form-item label="镜像地址" field="environmentImageTemplate" required
                                                 style="margin-bottom:18px;">
                                                 <div class="df df-c">
                                                     <a-input v-model="form.environmentImageTemplate" size="large"
@@ -1114,7 +1114,7 @@ export default {
                 environmentImageTemplate: [
                     {
                         required: true,
-                        message: '请输入镜像名称模板',
+                        message: '请输入镜像地址',
                         trigger: 'blur',
                         validator: (value, callback) => this.validateEnvironmentImageTemplate(value, callback),
                     },
@@ -1475,21 +1475,21 @@ export default {
         validateEnvironmentImageTemplate(value, callback) {
             let template = String(value || '').trim();
             if (!template) {
-                callback('请输入镜像名称模板');
+                callback('请输入镜像地址');
                 return;
             }
             if (/\s/.test(template)) {
-                callback('镜像名称模板不能包含空格或换行');
+                callback('镜像地址不能包含空格或换行');
                 return;
             }
             if (!template.includes('{version}')) {
-                callback('镜像名称模板必须包含 {version} 占位符');
+                callback('镜像地址必须包含 {version} 占位符');
                 return;
             }
             let unsupportedPlaceholders = [...new Set(template.match(/\{[^{}]+\}/g) || [])]
                 .filter(placeholder => placeholder != '{version}');
             if (unsupportedPlaceholders.length) {
-                callback('镜像名称模板包含不支持的占位符：' + unsupportedPlaceholders.join('、'));
+                callback('镜像地址包含不支持的占位符：' + unsupportedPlaceholders.join('、'));
                 return;
             }
             callback();

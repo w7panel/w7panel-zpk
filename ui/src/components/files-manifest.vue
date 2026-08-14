@@ -1589,7 +1589,7 @@ export default {
                 'sysbox/rootfs-rw-layer': JSON.stringify([{
                     name: containerName,
                     volumeName: 'system-rootfs',
-                    path: `www/server/${containerName}/system`,
+                    path: `${containerName}/system`,
                     persistentSpecialMounts: true,
                 }]),
             };

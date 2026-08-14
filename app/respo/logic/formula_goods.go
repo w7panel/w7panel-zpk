@@ -167,6 +167,10 @@ func (l FormulaGoods) PublishGoods(formula *Formula, publishGoodsReq devcenter.P
 		"support_cross_upgrade":  supportCrossUpgrade,
 		"cross_upgrade_formulas": string(crossUpgradeFormulaContent),
 	}
+	if formula.Setting != nil {
+		publishGoodsExtra["trial_enabled"] = formula.Setting.TrialEnabled
+		publishGoodsExtra["trial_days"] = formula.Setting.TrialDays
+	}
 	for key, value := range buildApplicationTypeExtra(*formula.Manifest) {
 		publishGoodsExtra[key] = value
 	}

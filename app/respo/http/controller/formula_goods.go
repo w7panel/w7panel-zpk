@@ -71,6 +71,8 @@ func (c FormulaGoods) SetServiceFee(ctx *gin.Context) {
 		Identifie         string                                   `form:"identifie" json:"identifie" binding:"required"`
 		InstallServiceFee float64                                  `form:"service_fee" json:"service_fee"`
 		EnableServiceFee  bool                                     `form:"enable_service_package_fee" json:"enable_service_package_fee"`
+		TrialEnabled      bool                                     `form:"trial_enabled" json:"trial_enabled"`
+		TrialDays         int                                      `form:"trial_days" json:"trial_days"`
 		ServicePackages   []devcenter.NotAppServicePackage         `form:"service_packages" json:"service_packages"`
 		VersionPrices     []devcenter.NotAppBranchVersionPriceInfo `form:"version_prices" json:"version_prices"`
 	}
@@ -98,7 +100,20 @@ func (c FormulaGoods) SetServiceFee(ctx *gin.Context) {
 	if formula.Setting == nil {
 		formula.Setting = &accessor.FormulaSettingOption{}
 	}
+	if params.TrialEnabled && (params.TrialDays < 1 || params.TrialDays > 365) {
+		c.JsonResponseWithError(ctx, errors.New("免费试用天数必须在 1 到 365 天之间"), 422)
+		return
+	}
+	if params.TrialEnabled && params.InstallServiceFee <= 0 {
+		c.JsonResponseWithError(ctx, errors.New("免费商品不能开启试用"), 422)
+		return
+	}
 	formula.Setting.EnableServicePackageFee = params.EnableServiceFee
+	formula.Setting.TrialEnabled = params.TrialEnabled
+	formula.Setting.TrialDays = params.TrialDays
+	if !formula.Setting.TrialEnabled {
+		formula.Setting.TrialDays = 0
+	}
 	if !formula.Setting.EnableServicePackageFee {
 		params.ServicePackages = make([]devcenter.NotAppServicePackage, 0)
 	}

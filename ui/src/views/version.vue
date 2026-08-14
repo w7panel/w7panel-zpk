@@ -203,6 +203,20 @@
                             </div>
                         </a-form-item>
 
+						<a-form-item label="免费试用">
+							<div>
+								<div class="df ai-c">
+									<a-switch v-model="instFee.trial_enabled" />
+									<span class="c-99" style="margin-left:10px;">开启后，用户可在设置天数内免费试用。</span>
+								</div>
+								<a-input v-if="instFee.trial_enabled" style="width: 200px; margin-top: 10px;"
+									v-model="instFee.trial_days" type="number" :min="1" :max="365" placeholder="请输入">
+									<template #append>天</template>
+								</a-input>
+								<div class="version-form-help">试用时长按用户领取时的设置保存，后续修改不影响已领取用户</div>
+							</div>
+						</a-form-item>
+
                         <a-form-item label="升级服务费用">
                             <div class="version-setting-block">
                                 <a-alert type="info" show-icon class="zpk-primary-alert version-paid-alert mb-20" title="提示" :closable="false">
@@ -452,6 +466,8 @@ export default {
             instFee: {
                 show: false,
                 enable_service_package_fee: false,
+				trial_enabled: false,
+				trial_days: 7,
                 service_fee: '',
                 service_packages: [],
                 version_prices: [],
@@ -850,8 +866,12 @@ export default {
             this.instFee = {
                 ...this.instFee,
                 old_fee: this.info?.install_service_fee,
+				old_trial_enabled: !!this.info?.setting?.trial_enabled,
+				old_trial_days: Number(this.info?.setting?.trial_days || 0),
                 service_fee: this.info?.install_service_fee || '',
                 enable_service_package_fee: !!(this.info?.setting?.enable_service_package_fee ?? this.crossUpgrade.setting?.enable_service_package_fee),
+				trial_enabled: !!this.info?.setting?.trial_enabled,
+				trial_days: Number(this.info?.setting?.trial_days || 7),
                 service_packages: this.normalizeServicePackageRows(this.info?.service_packages || []),
                 version_prices: version_prices,
             }
@@ -859,6 +879,14 @@ export default {
         submitInstFee() {
             this.$refs.instFee.validate((errors) => {
                 if (errors) { return }
+				if (this.instFee.trial_enabled && (Number(this.instFee.trial_days) < 1 || Number(this.instFee.trial_days) > 365)) {
+					messageError('免费试用天数必须在 1 到 365 天之间');
+					return;
+				}
+				if (this.instFee.trial_enabled && Number(this.instFee.service_fee) <= 0) {
+					messageError('免费商品不能开启试用');
+					return;
+				}
                 let service_packages = this.normalizeServicePackages();
                 let version_prices = this.normalizeVersionPrices();
 
@@ -866,10 +894,14 @@ export default {
                     identifie: this.identifie,
                     service_fee: Number(this.instFee.service_fee),
                     enable_service_package_fee: !!this.instFee.enable_service_package_fee,
+					trial_enabled: !!this.instFee.trial_enabled,
+					trial_days: this.instFee.trial_enabled ? Number(this.instFee.trial_days) : 0,
                     service_packages,
                     version_prices,
                 }).then(res => {
-                    if (this.goods_id && (Number(this.instFee.service_fee) != Number(this.instFee.old_fee)) && this.list.length) {
+					const trialChanged = !!this.instFee.trial_enabled !== !!this.instFee.old_trial_enabled
+						|| Number(this.instFee.trial_enabled ? this.instFee.trial_days : 0) !== Number(this.instFee.old_trial_days || 0);
+                    if (this.goods_id && (Number(this.instFee.service_fee) != Number(this.instFee.old_fee) || trialChanged) && this.list.length) {
                         let item = this.list.find(i => i.id === this.version.id);
                         if (item) { this.toPublish(item); }
                     } else {

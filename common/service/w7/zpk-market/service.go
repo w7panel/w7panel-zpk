@@ -18,6 +18,7 @@ type ZpkMarketService struct {
 const (
 	InstallConflictDomainMismatch    = "domain_mismatch"
 	InstallConflictAppIdentifyExists = "app_identify_exists"
+	EntitlementStatusTrialExpired    = "trial_expired"
 )
 
 type apiResponse[T any] struct {
@@ -34,6 +35,8 @@ type FormulaInstallCheckResult struct {
 	ConflictReason      string `json:"conflict_reason"`
 	ConflictDomain      string `json:"domain"`
 	ConflictAppIdentify string `json:"app_identify"`
+	EntitlementStatus   string `json:"entitlement_status"`
+	TrialExpireAt       string `json:"trial_expire_at"`
 }
 
 type FormulaUpgradeVersionResult struct {

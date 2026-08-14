@@ -122,6 +122,24 @@ func (c Formula) Info(ctx *gin.Context) {
 			}
 		} else {
 			checkResult := logic.Order{}.CheckFormulaCanInstallOrUpgrade(*formula, consoleUid, params.OrderSn, params.IsUpgrade > 0, params.Reinstall, params.Domain, params.AppIdentify)
+			if checkResult.EntitlementStatus == zpk_market.EntitlementStatusTrialExpired {
+				marketURL := strings.TrimRight(facade.GetConfig().GetString("setting.depot_market.frontend_url"), "/")
+				if marketURL != "" {
+					marketURL = fmt.Sprintf("%s/site-detail/%d", marketURL, formula.GoodsId)
+				}
+				ctx.JSON(http.StatusForbidden, gin.H{
+					"code":  "ZPK_TRIAL_EXPIRED",
+					"error": "免费试用已到期",
+					"data": gin.H{
+						"goods_id":        formula.GoodsId,
+						"order_sn":        checkResult.OrderSn,
+						"trial_expire_at": checkResult.TrialExpireAt,
+						"restriction":     "application_operation",
+						"market_url":      marketURL,
+					},
+				})
+				return
+			}
 			if !checkResult.CanInstallOrUpgrade {
 				switch checkResult.ConflictReason {
 				case zpk_market.InstallConflictDomainMismatch, zpk_market.InstallConflictAppIdentifyExists:

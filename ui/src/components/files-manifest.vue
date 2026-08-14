@@ -1555,6 +1555,8 @@ export default {
         ensureSystemImageContainer() {
             if (this.form.type != 'system-image') { return; }
             this.json.platform = this.json.platform || {};
+            delete this.json.source;
+            delete this.json.web;
             delete this.json.platform.container;
             let containers = this.json.platform['container-v2'] || [];
             if (!containers.length) {
@@ -2967,12 +2969,12 @@ platform:
             if (['environment', 'gateway-plugin', 'system-image'].includes(this.form.type)) {
                 this.loadFormulaSetting().catch(() => { });
             }
-            if (this.form.type !== 'light' && this.zip.url) {
+            if (!['light', 'system-image'].includes(this.form.type) && this.zip.url) {
                 if (!this.json.source) { this.json.source = {}; }
                 this.json.source.type = 'zip';
                 this.json.source.url = this.zip.url;
             }
-            if (this.form.type !== 'tradition' && this.web.url) {
+            if (!['tradition', 'system-image'].includes(this.form.type) && this.web.url) {
                 if (!this.json.web) { this.json.web = {}; }
                 this.json.web.type = 'zip';
                 this.json.web.url = this.web.url;

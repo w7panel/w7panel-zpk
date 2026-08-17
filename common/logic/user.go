@@ -92,6 +92,13 @@ func (l User) GetOrCreatePanelUser(userId string, username string, userRole stri
 			ResourceValue: facade.GetConfig().GetString("setting.depot.oci_namespace"),
 			Actions:       []string{"push", "pull"},
 		})
+	} else {
+		_, err := dao.Q.RegistryUser.Where(dao.RegistryUser.ID.Eq(user.ID)).Updates(entity.RegistryUser{
+			Role: userRole,
+		})
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return user, nil

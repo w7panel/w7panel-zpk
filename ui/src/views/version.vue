@@ -655,6 +655,8 @@ export default {
                     || setting.support_publish_to_zpk_market
                 );
                 this.instFee.enable_service_package_fee = !!setting.enable_service_package_fee;
+                this.instFee.trial_enabled = !!setting.trial_enabled;
+                this.instFee.trial_days = Number(setting.trial_days || 7);
             }).finally(() => {
                 this.crossUpgrade.settingLoading = false;
             });
@@ -875,6 +877,16 @@ export default {
                 service_packages: this.normalizeServicePackageRows(this.info?.service_packages || []),
                 version_prices: version_prices,
             }
+            // Paid settings, including trial configuration, are maintained by
+            // the dedicated setting endpoint rather than the artifact detail API.
+            myAxios.post('/respo/setting/get', { identifie: this.identifie }).then(res => {
+                const setting = res?.data?.data || {};
+                this.instFee.enable_service_package_fee = !!setting.enable_service_package_fee;
+                this.instFee.trial_enabled = !!setting.trial_enabled;
+                this.instFee.trial_days = Number(setting.trial_days || 7);
+                this.instFee.old_trial_enabled = this.instFee.trial_enabled;
+                this.instFee.old_trial_days = this.instFee.trial_enabled ? this.instFee.trial_days : 0;
+            });
         },
         submitInstFee() {
             this.$refs.instFee.validate((errors) => {

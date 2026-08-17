@@ -273,7 +273,7 @@ func (l Permission) ReplaceNamespacePermissions(namespace string, permissions []
 
 func (l Permission) OnAddUserPermissionEvent(payload registry.AddUserPermissionPayload) {
 	err := l.AddUserPermission(payload.UserID, payload.ResourceValue, PermissionResourceType(payload.ResourceType), payload.Actions)
-	slog.Error("OnAddUserPermissionEvent", "payload", payload, "err", err)
+	slog.Info("OnAddUserPermissionEvent", "payload", payload, "err", err)
 	if err != nil {
 		return
 	}
@@ -281,7 +281,7 @@ func (l Permission) OnAddUserPermissionEvent(payload registry.AddUserPermissionP
 
 func (l Permission) OnDelUserPermissionEvent(payload registry.DelUserPermissionPayload) {
 	err := l.DelUserPermission(payload.UserID, payload.ResourceValue, PermissionResourceType(payload.ResourceType))
-	slog.Error("OnDelUserPermissionEvent", "payload", payload, "err", err)
+	slog.Info("OnDelUserPermissionEvent", "payload", payload, "err", err)
 	if err != nil {
 		return
 	}
@@ -290,7 +290,7 @@ func (l Permission) OnDelUserPermissionEvent(payload registry.DelUserPermissionP
 
 func (l Permission) OnClearUserPermissionEvent(payload registry.ClearUserPermissionPayload) {
 	err := l.ClearUserPermission(payload.UserID)
-	slog.Error("onClearUserPermissionEvent", "payload", payload, "err", err)
+	slog.Info("onClearUserPermissionEvent", "payload", payload, "err", err)
 	if err != nil {
 		return
 	}

@@ -5,20 +5,11 @@ package command
 // run on a fresh depot without preparing manifests by hand.
 
 import (
-	"bytes"
-	"context"
+	"embed"
 	"fmt"
-	"image"
-	"image/color"
-	"image/jpeg"
-	"io"
-	"net/http"
-	"os"
-	"os/exec"
 	"regexp"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/w7panel/w7panel-zpk/app/respo/logic"
@@ -177,6 +168,13 @@ func systemImageManifest(system systemImageSpec, name, version string) commonlog
 
 var iconSlugs = map[string]string{"ubuntu": "ubuntu", "debian": "debian", "centos": "centos", "rocky": "rockylinux", "almalinux": "almalinux", "amazonlinux": "amazonwebservices", "redhat": "redhat"}
 
+// systemIconFiles are bundled with the command so publishing does not depend
+// on a CDN being reachable at runtime. Keep these files under source control
+// and update them deliberately when the icon set changes.
+//
+//go:embed system_icons/*.png
+var systemIconFiles embed.FS
+
 func normalizedSystemIcon(tag string) ([]byte, string, error) {
 	base := strings.ToLower(strings.Split(tag, ".")[0])
 	keys := []string{"linux"}
@@ -189,61 +187,16 @@ func normalizedSystemIcon(tag string) ([]byte, string, error) {
 	if strings.Contains(base, "oraclelinux") {
 		keys = []string{"oraclelinux", "oracle", "linux"}
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
-	defer cancel()
 	for _, key := range keys {
-		iconURL := "https://cdn.simpleicons.org/" + key
-		req, _ := http.NewRequestWithContext(ctx, http.MethodGet, iconURL, nil)
-		resp, err := http.DefaultClient.Do(req)
-		if err == nil {
-			data, _ := io.ReadAll(io.LimitReader(resp.Body, 2<<20))
-			resp.Body.Close()
-			if resp.StatusCode/100 == 2 {
-				if png, convErr := rasterizeIcon(data); convErr == nil {
-					return png, iconURL, nil
-				}
-			}
+		path := "system_icons/" + key + ".png"
+		data, err := systemIconFiles.ReadFile(path)
+		if err != nil {
+			continue
 		}
+		return data, "bundled:" + path, nil
 	}
-	// A valid 128x128 fallback keeps an artifact usable when the icon CDN is down.
-	img := image.NewRGBA(image.Rect(0, 0, 128, 128))
-	for y := 0; y < 128; y++ {
-		for x := 0; x < 128; x++ {
-			img.Set(x, y, color.RGBA{R: 45, G: 55, B: 72, A: 255})
-		}
-	}
-	var out bytes.Buffer
-	_ = jpeg.Encode(&out, img, &jpeg.Options{Quality: 90})
-	return out.Bytes(), "built-in-placeholder", nil
-}
-
-func rasterizeIcon(data []byte) ([]byte, error) {
-	if img, _, err := image.Decode(bytes.NewReader(data)); err == nil {
-		dst := image.NewRGBA(image.Rect(0, 0, 128, 128))
-		b := img.Bounds()
-		for y := 0; y < 128; y++ {
-			for x := 0; x < 128; x++ {
-				dst.Set(x, y, img.At(b.Min.X+x*b.Dx()/128, b.Min.Y+y*b.Dy()/128))
-			}
-		}
-		var out bytes.Buffer
-		if err := jpeg.Encode(&out, dst, &jpeg.Options{Quality: 90}); err != nil {
-			return nil, err
-		}
-		return out.Bytes(), nil
-	}
-	if _, err := exec.LookPath("convert"); err != nil {
-		return nil, err
-	}
-	f, err := os.CreateTemp("", "system-icon-*.svg")
-	if err != nil {
-		return nil, err
-	}
-	defer os.Remove(f.Name())
-	if _, err = f.Write(data); err != nil {
-		return nil, err
-	}
-	f.Close()
-	out, err := exec.Command("convert", f.Name(), "-resize", "128x128!", "jpeg:-").Output()
-	return out, err
+	// Keep the fallback in the same format as bundled assets: no conversion or
+	// external image tooling is needed during publishing.
+	data, _ := systemIconFiles.ReadFile("system_icons/linux.png")
+	return data, "built-in-placeholder", nil
 }

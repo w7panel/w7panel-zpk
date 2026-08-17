@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"embed"
 	_ "embed"
 	nethttp "net/http"
 
@@ -25,6 +26,9 @@ import (
 
 //go:embed config.yaml
 var ConfigFileContent []byte
+
+//go:embed app/respo/command/system_icons/*.png
+var systemIconFiles embed.FS
 
 func main() {
 	app := app.NewApp(app.Option{

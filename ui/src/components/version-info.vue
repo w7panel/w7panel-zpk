@@ -368,7 +368,7 @@ export default {
             return ['environment', 'gateway-plugin'].includes(this.applicationType);
         },
         isRegisterSiteDisabled() {
-            return ['environment', 'gateway-plugin'].includes(this.applicationType);
+            return this.applicationType == 'gateway-plugin';
         },
         requiredTagName() {
             if (this.applicationType == 'environment') { return '运行环境' }

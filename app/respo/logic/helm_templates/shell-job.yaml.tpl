@@ -43,16 +43,10 @@ spec:
         {{- $jobSidecarHostAliases | nindent 8 }}
       {{- end }}
       serviceAccountName: {{ include "common.serviceAccountName" $root }}
+      {{- with $root.Values.jobAffinity }}
       affinity:
-        podAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            - labelSelector:
-                matchExpressions:
-                  - key: w7.cc/identifie
-                    operator: In
-                    values:
-                      - {{ $root.Values.app.identify | quote }}
-              topologyKey: kubernetes.io/hostname
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       {{- if or $root.Values.volumes $jobSidecarVolumes }}
       volumes:
         {{- if $root.Values.volumes }}
@@ -69,12 +63,12 @@ spec:
           {{- if $job.image }}
           image: {{ $job.image | quote }}
           {{- else }}
-          image: "{{ $job.container.image.repository }}:{{ $job.container.image.tag }}"
+          image: "{{ $job.container.image.repository }}:{{ tpl $job.container.image.tag $root }}"
           {{- end }}
           imagePullPolicy: {{ $job.container.image.pullPolicy | default "IfNotPresent" }}
           command: ["/bin/sh", "-c"]
           args:
-            - {{ $job.shell | quote }}
+            - {{ tpl $job.shell $root | quote }}
           env:
             {{- with $job.container.env }}
             {{- toYaml . | nindent 12 }}

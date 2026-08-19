@@ -80,17 +80,9 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       serviceAccountName: {{ include "common.serviceAccountName" . }}
-      {{- if .Values.sharedStorageAffinity.targetSelectorApp }}
+      {{- with .Values.affinity }}
       affinity:
-        podAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            - labelSelector:
-                matchExpressions:
-                  - key: w7.cc/identifie
-                    operator: In
-                    values:
-                      - {{ .Values.sharedStorageAffinity.targetSelectorApp | quote }}
-              topologyKey: kubernetes.io/hostname
+        {{- toYaml . | nindent 8 }}
       {{- end }}
 
       containers:

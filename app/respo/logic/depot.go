@@ -300,8 +300,10 @@ func (self *Depot) GetFormula(name string, version string, user *entity.Registry
 
 func (self *Depot) GetFormulaBackendZipDownloadUrl(formula *Formula, isTemporary bool) string {
 	if formula.ZipPath != "" {
-		zipUrl, token := self.GetFormulaBackendZipDownloadUrlByApplication(formula.Manifest.Application, isTemporary)
-		self.DownloadMapping.Store(token, formula.ZipPath)
+		zipUrl, token := self.GetFormulaBackendZipDownloadUrlByApplication(formula.Manifest.Application, formula.ZipPath, isTemporary)
+		if isTemporary {
+			self.DownloadMapping.Store(token, formula.ZipPath)
+		}
 
 		return zipUrl
 	}
@@ -309,12 +311,17 @@ func (self *Depot) GetFormulaBackendZipDownloadUrl(formula *Formula, isTemporary
 	return ""
 }
 
-func (self *Depot) GetFormulaBackendZipDownloadUrlByApplication(application logic.Application, isTemporary bool) (string, string) {
+func (self *Depot) GetFormulaBackendZipDownloadUrlByApplication(application logic.Application, zipPath string, isTemporary bool) (string, string) {
 	token := ""
 	if isTemporary {
 		token = function.GetRandomString(20)
 	} else {
-		token = function.GetMd5("backend" + application.Identifie + application.Version)
+		var err error
+		token, err = createBackendZipDownloadToken(application, zipPath)
+		if err != nil {
+			slog.Error("create backend zip download token failed", "identifie", application.Identifie, "version", application.Version, "err", err)
+			return "", ""
+		}
 	}
 
 	domain := facade.GetConfig().GetString("setting.depot.external_domain")

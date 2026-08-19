@@ -224,7 +224,7 @@ func (hc *HelmPack) PackToHelm() error {
 				return err
 			}
 		}
-		if hc.Manifest.Application.Type != logic2.GatewayPluginApp && hc.Manifest.Application.Type != logic2.EnvironmentApp {
+		if shouldGenerateRegisterSite(hc.Manifest) {
 			if err := hc.generateRegisterSiteJobTemplate(templatesDir, hc.Manifest); err != nil {
 				return err
 			}
@@ -236,6 +236,10 @@ func (hc *HelmPack) PackToHelm() error {
 	}
 
 	return nil
+}
+
+func shouldGenerateRegisterSite(manifest logic2.Manifest) bool {
+	return manifest.Application.Type != logic2.GatewayPluginApp && manifest.Application.RegisterSite
 }
 
 func (hc *HelmPack) isHelmPackage() bool {
@@ -727,6 +731,10 @@ func (hc *HelmPack) generateHelpersTpl(rootDir string, identify string) error {
 // generateValuesYaml 生成 values.yaml
 func (hc *HelmPack) generateValuesYaml(rootDir string) error {
 	platform := hc.Manifest.Platform
+	if hc.Manifest.Application.Type == logic2.EnvironmentApp {
+		platform = withEnvironmentAppPVCName(platform)
+	}
+	platform.Shells = hc.getHelmShells()
 	if hc.Manifest.Application.Annotation == nil {
 		hc.Manifest.Application.Annotation = make(map[string]interface{})
 	}
@@ -754,25 +762,31 @@ func (hc *HelmPack) generateValuesYaml(rootDir string) error {
 		"annotations":          hc.Manifest.Application.Annotation,
 		"global":               hc.getGlobalValues(),
 		"replicas":             1,
-		"workload":             hc.getWorkloadValues(hc.Manifest.Platform),
-		"service":              hc.getServiceValues(hc.Manifest.Platform),
-		"node_service":         hc.getNodePortServiceValues(hc.Manifest.Platform),
+		"workload":             hc.getWorkloadValues(platform),
+		"service":              hc.getServiceValues(platform),
+		"node_service":         hc.getNodePortServiceValues(platform),
 		"ingress":              hc.getIngressValues(platform, hc.Manifest.Application),
 		"serviceAccount":       hc.getServiceAccountValues(hc.Manifest.Application),
-		"volumes":              hc.Manifest.Platform.Volumes,
+		"volumes":              platform.Volumes,
 		"volumeClaimTemplates": hc.getVolumeClaimTemplateValues(hc.Manifest.Platform),
 		"defaultPort":          defaultPort,
 		"startParams":          hc.getStartParamsEnvValues(hc.Manifest.Platform),
 		"runtimeClass":         hc.getRuntimeClassValues(hc.Manifest.Platform),
 		"hostUsers":            hc.Manifest.Platform.HostUsers,
-		"sharedStorageAffinity": map[string]interface{}{
-			"targetSelectorApp": hc.SharedStorageTargetApp,
-		},
-		"w7panelSidecars": hc.Sidecars,
+		"affinity":             hc.getWorkloadAffinityValues(),
+		"jobAffinity":          hc.getJobAffinityValues(),
+		"w7panelSidecars":      hc.Sidecars,
 	}
-	values["jobs"] = hc.getJobsValues(hc.Manifest.Platform)
-	helmContainers := make([]map[string]interface{}, 0, len(hc.Manifest.Platform.ContainerV2s))
-	for _, container := range hc.Manifest.Platform.ContainerV2s {
+	values["jobs"] = hc.getJobsValues(platform)
+	if hc.Manifest.Application.Type == logic2.EnvironmentApp && hc.Manifest.Source.Url != "" {
+		depot, _ := NewDepot()
+		codePackageURL, _ := depot.GetFormulaBackendZipDownloadUrlByApplication(
+			hc.Manifest.Application, strings.TrimPrefix(hc.Manifest.Source.Url, "file://"), false,
+		)
+		values["codePackageUrl"] = codePackageURL
+	}
+	helmContainers := make([]map[string]interface{}, 0, len(platform.ContainerV2s))
+	for _, container := range platform.ContainerV2s {
 		helmContainers = append(helmContainers, hc.generateContainerV2Values(container, hc.Manifest.Application))
 	}
 	values["containers"] = helmContainers
@@ -786,6 +800,34 @@ func (hc *HelmPack) generateValuesYaml(rootDir string) error {
 
 	filePath := filepath.Join(rootDir, "values.yaml")
 	return writeYAMLFile(filePath, values)
+}
+
+func (hc *HelmPack) getWorkloadAffinityValues() map[string]interface{} {
+	if hc.Manifest.Application.Type == logic2.EnvironmentApp {
+		return environmentAppPodAffinityValues()
+	}
+	if hc.SharedStorageTargetApp == "" {
+		return nil
+	}
+	return podAffinityByIdentify(hc.SharedStorageTargetApp)
+}
+
+func (hc *HelmPack) getJobAffinityValues() map[string]interface{} {
+	if hc.Manifest.Application.Type == logic2.EnvironmentApp {
+		return environmentAppPodAffinityValues()
+	}
+	return podAffinityByIdentify(hc.Manifest.Application.Identifie)
+}
+
+func podAffinityByIdentify(identify string) map[string]interface{} {
+	return map[string]interface{}{"podAffinity": map[string]interface{}{
+		"requiredDuringSchedulingIgnoredDuringExecution": []interface{}{map[string]interface{}{
+			"labelSelector": map[string]interface{}{"matchExpressions": []interface{}{map[string]interface{}{
+				"key": "w7.cc/identifie", "operator": "In", "values": []string{identify},
+			}}},
+			"topologyKey": "kubernetes.io/hostname",
+		}},
+	}}
 }
 
 func (hc *HelmPack) getWorkloadValues(platform logic2.Platform) map[string]interface{} {
@@ -976,10 +1018,14 @@ func (hc *HelmPack) generateIngressYaml(rootDir string, ingressName string, pare
 }
 
 func (hc *HelmPack) generateShellsTemplates(rootDir string) error {
-	if len(hc.Manifest.Platform.Shells) == 0 {
-		return nil
-	}
 	return writeHelmTemplateFile(rootDir, "shell-job.yaml", "shell-job.yaml.tpl")
+}
+
+func (hc *HelmPack) getHelmShells() []logic2.Shell {
+	if hc.Manifest.Application.Type == logic2.EnvironmentApp && hc.Manifest.Source.Url != "" {
+		return rewriteEnvironmentAppShells(hc.Manifest)
+	}
+	return append([]logic2.Shell(nil), hc.Manifest.Platform.Shells...)
 }
 
 func (hc *HelmPack) generateBuildImageJobTemplate(rootDir string) error {
@@ -1065,7 +1111,9 @@ func encodeShellsJSONBase64(shells []logic2.Shell) (string, error) {
 
 func (hc *HelmPack) generateCreateSiteJobTemplate(rootDir string, application logic2.Application, tradition logic2.Tradition, k8sAppName string) error {
 	depot, _ := NewDepot()
-	zipUrl, _ := depot.GetFormulaBackendZipDownloadUrlByApplication(application, false)
+	zipUrl, _ := depot.GetFormulaBackendZipDownloadUrlByApplication(
+		application, strings.TrimPrefix(hc.Manifest.Source.Url, "file://"), false,
+	)
 
 	cmdBase64, err := encodeCommandJSONBase64(tradition.Cmd)
 	if err != nil {
@@ -1268,7 +1316,7 @@ func (hc *HelmPack) getImageValues(container logic2.ContainerV2) map[string]inte
 	if imageName == "" {
 		imageName = GetBuildImageName(hc.Manifest.Application)
 	}
-	if hc.Manifest.Application.Type == logic2.SystemImageApp {
+	if hc.Manifest.Application.Type == logic2.SystemImageApp || hc.Manifest.Application.Type == logic2.EnvironmentApp {
 		imageName = strings.ReplaceAll(imageName, "{version}", "{{ .Values.IMAGE_VERSION }}")
 	}
 	repository := imageName
@@ -1313,6 +1361,9 @@ func (hc *HelmPack) getShellJobValues(items []logic2.Shell) []map[string]interfa
 		shellWeight := 0
 		hookName := ""
 		switch item.Type {
+		case environmentAppCodeInstallShellType:
+			shellWeight = -6
+			hookName = "pre-install,pre-upgrade"
 		case "requireinstall":
 			shellWeight = -5
 			hookName = "pre-install"
@@ -1380,6 +1431,12 @@ func (hc *HelmPack) getShellJobContainerValues(platform logic2.Platform, contain
 	}
 
 	container := platform.ContainerV2s[0]
+	for _, item := range platform.ContainerV2s {
+		if !item.IsInitContainer {
+			container = item
+			break
+		}
+	}
 	if containerName != "" {
 		for _, item := range platform.ContainerV2s {
 			if item.Name == containerName {
@@ -1410,7 +1467,9 @@ func (hc *HelmPack) getBuildImageValues(container logic2.ContainerV2, applicatio
 	}
 
 	depot, _ := NewDepot()
-	zipUrl, _ := depot.GetFormulaBackendZipDownloadUrlByApplication(application, false)
+	zipUrl, _ := depot.GetFormulaBackendZipDownloadUrlByApplication(
+		application, strings.TrimPrefix(hc.Manifest.Source.Url, "file://"), false,
+	)
 
 	dockerFilePath := "Dockerfile"
 	if container.Build.Context != "" {

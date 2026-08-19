@@ -110,25 +110,36 @@ func (c Attach) Download(ctx *gin.Context) {
 	depot := c.getDepot()
 	if val, ok := depot.DownloadMapping.Load(params.Token); ok {
 		depot.DownloadMapping.Delete(params.Token)
-		path := val.(string)
-		file, err := logic.GetLocalClient().GetFile(path)
-		if err != nil {
-			c.JsonResponseWithServerError(ctx, err)
-			return
-		}
-		defer file.Close()
+		c.downloadZipFile(ctx, params.Token, val.(string))
+		return
+	}
 
-		fileInfo, _ := file.Stat()
-		ctx.Header("Content-Length", strconv.FormatInt(fileInfo.Size(), 10))
-		ctx.Header("Content-Type", "application/zip")
-		ctx.Header("Content-Disposition", "attachment; filename="+params.Token+path2.Ext(path))
-
-		ctx.File(file.Name())
-
+	stableToken, err := logic.ParseBackendZipDownloadToken(params.Token)
+	if err == nil {
+		c.downloadZipFile(ctx, params.Token, stableToken.ZipPath)
 		return
 	}
 
 	c.JsonResponseWithServerError(ctx, errors.New("请先获取仓库信息"))
+}
+
+func (c Attach) downloadZipFile(ctx *gin.Context, token, path string) {
+	file, err := logic.GetLocalClient().GetFile(path)
+	if err != nil {
+		c.JsonResponseWithServerError(ctx, err)
+		return
+	}
+	defer file.Close()
+
+	fileInfo, err := file.Stat()
+	if err != nil {
+		c.JsonResponseWithServerError(ctx, err)
+		return
+	}
+	ctx.Header("Content-Length", strconv.FormatInt(fileInfo.Size(), 10))
+	ctx.Header("Content-Type", "application/zip")
+	ctx.Header("Content-Disposition", "attachment; filename="+token+path2.Ext(path))
+	ctx.File(file.Name())
 }
 
 func (c Attach) GetBackendZipFileList(ctx *gin.Context) {

@@ -837,6 +837,7 @@ import { confirm, messageError, messageSuccess, messageWarning } from '@/utils/u
 import emitWujieEvent from '@/utils/wujie-event';
 
 const environmentAnnotationKeys = {
+    parent: 'w7.cc/parent',
     imageLanguage: 'w7.cc/image_language',
     imageTemplate: 'w7.cc/image_template',
     imageVersion: 'w7.cc/image_version',
@@ -1774,7 +1775,7 @@ export default {
                 this.formulaBaseInfo = JSON.parse(JSON.stringify(baseInfo));
                 this.applyEnvironmentAnnotationForm(baseInfo.annotation || {});
                 this.applySystemImageAnnotationForm(baseInfo.annotation || {});
-                if (['environment', 'gateway-plugin'].includes(this.form.type)) {
+                if (this.form.type == 'gateway-plugin') {
                     this.form.once = true;
                 }
                 this.formulaSettingLoaded = true;
@@ -1813,6 +1814,17 @@ export default {
                 .map(item => item.trim())
                 .filter(Boolean))];
         },
+        getEnvironmentParentIdentifie() {
+            // AppGroup parent follows the complete application identifier
+            // (author-identifie), rather than a fixed environment name.
+            const currentIdentifie = this.form.author && this.form.identifie
+                ? `${this.form.author}-${this.form.identifie}`
+                : (this.json?.application?.identifie || this.form.identifie || this.identifie || '');
+            return String(currentIdentifie)
+                .trim()
+                .replaceAll('_', '-')
+                .toLowerCase();
+        },
         changeEnvironmentLanguage(value) {
             this.form.environmentSystemRebootRestore = String(value || '').toLowerCase() != 'php';
         },
@@ -1820,6 +1832,7 @@ export default {
             let versions = this.normalizeEnvironmentVersions(this.form.environmentImageVersion);
             this.form.environmentImageVersion = versions;
             const annotations = {
+                [environmentAnnotationKeys.parent]: this.getEnvironmentParentIdentifie(),
                 [environmentAnnotationKeys.imageLanguage]: String(this.form.environmentImageLanguage || '').trim(),
                 [environmentAnnotationKeys.imageTemplate]: String(this.form.environmentImageTemplate || '').trim(),
                 [environmentAnnotationKeys.imageVersion]: versions.join(','),
@@ -1947,7 +1960,7 @@ export default {
             let nextBaseInfo = {
                 ...baseInfo,
                 annotation: this.filterAnnotationsForType(baseInfo.annotation || {}),
-                once: ['environment', 'gateway-plugin'].includes(this.form.type)
+                once: this.form.type == 'gateway-plugin'
                     ? true
                     : Boolean(baseInfo.once),
             };
@@ -1955,7 +1968,7 @@ export default {
                 identifie: this.identifie,
                 base_info: nextBaseInfo,
             });
-            if (['environment', 'gateway-plugin'].includes(this.form.type)) {
+            if (this.form.type == 'gateway-plugin') {
                 this.form.once = true;
             }
             this.formulaBaseInfo = JSON.parse(JSON.stringify(nextBaseInfo));
@@ -2000,7 +2013,6 @@ export default {
                     ? depends.filter(item => !isEnvironmentAppDependency(item) && item?.identifie != 'w7panel-sysbox')
                     : depends;
             }
-            this.form.once = true;
             this.form.depends = [createEnvironmentAppDependency()];
         },
         syncSystemImageDependency() {
@@ -3174,7 +3186,7 @@ platform:
                 nextType,
             );
             this.currentApplicationType = nextType;
-            if (['environment', 'gateway-plugin'].includes(this.form.type)) {
+            if (this.form.type == 'gateway-plugin') {
                 this.form.once = true;
             }
             if (['environment', 'gateway-plugin', 'system-image'].includes(this.form.type)) {
@@ -3234,7 +3246,7 @@ platform:
                 j.application.author = this.form.author;
                 j.application.theme = this.form.theme;
                 j.application.type = this.form.type;
-                if (['environment', 'gateway-plugin'].includes(this.form.type)) {
+                if (this.form.type == 'gateway-plugin') {
                     this.form.once = true;
                 }
                 j.application.once = Boolean(this.form.once);

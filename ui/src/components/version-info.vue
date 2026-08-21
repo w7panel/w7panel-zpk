@@ -365,7 +365,7 @@ export default {
             return this.json?.application?.type || '';
         },
         isInstallOnlyOnceType() {
-            return ['environment', 'gateway-plugin'].includes(this.applicationType);
+            return this.applicationType == 'gateway-plugin';
         },
         isRegisterSiteDisabled() {
             return this.applicationType == 'gateway-plugin';

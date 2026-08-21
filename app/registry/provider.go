@@ -47,7 +47,6 @@ func (p Provider) registerRoutes(httpServer *httpserver.Server) {
 		api.POST("/repository/edit", controller.Repository{}.Edit)
 		api.POST("/repository/del", controller.Repository{}.Delete)
 		api.POST("/repository/tags/list", controller.Repository{}.Tags)
-		api.POST("/repository/sync-status/list", controller.RegistrySyncStatus{}.List)
 		api.POST("/repository/tags/del", controller.Repository{}.DelTag)
 
 		api.Any("/repository/deploy_rule/k8s/proxy/*path", controller.Deploy{}.K8sProxy)

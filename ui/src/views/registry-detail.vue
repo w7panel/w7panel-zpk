@@ -16,37 +16,6 @@
         <div class="bg-white" style="padding: 0 24px 6px;">
             <a-tabs v-model:active-key="tabsActive">
                 <a-tab-pane key="version" title="版本管理">
-                    <details v-if="syncStatuses.length" class="sync-status-section">
-                        <summary class="sync-status-title">
-                            镜像同步任务
-                            <a-tag size="small" color="arcoblue">{{ syncStatuses.length }}</a-tag>
-                        </summary>
-                        <a-table :data="syncStatuses" :pagination="false" row-key="tag_name" class="table-header">
-                            <template #columns>
-                                <a-table-column title="镜像版本" data-index="tag_name" />
-                                <a-table-column title="状态" :width="180">
-                                    <template #cell="{ record }">
-                                        <a-tooltip v-if="record.status === 'failed'" :content="record.error || '同步失败'">
-                                            <a-tag color="red">同步失败</a-tag>
-                                        </a-tooltip>
-                                        <a-tag v-else color="arcoblue">
-                                            同步中 {{ record.completed }}/{{ record.total }}
-                                        </a-tag>
-                                    </template>
-                                </a-table-column>
-                                <a-table-column title="进度" :width="240">
-                                    <template #cell="{ record }">
-                                        <a-progress :percent="record.progress / 100" :status="record.status === 'failed' ? 'danger' : 'normal'" />
-                                    </template>
-                                </a-table-column>
-                                <a-table-column title="更新时间" :width="200">
-                                    <template #cell="{ record }">
-                                        {{ record.updated_at ? new Date(record.updated_at).toLocaleString() : '未知' }}
-                                    </template>
-                                </a-table-column>
-                            </template>
-                        </a-table>
-                    </details>
                     <a-table :loading="loading" :data="tags" style="width: 100%" class="table-header"
                         :pagination="false" row-key="TagName">
                         <template #columns>
@@ -428,7 +397,6 @@ export default {
             loading: true,
             data: {},
             tags: [],
-            syncStatuses: [],
             tagPage: {
                 page: 1,
                 pageSize: 10,
@@ -915,16 +883,7 @@ export default {
                 })
                 this.tags = data
                 this.tagPage.total = res.data.data?.total;
-                return this.getTagSyncStatuses();
             }).finally(() => { this.loading = false; });
-        },
-        getTagSyncStatuses() {
-            return myAxios.post("/v2/api/repository/sync-status/list", {
-                id: this.id,
-            }).then(res => {
-                let statuses = res.data?.data?.list || [];
-                this.syncStatuses = statuses;
-            }).catch(() => { });
         },
 
         getBuild() {
@@ -1258,37 +1217,6 @@ export default {
 }
 </style>
 <style>
-.sync-status-section {
-    margin-bottom: 24px;
-    border: 1px solid #e5e6eb;
-    background: #f7f8fa;
-}
-
-.sync-status-title {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 14px 16px;
-    color: #1d2129;
-    font-size: 15px;
-    font-weight: 600;
-    cursor: pointer;
-    user-select: none;
-}
-
-.sync-status-title::marker {
-    color: #86909c;
-}
-
-.sync-status-section[open] .sync-status-title {
-    border-bottom: 1px solid #e5e6eb;
-
-}
-
-.sync-status-section .arco-table {
-    border: 0;
-}
-
 .registry-version-popover {
     max-width: 520px;
     white-space: normal;

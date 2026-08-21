@@ -270,7 +270,6 @@ func (c Repository) Tags(ctx *gin.Context) {
 			if _, exists := tagUpdateTimeMap[tag]; exists && !tagUpdateTimeMap[tag].IsZero() {
 				tagInfo.UpdatedAt = tagUpdateTimeMap[tag].Format(time.RFC3339)
 			}
-
 			tagInfos = append(tagInfos, logic.TagInfo{
 				RepositoryName: curRepository.Name,
 				TagName:        tagInfo.TagName,

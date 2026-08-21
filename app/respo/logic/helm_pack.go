@@ -3,7 +3,6 @@ package logic
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -139,10 +138,6 @@ func (hc *HelmPack) PackToHelm() error {
 		return err
 	}
 
-	traditionSiteName := ""
-	if hc.Manifest.Application.Type == logic2.Tradition_App {
-		traditionSiteName = buildTraditionSiteName(hc.Manifest.Platform.Tradition)
-	}
 	if hc.Manifest.Application.Type == logic2.GatewayPluginApp {
 		renderer, err := getGatewayPluginRenderer(hc.Manifest.Platform.GatewayPlugin)
 		if err != nil {
@@ -166,7 +161,13 @@ func (hc *HelmPack) PackToHelm() error {
 		if err := hc.generateValuesYaml(helmDir); err != nil {
 			return err
 		}
-		if err := hc.generateCreateSiteJobTemplate(templatesDir, hc.Manifest.Application, hc.Manifest.Platform.Tradition, traditionSiteName); err != nil {
+		if err := hc.generateHelpersTpl(templatesDir, hc.Manifest.Application.Identifie); err != nil {
+			return err
+		}
+		if err := hc.generateTraditionAppTemplates(templatesDir); err != nil {
+			return err
+		}
+		if err := hc.generateShellsTemplates(templatesDir); err != nil {
 			return err
 		}
 	} else {
@@ -182,6 +183,11 @@ func (hc *HelmPack) PackToHelm() error {
 		}
 		if err := hc.generateShellsTemplates(templatesDir); err != nil {
 			return err
+		}
+		if hc.Manifest.Application.Type == logic2.EnvironmentApp {
+			if err := hc.generateEnvironmentAppTemplates(templatesDir); err != nil {
+				return err
+			}
 		}
 		if err := hc.generateBuildImageJobTemplate(templatesDir); err != nil {
 			return err
@@ -592,6 +598,10 @@ func (hc *HelmPack) generateSubCharts(rootDir string) error {
 	}
 	mainChartName := hc.Manifest.Application.Identifie
 	for _, subManifest := range hc.SubManifest {
+		if hc.Manifest.Application.Type == logic2.Tradition_App &&
+			subManifest.Application.Identifie == hc.Manifest.Platform.Tradition.EnvironmentName {
+			continue
+		}
 		sharedStorageTargetApp := ""
 		if hasSharedPersistentStorage(hc.Manifest.Platform.Volumes, subManifest.Platform.Volumes) {
 			sharedStorageTargetApp = mainChartName
@@ -733,6 +743,11 @@ func (hc *HelmPack) generateValuesYaml(rootDir string) error {
 	platform := hc.Manifest.Platform
 	if hc.Manifest.Application.Type == logic2.EnvironmentApp {
 		platform = withEnvironmentAppPVCName(platform)
+	} else if hc.Manifest.Application.Type == logic2.Tradition_App {
+		platform.Volumes = append([]v1.Volume{{
+			Name:         "site-storage",
+			VolumeSource: v1.VolumeSource{PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{ClaimName: siteManagerPersistentVolumeClaim}},
+		}}, platform.Volumes...)
 	}
 	platform.Shells = hc.getHelmShells()
 	if hc.Manifest.Application.Annotation == nil {
@@ -753,8 +768,9 @@ func (hc *HelmPack) generateValuesYaml(rootDir string) error {
 		appName = hc.Manifest.Platform.BaseInfo.Identifie
 	}
 	values := map[string]interface{}{
-		"PVC_NAME":   "",
-		"DOMAIN_URL": "",
+		"PVC_NAME":               "",
+		"DOMAIN_URL":             "",
+		"CODE_INSTALL_DIRECTORY": "",
 		"app": map[string]interface{}{
 			"title":    appName,
 			"identify": hc.Manifest.Application.Identifie,
@@ -778,12 +794,15 @@ func (hc *HelmPack) generateValuesYaml(rootDir string) error {
 		"w7panelSidecars":      hc.Sidecars,
 	}
 	values["jobs"] = hc.getJobsValues(platform)
-	if hc.Manifest.Application.Type == logic2.EnvironmentApp && hc.Manifest.Source.Url != "" {
-		depot, _ := NewDepot()
-		codePackageURL, _ := depot.GetFormulaBackendZipDownloadUrlByApplication(
-			hc.Manifest.Application, strings.TrimPrefix(hc.Manifest.Source.Url, "file://"), false,
-		)
-		values["codePackageUrl"] = codePackageURL
+	if hc.Manifest.Application.Type == logic2.EnvironmentApp {
+		if err := hc.addEnvironmentAppValues(values); err != nil {
+			return err
+		}
+	}
+	if hc.Manifest.Application.Type == logic2.Tradition_App {
+		if err := hc.addTraditionAppValues(values); err != nil {
+			return err
+		}
 	}
 	helmContainers := make([]map[string]interface{}, 0, len(platform.ContainerV2s))
 	for _, container := range platform.ContainerV2s {
@@ -985,6 +1004,11 @@ func (hc *HelmPack) generateSecretYaml(rootDir string) error {
 }
 
 func (hc *HelmPack) generateIngressesYaml(rootDir string) error {
+	// Environment applications use a dedicated Ingress which routes through
+	// site-manager nginx rather than their own Service.
+	if hc.Manifest.Application.Type == logic2.EnvironmentApp {
+		return nil
+	}
 	domain := hc.getIngressDomain(hc.Manifest.Platform)
 	if domain == "" {
 		return nil
@@ -1022,8 +1046,8 @@ func (hc *HelmPack) generateShellsTemplates(rootDir string) error {
 }
 
 func (hc *HelmPack) getHelmShells() []logic2.Shell {
-	if hc.Manifest.Application.Type == logic2.EnvironmentApp && hc.Manifest.Source.Url != "" {
-		return rewriteEnvironmentAppShells(hc.Manifest)
+	if hc.Manifest.Application.Type == logic2.Tradition_App {
+		return hc.getTraditionAppShells()
 	}
 	return append([]logic2.Shell(nil), hc.Manifest.Platform.Shells...)
 }
@@ -1033,21 +1057,6 @@ func (hc *HelmPack) generateBuildImageJobTemplate(rootDir string) error {
 		return nil
 	}
 	return writeHelmTemplateFile(rootDir, "container-build-image.yaml", "container-build-image.yaml.tpl")
-}
-
-func getVersionIdentifie(appName, version string) string {
-	if version != "" {
-		cleanVersion := strings.ReplaceAll(version, ".", "")
-		return appName + "_" + cleanVersion
-	}
-	return appName
-}
-
-func buildTraditionSiteName(tradition logic2.Tradition) string {
-	appName := tradition.EnvironmentName
-	version := tradition.EnvironmentVersion
-	envIdentifie := strings.ToLower(strings.ReplaceAll(getVersionIdentifie(appName, version), "_", "-"))
-	return fmt.Sprintf(`{{ printf "%%s-%%s" (%q | trunc 54 | trimSuffix "-") (printf "%%s-%%s" $fullName %q | sha256sum | trunc 8) }}`, envIdentifie, envIdentifie)
 }
 
 func getStartParamsEnvJSONTemplate() string {
@@ -1075,98 +1084,6 @@ func renderHelmValuesPlaceholdersMap(values map[string]string) map[string]string
 		rendered[key] = renderHelmValuesPlaceholders(value)
 	}
 	return rendered
-}
-
-func encodeCommandJSONBase64(commands []string) (string, error) {
-	normalizedCommands := make([]string, 0, len(commands))
-	for _, command := range commands {
-		if strings.TrimSpace(command) == "" {
-			continue
-		}
-		normalizedCommands = append(normalizedCommands, command)
-	}
-	commands = normalizedCommands
-	if len(commands) == 0 {
-		return "", nil
-	}
-
-	val, err := json.Marshal(commands)
-	if err != nil {
-		return "", err
-	}
-	return base64.StdEncoding.EncodeToString(val), nil
-}
-
-func encodeShellsJSONBase64(shells []logic2.Shell) (string, error) {
-	if len(shells) == 0 {
-		return "", nil
-	}
-
-	val, err := json.Marshal(shells)
-	if err != nil {
-		return "", err
-	}
-	return base64.StdEncoding.EncodeToString(val), nil
-}
-
-func (hc *HelmPack) generateCreateSiteJobTemplate(rootDir string, application logic2.Application, tradition logic2.Tradition, k8sAppName string) error {
-	depot, _ := NewDepot()
-	zipUrl, _ := depot.GetFormulaBackendZipDownloadUrlByApplication(
-		application, strings.TrimPrefix(hc.Manifest.Source.Url, "file://"), false,
-	)
-
-	cmdBase64, err := encodeCommandJSONBase64(tradition.Cmd)
-	if err != nil {
-		return err
-	}
-	shellsBase64, err := encodeShellsJSONBase64(hc.Manifest.Platform.Shells)
-	if err != nil {
-		return err
-	}
-
-	createSiteJob, err := buildTraditionCreateSiteJobTemplate(application, tradition, k8sAppName, zipUrl)
-	if err != nil {
-		return err
-	}
-	if err := writeFile(filepath.Join(rootDir, "create-site-job.yaml"), createSiteJob); err != nil {
-		return err
-	}
-
-	siteShellJob, err := buildTraditionSiteShellJobTemplate(cmdBase64, shellsBase64, getStartParamsEnvJSONTemplate())
-	if err != nil {
-		return err
-	}
-	return writeFile(filepath.Join(rootDir, "site-shell-job.yaml"), siteShellJob)
-}
-
-func buildTraditionCreateSiteJobTemplate(application logic2.Application, tradition logic2.Tradition, k8sAppName, zipUrl string) (string, error) {
-	template, err := loadHelmTemplate("tradition-create-site-job.yaml.tpl")
-	if err != nil {
-		return "", err
-	}
-
-	return renderHelmTemplatePlaceholders(template, map[string]string{
-		"__ENV_TITLE__":         strconv.Quote(application.Identifie + "-" + tradition.EnvironmentVersion + "-副本"),
-		"__ENV_GROUP__":         strconv.Quote(tradition.EnvironmentName),
-		"__ENV_LANGUAGE__":      strconv.Quote(tradition.EnvironmentLanguage),
-		"__ENV_VERSION__":       strconv.Quote(tradition.EnvironmentVersion),
-		"__APP_IDENTIFY__":      strconv.Quote(application.Identifie),
-		"__NEW_ENV_K8S_APP__":   k8sAppName,
-		"__CODE_DOWNLOAD_URL__": strconv.Quote(zipUrl),
-	}), nil
-}
-
-func buildTraditionSiteShellJobTemplate(cmdBase64, shellsBase64, startParamsEnvBase64 string) (string, error) {
-	template, err := loadHelmTemplate("tradition-site-shell-job.yaml.tpl")
-	if err != nil {
-		return "", err
-	}
-
-	return renderHelmTemplatePlaceholders(template, map[string]string{
-		"__CMD_B64__":              cmdBase64,
-		"__SHELLS_B64__":           shellsBase64,
-		"__START_PARAMS_ENV_B64__": startParamsEnvBase64,
-	}), nil
 }
 
 func (hc *HelmPack) generateRegisterSiteJobTemplate(rootDir string, manifest logic2.Manifest) error {
@@ -1361,9 +1278,6 @@ func (hc *HelmPack) getShellJobValues(items []logic2.Shell) []map[string]interfa
 		shellWeight := 0
 		hookName := ""
 		switch item.Type {
-		case environmentAppCodeInstallShellType:
-			shellWeight = -6
-			hookName = "pre-install,pre-upgrade"
 		case "requireinstall":
 			shellWeight = -5
 			hookName = "pre-install"
@@ -1419,6 +1333,20 @@ func (hc *HelmPack) getJobsValues(platform logic2.Platform) []map[string]interfa
 }
 
 func (hc *HelmPack) getShellJobContainerValues(platform logic2.Platform, containerName string) map[string]interface{} {
+	if hc.Manifest.Application.Type == logic2.Tradition_App {
+		image := hc.getTraditionRuntimeImage()
+		if image == "" {
+			image = GetBuildImageName(hc.Manifest.Application) + ":latest"
+		}
+		return map[string]interface{}{
+			"name":            strings.ReplaceAll(hc.Manifest.Application.Identifie, "_", "-"),
+			"image":           traditionRuntimeImageValues(image),
+			"env":             []v1.EnvVar{},
+			"resources":       v1.ResourceRequirements{},
+			"volumeMounts":    []v1.VolumeMount{{Name: "site-storage", MountPath: "/www/wwwroot/{{ .Values.CODE_INSTALL_DIRECTORY }}", SubPath: "nginx-web-dir/{{ .Values.CODE_INSTALL_DIRECTORY }}"}},
+			"securityContext": map[string]interface{}{},
+		}
+	}
 	if len(platform.ContainerV2s) == 0 {
 		return map[string]interface{}{
 			"name":            strings.ReplaceAll(hc.Manifest.Application.Identifie, "_", "-"),

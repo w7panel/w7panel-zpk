@@ -1,13 +1,20 @@
 package logic
 
 import (
+	"fmt"
+	"strings"
+
 	logic2 "github.com/w7panel/w7panel-zpk/common/logic"
 	v1 "k8s.io/api/core/v1"
 )
 
-const siteManagerPersistentVolumeClaim = "w7-sitemanager-site-manager"
-
-const environmentAppCodeInstallShellType = "environment-code-install"
+const (
+	siteManagerPersistentVolumeClaim   = "w7-sitemanager-site-manager"
+	environmentAppCodeInstallerImage   = "busybox:1.36.1"
+	environmentAppSiteManagerImage     = "zpk.w7.cc/public/site-manager:v1.3.3"
+	environmentImageLanguageAnnotation = "w7.cc/image_language"
+	environmentNginxVhostAnnotation    = "w7.cc/nginx_vhost_template"
+)
 
 func withEnvironmentAppPVCName(platform logic2.Platform) logic2.Platform {
 	volumes := append([]v1.Volume(nil), platform.Volumes...)
@@ -33,21 +40,76 @@ func environmentAppPodAffinityValues() map[string]interface{} {
 	}}
 }
 
-func rewriteEnvironmentAppShells(manifest logic2.Manifest) []logic2.Shell {
-	shells := append([]logic2.Shell(nil), manifest.Platform.Shells...)
-	return append([]logic2.Shell{{
-		Title: "安装环境代码包",
-		Type:  environmentAppCodeInstallShellType,
-		Image: "busybox:1.36.1",
-		Shell: `set -eu
-: "${DOMAIN_URL:?DOMAIN_URL is required}"
-CODE_PACKAGE_URL='{{ .Values.codePackageUrl }}'
-test -n "$CODE_PACKAGE_URL"
-CODE_INSTALL_PATH="/www/wwwroot/$DOMAIN_URL"
-mkdir -p "$CODE_INSTALL_PATH"
-tmp_zip="$(mktemp /tmp/environment-code.XXXXXX.zip)"
-trap 'rm -f "$tmp_zip"' EXIT
-wget -q -O "$tmp_zip" "$CODE_PACKAGE_URL"
-unzip -oq "$tmp_zip" -d "$CODE_INSTALL_PATH"`,
-	}}, shells...)
+func (hc *HelmPack) addEnvironmentAppValues(values map[string]interface{}) error {
+	volumeName := ""
+	for _, volume := range hc.Manifest.Platform.Volumes {
+		if volume.PersistentVolumeClaim != nil {
+			volumeName = volume.Name
+			break
+		}
+	}
+	codeEnabled := strings.TrimSpace(hc.Manifest.Source.Url) != ""
+	if codeEnabled && volumeName == "" {
+		return fmt.Errorf("环境应用必须配置站点存储卷")
+	}
+
+	values["environment"] = map[string]interface{}{
+		"code": map[string]interface{}{
+			"enabled":    codeEnabled,
+			"image":      environmentAppCodeInstallerImage,
+			"packageUrl": environmentAppCodePackageURL(hc.Manifest),
+			"volumeName": volumeName,
+		},
+		"site": map[string]interface{}{
+			"image":              environmentAppSiteManagerImage,
+			"title":              environmentAppTitle(hc.Manifest),
+			"group":              strings.ReplaceAll(hc.Manifest.Application.Identifie, "_", "-"),
+			"language":           environmentAppAnnotation(hc.Manifest, environmentImageLanguageAnnotation),
+			"nginxVhostTemplate": environmentAppAnnotation(hc.Manifest, environmentNginxVhostAnnotation),
+		},
+	}
+	return nil
+}
+
+func environmentAppTitle(manifest logic2.Manifest) string {
+	title := strings.TrimSpace(manifest.Application.Name)
+	if title == "" {
+		title = strings.TrimSpace(manifest.Platform.BaseInfo.Name)
+	}
+	if title == "" {
+		title = manifest.Application.Identifie
+	}
+	return title
+}
+
+func environmentAppAnnotation(manifest logic2.Manifest, key string) string {
+	if value, ok := manifest.Application.Annotation[key].(string); ok {
+		return strings.TrimSpace(value)
+	}
+	return ""
+}
+
+func environmentAppCodePackageURL(manifest logic2.Manifest) string {
+	if strings.TrimSpace(manifest.Source.Url) == "" {
+		return ""
+	}
+	depot, _ := NewDepot()
+	codePackageURL, _ := depot.GetFormulaBackendZipDownloadUrlByApplication(
+		manifest.Application,
+		strings.TrimPrefix(manifest.Source.Url, "file://"),
+		false,
+	)
+	return codePackageURL
+}
+
+func (hc *HelmPack) generateEnvironmentAppTemplates(rootDir string) error {
+	if strings.TrimSpace(hc.Manifest.Source.Url) != "" {
+		if err := writeHelmTemplateFile(rootDir, "environment-install-code-job.yaml", "environment-install-code-job.yaml.tpl"); err != nil {
+			return err
+		}
+	}
+	if err := writeHelmTemplateFile(rootDir, "environment-create-site-job.yaml", "environment-create-site-job.yaml.tpl"); err != nil {
+		return err
+	}
+	return writeHelmTemplateFile(rootDir, "environment-ingress.yaml", "environment-ingress.yaml.tpl")
 }

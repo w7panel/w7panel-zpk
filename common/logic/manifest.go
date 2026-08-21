@@ -145,6 +145,8 @@ type Tradition struct {
 	EnvironmentName     string   `yaml:"environmentName" json:"environmentName"`
 	EnvironmentVersion  string   `yaml:"environmentVersion" json:"environmentVersion"`
 	EnvironmentLanguage string   `yaml:"environmentLanguage" json:"environmentLanguage"`
+	InstallType         string   `yaml:"installType,omitempty" json:"installType,omitempty"`
+	InstallRelativePath string   `yaml:"installRelativePath,omitempty" json:"installRelativePath,omitempty"`
 	CodeAttachUrl       string   `yaml:"-" json:"-"`
 	Cmd                 []string `yaml:"cmd" json:"cmd"`
 }

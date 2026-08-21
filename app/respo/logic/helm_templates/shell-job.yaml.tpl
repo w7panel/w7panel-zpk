@@ -20,6 +20,7 @@ metadata:
     w7.cc/custom-hook: 'true'
     {{- end }}
 spec:
+  suspend: {{ eq $job.type "custom" }}
   backoffLimit: 2
   ttlSecondsAfterFinished: 60
   template:

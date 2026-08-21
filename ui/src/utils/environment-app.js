@@ -2,7 +2,7 @@ const environmentApp = Object.freeze({
     dependencyIdentifie: 'w7-sitemanager',
     dependencyName: '站点管理',
     dependencySource: 'https://zpk.w7.cc',
-    storageName: 'environment-storage',
+    storageName: 'site-storage',
 });
 
 export function isEnvironmentAppDependency(record) {
@@ -56,4 +56,16 @@ export function removeEnvironmentAppCodeStorage(json) {
         container.volumeMounts = (container.volumeMounts || [])
             .filter(item => item?.name != environmentApp.storageName);
     });
+}
+
+export function getEnvironmentAppRootfsAnnotation(json) {
+    const container = json?.platform?.['container-v2']?.find(item => !item?.isInitContainer);
+    const name = String(container?.name || '').trim();
+    if (!name) return '';
+    return JSON.stringify([{
+        name,
+        volumeName: environmentApp.storageName,
+        path: `www/server/${name}/system`,
+        persistentSpecialMounts: true,
+    }]);
 }

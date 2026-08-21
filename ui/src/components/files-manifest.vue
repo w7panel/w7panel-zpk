@@ -122,13 +122,13 @@
                                         class="environment-config-spin">
                                         <a-alert type="info" show-icon class="zpk-primary-alert mt-20 mb-20"
                                             title="说明" :closable="false">
-                                            <div class="registry-alert-item">1. 运行环境会作为独立应用安装，同时保存为站点可选的运行环境模板；应用配置中的运行方式须使用 Deployment。</div>
+                                            <div class="registry-alert-item">1. 运行环境会作为独立应用安装，同时保存为站点可选的运行环境模板；运行方式固定为 Deployment。</div>
                                             <div class="registry-alert-item mt-6">2. 新建或升级站点并选择此运行环境时，系统会根据模板准备站点需要的运行环境。这里的修改只会用于之后新建的环境，已创建的环境不会自动更新。</div>
-                                            <div class="registry-alert-item mt-6">3. 独立安装时通过“环境版本”启动参数替换首个容器镜像中的 {version}；创建站点环境时也会使用同一模板。其他容器会一并保留。</div>
-                                            <div class="registry-alert-item mt-6">4. 如果需要配置启动脚本或自定义存储，请进入“应用配置”编辑：启动脚本配置在第一个应用容器中；自定义存储需先添加存储卷，再挂载到该容器。</div>
-                                            <div class="registry-alert-item mt-6">5. 容器的环境变量、端口、检查规则和挂载等配置会一起复制。系统会自动挂载站点代码目录 /www/wwwroot 和服务目录 /www/server，请勿将自定义存储挂载到这两个目录。</div>
+                                            <div class="registry-alert-item mt-6">3. 独立安装时通过“环境版本”启动参数替换运行容器镜像中的 {version}；创建站点环境时也会使用同一模板。</div>
+                                            <div class="registry-alert-item mt-6">4. 系统会自动配置站点代码目录 /www/wwwroot 和服务目录 /www/server 的共享存储。</div>
+                                            <div class="registry-alert-item mt-6">5. 环境容器的启动命令可在页面下方“启动命令”中配置。</div>
                                             <div class="registry-alert-item mt-6">6. 页面下方“脚本配置”中的安装、升级脚本只在安装或升级此制品时执行，站点管理新建环境时不会再次执行。</div>
-                                            <div class="registry-alert-item mt-6">7. 环境准备完成后，系统会使用 Nginx 模板配置站点并完成绑定。请将实际运行环境容器放在应用配置首位。</div>
+                                            <div class="registry-alert-item mt-6">7. 环境准备完成后，系统会使用 Nginx 模板配置站点并完成绑定。</div>
                                         </a-alert>
                                         <div class="greybox" style="margin-bottom:0;">
                                             <div class="greybox-title">运行环境配置</div>
@@ -164,7 +164,8 @@
                                             </a-form-item>
                                             <a-form-item label="系统重启还原" style="margin-bottom:18px;">
                                                 <div class="df df-c" style="align-items:flex-start;">
-                                                    <a-switch v-model="form.environmentSystemRebootRestore" />
+                                                    <a-switch v-model="form.environmentSystemRebootRestore"
+                                                        @change="syncEnvironmentRuntimeConfig" />
                                                     <span class="c-99 mt-6">关闭后使用持久存储保留容器系统层。</span>
                                                 </div>
                                             </a-form-item>
@@ -367,7 +368,12 @@
                                         :key="index" :label="item" :value="item"></a-option>
                                 </a-select>
                             </a-form-item>
-
+                            <a-form-item v-if="form.type == 'tradition'" label="应用类型">
+                                <a-radio-group v-model="form.installType" @change="changeForm">
+                                    <a-radio :value="traditionInstallTypes.site">整站应用</a-radio>
+                                    <a-radio :value="traditionInstallTypes.extension">扩展</a-radio>
+                                </a-radio-group>
+                            </a-form-item>
                             <a-form-item
                                 v-if="form.type != 'system-image' && form.type != 'gateway-plugin' && (!option || !option.pureManifest && form.type != 'docker' && form.type != 'light' && form.type != 'helm')"
                                 label="代码包">
@@ -399,12 +405,12 @@
                                     </files-upload>
                                     <div class="c-blue cursor ml-20" @click="deleteUpload">删除</div>
                                     <a-tooltip v-if="form.type == 'tradition'"
-                                        content="压缩包根目录就是应用代码目录，请进入代码目录后压缩，不要把外层项目目录一起压入。例如：cd 项目目录 && zip -r app.zip .。安装后解压到 /www/wwwroot/&lt;站点域名&gt;。"
+                                        content="整站应用请从项目根目录打包，扩展应用请从扩展所在目录打包；压缩包根目录就是安装内容，请不要包含外层项目目录。安装后解压到 /www/wwwroot/&lt;站点域名&gt;。"
                                         position="top">
                                         <icon-exclamation-circle-fill class="fs-16 c-99 ml-4" />
                                     </a-tooltip>
                                     <a-tooltip v-else-if="form.type == 'environment'"
-                                        content="代码包为可选配置，使用现有后端代码包保存方式随当前版本发布。"
+                                        content="代码包为可选配置。请将项目根目录内容直接压缩，不要包含外层项目目录，例如：cd 项目目录 && zip -r app.zip .。安装环境时会在预安装阶段解压到 /www/wwwroot/&lt;站点域名&gt;，并随当前版本发布。"
                                         position="top">
                                         <icon-exclamation-circle-fill class="fs-16 c-99 ml-4" />
                                     </a-tooltip>
@@ -485,7 +491,7 @@
                         </div>
                     </div>
 
-                    <div v-if="form.type != 'helm' && form.type != 'tradition' && form.type != 'gateway-plugin' && form.type != 'system-image'" class="bg-white com-line mt-20">
+                    <div v-if="form.type != 'helm' && form.type != 'tradition' && form.type != 'environment' && form.type != 'gateway-plugin' && form.type != 'system-image'" class="bg-white com-line mt-20">
                         <div class="mt-16">
                             <a-form-item label="应用配置">
                                 <div v-if="form.containers && form.containers.length">
@@ -809,9 +815,15 @@ import myAxios from '../utils/index';
 import {
     applyEnvironmentAppCodeStorage,
     createEnvironmentAppDependency,
+    getEnvironmentAppRootfsAnnotation,
     isEnvironmentAppDependency,
     removeEnvironmentAppCodeStorage,
 } from '@/utils/environment-app';
+import {
+    createTraditionEnvironmentDependency,
+    normalizeTraditionInstall,
+    traditionInstallTypes,
+} from '@/utils/tradition-app';
 import {
     IconCheckCircleFill,
     IconClose,
@@ -1039,6 +1051,7 @@ export default {
                 entry: 'public',
                 environmentName: '',
                 environmentVersion: '',
+                installType: traditionInstallTypes.site,
                 cmd: [''],
 
             },
@@ -1317,6 +1330,9 @@ export default {
     },
 
     computed: {
+        traditionInstallTypes() {
+            return traditionInstallTypes;
+        },
         environmentLanguageOptions() {
             let currentLanguage = String(this.form.environmentImageLanguage || '').trim();
             if (currentLanguage && !environmentLanguagePresets.some(option => option.value == currentLanguage)) {
@@ -1570,7 +1586,7 @@ export default {
             let customParams = (this.form.startParams || []).filter(item => !fixedNames.has(item?.name));
             let params = [
                 { mark: 'environment', name: 'IMAGE_VERSION', title: '环境版本', required: true, values_text: versions.join('|'), module_name: '', description: '选择要安装的运行环境版本', type: 'select' },
-                { mark: 'environment-site', name: 'DOMAIN_URL', title: '站点域名', required: true, values_text: '%DOMAIN_HOST%', module_name: '', description: '站点代码目录使用此域名隔离', type: 'text' },
+                { mark: 'environment-site', name: 'DOMAIN_URL', title: '站点域名', required: true, values_text: '%DOMAIN_URL%', module_name: '', description: '站点代码目录使用此域名隔离', type: 'text' },
             ];
             return [...params, ...customParams];
         },
@@ -1650,8 +1666,21 @@ export default {
             if (this.form.type != 'environment') { return; }
             this.ensureEnvironmentContainerDefaults(true);
             this.ensureEnvironmentCodeStorage();
+            this.applyEnvironmentRebootRestoreConfig();
             this.applyEnvironmentCommand();
             this.changeForm();
+        },
+        applyEnvironmentRebootRestoreConfig() {
+            if (this.form.type != 'environment' || !this.json?.platform) { return; }
+            if (!this.form.environmentSystemRebootRestore) {
+                this.json.platform.runtimeClassName = 'sysbox-runc';
+                this.json.platform.hostUsers = false;
+                return;
+            }
+            delete this.json.platform.hostUsers;
+            if (this.json.platform.runtimeClassName == 'sysbox-runc') {
+                delete this.json.platform.runtimeClassName;
+            }
         },
         ensureEnvironmentCodeStorage() {
             if (this.form.type != 'environment' || !this.json?.platform) { return; }
@@ -1769,6 +1798,7 @@ export default {
                 this.ensureEnvironmentContainerDefaults();
                 this.form.startParams = this.environmentStartParams();
                 this.ensureEnvironmentCodeStorage();
+                this.applyEnvironmentRebootRestoreConfig();
             }
         },
         applySystemImageAnnotationForm(annotation = {}) {
@@ -1789,13 +1819,22 @@ export default {
         getEnvironmentAnnotations() {
             let versions = this.normalizeEnvironmentVersions(this.form.environmentImageVersion);
             this.form.environmentImageVersion = versions;
-            return {
+            const annotations = {
                 [environmentAnnotationKeys.imageLanguage]: String(this.form.environmentImageLanguage || '').trim(),
                 [environmentAnnotationKeys.imageTemplate]: String(this.form.environmentImageTemplate || '').trim(),
                 [environmentAnnotationKeys.imageVersion]: versions.join(','),
                 [environmentAnnotationKeys.nginxVhostTemplate]: String(this.form.environmentNginxVhostTemplate || ''),
                 [environmentAnnotationKeys.systemRebootRestore]: String(Boolean(this.form.environmentSystemRebootRestore)),
             };
+            if (this.form.environmentSystemRebootRestore) {
+                if (this.json?.application?.annotation) {
+                    delete this.json.application.annotation[systemImageAnnotationKeys.rootfs];
+                }
+            } else {
+                const rootfs = getEnvironmentAppRootfsAnnotation(this.json);
+                if (rootfs) annotations[systemImageAnnotationKeys.rootfs] = rootfs;
+            }
+            return annotations;
         },
         filterAnnotationsForType(annotation = {}, type = this.form.type) {
             let filtered = { ...(annotation || {}) };
@@ -1816,7 +1855,7 @@ export default {
             }
             if (type != 'system-image') {
                 Object.values(systemImageAnnotationKeys)
-                    .filter(key => type != 'environment' || key != environmentAnnotationKeys.imageVersion)
+                    .filter(key => type != 'environment' || (key != environmentAnnotationKeys.imageVersion && key != systemImageAnnotationKeys.rootfs))
                     .forEach(key => delete filtered[key]);
             } else {
                 let versions = this.normalizeEnvironmentVersions(this.form.systemImageVersions);
@@ -2074,15 +2113,24 @@ export default {
             this.domainConfig.show = false;
         },
         onChange() { },
-        createDomainStartParam() {
+        createTraditionInstallTargetParam() {
             return {
                 mark: 'domain',
-                name: 'DOMAIN_URL',
-                values_text: '%DOMAIN_SSL_URL%',
-                title: '域名',
+                name: 'CODE_INSTALL_DIRECTORY',
+                values_text: '%DOMAIN_URL%',
+                title: '代码安装目录',
                 required: true,
                 module_name: '',
+                description: '填写已安装环境应用对应的站点域名',
+                type: 'text',
             };
+        },
+        ensureTraditionInstallTargetParam() {
+            if (this.form.type != 'tradition') { return; }
+            let params = (this.form.startParams || [])
+                .filter(item => !['DOMAIN_URL', 'CODE_INSTALL_DIRECTORY'].includes(item?.name));
+            params.push(this.createTraditionInstallTargetParam());
+            this.form.startParams = params;
         },
         isDomainStartParam(item) {
             return item?.mark === 'domain'
@@ -2113,8 +2161,11 @@ export default {
         },
         serializeStartParams() {
             let start = [];
-            for (let i in this.form.startParams) {
-                let o = this.form.startParams[i];
+            let params = this.form.type == 'environment'
+                ? this.environmentStartParams()
+                : this.form.startParams;
+            for (let i in params) {
+                let o = params[i];
                 if (o.name) {
                     start.push({
                         type: 'text',
@@ -2191,34 +2242,21 @@ export default {
             this.disabledDomainStartParams = !!v;
         },
         async changeEnv(item) {
-            const environmentFrom = this.getEnvironmentDependencyFrom(item);
             if (!item.identifie || item.identifie == this.form.environmentName) { return }
 
             this.form.depends = this.form.depends?.filter?.(i => !i.temporary) || []
             let findIndex = this.form.depends?.findIndex(i => i.identifie == item.identifie && i.name == item.name)
             if (findIndex != -1) {
-                this.form.depends[findIndex].temporary = true;
-                this.form.depends[findIndex].from = environmentFrom;
+                this.form.depends[findIndex] = {
+                    ...this.form.depends[findIndex],
+                    ...createTraditionEnvironmentDependency(item),
+                };
             } else {
-                this.form.depends.push({
-                    identifie: item.identifie,
-                    name: item.name,
-                    subidentifie: '',
-                    required: true,
-                    type: 'out',
-                    temporary: true,
-                    from: environmentFrom,
-                })
+                this.form.depends.push(createTraditionEnvironmentDependency(item))
             }
 
-            if (!this.form.startParams?.find?.(i => i.values_text == '%DOMAIN_SSL_URL%' || i.values_text == '%DOMAIN_URL%')) {
-                this.form.startParams.push(this.createDomainStartParam())
-                this.getStart();
-            } else {
-                this.form.startParams.forEach(i => {
-                    if (this.isDomainStartParam(i)) { i.mark = 'domain'; }
-                });
-            }
+            this.ensureTraditionInstallTargetParam();
+            this.getStart();
 
             this.form.environmentName = item.identifie;
             this.form.environmentVersion = '';
@@ -2229,15 +2267,6 @@ export default {
             this.normalizeCommandByEnvironment();
 
             this.changeForm();
-        },
-        getEnvironmentDependencyFrom(item) {
-            const formulaURL = String(item?.formula_url || '').trim();
-            if (!formulaURL) { return ''; }
-            try {
-                return new URL(formulaURL, window.location.origin).origin;
-            } catch {
-                return '';
-            }
         },
         getEnvironmentList() {
             // 运行环境列表由制品市场提供，支持版本使用接口返回的 support_version 字段。
@@ -2883,6 +2912,7 @@ platform:
 
                 this.form.environmentName = j.platform?.tradition?.environmentName || '';
                 this.form.environmentVersion = j.platform?.tradition?.environmentVersion || '';
+                this.form.installType = j.platform?.tradition?.installType || traditionInstallTypes.site;
                 if (['system-image', 'environment'].includes(this.form.type)) {
                     let command = this.form.type == 'environment'
                         ? this.getEnvironmentMainContainer()?.command
@@ -2917,6 +2947,8 @@ platform:
                     this.ensureEnvironmentContainerDefaults();
                     this.form.startParams = this.environmentStartParams();
                     this.ensureEnvironmentCodeStorage();
+                } else if (this.form.type == 'tradition') {
+                    this.ensureTraditionInstallTargetParam();
                 }
 
                 if (this.form.startParams?.length) {
@@ -3164,14 +3196,7 @@ platform:
                 if (this.json.source) { delete this.json.source; }
             }
             if (this.form.type == 'tradition') {
-
-                if (!this.form.startParams?.find?.(i => i.values_text == '%DOMAIN_SSL_URL%' || i.values_text == '%DOMAIN_URL%')) {
-                    this.form.startParams.push(this.createDomainStartParam())
-                } else {
-                    this.form.startParams.forEach(i => {
-                        if (this.isDomainStartParam(i)) { i.mark = 'domain'; }
-                    });
-                }
+                this.ensureTraditionInstallTargetParam();
                 this.getStart();
 
                 if (this.json.web) { delete this.json.web; }
@@ -3261,6 +3286,7 @@ platform:
                 this.form.startParams = this.environmentStartParams();
                 this.ensureEnvironmentContainerDefaults();
                 this.ensureEnvironmentCodeStorage();
+                this.applyEnvironmentRebootRestoreConfig();
                 this.applyEnvironmentCommand();
             } else {
                 delete j.platform.hostUsers;
@@ -3277,10 +3303,14 @@ platform:
                         ?.environment_language || environmentLanguage;
                 } catch { }
                 this.normalizeCommandByEnvironment();
+                this.ensureTraditionInstallTargetParam();
+                const traditionInstall = normalizeTraditionInstall(this.form);
+                this.form.installType = traditionInstall.installType;
                 j.platform.tradition = {
                     environmentName: this.form.environmentName,
                     environmentVersion: this.form.environmentVersion,
                     environmentLanguage: environmentLanguage,
+                    installType: traditionInstall.installType,
                     cmd: this.form.cmd,
                 }
             }
@@ -3411,6 +3441,7 @@ platform:
     display: block;
     width: 100%;
 }
+
 
 .nginx-template-field {
     width: 500px;

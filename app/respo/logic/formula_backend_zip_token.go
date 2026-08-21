@@ -1,10 +1,7 @@
 package logic
 
 import (
-	"crypto/hmac"
-	"crypto/sha256"
 	"encoding/base64"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"strings"
@@ -13,10 +10,6 @@ import (
 	logic2 "github.com/w7panel/w7panel-zpk/common/logic"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 )
-
-const backendZipTokenVersion = "v1"
-
-const backendZipTokenMACContext = "w7panel-zpk:backend-zip:v1:"
 
 type BackendZipDownloadToken struct {
 	ZipPath   string `json:"zip_path"`
@@ -42,25 +35,14 @@ func createBackendZipDownloadToken(application logic2.Application, zipPath strin
 	if err != nil {
 		return "", err
 	}
-	encodedCiphertext := base64.RawURLEncoding.EncodeToString(ciphertext)
-	signature := backendZipTokenSignature(encodedCiphertext)
-	return strings.Join([]string{backendZipTokenVersion, encodedCiphertext, signature}, "."), nil
+	// Keep the public token compact: the encrypted payload (including its
+	// random IV) is enough for the download endpoint and is URL-safe encoded
+	// without the standard Base64 padding.
+	return base64.RawURLEncoding.EncodeToString(ciphertext), nil
 }
 
 func ParseBackendZipDownloadToken(token string) (*BackendZipDownloadToken, error) {
-	parts := strings.Split(token, ".")
-	if len(parts) != 3 || parts[0] != backendZipTokenVersion {
-		return nil, errors.New("invalid backend zip token version")
-	}
-	providedSignature, err := hex.DecodeString(parts[2])
-	if err != nil {
-		return nil, errors.New("invalid backend zip token signature")
-	}
-	expectedSignature, _ := hex.DecodeString(backendZipTokenSignature(parts[1]))
-	if !hmac.Equal(providedSignature, expectedSignature) {
-		return nil, errors.New("invalid backend zip token signature")
-	}
-	ciphertext, err := base64.RawURLEncoding.DecodeString(parts[1])
+	ciphertext, err := base64.RawURLEncoding.DecodeString(token)
 	if err != nil {
 		return nil, errors.New("invalid backend zip token encoding")
 	}
@@ -80,11 +62,4 @@ func ParseBackendZipDownloadToken(token string) (*BackendZipDownloadToken, error
 
 func backendZipTokenEncryptionKey() string {
 	return function.GetMd5(facade.GetConfig().GetString("setting.secret"))
-}
-
-func backendZipTokenSignature(ciphertext string) string {
-	secret := sha256.Sum256([]byte(backendZipTokenMACContext + facade.GetConfig().GetString("setting.secret")))
-	signer := hmac.New(sha256.New, secret[:])
-	_, _ = signer.Write([]byte(ciphertext))
-	return hex.EncodeToString(signer.Sum(nil))
 }

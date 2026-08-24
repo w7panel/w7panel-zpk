@@ -142,13 +142,15 @@ type ContainerV2 struct {
 }
 
 type Tradition struct {
-	EnvironmentName     string   `yaml:"environmentName" json:"environmentName"`
-	EnvironmentVersion  string   `yaml:"environmentVersion" json:"environmentVersion"`
-	EnvironmentLanguage string   `yaml:"environmentLanguage" json:"environmentLanguage"`
-	InstallType         string   `yaml:"installType,omitempty" json:"installType,omitempty"`
-	InstallRelativePath string   `yaml:"installRelativePath,omitempty" json:"installRelativePath,omitempty"`
-	CodeAttachUrl       string   `yaml:"-" json:"-"`
-	Cmd                 []string `yaml:"cmd" json:"cmd"`
+	EnvironmentName          string   `yaml:"environmentName" json:"environmentName"`
+	EnvironmentGoodsID       int      `yaml:"environmentGoodsId,omitempty" json:"environmentGoodsId,omitempty"`
+	EnvironmentVersion       string   `yaml:"environmentVersion" json:"environmentVersion"`
+	EnvironmentLanguage      string   `yaml:"environmentLanguage" json:"environmentLanguage"`
+	EnvironmentImageTemplate string   `yaml:"environmentImageTemplate,omitempty" json:"environmentImageTemplate,omitempty"`
+	InstallType              string   `yaml:"installType,omitempty" json:"installType,omitempty"`
+	InstallRelativePath      string   `yaml:"installRelativePath,omitempty" json:"installRelativePath,omitempty"`
+	CodeAttachUrl            string   `yaml:"-" json:"-"`
+	Cmd                      []string `yaml:"cmd" json:"cmd"`
 }
 
 type HelmDependYaml struct {
@@ -186,6 +188,7 @@ type StartParams struct {
 	Type        string `yaml:"type" json:"type"`
 	ValuesText  string `yaml:"values_text" json:"values_text"`
 	ModuleName  string `yaml:"module_name" json:"module_name"`
+	Hidden      bool   `yaml:"hidden,omitempty" json:"hidden,omitempty"`
 }
 
 type Container struct {
@@ -324,13 +327,16 @@ type Ingress struct {
 }
 
 type Depend struct {
-	Identifie    string `yaml:"identifie" json:"identifie"`
-	Name         string `yaml:"name" json:"name"`
-	From         string `yaml:"from" json:"from"`
-	Required     bool   `yaml:"required" json:"required"`
-	Type         string `yaml:"type" json:"type"`
-	SubIdentifie string `yaml:"subidentifie" json:"subidentifie"`
-	SubName      string `yaml:"subname" json:"subname"`
+	Identifie         string `yaml:"identifie" json:"identifie"`
+	Name              string `yaml:"name" json:"name"`
+	From              string `yaml:"from" json:"from"`
+	Required          bool   `yaml:"required" json:"required"`
+	Type              string `yaml:"type" json:"type"`
+	SubIdentifie      string `yaml:"subidentifie" json:"subidentifie"`
+	SubName           string `yaml:"subname" json:"subname"`
+	MultipleInstances bool   `yaml:"multipleInstances,omitempty" json:"multipleInstances,omitempty"`
+	ReleaseName       string `yaml:"releaseName,omitempty" json:"releaseName,omitempty"`
+	ReleaseNameFixed  bool   `yaml:"releaseNameFixed" json:"releaseNameFixed"`
 }
 
 type Source struct {

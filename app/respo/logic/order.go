@@ -23,7 +23,7 @@ func (l Order) UseOrder(ticketInfo TicketInfo, panelDeviceSN, panelURL string) e
 	if ticketInfo.ConsoleUid <= 0 || ticketInfo.OrderSn == "" {
 		return nil
 	}
-	return w7.ZpkMarketSdk.UseOrder(ticketInfo.ConsoleUid, ticketInfo.OrderSn, ticketInfo.FormulaVersion, ticketInfo.IsUpgrade, ticketInfo.Reinstall, panelDeviceSN, panelURL, ticketInfo.AppIdentify, ticketInfo.Domain)
+	return w7.ZpkMarketSdk.UseOrder(ticketInfo.ConsoleUid, ticketInfo.OrderSn, ticketInfo.FormulaVersion, ticketInfo.FormulaType, ticketInfo.FormulaIsPlugin, ticketInfo.IsUpgrade, ticketInfo.Reinstall, panelDeviceSN, panelURL, ticketInfo.AppIdentify, ticketInfo.Domain)
 }
 
 func (l Order) CheckFormulaCanInstallOrUpgrade(formula Formula, consoleUid int32, orderSn string, isUpgrade, reinstall bool, domain, appIdentify string) zpk_market.FormulaInstallCheckResult {

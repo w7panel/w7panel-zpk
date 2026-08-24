@@ -10,6 +10,7 @@ import (
 
 const (
 	siteManagerPersistentVolumeClaim   = "w7-sitemanager-site-manager"
+	environmentAppStorageVolumeName    = "site-storage"
 	environmentAppCodeInstallerImage   = "busybox:1.36.1"
 	environmentAppSiteManagerImage     = "zpk.w7.cc/public/site-manager:v1.3.3"
 	environmentImageLanguageAnnotation = "w7.cc/image_language"
@@ -27,6 +28,40 @@ func withEnvironmentAppPVCName(platform logic2.Platform) logic2.Platform {
 	return platform
 }
 
+func withEnvironmentAppCodeStorage(platform logic2.Platform) logic2.Platform {
+	volumes := make([]v1.Volume, 0, len(platform.Volumes)+1)
+	for _, volume := range platform.Volumes {
+		if volume.Name != environmentAppStorageVolumeName {
+			volumes = append(volumes, volume)
+		}
+	}
+	volumes = append(volumes, v1.Volume{
+		Name: environmentAppStorageVolumeName,
+		VolumeSource: v1.VolumeSource{PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+			ClaimName: siteManagerPersistentVolumeClaim,
+		}},
+	})
+	platform.Volumes = volumes
+	for index := range platform.ContainerV2s {
+		if platform.ContainerV2s[index].IsInitContainer {
+			continue
+		}
+		mounts := make([]v1.VolumeMount, 0, len(platform.ContainerV2s[index].VolumeMounts)+1)
+		for _, mount := range platform.ContainerV2s[index].VolumeMounts {
+			if mount.Name != environmentAppStorageVolumeName {
+				mounts = append(mounts, mount)
+			}
+		}
+		mounts = append(mounts, v1.VolumeMount{
+			Name: environmentAppStorageVolumeName, MountPath: `{{ print "/www/wwwroot/" .Values.DOMAIN_URL }}`,
+			SubPath: `{{ print "nginx-web-dir/" .Values.DOMAIN_URL }}`,
+		})
+		platform.ContainerV2s[index].VolumeMounts = mounts
+		break
+	}
+	return platform
+}
+
 func environmentAppPodAffinityValues() map[string]interface{} {
 	return map[string]interface{}{"podAffinity": map[string]interface{}{
 		"requiredDuringSchedulingIgnoredDuringExecution": []interface{}{map[string]interface{}{
@@ -41,7 +76,7 @@ func environmentAppPodAffinityValues() map[string]interface{} {
 }
 
 func (hc *HelmPack) addEnvironmentAppValues(values map[string]interface{}) error {
-	volumeName := ""
+	volumeName := environmentAppStorageVolumeName
 	for _, volume := range hc.Manifest.Platform.Volumes {
 		if volume.PersistentVolumeClaim != nil {
 			volumeName = volume.Name
@@ -69,6 +104,18 @@ func (hc *HelmPack) addEnvironmentAppValues(values map[string]interface{}) error
 		},
 	}
 	return nil
+}
+
+func (hc *HelmPack) generateEnvironmentAppTemplates(rootDir string) error {
+	if strings.TrimSpace(hc.Manifest.Source.Url) != "" {
+		if err := writeHelmTemplateFile(rootDir, "environment-install-code-job.yaml", "environment-install-code-job.yaml.tpl"); err != nil {
+			return err
+		}
+	}
+	if err := writeHelmTemplateFile(rootDir, "environment-create-site-job.yaml", "environment-create-site-job.yaml.tpl"); err != nil {
+		return err
+	}
+	return writeHelmTemplateFile(rootDir, "environment-ingress.yaml", "environment-ingress.yaml.tpl")
 }
 
 func environmentAppTitle(manifest logic2.Manifest) string {
@@ -100,16 +147,4 @@ func environmentAppCodePackageURL(manifest logic2.Manifest) string {
 		false,
 	)
 	return codePackageURL
-}
-
-func (hc *HelmPack) generateEnvironmentAppTemplates(rootDir string) error {
-	if strings.TrimSpace(hc.Manifest.Source.Url) != "" {
-		if err := writeHelmTemplateFile(rootDir, "environment-install-code-job.yaml", "environment-install-code-job.yaml.tpl"); err != nil {
-			return err
-		}
-	}
-	if err := writeHelmTemplateFile(rootDir, "environment-create-site-job.yaml", "environment-create-site-job.yaml.tpl"); err != nil {
-		return err
-	}
-	return writeHelmTemplateFile(rootDir, "environment-ingress.yaml", "environment-ingress.yaml.tpl")
 }

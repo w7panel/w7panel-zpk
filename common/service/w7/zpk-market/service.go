@@ -46,6 +46,10 @@ type FormulaUpgradeVersionResult struct {
 	OrderSn         string `json:"order_sn"`
 }
 
+type DependencyOrderBinding struct {
+	AppIdentify string `json:"app_identify"`
+}
+
 func (s ZpkMarketService) CheckToken(token, formulaIdentify string) error {
 	return postSigned[any](s, "/zpk-market/formula/check-token", map[string]interface{}{
 		"token":            token,
@@ -53,17 +57,19 @@ func (s ZpkMarketService) CheckToken(token, formulaIdentify string) error {
 	}, nil)
 }
 
-func (s ZpkMarketService) UseOrder(consoleUid int32, orderSn, formulaVersion string, isUpgrade, reinstall bool, panelDeviceSN, panelURL, appIdentify, domain string) error {
+func (s ZpkMarketService) UseOrder(consoleUid int32, orderSn, formulaVersion, formulaType string, formulaIsPlugin, isUpgrade, reinstall bool, panelDeviceSN, panelURL, appIdentify, domain string) error {
 	return postSigned[any](s, "/zpk-market/order/use-order", map[string]interface{}{
-		"order_sn":        orderSn,
-		"formula_version": formulaVersion,
-		"is_upgrade":      isUpgrade,
-		"reinstall":       reinstall,
-		"console_uid":     consoleUid,
-		"panel_device_sn": panelDeviceSN,
-		"panel_url":       panelURL,
-		"app_identify":    appIdentify,
-		"domain":          domain,
+		"order_sn":          orderSn,
+		"formula_version":   formulaVersion,
+		"formula_type":      formulaType,
+		"formula_is_plugin": formulaIsPlugin,
+		"is_upgrade":        isUpgrade,
+		"reinstall":         reinstall,
+		"console_uid":       consoleUid,
+		"panel_device_sn":   panelDeviceSN,
+		"panel_url":         panelURL,
+		"app_identify":      appIdentify,
+		"domain":            domain,
 	}, nil)
 }
 
@@ -104,6 +110,15 @@ func (s ZpkMarketService) GetFormulaCanUpgradeVersion(goodsId, consoleUid int32,
 	}
 
 	return ret, nil
+}
+
+func (s ZpkMarketService) GetDependencyOrders(consoleUid int32, orderSn string) (map[string]DependencyOrderBinding, error) {
+	ret := make(map[string]DependencyOrderBinding)
+	err := postSigned(s, "/zpk-market/order/dependency-orders", map[string]interface{}{
+		"console_uid": consoleUid,
+		"order_sn":    orderSn,
+	}, &ret)
+	return ret, err
 }
 
 func postSigned[T any](s ZpkMarketService, path string, params map[string]interface{}, result *T) error {

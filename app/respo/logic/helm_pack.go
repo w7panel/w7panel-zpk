@@ -70,6 +70,7 @@ type HelmPack struct {
 }
 
 func NewHelmPack(manifest logic2.Manifest, subManifests []*logic2.Manifest, outputDir, chartVersion string, isSubFormula bool, sharedStorageTargetApp string) *HelmPack {
+	ApplyDependencyReleaseStartParams(&manifest)
 	subManifestMap := make(map[string]logic2.Manifest)
 	if subManifests != nil {
 		for _, item := range subManifests {
@@ -742,12 +743,9 @@ func (hc *HelmPack) generateHelpersTpl(rootDir string, identify string) error {
 func (hc *HelmPack) generateValuesYaml(rootDir string) error {
 	platform := hc.Manifest.Platform
 	if hc.Manifest.Application.Type == logic2.EnvironmentApp {
-		platform = withEnvironmentAppPVCName(platform)
+		platform = withEnvironmentAppCodeStorage(withEnvironmentAppPVCName(platform))
 	} else if hc.Manifest.Application.Type == logic2.Tradition_App {
-		platform.Volumes = append([]v1.Volume{{
-			Name:         "site-storage",
-			VolumeSource: v1.VolumeSource{PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{ClaimName: siteManagerPersistentVolumeClaim}},
-		}}, platform.Volumes...)
+		platform = withTraditionAppPVC(platform)
 	}
 	platform.Shells = hc.getHelmShells()
 	if hc.Manifest.Application.Annotation == nil {
@@ -768,9 +766,8 @@ func (hc *HelmPack) generateValuesYaml(rootDir string) error {
 		appName = hc.Manifest.Platform.BaseInfo.Identifie
 	}
 	values := map[string]interface{}{
-		"PVC_NAME":               "",
-		"DOMAIN_URL":             "",
-		"CODE_INSTALL_DIRECTORY": "",
+		"PVC_NAME":   "",
+		"DOMAIN_URL": "",
 		"app": map[string]interface{}{
 			"title":    appName,
 			"identify": hc.Manifest.Application.Identifie,
@@ -793,7 +790,7 @@ func (hc *HelmPack) generateValuesYaml(rootDir string) error {
 		"jobAffinity":          hc.getJobAffinityValues(),
 		"w7panelSidecars":      hc.Sidecars,
 	}
-	values["jobs"] = hc.getJobsValues(platform)
+	values["jobs"] = hc.buildJobValues(platform)
 	if hc.Manifest.Application.Type == logic2.EnvironmentApp {
 		if err := hc.addEnvironmentAppValues(values); err != nil {
 			return err
@@ -1236,20 +1233,7 @@ func (hc *HelmPack) getImageValues(container logic2.ContainerV2) map[string]inte
 	if hc.Manifest.Application.Type == logic2.SystemImageApp || hc.Manifest.Application.Type == logic2.EnvironmentApp {
 		imageName = strings.ReplaceAll(imageName, "{version}", "{{ .Values.IMAGE_VERSION }}")
 	}
-	repository := imageName
-	tag := "latest"
-	lastSlash := strings.LastIndex(imageName, "/")
-	lastColon := strings.LastIndex(imageName, ":")
-	if lastColon > lastSlash {
-		tag = imageName[lastColon+1:]
-		repository = imageName[:lastColon]
-	}
-
-	return map[string]interface{}{
-		"repository": repository,
-		"tag":        tag,
-		"pullPolicy": container.ImagePullPolicy,
-	}
+	return imageValues(imageName, container.ImagePullPolicy)
 }
 
 // 获取 Pod 安全上下文
@@ -1272,7 +1256,7 @@ func (hc *HelmPack) getSecurityContext(container logic2.ContainerV2) map[string]
 	return conf
 }
 
-func (hc *HelmPack) getShellJobValues(items []logic2.Shell) []map[string]interface{} {
+func (hc *HelmPack) buildShellJobValues(items []logic2.Shell) []map[string]interface{} {
 	jobs := make([]map[string]interface{}, 0)
 	for _, item := range items {
 		shellWeight := 0
@@ -1322,9 +1306,9 @@ func (hc *HelmPack) getShellJobValues(items []logic2.Shell) []map[string]interfa
 	return jobs
 }
 
-func (hc *HelmPack) getJobsValues(platform logic2.Platform) []map[string]interface{} {
+func (hc *HelmPack) buildJobValues(platform logic2.Platform) []map[string]interface{} {
 	jobs := make([]map[string]interface{}, 0)
-	for _, job := range hc.getShellJobValues(platform.Shells) {
+	for _, job := range hc.buildShellJobValues(platform.Shells) {
 		containerName, _ := job["containerName"].(string)
 		job["container"] = hc.getShellJobContainerValues(platform, containerName)
 		jobs = append(jobs, job)
@@ -1334,18 +1318,7 @@ func (hc *HelmPack) getJobsValues(platform logic2.Platform) []map[string]interfa
 
 func (hc *HelmPack) getShellJobContainerValues(platform logic2.Platform, containerName string) map[string]interface{} {
 	if hc.Manifest.Application.Type == logic2.Tradition_App {
-		image := hc.getTraditionRuntimeImage()
-		if image == "" {
-			image = GetBuildImageName(hc.Manifest.Application) + ":latest"
-		}
-		return map[string]interface{}{
-			"name":            strings.ReplaceAll(hc.Manifest.Application.Identifie, "_", "-"),
-			"image":           traditionRuntimeImageValues(image),
-			"env":             []v1.EnvVar{},
-			"resources":       v1.ResourceRequirements{},
-			"volumeMounts":    []v1.VolumeMount{{Name: "site-storage", MountPath: "/www/wwwroot/{{ .Values.CODE_INSTALL_DIRECTORY }}", SubPath: "nginx-web-dir/{{ .Values.CODE_INSTALL_DIRECTORY }}"}},
-			"securityContext": map[string]interface{}{},
-		}
+		return hc.getTraditionShellJobContainerValues()
 	}
 	if len(platform.ContainerV2s) == 0 {
 		return map[string]interface{}{
@@ -1629,6 +1602,18 @@ func (hc *HelmPack) getStartParamsEnvValues(platform logic2.Platform) map[string
 
 func GetBuildImageName(application logic2.Application) string {
 	return "registry.local.w7.cc/default/" + application.Identifie + ":" + application.Version
+}
+
+func imageValues(imageName string, pullPolicy v1.PullPolicy) map[string]interface{} {
+	repository, tag := imageName, "latest"
+	if index := strings.LastIndex(imageName, ":"); index > strings.LastIndex(imageName, "/") {
+		repository, tag = imageName[:index], imageName[index+1:]
+	}
+	return map[string]interface{}{
+		"repository": repository,
+		"tag":        tag,
+		"pullPolicy": pullPolicy,
+	}
 }
 
 // ==================== 文件工具函数 ====================

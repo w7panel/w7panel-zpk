@@ -1,4 +1,5 @@
 {{- $fullName := include "common.fullname" . -}}
+{{- $codeInstallDirectory := include "tradition.codeInstallDirectory" . -}}
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -55,12 +56,12 @@ spec:
               unzip -oq "$tmp_zip" -d "$SITE_ROOT"
           env:
             - name: CODE_INSTALL_DIRECTORY
-              value: {{ .Values.CODE_INSTALL_DIRECTORY | quote }}
+              value: {{ $codeInstallDirectory | quote }}
             - name: SITE_ROOT
-              value: {{ printf "/www/wwwroot/%s" .Values.CODE_INSTALL_DIRECTORY | quote }}
+              value: {{ printf "/www/wwwroot/%s" $codeInstallDirectory | quote }}
             - name: CODE_PACKAGE_URL
               value: {{ .Values.tradition.codePackageUrl | quote }}
           volumeMounts:
             - name: "site-storage"
-              mountPath: {{ printf "/www/wwwroot/%s" .Values.CODE_INSTALL_DIRECTORY | quote }}
-              subPath: {{ printf "nginx-web-dir/%s" .Values.CODE_INSTALL_DIRECTORY | quote }}
+              mountPath: {{ printf "/www/wwwroot/%s" $codeInstallDirectory | quote }}
+              subPath: {{ printf "nginx-web-dir/%s" $codeInstallDirectory | quote }}

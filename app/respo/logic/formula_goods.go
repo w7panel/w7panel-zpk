@@ -214,8 +214,13 @@ func (l FormulaGoods) PublishGoods(formula *Formula, publishGoodsReq devcenter.P
 }
 
 func buildApplicationTypeExtra(manifest commonlogic.Manifest) map[string]interface{} {
+	formulaIsPlugin := IsFormulaPlugin(
+		manifest.Application.Type,
+		manifest.Platform.Tradition.InstallType,
+	)
 	extra := map[string]interface{}{
-		"application_type": manifest.Application.Type,
+		"application_type":  manifest.Application.Type,
+		"formula_is_plugin": formulaIsPlugin,
 	}
 	if manifest.Application.Type == commonlogic.GatewayPluginApp {
 		extra["plugin_type"] = manifest.Platform.GatewayPlugin.Category
@@ -224,6 +229,9 @@ func buildApplicationTypeExtra(manifest commonlogic.Manifest) map[string]interfa
 		extra["support_version"] = manifest.Application.Annotation["w7.cc/image_version"]
 		extra["env_language"] = manifest.Application.Annotation["w7.cc/image_language"]
 		extra["image"] = manifest.Application.Annotation["w7.cc/image_template"]
+	}
+	if formulaIsPlugin && manifest.Platform.Tradition.EnvironmentGoodsID > 0 {
+		extra["environment_goods_id"] = manifest.Platform.Tradition.EnvironmentGoodsID
 	}
 	return extra
 }

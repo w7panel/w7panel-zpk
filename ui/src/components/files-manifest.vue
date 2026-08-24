@@ -813,7 +813,6 @@ import ManifestConfigTable from '@/components/manifest-config-table.vue';
 import ManifestConfigTableColumn from '@/components/manifest-config-table-column.vue';
 import myAxios from '../utils/index';
 import {
-    applyEnvironmentAppCodeStorage,
     createEnvironmentAppDependency,
     getEnvironmentAppRootfsAnnotation,
     isEnvironmentAppDependency,
@@ -1051,6 +1050,7 @@ export default {
                 },
                 entry: 'public',
                 environmentName: '',
+                environmentGoodsId: 0,
                 environmentVersion: '',
                 installType: traditionInstallTypes.site,
                 cmd: [''],
@@ -1666,7 +1666,6 @@ export default {
         syncEnvironmentRuntimeConfig() {
             if (this.form.type != 'environment') { return; }
             this.ensureEnvironmentContainerDefaults(true);
-            this.ensureEnvironmentCodeStorage();
             this.applyEnvironmentRebootRestoreConfig();
             this.applyEnvironmentCommand();
             this.changeForm();
@@ -1682,10 +1681,6 @@ export default {
             if (this.json.platform.runtimeClassName == 'sysbox-runc') {
                 delete this.json.platform.runtimeClassName;
             }
-        },
-        ensureEnvironmentCodeStorage() {
-            if (this.form.type != 'environment' || !this.json?.platform) { return; }
-            applyEnvironmentAppCodeStorage(this.json);
         },
         syncSystemImageConfig() {
             if (this.form.type != 'system-image') { return; }
@@ -1798,7 +1793,6 @@ export default {
             if (this.form.type == 'environment') {
                 this.ensureEnvironmentContainerDefaults();
                 this.form.startParams = this.environmentStartParams();
-                this.ensureEnvironmentCodeStorage();
                 this.applyEnvironmentRebootRestoreConfig();
             }
         },
@@ -2125,25 +2119,6 @@ export default {
             this.domainConfig.show = false;
         },
         onChange() { },
-        createTraditionInstallTargetParam() {
-            return {
-                mark: 'domain',
-                name: 'CODE_INSTALL_DIRECTORY',
-                values_text: '%DOMAIN_URL%',
-                title: '代码安装目录',
-                required: true,
-                module_name: '',
-                description: '填写已安装环境应用对应的站点域名',
-                type: 'text',
-            };
-        },
-        ensureTraditionInstallTargetParam() {
-            if (this.form.type != 'tradition') { return; }
-            let params = (this.form.startParams || [])
-                .filter(item => !['DOMAIN_URL', 'CODE_INSTALL_DIRECTORY'].includes(item?.name));
-            params.push(this.createTraditionInstallTargetParam());
-            this.form.startParams = params;
-        },
         isDomainStartParam(item) {
             return item?.mark === 'domain'
                 || (item?.name === 'DOMAIN_URL' && ['%DOMAIN_URL%', '%DOMAIN_SSL_URL%'].includes(item?.values_text));
@@ -2176,6 +2151,8 @@ export default {
             let params = this.form.type == 'environment'
                 ? this.environmentStartParams()
                 : this.form.startParams;
+            params = (params || []).filter(item => item?.mark !== 'environment-release'
+                && item?.name !== 'ENVIRONMENT_RELEASE_NAME');
             for (let i in params) {
                 let o = params[i];
                 if (o.name) {
@@ -2187,6 +2164,7 @@ export default {
                         values_text: o.values_text,
                         module_name: o.module_name,
                         description: o.description || '',
+                        hidden: Boolean(o.hidden),
                     })
                 }
             }
@@ -2267,15 +2245,17 @@ export default {
                 this.form.depends.push(createTraditionEnvironmentDependency(item))
             }
 
-            this.ensureTraditionInstallTargetParam();
-            this.getStart();
-
             this.form.environmentName = item.identifie;
+            this.form.environmentGoodsId = Number(item.goods_id || item.goodsId || item.id || 0);
+            this.form.environmentImageTemplate = String(
+                item.image_template || item.image || item.extra?.image || ''
+            ).trim();
             this.form.environmentVersion = '';
 
             if (item.versions?.length) {
                 this.form.environmentVersion = item.versions[0];
             }
+            this.getStart();
             this.normalizeCommandByEnvironment();
 
             this.changeForm();
@@ -2295,6 +2275,9 @@ export default {
                     const identifie = item.identifie || item.identify || item.identifier
                         || item.formula_identifie || item.formula_identify || '';
                     const environmentLanguage = String(item.environment_language || '').trim();
+                    const imageTemplate = String(
+                        item.image_template || item.image || item.extra?.image || ''
+                    ).trim();
                     const versions = String(item.support_version || '')
                         .split(',')
                         .map(version => version.trim())
@@ -2304,6 +2287,7 @@ export default {
                         identifie,
                         name: item.name || item.formula_name || item.title || identifie,
                         environment_language: environmentLanguage,
+                        image_template: imageTemplate,
                         versions,
                     };
                 }).filter(item => item.identifie);
@@ -2791,7 +2775,6 @@ platform:
                 if (this.form.type == 'environment') {
                     this.form.startParams = this.environmentStartParams();
                     this.ensureEnvironmentContainerDefaults();
-                    this.ensureEnvironmentCodeStorage();
                     this.json.platform.startParams = this.serializeStartParams();
                 }
                 this.setYaml();
@@ -2816,7 +2799,6 @@ platform:
                     if (this.form.type == 'environment') {
                         this.form.startParams = this.environmentStartParams();
                         this.ensureEnvironmentContainerDefaults();
-                        this.ensureEnvironmentCodeStorage();
                         this.json.platform.startParams = this.serializeStartParams();
                     }
                     this.setYaml();
@@ -2923,7 +2905,9 @@ platform:
             if (j.platform) {
 
                 this.form.environmentName = j.platform?.tradition?.environmentName || '';
+                this.form.environmentGoodsId = Number(j.platform?.tradition?.environmentGoodsId || 0);
                 this.form.environmentVersion = j.platform?.tradition?.environmentVersion || '';
+                this.form.environmentImageTemplate = j.platform?.tradition?.environmentImageTemplate || '';
                 this.form.installType = j.platform?.tradition?.installType || traditionInstallTypes.site;
                 if (['system-image', 'environment'].includes(this.form.type)) {
                     let command = this.form.type == 'environment'
@@ -2949,7 +2933,10 @@ platform:
                 };
 
                 let startParams = j?.platform?.startParams;
-                this.form.startParams = JSON.parse(JSON.stringify(startParams?.length ? startParams : []));
+                this.form.startParams = JSON.parse(JSON.stringify(startParams?.length ? startParams : []))
+                    .filter(item => item?.mark !== 'environment-release'
+                        && item?.name !== 'ENVIRONMENT_RELEASE_NAME'
+                        && !(item?.hidden && item?.values_text === '%RELEASE_NAME%' && /_RELEASE_NAME$/.test(item?.name || '')));
 
                 if (this.form.type == 'system-image') {
                     this.form.startParams = this.systemImageStartParams();
@@ -2958,9 +2945,6 @@ platform:
                 } else if (this.form.type == 'environment') {
                     this.ensureEnvironmentContainerDefaults();
                     this.form.startParams = this.environmentStartParams();
-                    this.ensureEnvironmentCodeStorage();
-                } else if (this.form.type == 'tradition') {
-                    this.ensureTraditionInstallTargetParam();
                 }
 
                 if (this.form.startParams?.length) {
@@ -3133,7 +3117,6 @@ platform:
                 } else if (this.form.type == 'environment') {
                     this.form.startParams = this.environmentStartParams();
                     this.ensureEnvironmentContainerDefaults();
-                    this.ensureEnvironmentCodeStorage();
                     this.applyEnvironmentCommand();
                     this.applyPlatformShells();
                 } else if (this.form.type == 'docker') {
@@ -3208,7 +3191,6 @@ platform:
                 if (this.json.source) { delete this.json.source; }
             }
             if (this.form.type == 'tradition') {
-                this.ensureTraditionInstallTargetParam();
                 this.getStart();
 
                 if (this.json.web) { delete this.json.web; }
@@ -3297,7 +3279,6 @@ platform:
                 this.form.environmentImageVersion = this.normalizeEnvironmentVersions(this.form.environmentImageVersion);
                 this.form.startParams = this.environmentStartParams();
                 this.ensureEnvironmentContainerDefaults();
-                this.ensureEnvironmentCodeStorage();
                 this.applyEnvironmentRebootRestoreConfig();
                 this.applyEnvironmentCommand();
             } else {
@@ -3310,18 +3291,26 @@ platform:
             if (this.form.type == 'tradition') {
                 let environmentLanguage = j.platform?.tradition?.environmentLanguage || '';
                 try {
-                    environmentLanguage = this.environmentList
-                        ?.find?.(i => i.identifie == this.form.environmentName)
-                        ?.environment_language || environmentLanguage;
+                    const selectedEnvironment = this.environmentList
+                        ?.find?.(i => i.identifie == this.form.environmentName);
+                    environmentLanguage = selectedEnvironment?.environment_language || environmentLanguage;
+                    this.form.environmentGoodsId = Number(
+                        selectedEnvironment?.goods_id
+                        || selectedEnvironment?.goodsId
+                        || selectedEnvironment?.id
+                        || this.form.environmentGoodsId
+                        || 0
+                    );
                 } catch { }
                 this.normalizeCommandByEnvironment();
-                this.ensureTraditionInstallTargetParam();
                 const traditionInstall = normalizeTraditionInstall(this.form);
                 this.form.installType = traditionInstall.installType;
                 j.platform.tradition = {
                     environmentName: this.form.environmentName,
+                    environmentGoodsId: this.form.environmentGoodsId,
                     environmentVersion: this.form.environmentVersion,
                     environmentLanguage: environmentLanguage,
+                    environmentImageTemplate: this.form.environmentImageTemplate,
                     installType: traditionInstall.installType,
                     cmd: this.form.cmd,
                 }

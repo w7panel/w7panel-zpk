@@ -244,6 +244,10 @@ func (c Formula) Info(ctx *gin.Context) {
 			}
 		}
 	}
+	if err = logic.ResolveManifestDependencyReleaseNames(&responseManifest, consoleUid, params.OrderSn); err != nil {
+		c.JsonResponseWithError(ctx, err, http.StatusInternalServerError)
+		return
+	}
 
 	type FormulaInstallInfo struct {
 		Name        string               `json:"name"`
@@ -255,8 +259,8 @@ func (c Formula) Info(ctx *gin.Context) {
 	}
 	installFormulas := make([]FormulaInstallInfo, 0)
 	if params.CName == "" {
-		if formula.Manifest.Platform.StartParams == nil {
-			formula.Manifest.Platform.StartParams = make([]logic2.StartParams, 0)
+		if responseManifest.Platform.StartParams == nil {
+			responseManifest.Platform.StartParams = make([]logic2.StartParams, 0)
 		}
 		if formula.Manifest.Platform.Volumes == nil {
 			formula.Manifest.Platform.Volumes = make([]v1.Volume, 0)
@@ -269,10 +273,10 @@ func (c Formula) Info(ctx *gin.Context) {
 			}
 		}
 		installFormulas = append(installFormulas, FormulaInstallInfo{
-			Name:        formula.Manifest.Application.Identifie,
-			Title:       formula.Manifest.Application.Name,
+			Name:        responseManifest.Application.Identifie,
+			Title:       responseManifest.Application.Name,
 			Required:    true,
-			StartParams: formula.Manifest.Platform.StartParams,
+			StartParams: responseManifest.Platform.StartParams,
 			RequirePvc:  needPvc,
 			Volumes:     formula.Manifest.Platform.Volumes,
 		})
@@ -282,26 +286,31 @@ func (c Formula) Info(ctx *gin.Context) {
 		}
 		for _, item := range formula.AllManifest {
 			if item.Application.Identifie != formula.Manifest.Application.Identifie {
+				itemManifest := *item
+				if err = logic.ResolveManifestDependencyReleaseNames(&itemManifest, consoleUid, params.OrderSn); err != nil {
+					c.JsonResponseWithError(ctx, err, http.StatusInternalServerError)
+					return
+				}
 				ineedPvc := false
-				for _, iitem := range item.Platform.Volumes {
+				for _, iitem := range itemManifest.Platform.Volumes {
 					if iitem.PersistentVolumeClaim != nil {
 						ineedPvc = true
 						break
 					}
 				}
-				if item.Platform.StartParams == nil {
-					item.Platform.StartParams = make([]logic2.StartParams, 0)
+				if itemManifest.Platform.StartParams == nil {
+					itemManifest.Platform.StartParams = make([]logic2.StartParams, 0)
 				}
-				if item.Platform.Volumes == nil {
-					item.Platform.Volumes = make([]v1.Volume, 0)
+				if itemManifest.Platform.Volumes == nil {
+					itemManifest.Platform.Volumes = make([]v1.Volume, 0)
 				}
 				installFormulas = append(installFormulas, FormulaInstallInfo{
-					Name:        item.Application.Identifie,
-					Title:       item.Application.Name,
-					Required:    formulaRequiredMap[item.Application.Identifie],
-					StartParams: item.Platform.StartParams,
+					Name:        itemManifest.Application.Identifie,
+					Title:       itemManifest.Application.Name,
+					Required:    formulaRequiredMap[itemManifest.Application.Identifie],
+					StartParams: itemManifest.Platform.StartParams,
 					RequirePvc:  ineedPvc,
-					Volumes:     item.Platform.Volumes,
+					Volumes:     itemManifest.Platform.Volumes,
 				})
 			}
 		}
@@ -322,15 +331,21 @@ func (c Formula) Info(ctx *gin.Context) {
 			crossUpgradeFormulas = append(crossUpgradeFormulas, item)
 		}
 	}
+	formulaIsPlugin := logic.IsFormulaPlugin(
+		formula.Manifest.Application.Type,
+		formula.Manifest.Platform.Tradition.InstallType,
+	)
 	ticket, _ := logic.Ticket{}.GetTicket(logic.TicketInfo{
-		FormulaId:      formula.ID,
-		ConsoleUid:     consoleUid,
-		FormulaVersion: version.Name,
-		OrderSn:        params.OrderSn,
-		IsUpgrade:      params.IsUpgrade > 0,
-		Reinstall:      params.Reinstall,
-		Domain:         params.Domain,
-		AppIdentify:    params.AppIdentify,
+		FormulaId:       formula.ID,
+		ConsoleUid:      consoleUid,
+		FormulaVersion:  version.Name,
+		FormulaType:     formula.Manifest.Application.Type,
+		FormulaIsPlugin: formulaIsPlugin,
+		OrderSn:         params.OrderSn,
+		IsUpgrade:       params.IsUpgrade > 0,
+		Reinstall:       params.Reinstall,
+		Domain:          params.Domain,
+		AppIdentify:     params.AppIdentify,
 	})
 
 	responseManifest.Version = 3
@@ -345,9 +360,11 @@ func (c Formula) Info(ctx *gin.Context) {
 	manifestContent := string(tmpContent)
 	infoPath := replaceFormulaIdentifieInInfoPath(ctx.Request.URL.Path, params.Identifie, formula.Name)
 	infoURL := fmt.Sprintf("%s%s%s", schemaHttp, domain, infoPath)
+	query := url.Values{}
 	if params.OrderSn != "" {
-		query := url.Values{}
 		query.Set("order_sn", params.OrderSn)
+	}
+	if len(query) > 0 {
 		infoURL += "?" + query.Encode()
 	}
 
@@ -375,6 +392,7 @@ func (c Formula) Info(ctx *gin.Context) {
 		"tags":                   formula.Tags,
 		"install_formulas":       installFormulas,
 		"formula_type":           formula.Manifest.Application.Type,
+		"formula_is_plugin":      formulaIsPlugin,
 	})
 }
 

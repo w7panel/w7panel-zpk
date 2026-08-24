@@ -5,22 +5,33 @@ import (
 	"strings"
 
 	logic2 "github.com/w7panel/w7panel-zpk/common/logic"
+	v1 "k8s.io/api/core/v1"
 )
 
-const (
-	traditionInstallTypeSite      = "site"
-	traditionInstallTypeExtension = "extension"
-)
+func withTraditionAppPVC(platform logic2.Platform) logic2.Platform {
+	volumes := make([]v1.Volume, 0, len(platform.Volumes)+1)
+	for _, volume := range platform.Volumes {
+		if volume.Name != "site-storage" {
+			volumes = append(volumes, volume)
+		}
+	}
+	platform.Volumes = append([]v1.Volume{{
+		Name: "site-storage",
+		VolumeSource: v1.VolumeSource{PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+			ClaimName: siteManagerPersistentVolumeClaim,
+		}},
+	}}, volumes...)
+	return platform
+}
 
-func normalizeTraditionInstall(tradition logic2.Tradition) (string, error) {
-	installType := strings.TrimSpace(tradition.InstallType)
-	if installType == "" {
-		installType = traditionInstallTypeSite
+func (hc *HelmPack) getTraditionShellJobContainerValues() map[string]interface{} {
+	return map[string]interface{}{
+		"name":  strings.ReplaceAll(hc.Manifest.Application.Identifie, "_", "-"),
+		"image": imageValues(hc.getTraditionRuntimeImage(), v1.PullIfNotPresent), "env": []v1.EnvVar{},
+		"resources":       v1.ResourceRequirements{},
+		"volumeMounts":    []v1.VolumeMount{{Name: "site-storage", MountPath: "/www/wwwroot/{{ include \"tradition.codeInstallDirectory\" . }}", SubPath: "nginx-web-dir/{{ include \"tradition.codeInstallDirectory\" . }}"}},
+		"securityContext": map[string]interface{}{},
 	}
-	if installType != traditionInstallTypeSite && installType != traditionInstallTypeExtension {
-		return "", fmt.Errorf("不支持的传统应用安装类型: %s", installType)
-	}
-	return installType, nil
 }
 
 func (hc *HelmPack) addTraditionAppValues(values map[string]interface{}) error {
@@ -29,9 +40,6 @@ func (hc *HelmPack) addTraditionAppValues(values map[string]interface{}) error {
 	}
 	if strings.TrimSpace(hc.Manifest.Platform.Tradition.EnvironmentVersion) == "" {
 		return fmt.Errorf("传统应用必须指定环境应用版本")
-	}
-	if _, err := normalizeTraditionInstall(hc.Manifest.Platform.Tradition); err != nil {
-		return err
 	}
 	if strings.TrimSpace(hc.Manifest.Source.Url) == "" {
 		return fmt.Errorf("传统应用必须配置代码包")
@@ -45,13 +53,17 @@ func (hc *HelmPack) addTraditionAppValues(values map[string]interface{}) error {
 	)
 
 	values["tradition"] = map[string]interface{}{
-		"codePackageUrl": codePackageURL,
-		"affinity":       environmentAppPodAffinityValues(),
+		"codePackageUrl":       codePackageURL,
+		"affinity":             environmentAppPodAffinityValues(),
+		"environmentIdentifie": hc.Manifest.Platform.Tradition.EnvironmentName,
 	}
 	return nil
 }
 
 func (hc *HelmPack) generateTraditionAppTemplates(rootDir string) error {
+	if err := writeHelmTemplateFile(rootDir, "_tradition.tpl", "tradition-helpers.tpl"); err != nil {
+		return err
+	}
 	if err := writeHelmTemplateFile(rootDir, "install-code-job.yaml", "tradition-install-code-job.yaml.tpl"); err != nil {
 		return err
 	}
@@ -71,27 +83,12 @@ func (hc *HelmPack) getTraditionAppShells() []logic2.Shell {
 }
 
 func (hc *HelmPack) getTraditionRuntimeImage() string {
-	if hc.Manifest.Application.Type != logic2.Tradition_App || hc.SubManifest == nil {
+	if hc.Manifest.Application.Type != logic2.Tradition_App {
 		return ""
 	}
-	environmentName := hc.Manifest.Platform.Tradition.EnvironmentName
-	environment, ok := hc.SubManifest[environmentName]
-	if !ok {
+	imageTemplate := strings.TrimSpace(hc.Manifest.Platform.Tradition.EnvironmentImageTemplate)
+	if imageTemplate == "" {
 		return ""
 	}
-	for _, container := range environment.Platform.ContainerV2s {
-		if container.IsInitContainer || strings.TrimSpace(container.Image) == "" {
-			continue
-		}
-		return strings.ReplaceAll(container.Image, "{version}", hc.Manifest.Platform.Tradition.EnvironmentVersion)
-	}
-	return ""
-}
-
-func traditionRuntimeImageValues(image string) map[string]interface{} {
-	repository, tag := image, "latest"
-	if index := strings.LastIndex(image, ":"); index > strings.LastIndex(image, "/") {
-		repository, tag = image[:index], image[index+1:]
-	}
-	return map[string]interface{}{"repository": repository, "tag": tag, "pullPolicy": "IfNotPresent"}
+	return strings.ReplaceAll(imageTemplate, "{version}", hc.Manifest.Platform.Tradition.EnvironmentVersion)
 }

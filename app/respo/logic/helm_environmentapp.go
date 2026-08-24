@@ -1,7 +1,6 @@
 package logic
 
 import (
-	"fmt"
 	"strings"
 
 	logic2 "github.com/w7panel/w7panel-zpk/common/logic"
@@ -17,18 +16,7 @@ const (
 	environmentNginxVhostAnnotation    = "w7.cc/nginx_vhost_template"
 )
 
-func withEnvironmentAppPVCName(platform logic2.Platform) logic2.Platform {
-	volumes := append([]v1.Volume(nil), platform.Volumes...)
-	for index := range volumes {
-		if volumes[index].PersistentVolumeClaim != nil {
-			volumes[index].PersistentVolumeClaim.ClaimName = siteManagerPersistentVolumeClaim
-		}
-	}
-	platform.Volumes = volumes
-	return platform
-}
-
-func withEnvironmentAppCodeStorage(platform logic2.Platform) logic2.Platform {
+func withEnvironmentAppStorage(platform logic2.Platform) logic2.Platform {
 	volumes := make([]v1.Volume, 0, len(platform.Volumes)+1)
 	for _, volume := range platform.Volumes {
 		if volume.Name != environmentAppStorageVolumeName {
@@ -76,24 +64,14 @@ func environmentAppPodAffinityValues() map[string]interface{} {
 }
 
 func (hc *HelmPack) addEnvironmentAppValues(values map[string]interface{}) error {
-	volumeName := environmentAppStorageVolumeName
-	for _, volume := range hc.Manifest.Platform.Volumes {
-		if volume.PersistentVolumeClaim != nil {
-			volumeName = volume.Name
-			break
-		}
-	}
 	codeEnabled := strings.TrimSpace(hc.Manifest.Source.Url) != ""
-	if codeEnabled && volumeName == "" {
-		return fmt.Errorf("环境应用必须配置站点存储卷")
-	}
 
 	values["environment"] = map[string]interface{}{
 		"code": map[string]interface{}{
 			"enabled":    codeEnabled,
 			"image":      environmentAppCodeInstallerImage,
 			"packageUrl": environmentAppCodePackageURL(hc.Manifest),
-			"volumeName": volumeName,
+			"volumeName": environmentAppStorageVolumeName,
 		},
 		"site": map[string]interface{}{
 			"image":              environmentAppSiteManagerImage,

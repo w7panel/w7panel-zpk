@@ -8,15 +8,17 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
-func withTraditionAppPVC(platform logic2.Platform) logic2.Platform {
+const traditionAppStorageVolumeName = "site-storage"
+
+func withTraditionAppStorage(platform logic2.Platform) logic2.Platform {
 	volumes := make([]v1.Volume, 0, len(platform.Volumes)+1)
 	for _, volume := range platform.Volumes {
-		if volume.Name != "site-storage" {
+		if volume.Name != traditionAppStorageVolumeName {
 			volumes = append(volumes, volume)
 		}
 	}
 	platform.Volumes = append([]v1.Volume{{
-		Name: "site-storage",
+		Name: traditionAppStorageVolumeName,
 		VolumeSource: v1.VolumeSource{PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
 			ClaimName: siteManagerPersistentVolumeClaim,
 		}},
@@ -29,7 +31,7 @@ func (hc *HelmPack) getTraditionShellJobContainerValues() map[string]interface{}
 		"name":  strings.ReplaceAll(hc.Manifest.Application.Identifie, "_", "-"),
 		"image": imageValues(hc.getTraditionRuntimeImage(), v1.PullIfNotPresent), "env": []v1.EnvVar{},
 		"resources":       v1.ResourceRequirements{},
-		"volumeMounts":    []v1.VolumeMount{{Name: "site-storage", MountPath: "/www/wwwroot/{{ include \"tradition.codeInstallDirectory\" . }}", SubPath: "nginx-web-dir/{{ include \"tradition.codeInstallDirectory\" . }}"}},
+		"volumeMounts":    []v1.VolumeMount{{Name: traditionAppStorageVolumeName, MountPath: "/www/wwwroot/{{ include \"tradition.codeInstallDirectory\" . }}", SubPath: "nginx-web-dir/{{ include \"tradition.codeInstallDirectory\" . }}"}},
 		"securityContext": map[string]interface{}{},
 	}
 }

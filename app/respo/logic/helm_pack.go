@@ -743,9 +743,9 @@ func (hc *HelmPack) generateHelpersTpl(rootDir string, identify string) error {
 func (hc *HelmPack) generateValuesYaml(rootDir string) error {
 	platform := hc.Manifest.Platform
 	if hc.Manifest.Application.Type == logic2.EnvironmentApp {
-		platform = withEnvironmentAppCodeStorage(withEnvironmentAppPVCName(platform))
+		platform = withEnvironmentAppStorage(platform)
 	} else if hc.Manifest.Application.Type == logic2.Tradition_App {
-		platform = withTraditionAppPVC(platform)
+		platform = withTraditionAppStorage(platform)
 	}
 	platform.Shells = hc.getHelmShells()
 	if hc.Manifest.Application.Annotation == nil {

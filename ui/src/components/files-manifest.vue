@@ -421,7 +421,7 @@
 
                             <slot></slot>
 
-                            <a-form-item v-if="['tradition', 'environment', 'system-image'].includes(form.type)" label="CMD">
+                            <a-form-item v-if="['environment', 'system-image'].includes(form.type)" label="CMD">
                                 <div class="df df-c">
                                     <div v-for="(item, index) in form.cmd" :key="index" class="df ai-e"
                                         :style="{ marginTop: index == 0 ? 0 : '10px' }">
@@ -434,9 +434,7 @@
                                             <span class="ml-10 cursor c-blue" v-if="index + 1 == form.cmd.length"
                                                 @click="form.cmd.push('')">添加</span>
                                             <a-tooltip v-if="index + 1 == form.cmd.length"
-                                                :content="['system-image', 'environment'].includes(form.type)
-                                                    ? '运行容器的启动命令。该配置可选，留空时使用镜像自身的 ENTRYPOINT/CMD。'
-                                                    : '容器的启动参数。该参数为可选参数，如果不填写，则默认使用 Dockerfile 中的 CMD。输入规范，以“空格”作为参数的分割标识，例如 -u app.py'"
+                                                content="运行容器的启动命令。该配置可选，留空时使用镜像自身的 ENTRYPOINT/CMD。"
                                                 position="top">
                                                 <icon-exclamation-circle-fill class="fs-16 c-99 ml-4" />
                                             </a-tooltip>
@@ -2179,8 +2177,6 @@ export default {
                 },
             }));
         },
-        normalizeCommandByEnvironment() {
-        },
         openAppset() {
             let volumes = this.json?.platform?.volumes;
             let volumeClaimTemplates = this.json?.platform?.volumeClaimTemplates;
@@ -2256,8 +2252,6 @@ export default {
                 this.form.environmentVersion = item.versions[0];
             }
             this.getStart();
-            this.normalizeCommandByEnvironment();
-
             this.changeForm();
         },
         getEnvironmentList() {
@@ -2291,8 +2285,6 @@ export default {
                         versions,
                     };
                 }).filter(item => item.identifie);
-                this.normalizeCommandByEnvironment();
-
                 this.form.depends?.map?.((item, index) => {
                     if (this.form.type == 'tradition' && this.environmentList?.length) {
                         let now = this.environmentList.find(i => i.identifie == this.form.environmentName);
@@ -2917,7 +2909,7 @@ platform:
                         ? command.map(item => String(item))
                         : [''];
                 } else {
-                    this.form.cmd = j.platform?.tradition?.cmd || [''];
+                    this.form.cmd = [''];
                 }
 
                 this.form.ingress = JSON.parse(JSON.stringify(j.platform?.ingress || []));
@@ -3110,9 +3102,6 @@ platform:
                         delete this.json.platform.ingress
                         delete this.json.platform.runtimeClassName
                     } catch { }
-                    if (this.json.platform?.tradition) {
-                        this.json.platform.tradition.cmd = this.form.cmd;
-                    }
                     this.applyPlatformShells();
                 } else if (this.form.type == 'environment') {
                     this.form.startParams = this.environmentStartParams();
@@ -3302,7 +3291,6 @@ platform:
                         || 0
                     );
                 } catch { }
-                this.normalizeCommandByEnvironment();
                 const traditionInstall = normalizeTraditionInstall(this.form);
                 this.form.installType = traditionInstall.installType;
                 j.platform.tradition = {
@@ -3312,7 +3300,6 @@ platform:
                     environmentLanguage: environmentLanguage,
                     environmentImageTemplate: this.form.environmentImageTemplate,
                     installType: traditionInstall.installType,
-                    cmd: this.form.cmd,
                 }
             }
 

@@ -326,16 +326,17 @@ type Ingress struct {
 }
 
 type Depend struct {
-	Identifie         string `yaml:"identifie" json:"identifie"`
-	Name              string `yaml:"name" json:"name"`
-	From              string `yaml:"from" json:"from"`
-	Required          bool   `yaml:"required" json:"required"`
-	Type              string `yaml:"type" json:"type"`
-	SubIdentifie      string `yaml:"subidentifie" json:"subidentifie"`
-	SubName           string `yaml:"subname" json:"subname"`
-	MultipleInstances bool   `yaml:"multipleInstances,omitempty" json:"multipleInstances,omitempty"`
-	ReleaseName       string `yaml:"releaseName,omitempty" json:"releaseName,omitempty"`
-	ReleaseNameFixed  bool   `yaml:"releaseNameFixed" json:"releaseNameFixed"`
+	Identifie         string            `yaml:"identifie" json:"identifie"`
+	Name              string            `yaml:"name" json:"name"`
+	From              string            `yaml:"from" json:"from"`
+	Required          bool              `yaml:"required" json:"required"`
+	Type              string            `yaml:"type" json:"type"`
+	SubIdentifie      string            `yaml:"subidentifie" json:"subidentifie"`
+	SubName           string            `yaml:"subname" json:"subname"`
+	MultipleInstances bool              `yaml:"multipleInstances,omitempty" json:"multipleInstances,omitempty"`
+	ReleaseName       string            `yaml:"releaseName,omitempty" json:"releaseName,omitempty"`
+	ReleaseNameFixed  bool              `yaml:"releaseNameFixed" json:"releaseNameFixed"`
+	StartParams       map[string]string `yaml:"startParams,omitempty" json:"startParams,omitempty"`
 }
 
 type Source struct {

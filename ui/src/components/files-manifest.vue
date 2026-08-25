@@ -817,6 +817,7 @@ import {
     removeEnvironmentAppCodeStorage,
 } from '@/utils/environment-app';
 import {
+    applyTraditionEnvironmentDependencyStartParams,
     createTraditionEnvironmentDependency,
     normalizeTraditionInstall,
     traditionInstallTypes,
@@ -847,6 +848,14 @@ const systemImageAnnotationKeys = {
     versions: environmentAnnotationKeys.imageVersion,
     rootfs: 'sysbox/rootfs-rw-layer',
 };
+
+const isDerivedDependencyReleaseStartParam = item => Boolean(
+    item?.hidden && /_RELEASE_NAME$/.test(item?.name || '')
+);
+
+const isLegacyTraditionInstallDirectoryStartParam = (item, applicationType) => (
+    applicationType === 'tradition' && item?.name === 'CODE_INSTALL_DIRECTORY'
+);
 
 const gatewayPluginAnnotationPrefix = 'w7.cc/plugin-';
 const gatewayPluginAnnotationKeys = ['w7.cc/official-app'];
@@ -1983,7 +1992,14 @@ export default {
         },
         isEnvironmentFixedDependency(record) {
             return (this.form.type == 'environment' && isEnvironmentAppDependency(record))
-                || (this.form.type == 'system-image' && record?.identifie == 'w7panel-sysbox');
+                || (this.form.type == 'system-image' && record?.identifie == 'w7panel-sysbox')
+                || this.isTraditionEnvironmentDependency(record);
+        },
+        isTraditionEnvironmentDependency(record) {
+            if (this.form.type != 'tradition') { return false }
+            const dependencyIdentify = String(record?.identifie || '').replaceAll('_', '-');
+            const environmentIdentify = String(this.form.environmentName || '').replaceAll('_', '-');
+            return Boolean(environmentIdentify) && dependencyIdentify == environmentIdentify;
         },
         syncEnvironmentDependency() {
             if (this.form.type != 'environment') {
@@ -2150,7 +2166,8 @@ export default {
                 ? this.environmentStartParams()
                 : this.form.startParams;
             params = (params || []).filter(item => item?.mark !== 'environment-release'
-                && item?.name !== 'ENVIRONMENT_RELEASE_NAME');
+                && !isDerivedDependencyReleaseStartParam(item)
+                && !isLegacyTraditionInstallDirectoryStartParam(item, this.form.type));
             for (let i in params) {
                 let o = params[i];
                 if (o.name) {
@@ -2927,8 +2944,8 @@ platform:
                 let startParams = j?.platform?.startParams;
                 this.form.startParams = JSON.parse(JSON.stringify(startParams?.length ? startParams : []))
                     .filter(item => item?.mark !== 'environment-release'
-                        && item?.name !== 'ENVIRONMENT_RELEASE_NAME'
-                        && !(item?.hidden && item?.values_text === '%RELEASE_NAME%' && /_RELEASE_NAME$/.test(item?.name || '')));
+                        && !isDerivedDependencyReleaseStartParam(item)
+                        && !isLegacyTraditionInstallDirectoryStartParam(item, this.form.type));
 
                 if (this.form.type == 'system-image') {
                     this.form.startParams = this.systemImageStartParams();
@@ -2966,6 +2983,11 @@ platform:
                 this.form.depends = j.platform?.depends?.filter(i => i.type == 'out') || [];
 
                 this.form.depends.map((item, index) => {
+                    if (this.isTraditionEnvironmentDependency(item)) {
+                        item.temporary = true;
+                        item.required = true;
+                        item.multipleInstances = true;
+                    }
                     if (this.form.type == 'tradition' && this.environmentList?.length) {
                         let now = this.environmentList.find(i => i.identifie == this.form.environmentName);
                         if (now) {
@@ -3315,7 +3337,15 @@ platform:
                 }
 
 
-                j.platform.depends = this.form.dependsIn.concat(this.form.depends);
+                let dependencies = this.form.dependsIn.concat(this.form.depends);
+                if (this.form.type == 'tradition') {
+                    dependencies = applyTraditionEnvironmentDependencyStartParams(
+                        dependencies,
+                        this.form.environmentName,
+                        this.form.environmentVersion,
+                    );
+                }
+                j.platform.depends = dependencies;
                 j.platform.startParams = this.serializeStartParams();
 
                 if (this.form.type == 'helm') {

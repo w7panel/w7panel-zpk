@@ -64,7 +64,7 @@ func ResolveDependencyReleaseNames(manifest *commonlogic.Manifest, bindings map[
 			dependency.ReleaseNameFixed = true
 			continue
 		}
-		if hasBinding {
+		if hasBinding && dependency.MultipleInstances {
 			var err error
 			dependency.ReleaseName, err = GenerateDependencyReleaseName(identify)
 			if err != nil {

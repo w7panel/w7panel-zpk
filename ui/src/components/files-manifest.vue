@@ -1602,15 +1602,6 @@ export default {
             return this.form.type == 'environment'
                 && Boolean(String(this.zip?.url || this.json?.source?.url || '').trim());
         },
-        validateEnvironmentStorage() {
-            if (this.form.type != 'environment') { return true; }
-            let volumes = this.json?.platform?.volumes;
-            let storage = Array.isArray(volumes)
-                && volumes.find(item => item?.persistentVolumeClaim);
-            if (storage) { return true; }
-            messageWarning('运行环境必须配置站点存储卷');
-            return false;
-        },
         syncEnvironmentVersionConfig() {
             if (this.form.type != 'environment') { return; }
             this.form.environmentImageVersion = this.normalizeEnvironmentVersions(this.form.environmentImageVersion);
@@ -3080,8 +3071,6 @@ platform:
                         : '必填项不能为空');
                     return;
                 }
-
-                if (!this.validateEnvironmentStorage()) { return }
 
                 if (this.form.type == 'gateway-plugin') {
                     if (!this.form.gatewayPluginSupportGlobal && !this.form.gatewayPluginSupportRule) {

@@ -9,7 +9,7 @@ import (
 
 const (
 	environmentAppCodeInstallerImage   = "busybox:1.36.1"
-	environmentAppSiteManagerImage     = "zpk.w7.cc/public/site-manager:v1.3.5"
+	environmentAppSiteManagerImage     = "zpk.w7.cc/public/site-manager:v1.3.6"
 	environmentImageLanguageAnnotation = "w7.cc/image_language"
 	environmentNginxVhostAnnotation    = "w7.cc/nginx_vhost_template"
 )

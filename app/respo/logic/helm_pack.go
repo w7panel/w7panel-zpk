@@ -69,6 +69,14 @@ type HelmPack struct {
 	Sidecars               []HelmSidecar
 }
 
+type helmValuesOptions struct {
+	platform                logic2.Platform
+	workloadAffinity        map[string]interface{}
+	jobAffinity             map[string]interface{}
+	addValues               func(map[string]interface{}) error
+	shellJobContainerValues func(logic2.Platform, string) map[string]interface{}
+}
+
 func NewHelmPack(manifest logic2.Manifest, subManifests []*logic2.Manifest, outputDir, chartVersion string, isSubFormula bool, sharedStorageTargetApp string) *HelmPack {
 	ApplyDependencyReleaseStartParams(&manifest)
 	subManifestMap := make(map[string]logic2.Manifest)
@@ -140,14 +148,7 @@ func (hc *HelmPack) PackToHelm() error {
 	}
 
 	if hc.Manifest.Application.Type == logic2.GatewayPluginApp {
-		renderer, err := getGatewayPluginRenderer(hc.Manifest.Platform.GatewayPlugin)
-		if err != nil {
-			return err
-		}
-		if err := hc.generateGatewayPluginValuesYaml(helmDir, renderer); err != nil {
-			return err
-		}
-		if err := hc.generateGatewayPluginTemplate(templatesDir, renderer); err != nil {
+		if err := hc.packGatewayPluginApp(helmDir, templatesDir); err != nil {
 			return err
 		}
 	} else if hc.isHelmPackage() {
@@ -159,62 +160,16 @@ func (hc *HelmPack) PackToHelm() error {
 			return err
 		}
 	} else if hc.Manifest.Application.Type == logic2.Tradition_App {
-		if err := hc.generateValuesYaml(helmDir); err != nil {
+		if err := hc.packTraditionApp(helmDir, templatesDir); err != nil {
 			return err
 		}
-		if err := hc.generateHelpersTpl(templatesDir, hc.Manifest.Application.Identifie); err != nil {
-			return err
-		}
-		if err := hc.generateTraditionAppTemplates(templatesDir); err != nil {
-			return err
-		}
-		if err := hc.generateShellsTemplates(templatesDir); err != nil {
+	} else if hc.Manifest.Application.Type == logic2.EnvironmentApp {
+		if err := hc.packEnvironmentApp(helmDir, templatesDir); err != nil {
 			return err
 		}
 	} else {
-		if err := hc.generateValuesYaml(helmDir); err != nil {
+		if err := hc.packWorkloadApplication(helmDir, templatesDir, hc.defaultHelmValuesOptions(), true, nil); err != nil {
 			return err
-		}
-		if err := hc.generateHelpersTpl(templatesDir, hc.Manifest.Application.Identifie); err != nil {
-			return err
-		}
-
-		if err := hc.generateWorkloadYaml(templatesDir); err != nil {
-			return err
-		}
-		if err := hc.generateShellsTemplates(templatesDir); err != nil {
-			return err
-		}
-		if hc.Manifest.Application.Type == logic2.EnvironmentApp {
-			if err := hc.generateEnvironmentAppTemplates(templatesDir); err != nil {
-				return err
-			}
-		}
-		if err := hc.generateBuildImageJobTemplate(templatesDir); err != nil {
-			return err
-		}
-		if err := hc.generateServiceYaml(templatesDir); err != nil {
-			return err
-		}
-		if err := hc.generateNodePortServiceYaml(templatesDir); err != nil {
-			return err
-		}
-		if err := hc.generateIngressesYaml(templatesDir); err != nil {
-			return err
-		}
-		if hc.Manifest.Application.ClusterPrivileged {
-			if err := hc.generateServiceAccountYaml(templatesDir); err != nil {
-				return err
-			}
-			if err := hc.generateClusterRoleYaml(templatesDir); err != nil {
-				return err
-			}
-			if err := hc.generateClusterRoleBindingYaml(templatesDir); err != nil {
-				return err
-			}
-			if err := hc.generateSecretYaml(templatesDir); err != nil {
-				return err
-			}
 		}
 	}
 
@@ -599,10 +554,6 @@ func (hc *HelmPack) generateSubCharts(rootDir string) error {
 	}
 	mainChartName := hc.Manifest.Application.Identifie
 	for _, subManifest := range hc.SubManifest {
-		if hc.Manifest.Application.Type == logic2.Tradition_App &&
-			subManifest.Application.Identifie == hc.Manifest.Platform.Tradition.EnvironmentName {
-			continue
-		}
 		sharedStorageTargetApp := ""
 		if hasSharedPersistentStorage(hc.Manifest.Platform.Volumes, subManifest.Platform.Volumes) {
 			sharedStorageTargetApp = mainChartName
@@ -614,6 +565,53 @@ func (hc *HelmPack) generateSubCharts(rootDir string) error {
 	}
 
 	return nil
+}
+
+func (hc *HelmPack) packWorkloadApplication(rootDir, templatesDir string, valuesOptions helmValuesOptions, generateIngress bool, generateTypeTemplates func(string) error) error {
+	if err := hc.generateValuesYaml(rootDir, valuesOptions); err != nil {
+		return err
+	}
+	if err := hc.generateHelpersTpl(templatesDir, hc.Manifest.Application.Identifie); err != nil {
+		return err
+	}
+	if err := hc.generateWorkloadYaml(templatesDir); err != nil {
+		return err
+	}
+	if err := hc.generateShellsTemplates(templatesDir); err != nil {
+		return err
+	}
+	if generateTypeTemplates != nil {
+		if err := generateTypeTemplates(templatesDir); err != nil {
+			return err
+		}
+	}
+	if err := hc.generateBuildImageJobTemplate(templatesDir); err != nil {
+		return err
+	}
+	if err := hc.generateServiceYaml(templatesDir); err != nil {
+		return err
+	}
+	if err := hc.generateNodePortServiceYaml(templatesDir); err != nil {
+		return err
+	}
+	if generateIngress {
+		if err := hc.generateIngressesYaml(templatesDir); err != nil {
+			return err
+		}
+	}
+	if !hc.Manifest.Application.ClusterPrivileged {
+		return nil
+	}
+	if err := hc.generateServiceAccountYaml(templatesDir); err != nil {
+		return err
+	}
+	if err := hc.generateClusterRoleYaml(templatesDir); err != nil {
+		return err
+	}
+	if err := hc.generateClusterRoleBindingYaml(templatesDir); err != nil {
+		return err
+	}
+	return hc.generateSecretYaml(templatesDir)
 }
 
 // generateChartYaml 生成 Chart.yaml
@@ -740,14 +738,17 @@ func (hc *HelmPack) generateHelpersTpl(rootDir string, identify string) error {
 }
 
 // generateValuesYaml 生成 values.yaml
-func (hc *HelmPack) generateValuesYaml(rootDir string) error {
-	platform := hc.Manifest.Platform
-	if hc.Manifest.Application.Type == logic2.EnvironmentApp {
-		platform = withEnvironmentAppStorage(platform)
-	} else if hc.Manifest.Application.Type == logic2.Tradition_App {
-		platform = withTraditionAppStorage(platform)
+func (hc *HelmPack) defaultHelmValuesOptions() helmValuesOptions {
+	return helmValuesOptions{
+		platform:                hc.Manifest.Platform,
+		workloadAffinity:        hc.getSharedStorageWorkloadAffinityValues(),
+		jobAffinity:             hc.getDefaultJobAffinityValues(),
+		shellJobContainerValues: hc.getShellJobContainerValues,
 	}
-	platform.Shells = hc.getHelmShells()
+}
+
+func (hc *HelmPack) generateValuesYaml(rootDir string, options helmValuesOptions) error {
+	platform := options.platform
 	if hc.Manifest.Application.Annotation == nil {
 		hc.Manifest.Application.Annotation = make(map[string]interface{})
 	}
@@ -786,18 +787,13 @@ func (hc *HelmPack) generateValuesYaml(rootDir string) error {
 		"startParams":          hc.getStartParamsEnvValues(hc.Manifest.Platform),
 		"runtimeClass":         hc.getRuntimeClassValues(hc.Manifest.Platform),
 		"hostUsers":            hc.Manifest.Platform.HostUsers,
-		"affinity":             hc.getWorkloadAffinityValues(),
-		"jobAffinity":          hc.getJobAffinityValues(),
+		"affinity":             options.workloadAffinity,
+		"jobAffinity":          options.jobAffinity,
 		"w7panelSidecars":      hc.Sidecars,
 	}
-	values["jobs"] = hc.buildJobValues(platform)
-	if hc.Manifest.Application.Type == logic2.EnvironmentApp {
-		if err := hc.addEnvironmentAppValues(values); err != nil {
-			return err
-		}
-	}
-	if hc.Manifest.Application.Type == logic2.Tradition_App {
-		if err := hc.addTraditionAppValues(values); err != nil {
+	values["jobs"] = hc.buildJobValues(platform, options.shellJobContainerValues)
+	if options.addValues != nil {
+		if err := options.addValues(values); err != nil {
 			return err
 		}
 	}
@@ -818,20 +814,14 @@ func (hc *HelmPack) generateValuesYaml(rootDir string) error {
 	return writeYAMLFile(filePath, values)
 }
 
-func (hc *HelmPack) getWorkloadAffinityValues() map[string]interface{} {
-	if hc.Manifest.Application.Type == logic2.EnvironmentApp {
-		return environmentAppPodAffinityValues()
-	}
+func (hc *HelmPack) getSharedStorageWorkloadAffinityValues() map[string]interface{} {
 	if hc.SharedStorageTargetApp == "" {
 		return nil
 	}
 	return podAffinityByIdentify(hc.SharedStorageTargetApp)
 }
 
-func (hc *HelmPack) getJobAffinityValues() map[string]interface{} {
-	if hc.Manifest.Application.Type == logic2.EnvironmentApp {
-		return environmentAppPodAffinityValues()
-	}
+func (hc *HelmPack) getDefaultJobAffinityValues() map[string]interface{} {
 	return podAffinityByIdentify(hc.Manifest.Application.Identifie)
 }
 
@@ -1001,11 +991,6 @@ func (hc *HelmPack) generateSecretYaml(rootDir string) error {
 }
 
 func (hc *HelmPack) generateIngressesYaml(rootDir string) error {
-	// Environment applications use a dedicated Ingress which routes through
-	// site-manager nginx rather than their own Service.
-	if hc.Manifest.Application.Type == logic2.EnvironmentApp {
-		return nil
-	}
 	domain := hc.getIngressDomain(hc.Manifest.Platform)
 	if domain == "" {
 		return nil
@@ -1040,13 +1025,6 @@ func (hc *HelmPack) generateIngressYaml(rootDir string, ingressName string, pare
 
 func (hc *HelmPack) generateShellsTemplates(rootDir string) error {
 	return writeHelmTemplateFile(rootDir, "shell-job.yaml", "shell-job.yaml.tpl")
-}
-
-func (hc *HelmPack) getHelmShells() []logic2.Shell {
-	if hc.Manifest.Application.Type == logic2.Tradition_App {
-		return hc.getTraditionAppShells()
-	}
-	return append([]logic2.Shell(nil), hc.Manifest.Platform.Shells...)
 }
 
 func (hc *HelmPack) generateBuildImageJobTemplate(rootDir string) error {
@@ -1107,47 +1085,6 @@ func (hc *HelmPack) generateRegisterSiteJobTemplate(rootDir string, manifest log
 	})
 
 	return writeFile(siteFilePath, siteTemplate)
-}
-
-func (hc *HelmPack) generateGatewayPluginValuesYaml(rootDir string, renderer gatewayPluginRenderer) error {
-	plugin := hc.Manifest.Platform.GatewayPlugin.Normalize()
-	defaultConfig := plugin.DefaultConfig
-	if defaultConfig == nil {
-		defaultConfig = make(map[string]interface{})
-	}
-	appName := hc.Manifest.Application.Name
-	if appName == "" {
-		appName = hc.Manifest.Application.Identifie
-	}
-	values := map[string]interface{}{
-		"app": map[string]interface{}{
-			"title":    appName,
-			"identify": hc.Manifest.Application.Identifie,
-		},
-		"gatewayPlugin": map[string]interface{}{
-			"defaultEnabled": plugin.IsEnabledByDefault(),
-			"supportGlobal":  plugin.IsSupportGlobal(),
-			"supportRule":    plugin.Supports.Rule,
-			"defaultConfig":  defaultConfig,
-			"configSchema":   plugin.ConfigSchema,
-			"hasFrontend":    strings.TrimSpace(hc.Manifest.Web.Url) != "",
-			"runtime":        renderer.RuntimeValues(plugin),
-		},
-	}
-	return writeYAMLFile(filepath.Join(rootDir, "values.yaml"), values)
-}
-
-func (hc *HelmPack) generateGatewayPluginTemplate(rootDir string, renderer gatewayPluginRenderer) error {
-	template, err := loadHelmTemplate(renderer.TemplateName())
-	if err != nil {
-		return err
-	}
-	template = renderHelmTemplatePlaceholders(template, map[string]string{
-		"__APPLICATION_DESCRIPTION__": strconv.Quote(hc.Manifest.Application.Description),
-		"__APPLICATION_IDENTIFY__":    hc.Manifest.Application.Identifie,
-		"__APPLICATION_VERSION__":     hc.Manifest.Application.Version,
-	})
-	return writeFile(filepath.Join(rootDir, renderer.OutputName()), template)
 }
 
 func shouldPackageMicroApp(manifest logic2.Manifest) bool {
@@ -1230,7 +1167,7 @@ func (hc *HelmPack) getImageValues(container logic2.ContainerV2) map[string]inte
 	if imageName == "" {
 		imageName = GetBuildImageName(hc.Manifest.Application)
 	}
-	if hc.Manifest.Application.Type == logic2.SystemImageApp || hc.Manifest.Application.Type == logic2.EnvironmentApp {
+	if hc.Manifest.Application.Type == logic2.SystemImageApp {
 		imageName = strings.ReplaceAll(imageName, "{version}", "{{ .Values.IMAGE_VERSION }}")
 	}
 	return imageValues(imageName, container.ImagePullPolicy)
@@ -1306,20 +1243,17 @@ func (hc *HelmPack) buildShellJobValues(items []logic2.Shell) []map[string]inter
 	return jobs
 }
 
-func (hc *HelmPack) buildJobValues(platform logic2.Platform) []map[string]interface{} {
+func (hc *HelmPack) buildJobValues(platform logic2.Platform, containerValues func(logic2.Platform, string) map[string]interface{}) []map[string]interface{} {
 	jobs := make([]map[string]interface{}, 0)
 	for _, job := range hc.buildShellJobValues(platform.Shells) {
 		containerName, _ := job["containerName"].(string)
-		job["container"] = hc.getShellJobContainerValues(platform, containerName)
+		job["container"] = containerValues(platform, containerName)
 		jobs = append(jobs, job)
 	}
 	return jobs
 }
 
 func (hc *HelmPack) getShellJobContainerValues(platform logic2.Platform, containerName string) map[string]interface{} {
-	if hc.Manifest.Application.Type == logic2.Tradition_App {
-		return hc.getTraditionShellJobContainerValues()
-	}
 	if len(platform.ContainerV2s) == 0 {
 		return map[string]interface{}{
 			"name":            strings.ReplaceAll(hc.Manifest.Application.Identifie, "_", "-"),

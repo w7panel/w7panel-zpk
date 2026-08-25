@@ -3,6 +3,8 @@ package logic
 import (
 	"errors"
 	"fmt"
+	"path/filepath"
+	"strconv"
 	"strings"
 
 	commonlogic "github.com/w7panel/w7panel-zpk/common/logic"
@@ -76,4 +78,56 @@ func (higressWasmV1Renderer) TemplateName() string {
 
 func (higressWasmV1Renderer) OutputName() string {
 	return "higress-gateway-plugin.yaml"
+}
+
+func (hc *HelmPack) packGatewayPluginApp(rootDir, templatesDir string) error {
+	renderer, err := getGatewayPluginRenderer(hc.Manifest.Platform.GatewayPlugin)
+	if err != nil {
+		return err
+	}
+	if err := hc.generateGatewayPluginValuesYaml(rootDir, renderer); err != nil {
+		return err
+	}
+	return hc.generateGatewayPluginTemplate(templatesDir, renderer)
+}
+
+func (hc *HelmPack) generateGatewayPluginValuesYaml(rootDir string, renderer gatewayPluginRenderer) error {
+	plugin := hc.Manifest.Platform.GatewayPlugin.Normalize()
+	defaultConfig := plugin.DefaultConfig
+	if defaultConfig == nil {
+		defaultConfig = make(map[string]interface{})
+	}
+	appName := hc.Manifest.Application.Name
+	if appName == "" {
+		appName = hc.Manifest.Application.Identifie
+	}
+	values := map[string]interface{}{
+		"app": map[string]interface{}{
+			"title":    appName,
+			"identify": hc.Manifest.Application.Identifie,
+		},
+		"gatewayPlugin": map[string]interface{}{
+			"defaultEnabled": plugin.IsEnabledByDefault(),
+			"supportGlobal":  plugin.IsSupportGlobal(),
+			"supportRule":    plugin.Supports.Rule,
+			"defaultConfig":  defaultConfig,
+			"configSchema":   plugin.ConfigSchema,
+			"hasFrontend":    strings.TrimSpace(hc.Manifest.Web.Url) != "",
+			"runtime":        renderer.RuntimeValues(plugin),
+		},
+	}
+	return writeYAMLFile(filepath.Join(rootDir, "values.yaml"), values)
+}
+
+func (hc *HelmPack) generateGatewayPluginTemplate(rootDir string, renderer gatewayPluginRenderer) error {
+	template, err := loadHelmTemplate(renderer.TemplateName())
+	if err != nil {
+		return err
+	}
+	template = renderHelmTemplatePlaceholders(template, map[string]string{
+		"__APPLICATION_DESCRIPTION__": strconv.Quote(hc.Manifest.Application.Description),
+		"__APPLICATION_IDENTIFY__":    hc.Manifest.Application.Identifie,
+		"__APPLICATION_VERSION__":     hc.Manifest.Application.Version,
+	})
+	return writeFile(filepath.Join(rootDir, renderer.OutputName()), template)
 }

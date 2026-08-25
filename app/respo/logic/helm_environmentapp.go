@@ -8,8 +8,6 @@ import (
 )
 
 const (
-	siteManagerPersistentVolumeClaim   = "w7-sitemanager-site-manager"
-	environmentAppStorageVolumeName    = "site-storage"
 	environmentAppCodeInstallerImage   = "busybox:1.36.1"
 	environmentAppSiteManagerImage     = "zpk.w7.cc/public/site-manager:v1.3.3"
 	environmentImageLanguageAnnotation = "w7.cc/image_language"
@@ -17,14 +15,18 @@ const (
 )
 
 func withEnvironmentAppStorage(platform logic2.Platform) logic2.Platform {
+	platform.ContainerV2s = append([]logic2.ContainerV2(nil), platform.ContainerV2s...)
+	for index := range platform.ContainerV2s {
+		platform.ContainerV2s[index].VolumeMounts = append([]v1.VolumeMount(nil), platform.ContainerV2s[index].VolumeMounts...)
+	}
 	volumes := make([]v1.Volume, 0, len(platform.Volumes)+1)
 	for _, volume := range platform.Volumes {
-		if volume.Name != environmentAppStorageVolumeName {
+		if volume.Name != siteManagerStorageVolumeName {
 			volumes = append(volumes, volume)
 		}
 	}
 	volumes = append(volumes, v1.Volume{
-		Name: environmentAppStorageVolumeName,
+		Name: siteManagerStorageVolumeName,
 		VolumeSource: v1.VolumeSource{PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
 			ClaimName: siteManagerPersistentVolumeClaim,
 		}},
@@ -36,12 +38,12 @@ func withEnvironmentAppStorage(platform logic2.Platform) logic2.Platform {
 		}
 		mounts := make([]v1.VolumeMount, 0, len(platform.ContainerV2s[index].VolumeMounts)+1)
 		for _, mount := range platform.ContainerV2s[index].VolumeMounts {
-			if mount.Name != environmentAppStorageVolumeName {
+			if mount.Name != siteManagerStorageVolumeName {
 				mounts = append(mounts, mount)
 			}
 		}
 		mounts = append(mounts, v1.VolumeMount{
-			Name: environmentAppStorageVolumeName, MountPath: `{{ print "/www/wwwroot/" .Values.DOMAIN_URL }}`,
+			Name: siteManagerStorageVolumeName, MountPath: `{{ print "/www/wwwroot/" .Values.DOMAIN_URL }}`,
 			SubPath: `{{ print "nginx-web-dir/" .Values.DOMAIN_URL }}`,
 		})
 		platform.ContainerV2s[index].VolumeMounts = mounts
@@ -50,17 +52,16 @@ func withEnvironmentAppStorage(platform logic2.Platform) logic2.Platform {
 	return platform
 }
 
-func environmentAppPodAffinityValues() map[string]interface{} {
-	return map[string]interface{}{"podAffinity": map[string]interface{}{
-		"requiredDuringSchedulingIgnoredDuringExecution": []interface{}{map[string]interface{}{
-			"labelSelector": map[string]interface{}{"matchLabels": map[string]string{
-				"app.kubernetes.io/instance": "w7-sitemanager",
-				"app.kubernetes.io/name":     "site-manager",
-				"w7.cc/identifie":            "w7-sitemanager",
-			}},
-			"topologyKey": "kubernetes.io/hostname",
-		}},
-	}}
+func withEnvironmentAppImages(platform logic2.Platform) logic2.Platform {
+	platform.ContainerV2s = append([]logic2.ContainerV2(nil), platform.ContainerV2s...)
+	for index := range platform.ContainerV2s {
+		platform.ContainerV2s[index].Image = strings.ReplaceAll(
+			platform.ContainerV2s[index].Image,
+			"{version}",
+			"{{ .Values.IMAGE_VERSION }}",
+		)
+	}
+	return platform
 }
 
 func (hc *HelmPack) addEnvironmentAppValues(values map[string]interface{}) error {
@@ -71,7 +72,7 @@ func (hc *HelmPack) addEnvironmentAppValues(values map[string]interface{}) error
 			"enabled":    codeEnabled,
 			"image":      environmentAppCodeInstallerImage,
 			"packageUrl": environmentAppCodePackageURL(hc.Manifest),
-			"volumeName": environmentAppStorageVolumeName,
+			"volumeName": siteManagerStorageVolumeName,
 		},
 		"site": map[string]interface{}{
 			"image":              environmentAppSiteManagerImage,
@@ -82,6 +83,29 @@ func (hc *HelmPack) addEnvironmentAppValues(values map[string]interface{}) error
 		},
 	}
 	return nil
+}
+
+func (hc *HelmPack) environmentAppHelmValuesOptions() helmValuesOptions {
+	platform := withEnvironmentAppImages(withEnvironmentAppStorage(hc.Manifest.Platform))
+	return helmValuesOptions{
+		platform:                platform,
+		workloadAffinity:        siteManagerPodAffinityValues(),
+		jobAffinity:             siteManagerPodAffinityValues(),
+		addValues:               hc.addEnvironmentAppValues,
+		shellJobContainerValues: hc.getShellJobContainerValues,
+	}
+}
+
+func (hc *HelmPack) packEnvironmentApp(rootDir, templatesDir string) error {
+	// Environment applications use a dedicated Ingress routed through
+	// site-manager nginx, so the standard application Ingress is disabled.
+	return hc.packWorkloadApplication(
+		rootDir,
+		templatesDir,
+		hc.environmentAppHelmValuesOptions(),
+		false,
+		hc.generateEnvironmentAppTemplates,
+	)
 }
 
 func (hc *HelmPack) generateEnvironmentAppTemplates(rootDir string) error {

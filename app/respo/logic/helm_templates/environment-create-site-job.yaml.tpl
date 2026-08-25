@@ -52,13 +52,12 @@ spec:
               /home/rangine create:site \
                 --app_name={{ .Values.app.identify | quote }} \
                 --title={{ .Values.environment.site.title | quote }} \
-                --name={{ .Values.environment.site.group | quote }} \
                 --language={{ .Values.environment.site.language | quote }} \
                 --version={{ first (splitList "|" (.Values.IMAGE_VERSION | default "")) | quote }} \
                 --domain={{ .Values.DOMAIN_URL | quote }} \
                 --k8s-app-name={{ .Release.Name | quote }} \
                 --k8s-env-app-name={{ $fullName | quote }} \
-                --nginx-vhost-template={{ .Values.environment.site.nginxVhostTemplate | quote }} \
+                --nginx-vhost-template-base64={{ .Values.environment.site.nginxVhostTemplate | b64enc | quote }} \
                 --token={{ dig "panel" "panelAccessToken" "" .Values.global | quote }}
 
               selector="app.kubernetes.io%2Finstance%3Dw7-sitemanager%2Capp.kubernetes.io%2Fname%3Dsite-manager-nginx"

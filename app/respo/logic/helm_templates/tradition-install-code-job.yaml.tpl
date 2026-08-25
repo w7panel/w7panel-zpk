@@ -50,7 +50,7 @@ spec:
               esac
 
               mkdir -p "$SITE_ROOT"
-              tmp_zip="$(mktemp /tmp/tradition-code.XXXXXX.zip)"
+              tmp_zip="$(mktemp /tmp/tradition-code.XXXXXX)"
               trap 'rm -f "$tmp_zip"' EXIT
               wget -q -O "$tmp_zip" "$CODE_PACKAGE_URL"
               unzip -oq "$tmp_zip" -d "$SITE_ROOT"

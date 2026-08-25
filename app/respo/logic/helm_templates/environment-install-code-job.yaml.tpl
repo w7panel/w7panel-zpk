@@ -42,7 +42,7 @@ spec:
               : "${DOMAIN_URL:?DOMAIN_URL is required}"
               test -n "$CODE_PACKAGE_URL"
               mkdir -p "$CODE_INSTALL_PATH"
-              tmp_zip="$(mktemp /tmp/environment-code.XXXXXX.zip)"
+              tmp_zip="$(mktemp /tmp/environment-code.XXXXXX)"
               trap 'rm -f "$tmp_zip"' EXIT
               wget -q -O "$tmp_zip" "$CODE_PACKAGE_URL"
               unzip -oq "$tmp_zip" -d "$CODE_INSTALL_PATH"

@@ -23,6 +23,12 @@ const ServicePackageEnable = 2
 type FormulaGoods struct {
 }
 
+type goodsDependency struct {
+	Identifie string `json:"identifie"`
+	GoodsID   int    `json:"goods_id"`
+	Required  bool   `json:"required"`
+}
+
 func (l FormulaGoods) uploadImage(formula *Formula) (string, error) {
 	iconFile, err := GetLocalClient().GetFile(formula.GetIconRelativePath())
 	iconPath := ""
@@ -222,6 +228,10 @@ func buildApplicationTypeExtra(manifest commonlogic.Manifest) map[string]interfa
 		"application_type":  manifest.Application.Type,
 		"formula_is_plugin": formulaIsPlugin,
 	}
+	dependencies := buildGoodsDependencies(manifest)
+	if len(dependencies) > 0 {
+		extra["dependencies"] = dependencies
+	}
 	if manifest.Application.Type == commonlogic.GatewayPluginApp {
 		extra["plugin_type"] = manifest.Platform.GatewayPlugin.Category
 	}
@@ -230,8 +240,30 @@ func buildApplicationTypeExtra(manifest commonlogic.Manifest) map[string]interfa
 		extra["env_language"] = manifest.Application.Annotation["w7.cc/image_language"]
 		extra["image"] = manifest.Application.Annotation["w7.cc/image_template"]
 	}
-	if formulaIsPlugin && manifest.Platform.Tradition.EnvironmentGoodsID > 0 {
-		extra["environment_goods_id"] = manifest.Platform.Tradition.EnvironmentGoodsID
-	}
 	return extra
+}
+
+func buildGoodsDependencies(manifest commonlogic.Manifest) []goodsDependency {
+	dependencies := make([]goodsDependency, 0, len(manifest.Platform.Depends))
+	seen := make(map[string]struct{}, len(manifest.Platform.Depends))
+	for _, dependency := range manifest.Platform.Depends {
+		if dependency.Type != "out" {
+			continue
+		}
+		identify := strings.TrimSpace(dependency.Identifie)
+		goodsID := dependency.GoodsID
+		if identify == "" || goodsID <= 0 {
+			continue
+		}
+		if _, exists := seen[identify]; exists {
+			continue
+		}
+		seen[identify] = struct{}{}
+		dependencies = append(dependencies, goodsDependency{
+			Identifie: identify,
+			GoodsID:   goodsID,
+			Required:  dependency.Required,
+		})
+	}
+	return dependencies
 }

@@ -15,6 +15,7 @@ export function createTraditionEnvironmentDependency(environment) {
     }
     return {
         identifie: environment?.identifie || '',
+        goodsId: Number(environment?.goods_id || environment?.goodsId || environment?.id || 0),
         name: environment?.name || '',
         subidentifie: '',
         subname: '',

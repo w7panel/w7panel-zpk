@@ -1057,7 +1057,6 @@ export default {
                 },
                 entry: 'public',
                 environmentName: '',
-                environmentGoodsId: 0,
                 environmentVersion: '',
                 installType: traditionInstallTypes.site,
                 cmd: [''],
@@ -2250,7 +2249,6 @@ export default {
             }
 
             this.form.environmentName = item.identifie;
-            this.form.environmentGoodsId = Number(item.goods_id || item.goodsId || item.id || 0);
             this.form.environmentImageTemplate = String(
                 item.image_template || item.image || item.extra?.image || ''
             ).trim();
@@ -2298,6 +2296,7 @@ export default {
                         let now = this.environmentList.find(i => i.identifie == this.form.environmentName);
                         if (now) {
                             if (item.name == now.name && item.identifie == now.identifie) {
+                                item.goodsId = Number(now.goods_id || now.goodsId || now.id || 0);
                                 item.temporary = true;
                             }
                         }
@@ -2432,6 +2431,7 @@ export default {
             if (!record?.identifie) { return }
             let data = {
                 identifie: record.identifie,
+                goodsId: Number(record.goods_id || record.goodsId || record.id || 0),
                 name: record.name || record.identifie,
                 subidentifie: '',
                 subname: '',
@@ -2905,7 +2905,6 @@ platform:
             if (j.platform) {
 
                 this.form.environmentName = j.platform?.tradition?.environmentName || '';
-                this.form.environmentGoodsId = Number(j.platform?.tradition?.environmentGoodsId || 0);
                 this.form.environmentVersion = j.platform?.tradition?.environmentVersion || '';
                 this.form.environmentImageTemplate = j.platform?.tradition?.environmentImageTemplate || '';
                 this.form.installType = j.platform?.tradition?.installType || traditionInstallTypes.site;
@@ -3294,19 +3293,11 @@ platform:
                     const selectedEnvironment = this.environmentList
                         ?.find?.(i => i.identifie == this.form.environmentName);
                     environmentLanguage = selectedEnvironment?.environment_language || environmentLanguage;
-                    this.form.environmentGoodsId = Number(
-                        selectedEnvironment?.goods_id
-                        || selectedEnvironment?.goodsId
-                        || selectedEnvironment?.id
-                        || this.form.environmentGoodsId
-                        || 0
-                    );
                 } catch { }
                 const traditionInstall = normalizeTraditionInstall(this.form);
                 this.form.installType = traditionInstall.installType;
                 j.platform.tradition = {
                     environmentName: this.form.environmentName,
-                    environmentGoodsId: this.form.environmentGoodsId,
                     environmentVersion: this.form.environmentVersion,
                     environmentLanguage: environmentLanguage,
                     environmentImageTemplate: this.form.environmentImageTemplate,

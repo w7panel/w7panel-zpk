@@ -143,7 +143,6 @@ type ContainerV2 struct {
 
 type Tradition struct {
 	EnvironmentName          string `yaml:"environmentName" json:"environmentName"`
-	EnvironmentGoodsID       int    `yaml:"environmentGoodsId,omitempty" json:"environmentGoodsId,omitempty"`
 	EnvironmentVersion       string `yaml:"environmentVersion" json:"environmentVersion"`
 	EnvironmentLanguage      string `yaml:"environmentLanguage" json:"environmentLanguage"`
 	EnvironmentImageTemplate string `yaml:"environmentImageTemplate,omitempty" json:"environmentImageTemplate,omitempty"`
@@ -327,6 +326,7 @@ type Ingress struct {
 
 type Depend struct {
 	Identifie         string            `yaml:"identifie" json:"identifie"`
+	GoodsID           int               `yaml:"goodsId,omitempty" json:"goodsId,omitempty"`
 	Name              string            `yaml:"name" json:"name"`
 	From              string            `yaml:"from" json:"from"`
 	Required          bool              `yaml:"required" json:"required"`

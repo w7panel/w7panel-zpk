@@ -13,6 +13,7 @@ const dependencyReleaseSuffixLen = 12
 
 type DependencyOrderBinding struct {
 	AppIdentify string `json:"app_identify"`
+	OrderSn     string `json:"order_sn"`
 }
 
 func ResolveManifestDependencyReleaseNames(manifest *commonlogic.Manifest, consoleUID int32, orderSn string) error {
@@ -33,7 +34,10 @@ func ResolveManifestDependencyReleaseNames(manifest *commonlogic.Manifest, conso
 			return fmt.Errorf("查询依赖订单失败: %w", err)
 		}
 		for identify, binding := range marketBindings {
-			bindings[identify] = DependencyOrderBinding{AppIdentify: binding.AppIdentify}
+			bindings[identify] = DependencyOrderBinding{
+				AppIdentify: binding.AppIdentify,
+				OrderSn:     binding.OrderSn,
+			}
 		}
 	}
 	return ResolveDependencyReleaseNames(manifest, bindings)
@@ -56,6 +60,9 @@ func ResolveDependencyReleaseNames(manifest *commonlogic.Manifest, bindings map[
 
 		identify := normalizeDependencyName(dependency.Identifie)
 		binding, hasBinding := normalizedBindings[identify]
+		if hasBinding {
+			dependency.OrderSn = strings.TrimSpace(binding.OrderSn)
+		}
 		if hasBinding && strings.TrimSpace(binding.AppIdentify) != "" {
 			dependency.ReleaseName = normalizeDependencyName(binding.AppIdentify)
 			if dependency.ReleaseName == "" {

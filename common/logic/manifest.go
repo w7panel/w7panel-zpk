@@ -327,6 +327,7 @@ type Ingress struct {
 type Depend struct {
 	Identifie         string            `yaml:"identifie" json:"identifie"`
 	GoodsID           int               `yaml:"goodsId,omitempty" json:"goodsId,omitempty"`
+	OrderSn           string            `yaml:"order_sn,omitempty" json:"order_sn,omitempty"`
 	Name              string            `yaml:"name" json:"name"`
 	From              string            `yaml:"from" json:"from"`
 	Required          bool              `yaml:"required" json:"required"`

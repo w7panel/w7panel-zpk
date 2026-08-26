@@ -48,6 +48,7 @@ type FormulaUpgradeVersionResult struct {
 
 type DependencyOrderBinding struct {
 	AppIdentify string `json:"app_identify"`
+	OrderSn     string `json:"order_sn"`
 }
 
 func (s ZpkMarketService) CheckToken(token, formulaIdentify string) error {

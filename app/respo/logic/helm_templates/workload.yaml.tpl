@@ -50,6 +50,9 @@ spec:
       {{- end }}
       {{- if .Values.runtimeClass.enable }}
       runtimeClassName: {{ .Values.runtimeClass.name }}
+      {{- if contains "sysbox-runc" .Values.runtimeClass.name }}
+      enableServiceLinks: false
+      {{- end }}
       {{- end }}
 
       {{- $podVolumes := .Values.volumes }}

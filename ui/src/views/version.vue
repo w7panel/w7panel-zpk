@@ -46,7 +46,7 @@
 
                                         <a-tooltip v-if="audit_status > 1" content="应用已发布至制品市场" position="top">
                                             <a class="ml-10 cursor c-blue" target="_blank"
-                                                :href="'https://zm.idc.w7.com/#/site-detail/' + goods_id">
+                                                :href="'https://zm.w7.com/#/site-detail/' + goods_id">
                                                 <IconCloud />
                                                 <span class="ml-4">{{ {2: '待审核', 3: '审核失败', 4: '审核通过'}[audit_status] }}</span>
                                             </a>

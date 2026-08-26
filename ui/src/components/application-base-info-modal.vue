@@ -60,7 +60,7 @@
                 </a-form-item>
                 <a-form-item label="属性">
                     <div class="application-property-list">
-                        <a-checkbox v-model="form.once" :disabled="isInstallOnlyOnceType">仅安装一次</a-checkbox>
+                        <a-checkbox v-model="form.once" :disabled="isInstallOnlyOnceType || isInstallNeverOnceType">仅安装一次</a-checkbox>
                         <a-checkbox v-model="form.clusterPrivileges">集群特权</a-checkbox>
                         <a-checkbox v-model="form.registerSite" :disabled="isRegisterSiteDisabled">创建站点</a-checkbox>
                         <a-checkbox v-model="form.officialApp">官方应用</a-checkbox>
@@ -191,6 +191,9 @@ export default {
         isInstallOnlyOnceType() {
             return this.applicationType == 'gateway-plugin';
         },
+        isInstallNeverOnceType() {
+            return ['environment', 'system-image'].includes(this.applicationType);
+        },
         isRegisterSiteDisabled() {
             return this.applicationType == 'gateway-plugin';
         },
@@ -243,7 +246,7 @@ export default {
                     .map(([key, value]) => ({ key, value: String(value) }));
                 this.form.officialApp = String(annotation[officialAppAnnotationKey]).toLowerCase() == 'true';
                 this.form.denyDelete = String(annotation[denyDeleteAnnotationKey]).toLowerCase() == 'true';
-                this.form.once = this.isInstallOnlyOnceType ? true : Boolean(baseInfo.once);
+                this.form.once = this.isInstallOnlyOnceType ? true : (this.isInstallNeverOnceType ? false : Boolean(baseInfo.once));
                 this.form.clusterPrivileges = Boolean(baseInfo.cluster_privileges);
                 this.form.registerSite = this.isRegisterSiteDisabled ? false : Boolean(baseInfo.register_site);
                 this.iconPreview = this.getIconUrl(latestInfo?.icon_url || this.info?.icon_url || '');
@@ -317,7 +320,7 @@ export default {
                         name,
                         description: this.form.description || '',
                         annotation,
-                        once: this.isInstallOnlyOnceType ? true : Boolean(this.form.once),
+                        once: this.isInstallOnlyOnceType ? true : (this.isInstallNeverOnceType ? false : Boolean(this.form.once)),
                         cluster_privileges: Boolean(this.form.clusterPrivileges),
                         register_site: this.isRegisterSiteDisabled ? false : Boolean(this.form.registerSite),
                     },

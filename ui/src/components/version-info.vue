@@ -58,7 +58,7 @@
             </a-form-item>
             <a-form-item label="属性">
                 <div class="version-info-checks">
-                    <a-checkbox v-model="edit.once" :disabled="isInstallOnlyOnceType"
+                    <a-checkbox v-model="edit.once" :disabled="isInstallOnlyOnceType || isInstallNeverOnceType"
                         @change="changeForm('once')">仅安装一次</a-checkbox>
                     <a-checkbox v-model="edit.clusterPrivileges"
                         @change="changeForm('clusterPrivileges')">集群特权</a-checkbox>
@@ -187,7 +187,7 @@ export default {
             const annotation = this.json.application?.annotation || {};
 
             if (this.json.application) {
-                this.form.once = this.isInstallOnlyOnceType ? true : (this.json.application?.once || false);
+                this.form.once = this.isInstallOnlyOnceType ? true : (this.isInstallNeverOnceType ? false : (this.json.application?.once || false));
                 this.form.name = this.json.application?.name || '';
                 this.form.description = this.json?.application?.description || '';
                 this.form.clusterPrivileges = this.json?.application?.clusterPrivileges || false;
@@ -195,7 +195,7 @@ export default {
                 this.form.officialApp = String(annotation[propertyAnnotationKeys.officialApp]).toLowerCase() == 'true';
                 this.form.denyDelete = String(annotation[propertyAnnotationKeys.denyDelete]).toLowerCase() == 'true';
             }
-            this.edit.once = this.isInstallOnlyOnceType ? true : (this.json?.application?.once || false);
+            this.edit.once = this.isInstallOnlyOnceType ? true : (this.isInstallNeverOnceType ? false : (this.json?.application?.once || false));
             this.edit.clusterPrivileges = this.json?.application?.clusterPrivileges || false;
             this.edit.registerSite = this.isRegisterSiteDisabled ? false : (this.json?.application?.registerSite || false);
             this.edit.officialApp = this.form.officialApp;
@@ -308,8 +308,8 @@ export default {
             this.submit();
         },
         changeForm(type) {
-            if (type == 'once' && this.isInstallOnlyOnceType) {
-                this.edit.once = true;
+            if (type == 'once' && (this.isInstallOnlyOnceType || this.isInstallNeverOnceType)) {
+                this.edit.once = this.isInstallOnlyOnceType;
                 return;
             }
             if (type == 'registerSite' && this.isRegisterSiteDisabled) {
@@ -350,7 +350,7 @@ export default {
                     name: this.json?.application?.name || this.form.name || '',
                     description: this.json?.application?.description || this.form.description || '',
                     annotation,
-                    once: this.isInstallOnlyOnceType ? true : Boolean(this.json?.application?.once),
+                    once: this.isInstallOnlyOnceType ? true : (this.isInstallNeverOnceType ? false : Boolean(this.json?.application?.once)),
                     cluster_privileges: Boolean(this.json?.application?.clusterPrivileges),
                     register_site: this.isRegisterSiteDisabled ? false : Boolean(this.json?.application?.registerSite),
                 },
@@ -366,6 +366,9 @@ export default {
         },
         isInstallOnlyOnceType() {
             return this.applicationType == 'gateway-plugin';
+        },
+        isInstallNeverOnceType() {
+            return ['environment', 'system-image'].includes(this.applicationType);
         },
         isRegisterSiteDisabled() {
             return this.applicationType == 'gateway-plugin';

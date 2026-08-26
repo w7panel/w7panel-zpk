@@ -421,7 +421,7 @@
 
                             <slot></slot>
 
-                            <a-form-item v-if="['environment', 'system-image'].includes(form.type)" label="CMD">
+                            <a-form-item v-if="form.type == 'system-image'" label="CMD">
                                 <div class="df df-c">
                                     <div v-for="(item, index) in form.cmd" :key="index" class="df ai-e"
                                         :style="{ marginTop: index == 0 ? 0 : '10px' }">
@@ -489,7 +489,7 @@
                         </div>
                     </div>
 
-                    <div v-if="form.type != 'helm' && form.type != 'tradition' && form.type != 'environment' && form.type != 'gateway-plugin' && form.type != 'system-image'" class="bg-white com-line mt-20">
+                    <div v-if="form.type != 'helm' && form.type != 'tradition' && form.type != 'gateway-plugin' && form.type != 'system-image'" class="bg-white com-line mt-20">
                         <div class="mt-16">
                             <a-form-item label="应用配置">
                                 <div v-if="form.containers && form.containers.length">
@@ -1607,19 +1607,6 @@ export default {
             this.form.startParams = this.environmentStartParams();
             this.changeForm();
         },
-        applyEnvironmentCommand() {
-            if (this.form.type != 'environment') { return; }
-            let container = this.getEnvironmentMainContainer();
-            if (!container) { return; }
-            let command = (this.form.cmd || [])
-                .map(item => String(item || '').trim())
-                .filter(Boolean);
-            if (command.length) {
-                container.command = command;
-            } else {
-                delete container.command;
-            }
-        },
         ensureEnvironmentContainerDefaults(forceImage = false) {
             if (this.form.type != 'environment') { return; }
             this.json.platform = this.json.platform || {};
@@ -1664,7 +1651,6 @@ export default {
             if (this.form.type != 'environment') { return; }
             this.ensureEnvironmentContainerDefaults(true);
             this.applyEnvironmentRebootRestoreConfig();
-            this.applyEnvironmentCommand();
             this.changeForm();
         },
         applyEnvironmentRebootRestoreConfig() {
@@ -1953,7 +1939,7 @@ export default {
                 annotation: this.filterAnnotationsForType(baseInfo.annotation || {}),
                 once: this.form.type == 'gateway-plugin'
                     ? true
-                    : Boolean(baseInfo.once),
+                    : (['environment', 'system-image'].includes(this.form.type) ? false : Boolean(baseInfo.once)),
             };
             await myAxios.post('/respo/setting/set', {
                 identifie: this.identifie,
@@ -1961,6 +1947,8 @@ export default {
             });
             if (this.form.type == 'gateway-plugin') {
                 this.form.once = true;
+            } else if (['environment', 'system-image'].includes(this.form.type)) {
+                this.form.once = false;
             }
             this.formulaBaseInfo = JSON.parse(JSON.stringify(nextBaseInfo));
         },
@@ -2908,10 +2896,8 @@ platform:
                 this.form.environmentVersion = j.platform?.tradition?.environmentVersion || '';
                 this.form.environmentImageTemplate = j.platform?.tradition?.environmentImageTemplate || '';
                 this.form.installType = j.platform?.tradition?.installType || traditionInstallTypes.site;
-                if (['system-image', 'environment'].includes(this.form.type)) {
-                    let command = this.form.type == 'environment'
-                        ? this.getEnvironmentMainContainer()?.command
-                        : j.platform?.['container-v2']?.[0]?.command;
+                if (this.form.type == 'system-image') {
+                    let command = j.platform?.['container-v2']?.[0]?.command;
                     this.form.cmd = Array.isArray(command) && command.length
                         ? command.map(item => String(item))
                         : [''];
@@ -3116,7 +3102,6 @@ platform:
                 } else if (this.form.type == 'environment') {
                     this.form.startParams = this.environmentStartParams();
                     this.ensureEnvironmentContainerDefaults();
-                    this.applyEnvironmentCommand();
                     this.applyPlatformShells();
                 } else if (this.form.type == 'docker') {
 
@@ -3229,8 +3214,12 @@ platform:
                 j.application.type = this.form.type;
                 if (this.form.type == 'gateway-plugin') {
                     this.form.once = true;
+                } else if (['environment', 'system-image'].includes(this.form.type)) {
+                    this.form.once = false;
                 }
-                j.application.once = Boolean(this.form.once);
+                j.application.once = ['environment', 'system-image'].includes(this.form.type)
+                    ? false
+                    : Boolean(this.form.once);
                 if (this.form.type != 'tradition') {
                     this.form.language = '';
                 }
@@ -3279,7 +3268,6 @@ platform:
                 this.form.startParams = this.environmentStartParams();
                 this.ensureEnvironmentContainerDefaults();
                 this.applyEnvironmentRebootRestoreConfig();
-                this.applyEnvironmentCommand();
             } else {
                 delete j.platform.hostUsers;
                 if (j.platform.runtimeClassName == 'sysbox-runc') {

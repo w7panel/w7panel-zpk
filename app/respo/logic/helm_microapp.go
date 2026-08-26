@@ -10,19 +10,44 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
-func WithMicroAppBindings(names []string, bindings []logic2.Bindings) DynamicHelmPackageOption {
+type microAppTemplateConfig struct {
+	Name      string `json:"name"`
+	Identifie string `json:"identifie"`
+	Type      string `json:"type"`
+	Version   string `json:"version"`
+}
+
+func newMicroAppTemplateConfig(application logic2.Application) microAppTemplateConfig {
+	return microAppTemplateConfig{
+		Name:      application.Name,
+		Identifie: application.Identifie,
+		Type:      application.Type,
+		Version:   application.Version,
+	}
+}
+
+func WithMicroAppBindings(application logic2.Application, names []string, bindings []logic2.Bindings) DynamicHelmPackageOption {
 	replacementNames := append([]string(nil), names...)
 	replacements := append([]logic2.Bindings(nil), bindings...)
+	templateConfig := newMicroAppTemplateConfig(application)
 	cacheValue := struct {
-		Names    []string          `json:"names"`
-		Bindings []logic2.Bindings `json:"bindings"`
+		TemplateConfig microAppTemplateConfig `json:"template_config"`
+		Names          []string               `json:"names"`
+		Bindings       []logic2.Bindings      `json:"bindings"`
 	}{
-		Names:    replacementNames,
-		Bindings: replacements,
+		TemplateConfig: templateConfig,
+		Names:          replacementNames,
+		Bindings:       replacements,
 	}
 	return func(options *dynamicHelmPackageOptions) error {
 		return options.addTransform(cacheValue, func(chartDir string) error {
-			return replaceHelmChartMicroAppBindings(chartDir, replacementNames, replacements)
+			if err := replaceHelmChartMicroAppBindings(chartDir, replacementNames, replacements); err != nil {
+				return err
+			}
+			if len(replacements) == 0 {
+				return nil
+			}
+			return writeMicroAppTemplate(filepath.Join(chartDir, "templates"), application)
 		})
 	}
 }

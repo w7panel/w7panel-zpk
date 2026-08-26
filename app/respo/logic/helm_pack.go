@@ -1121,11 +1121,23 @@ func (hc *HelmPack) generateMicroAppTemplate(rootDir string, manifest logic2.Man
 		return err
 	}
 
-	appName := manifest.Application.Name
-	if appName == "" {
-		appName = manifest.Application.Identifie
+	return writeMicroAppTemplate(rootDir, manifest.Application)
+}
+
+func writeMicroAppTemplate(rootDir string, application logic2.Application) error {
+	microAppFilePath := filepath.Join(rootDir, "microapp.yaml")
+	if function.FileExists(microAppFilePath) {
+		return nil
 	}
-	manifestType := manifest.Application.Type
+	if err := os.MkdirAll(rootDir, 0755); err != nil {
+		return fmt.Errorf("创建 MicroApp 模板目录失败: %w", err)
+	}
+
+	appName := application.Name
+	if appName == "" {
+		appName = application.Identifie
+	}
+	manifestType := application.Type
 	if manifestType == logic2.Docker_App {
 		manifestType = "native"
 	}
@@ -1135,9 +1147,9 @@ func (hc *HelmPack) generateMicroAppTemplate(rootDir string, manifest logic2.Man
 		return err
 	}
 	microAppTemplate = renderHelmTemplatePlaceholders(microAppTemplate, map[string]string{
-		"__APPLICATION_TYPE__":     manifest.Application.Type,
-		"__APPLICATION_IDENTIFY__": manifest.Application.Identifie,
-		"__APPLICATION_VERSION__":  manifest.Application.Version,
+		"__APPLICATION_TYPE__":     application.Type,
+		"__APPLICATION_IDENTIFY__": application.Identifie,
+		"__APPLICATION_VERSION__":  application.Version,
 		"__MANIFEST_TYPE__":        manifestType,
 		"__APP_TITLE__":            strconv.Quote(appName),
 	})

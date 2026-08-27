@@ -270,7 +270,7 @@ func (hc *HelmPack) processHelmPkg(rootDir string) error {
 		if !dependHelmYamlInHelm {
 			chartYaml := ChartYAML{
 				APIVersion:  "v2",
-				Name:        strings.ReplaceAll(hc.Manifest.Application.Identifie, "-", "_"),
+				Name:        strings.ToLower(hc.Manifest.Application.Identifie),
 				Version:     hc.ChartVersion,
 				Description: hc.Manifest.Application.Identifie,
 				Type:        "application",
@@ -669,7 +669,7 @@ func (hc *HelmPack) generateChartYaml(rootDir string) error {
 	} else {
 		chartYaml = ChartYAML{
 			APIVersion:  "v2",
-			Name:        hc.Manifest.Application.Identifie,
+			Name:        strings.ToLower(hc.Manifest.Application.Identifie),
 			Version:     hc.ChartVersion,
 			Description: hc.Manifest.Application.Description,
 			Type:        "application",
@@ -916,7 +916,7 @@ func hasSharedPersistentStorage(mainVolumes []v1.Volume, subVolumes []v1.Volume)
 }
 
 func buildStableSubPathTemplate(containerName string, volumeMount v1.VolumeMount) string {
-	return fmt.Sprintf(`{{ printf "%%s|%%s|%%s|%s|%s|%s" .Release.Name .Release.Namespace .Chart.Name | sha256sum | trunc 12 }}`,
+	return fmt.Sprintf(`{{ include "common.resolveStableSubPath" (dict "root" . "containerName" %q "volumeName" %q "mountPath" %q) }}`,
 		containerName,
 		volumeMount.Name,
 		volumeMount.MountPath,

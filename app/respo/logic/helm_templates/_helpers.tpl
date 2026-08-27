@@ -69,6 +69,45 @@ Create the name of the service to use
 {{- end }}
 
 {{/*
+Keep RANDOM_DIR mounts stable across upgrades. Existing workloads are the
+source of truth; new installations use the original deterministic fallback.
+*/}}
+{{- define "common.resolveStableSubPath" -}}
+{{- $root := .root -}}
+{{- $containerName := .containerName -}}
+{{- $volumeName := .volumeName -}}
+{{- $mountPath := .mountPath -}}
+{{- $fallback := printf "%s|%s|%s|%s|%s|%s" $root.Release.Name $root.Release.Namespace $root.Chart.Name $containerName $volumeName $mountPath | sha256sum | trunc 12 -}}
+{{- $workloadName := include "common.fullname" $root -}}
+{{- $existing := lookup "apps/v1" "Deployment" $root.Release.Namespace $workloadName -}}
+{{- if not $existing -}}
+  {{- $existing = lookup "apps/v1" "StatefulSet" $root.Release.Namespace $workloadName -}}
+{{- end -}}
+{{- if not $existing -}}
+  {{- $existing = lookup "apps/v1" "DaemonSet" $root.Release.Namespace $workloadName -}}
+{{- end -}}
+{{- $existingSubPath := "" -}}
+{{- if $existing -}}
+  {{- $spec := default (dict) (index $existing "spec") -}}
+  {{- $template := default (dict) (index $spec "template") -}}
+  {{- $podSpec := default (dict) (index $template "spec") -}}
+  {{- $containerGroups := list (default (list) (index $podSpec "containers")) (default (list) (index $podSpec "initContainers")) -}}
+  {{- range $containers := $containerGroups -}}
+    {{- range $container := $containers -}}
+      {{- if eq (default "" $container.name) $containerName -}}
+        {{- range $mount := (default (list) $container.volumeMounts) -}}
+          {{- if and (eq $existingSubPath "") (eq (default "" $mount.name) $volumeName) (eq (default "" $mount.mountPath) $mountPath) (ne (default "" $mount.subPath) "") -}}
+            {{- $existingSubPath = $mount.subPath -}}
+          {{- end -}}
+        {{- end -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- default $fallback $existingSubPath -}}
+{{- end }}
+
+{{/*
 Create pull secrets
 */}}
 {{- define "common.pullSecrets" -}}

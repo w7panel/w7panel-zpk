@@ -81,7 +81,8 @@ func UnzipHelmPackage(archivePath, targetDir string) error {
 				return fmt.Errorf("创建父目录失败: %w", err)
 			}
 
-			outFile, err := os.OpenFile(targetPath, os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode))
+			//os.O_TRUNC：打开已存在文件时把文件长度截断为 0
+			outFile, err := os.OpenFile(targetPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, os.FileMode(header.Mode))
 			if err != nil {
 				return fmt.Errorf("创建文件失败: %w", err)
 			}
@@ -91,10 +92,9 @@ func UnzipHelmPackage(archivePath, targetDir string) error {
 				return fmt.Errorf("复制文件内容失败: %w", err)
 			}
 			outFile.Close()
-		case tar.TypeSymlink:
-			if err := os.Symlink(header.Linkname, targetPath); err != nil {
-				return fmt.Errorf("创建符号链接失败: %w", err)
-			}
+		case tar.TypeSymlink, tar.TypeLink:
+			// Links can escape targetDir or redirect subsequent writes outside it.
+			return fmt.Errorf("Helm 包不允许包含链接: %s", header.Name)
 		}
 	}
 

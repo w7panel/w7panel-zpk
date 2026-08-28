@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"errors"
+	"log/slog"
 
 	"github.com/gin-gonic/gin"
 	"github.com/w7panel/w7panel-zpk/common/logic"
@@ -21,17 +22,13 @@ func (m Auth) Process(ctx *gin.Context) {
 			return
 		}
 
-		//m.JsonResponseWithError(ctx, errors.New("token 错误"), 401)
-		//ctx.Abort()
-		//return
+		m.JsonResponseWithError(ctx, errors.New("token 错误"), 401)
+		ctx.Abort()
+		return
 	}
 
 	sessionUser, err := logic.Session{}.GetUserInfo(ctx, zpkToken)
-	sessionUser = &logic.UserSession{
-		UserID:     1,
-		ConsoleUid: 76052,
-	}
-	err = nil
+	slog.Info("auth middleware GetUserInfo", "token", zpkToken, "user", sessionUser, "err", err)
 	if err != nil {
 		m.JsonResponseWithServerError(ctx, err)
 		ctx.Abort()

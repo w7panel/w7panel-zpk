@@ -2,8 +2,9 @@
 {{- $root := . -}}
 {{- $annotations := dict -}}
 {{- range $sidecar := ($root.Values.w7panelSidecars | default list) -}}
-  {{- with $sidecar.podAnnotationsTemplate -}}
-    {{- $context := index $root.Subcharts $sidecar.chart -}}
+  {{- $context := index $root.Subcharts $sidecar.chart -}}
+  {{- $template := index $context.Chart.Annotations "w7.cc/sidecar-pod-annotations-template" -}}
+  {{- with $template -}}
     {{- $rendered := include . $context | fromYaml | default dict -}}
     {{- range $key, $value := $rendered -}}
       {{- $_ := set $annotations $key $value -}}
@@ -38,9 +39,11 @@
 {{- $aliasesByIP := dict -}}
 {{- $hostnameIPs := dict -}}
 {{- range $sidecar := ($root.Values.w7panelSidecars | default list) -}}
-  {{- if or (not $jobOnly) $sidecar.jobContainerTemplate -}}
-    {{- with $sidecar.hostAliasesTemplate -}}
-      {{- $context := index $root.Subcharts $sidecar.chart -}}
+  {{- $context := index $root.Subcharts $sidecar.chart -}}
+  {{- $jobContainerTemplate := index $context.Chart.Annotations "w7.cc/sidecar-job-container-template" -}}
+  {{- if or (not $jobOnly) $jobContainerTemplate -}}
+    {{- $template := index $context.Chart.Annotations "w7.cc/sidecar-host-aliases-template" -}}
+    {{- with $template -}}
       {{- range $item := (include . $context | fromYamlArray | default list) -}}
         {{- $ip := toString $item.ip -}}
         {{- if not $ip -}}
@@ -89,8 +92,10 @@
 {{- $root := . -}}
 {{- $items := list -}}
 {{- range $sidecar := ($root.Values.w7panelSidecars | default list) -}}
-  {{- with $sidecar.volumesTemplate -}}
-    {{- $items = concat $items (include . (index $root.Subcharts $sidecar.chart) | fromYamlArray | default list) -}}
+  {{- $context := index $root.Subcharts $sidecar.chart -}}
+  {{- $template := index $context.Chart.Annotations "w7.cc/sidecar-volumes-template" -}}
+  {{- with $template -}}
+    {{- $items = concat $items (include . $context | fromYamlArray | default list) -}}
   {{- end -}}
 {{- end -}}
 {{- if $items -}}
@@ -102,8 +107,10 @@
 {{- $root := . -}}
 {{- $items := list -}}
 {{- range $sidecar := ($root.Values.w7panelSidecars | default list) -}}
-  {{- with $sidecar.initTemplate -}}
-    {{- $items = concat $items (include . (index $root.Subcharts $sidecar.chart) | fromYamlArray | default list) -}}
+  {{- $context := index $root.Subcharts $sidecar.chart -}}
+  {{- $template := index $context.Chart.Annotations "w7.cc/sidecar-init-template" -}}
+  {{- with $template -}}
+    {{- $items = concat $items (include . $context | fromYamlArray | default list) -}}
   {{- end -}}
 {{- end -}}
 {{- if $items -}}
@@ -115,8 +122,10 @@
 {{- $root := . -}}
 {{- $items := list -}}
 {{- range $sidecar := ($root.Values.w7panelSidecars | default list) -}}
-  {{- with $sidecar.containerTemplate -}}
-    {{- $items = concat $items (include . (index $root.Subcharts $sidecar.chart) | fromYamlArray | default list) -}}
+  {{- $context := index $root.Subcharts $sidecar.chart -}}
+  {{- $template := index $context.Chart.Annotations "w7.cc/sidecar-container-template" -}}
+  {{- with $template -}}
+    {{- $items = concat $items (include . $context | fromYamlArray | default list) -}}
   {{- end -}}
 {{- end -}}
 {{- if $items -}}
@@ -128,9 +137,11 @@
 {{- $root := . -}}
 {{- $items := list -}}
 {{- range $sidecar := ($root.Values.w7panelSidecars | default list) -}}
-  {{- with $sidecar.jobContainerTemplate -}}
-    {{- $context := index $root.Subcharts $sidecar.chart -}}
-    {{- with $sidecar.initTemplate -}}
+  {{- $context := index $root.Subcharts $sidecar.chart -}}
+  {{- $jobContainerTemplate := index $context.Chart.Annotations "w7.cc/sidecar-job-container-template" -}}
+  {{- with $jobContainerTemplate -}}
+    {{- $initTemplate := index $context.Chart.Annotations "w7.cc/sidecar-init-template" -}}
+    {{- with $initTemplate -}}
       {{- $items = concat $items (include . $context | fromYamlArray | default list) -}}
     {{- end -}}
     {{- $items = concat $items (include . $context | fromYamlArray | default list) -}}
@@ -145,9 +156,12 @@
 {{- $root := . -}}
 {{- $items := list -}}
 {{- range $sidecar := ($root.Values.w7panelSidecars | default list) -}}
-  {{- if $sidecar.jobContainerTemplate -}}
-    {{- with $sidecar.volumesTemplate -}}
-      {{- $items = concat $items (include . (index $root.Subcharts $sidecar.chart) | fromYamlArray | default list) -}}
+  {{- $context := index $root.Subcharts $sidecar.chart -}}
+  {{- $jobContainerTemplate := index $context.Chart.Annotations "w7.cc/sidecar-job-container-template" -}}
+  {{- if $jobContainerTemplate -}}
+    {{- $template := index $context.Chart.Annotations "w7.cc/sidecar-volumes-template" -}}
+    {{- with $template -}}
+      {{- $items = concat $items (include . $context | fromYamlArray | default list) -}}
     {{- end -}}
   {{- end -}}
 {{- end -}}
@@ -159,8 +173,10 @@
 {{- define "w7panel.sidecars.resources" -}}
 {{- $root := . -}}
 {{- range $sidecar := ($root.Values.w7panelSidecars | default list) -}}
-  {{- with $sidecar.resourcesTemplate -}}
-    {{- include . (index $root.Subcharts $sidecar.chart) -}}
+  {{- $context := index $root.Subcharts $sidecar.chart -}}
+  {{- $template := index $context.Chart.Annotations "w7.cc/sidecar-resources-template" -}}
+  {{- with $template -}}
+    {{- include . $context -}}
   {{- end -}}
 {{- end -}}
 {{- end -}}

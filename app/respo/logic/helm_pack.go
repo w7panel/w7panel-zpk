@@ -789,7 +789,7 @@ func (hc *HelmPack) generateValuesYaml(rootDir string, options helmValuesOptions
 		"hostUsers":            hc.Manifest.Platform.HostUsers,
 		"affinity":             options.workloadAffinity,
 		"jobAffinity":          options.jobAffinity,
-		"w7panelSidecars":      hc.Sidecars,
+		"w7panelSidecars":      sidecarChartReferences(hc.Sidecars),
 	}
 	values["jobs"] = hc.buildJobValues(platform, options.shellJobContainerValues)
 	if options.addValues != nil {

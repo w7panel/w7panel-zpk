@@ -1954,6 +1954,7 @@ export default {
         },
         getDefaultTypeTagName(type = this.form.type) {
             if (type == 'environment') { return '运行环境' }
+            if (type == 'system-image') { return '系统镜像' }
             if (type == 'gateway-plugin') { return '网关插件' }
             return '';
         },
@@ -2954,9 +2955,9 @@ platform:
                     })
                 }
 
-                this.form.dependsIn = j.platform?.depends?.filter(i => i.type != 'out') || [];
+                this.form.dependsIn = j.platform?.depends?.filter(i => i.type != 'out' && !String(i.from || '').trim()) || [];
                 this.form.dependsIn.map(i => i.type = 'in');
-                this.form.depends = j.platform?.depends?.filter(i => i.type == 'out') || [];
+                this.form.depends = j.platform?.depends?.filter(i => i.type == 'out' || String(i.from || '').trim()) || [];
 
                 this.form.depends.map((item, index) => {
                     if (this.isTraditionEnvironmentDependency(item)) {

@@ -143,11 +143,11 @@ func (hc *HelmPack) PackToHelm() error {
 	if err := hc.generateSubCharts(chartsDir); err != nil {
 		return err
 	}
-	if err := hc.prepareSidecarCharts(chartsDir); err != nil {
-		return err
-	}
 
 	if hc.Manifest.Application.Type == logic2.GatewayPluginApp {
+		if err := hc.prepareRemoteHelmCharts(chartsDir); err != nil {
+			return err
+		}
 		if err := hc.packGatewayPluginApp(helmDir, templatesDir); err != nil {
 			return err
 		}
@@ -156,18 +156,30 @@ func (hc *HelmPack) PackToHelm() error {
 		if err != nil {
 			return err
 		}
+		if err := hc.prepareRemoteHelmCharts(chartsDir); err != nil {
+			return err
+		}
 		if err := hc.configureHelmSidecarHost(helmDir); err != nil {
 			return err
 		}
 	} else if hc.Manifest.Application.Type == logic2.Tradition_App {
+		if err := hc.prepareRemoteHelmCharts(chartsDir); err != nil {
+			return err
+		}
 		if err := hc.packTraditionApp(helmDir, templatesDir); err != nil {
 			return err
 		}
 	} else if hc.Manifest.Application.Type == logic2.EnvironmentApp {
+		if err := hc.prepareRemoteHelmCharts(chartsDir); err != nil {
+			return err
+		}
 		if err := hc.packEnvironmentApp(helmDir, templatesDir); err != nil {
 			return err
 		}
 	} else {
+		if err := hc.prepareRemoteHelmCharts(chartsDir); err != nil {
+			return err
+		}
 		if err := hc.packWorkloadApplication(helmDir, templatesDir, hc.defaultHelmValuesOptions(), true, nil); err != nil {
 			return err
 		}
@@ -554,6 +566,9 @@ func (hc *HelmPack) generateSubCharts(rootDir string) error {
 	}
 	mainChartName := hc.Manifest.Application.Identifie
 	for _, subManifest := range hc.SubManifest {
+		if hc.isEmbeddedHelmDependency(subManifest.Application.Identifie) {
+			continue
+		}
 		sharedStorageTargetApp := ""
 		if hasSharedPersistentStorage(hc.Manifest.Platform.Volumes, subManifest.Platform.Volumes) {
 			sharedStorageTargetApp = mainChartName
@@ -565,6 +580,23 @@ func (hc *HelmPack) generateSubCharts(rootDir string) error {
 	}
 
 	return nil
+}
+
+func (hc *HelmPack) isEmbeddedHelmDependency(identifie string) bool {
+	identifie = strings.TrimSpace(identifie)
+	if identifie == "" {
+		return false
+	}
+	for _, dependency := range hc.Manifest.Platform.Depends {
+		if !isEmbeddedHelmDependency(dependency) {
+			continue
+		}
+		dependencyIdentifie := strings.TrimSpace(dependency.Identifie)
+		if dependencyIdentifie == identifie || strings.ReplaceAll(dependencyIdentifie, "_", "-") == strings.ReplaceAll(identifie, "_", "-") {
+			return true
+		}
+	}
+	return false
 }
 
 func (hc *HelmPack) packWorkloadApplication(rootDir, templatesDir string, valuesOptions helmValuesOptions, generateIngress bool, generateTypeTemplates func(string) error) error {

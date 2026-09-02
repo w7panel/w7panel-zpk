@@ -240,7 +240,7 @@ export default {
                 if (this.json?.platform?.depends) {
                     this.dependsIndex = -1;
                     let depends = this.json?.platform?.depends || [];
-                    depends = depends.filter(i => i.type !== 'out');
+                    depends = depends.filter(i => i.type !== 'out' && !String(i.from || '').trim());
                     depends.forEach(i => {
                         i.manifest = this.list[i.identifie + '/manifest.yaml'] || defaultManifest;
                         i.title = i.identifie + '/manifest.yaml';
@@ -330,7 +330,8 @@ export default {
                     tree.push({ label: i })
                 }
                 this.tree = tree;
-                this.depends = this.json?.platform?.depends || [];
+                this.depends = (this.json?.platform?.depends || [])
+                    .filter(i => i.type !== 'out' && !String(i.from || '').trim());
                 this.depends.forEach(i => {
                     i.manifest = (this.list[i.identifie + '/manifest.yaml'] || defaultManifest)?.replace(/backend_port: 0/g, 'backend_port:');
                     i.title = i.identifie + '/manifest.yaml';

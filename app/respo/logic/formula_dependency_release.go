@@ -23,7 +23,7 @@ func ResolveManifestDependencyReleaseNames(manifest *commonlogic.Manifest, conso
 	}
 	hasExternalDependency := false
 	for _, dependency := range manifest.Platform.Depends {
-		if dependency.Type == "out" {
+		if isExternalDependency(dependency) {
 			hasExternalDependency = true
 			break
 		}
@@ -54,7 +54,7 @@ func ResolveDependencyReleaseNames(manifest *commonlogic.Manifest, bindings map[
 	manifest.Platform.Depends = append([]commonlogic.Depend(nil), manifest.Platform.Depends...)
 	for index := range manifest.Platform.Depends {
 		dependency := &manifest.Platform.Depends[index]
-		if dependency.Type != "out" {
+		if !isExternalDependency(*dependency) {
 			continue
 		}
 

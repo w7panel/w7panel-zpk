@@ -172,11 +172,18 @@
 
 {{- define "w7panel.sidecars.resources" -}}
 {{- $root := . -}}
+{{- $resources := list -}}
 {{- range $sidecar := ($root.Values.w7panelSidecars | default list) -}}
   {{- $context := index $root.Subcharts $sidecar.chart -}}
   {{- $template := index $context.Chart.Annotations "w7.cc/sidecar-resources-template" -}}
   {{- with $template -}}
-    {{- include . $context -}}
+    {{- $rendered := include . $context | trim -}}
+    {{- if $rendered -}}
+      {{- $resources = append $resources $rendered -}}
+    {{- end -}}
   {{- end -}}
+{{- end -}}
+{{- if $resources -}}
+{{ join "\n---\n" $resources }}
 {{- end -}}
 {{- end -}}

@@ -297,7 +297,7 @@ export default {
                 if (this.json?.platform?.depends) {
                     this.dependsIndex = -1;
                     let depends = this.json?.platform?.depends || [];
-                    depends = depends.filter(i => i.type !== 'out');
+                    depends = depends.filter(i => i.type !== 'out' && !String(i.from || '').trim());
                     depends = depends.map(i => {
                         i.manifest = this.list[i.identifie + '/manifest.yaml'] || defaultManifest;
                         i.title = i.identifie + '/manifest.yaml';

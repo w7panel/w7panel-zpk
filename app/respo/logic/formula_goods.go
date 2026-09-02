@@ -247,7 +247,7 @@ func buildGoodsDependencies(manifest commonlogic.Manifest) []goodsDependency {
 	dependencies := make([]goodsDependency, 0, len(manifest.Platform.Depends))
 	seen := make(map[string]struct{}, len(manifest.Platform.Depends))
 	for _, dependency := range manifest.Platform.Depends {
-		if dependency.Type != "out" {
+		if !isExternalDependency(dependency) {
 			continue
 		}
 		identify := strings.TrimSpace(dependency.Identifie)

@@ -375,6 +375,7 @@ export default {
         },
         requiredTagName() {
             if (this.applicationType == 'environment') { return '运行环境' }
+            if (this.applicationType == 'system-image') { return '系统镜像' }
             if (this.applicationType == 'gateway-plugin') { return '网关插件' }
             return '';
         },

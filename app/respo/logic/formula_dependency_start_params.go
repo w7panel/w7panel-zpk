@@ -31,7 +31,7 @@ func ApplyDependencyReleaseStartParams(manifest *logic.Manifest) {
 	generatedNames := make(map[string]struct{})
 	generated := make([]logic.StartParams, 0, len(manifest.Platform.Depends))
 	for _, dependency := range manifest.Platform.Depends {
-		if dependency.Type != "out" {
+		if !isExternalDependency(dependency) {
 			continue
 		}
 		name := DependencyReleaseStartParamName(dependency)

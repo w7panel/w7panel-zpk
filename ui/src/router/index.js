@@ -32,11 +32,6 @@ const routes = [
         component: () => import("../views/respo-edit.vue"),
     },
     {
-        path: '/zpk-manifest',
-        name: 'zpk-manifest',
-        component: () => import("../views/respo-create.vue"),
-    },
-    {
         path: '/zpk-manifest-editor',
         name: 'zpk-manifest-editor',
         component: () => import("../components/manifest-editor.vue"),

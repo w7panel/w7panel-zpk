@@ -47,9 +47,11 @@ func ResolveDependencyReleaseNames(manifest *commonlogic.Manifest, bindings map[
 	if manifest == nil {
 		return nil
 	}
-	normalizedBindings := make(map[string]DependencyOrderBinding, len(bindings))
+	bindingsByIdentifie := make(map[string]DependencyOrderBinding, len(bindings))
 	for identify, binding := range bindings {
-		normalizedBindings[normalizeDependencyName(identify)] = binding
+		if identify != "" {
+			bindingsByIdentifie[identify] = binding
+		}
 	}
 	manifest.Platform.Depends = append([]commonlogic.Depend(nil), manifest.Platform.Depends...)
 	for index := range manifest.Platform.Depends {
@@ -58,16 +60,13 @@ func ResolveDependencyReleaseNames(manifest *commonlogic.Manifest, bindings map[
 			continue
 		}
 
-		identify := normalizeDependencyName(dependency.Identifie)
-		binding, hasBinding := normalizedBindings[identify]
+		identify := dependency.Identifie
+		binding, hasBinding := bindingsByIdentifie[identify]
 		if hasBinding {
 			dependency.OrderSn = strings.TrimSpace(binding.OrderSn)
 		}
-		if hasBinding && strings.TrimSpace(binding.AppIdentify) != "" {
-			dependency.ReleaseName = normalizeDependencyName(binding.AppIdentify)
-			if dependency.ReleaseName == "" {
-				return fmt.Errorf("依赖 %s 的 app_identify 无法作为 releaseName", dependency.Identifie)
-			}
+		if hasBinding && binding.AppIdentify != "" {
+			dependency.ReleaseName = binding.AppIdentify
 			dependency.ReleaseNameFixed = true
 			continue
 		}
@@ -80,11 +79,8 @@ func ResolveDependencyReleaseNames(manifest *commonlogic.Manifest, bindings map[
 			dependency.ReleaseNameFixed = false
 			continue
 		}
-		if strings.TrimSpace(dependency.ReleaseName) != "" {
-			dependency.ReleaseName = normalizeDependencyName(dependency.ReleaseName)
-			if dependency.ReleaseName == "" {
-				return fmt.Errorf("依赖 %s 的 releaseName 无效", dependency.Identifie)
-			}
+		if dependency.ReleaseName != "" {
+			dependency.ReleaseName = dependency.ReleaseName
 			dependency.ReleaseNameFixed = true
 			continue
 		}
@@ -101,13 +97,12 @@ func ResolveDependencyReleaseNames(manifest *commonlogic.Manifest, bindings map[
 		dependency.ReleaseName = identify
 		dependency.ReleaseNameFixed = true
 	}
-	ApplyDependencyReleaseStartParams(manifest)
+	PopulateManifestStartParamsWithDependencyReleaseNames(manifest)
 	return nil
 }
 
 func GenerateDependencyReleaseName(identify string) (string, error) {
-	base := normalizeDependencyName(identify)
-	if base == "" {
+	if identify == "" {
 		return "", fmt.Errorf("依赖应用标识不能为空")
 	}
 	suffix, err := secureLowercaseString(dependencyReleaseSuffixLen)
@@ -115,33 +110,13 @@ func GenerateDependencyReleaseName(identify string) (string, error) {
 		return "", fmt.Errorf("生成依赖 releaseName 失败: %w", err)
 	}
 	maxBaseLen := 63 - len(suffix) - 1
-	if len(base) > maxBaseLen {
-		base = strings.TrimRight(base[:maxBaseLen], "-")
+	if len(identify) > maxBaseLen {
+		identify = strings.TrimRight(identify[:maxBaseLen], "-")
 	}
-	if base == "" {
+	if identify == "" {
 		return "", fmt.Errorf("依赖应用标识无法生成 releaseName")
 	}
-	return base + "-" + suffix, nil
-}
-
-func normalizeDependencyName(value string) string {
-	value = strings.ToLower(strings.TrimSpace(value))
-	value = strings.ReplaceAll(value, "_", "-")
-	var builder strings.Builder
-	lastDash := false
-	for _, char := range value {
-		valid := char >= 'a' && char <= 'z' || char >= '0' && char <= '9'
-		if valid {
-			builder.WriteRune(char)
-			lastDash = false
-			continue
-		}
-		if !lastDash && builder.Len() > 0 {
-			builder.WriteByte('-')
-			lastDash = true
-		}
-	}
-	return strings.Trim(builder.String(), "-")
+	return identify + "-" + suffix, nil
 }
 
 func secureLowercaseString(length int) (string, error) {

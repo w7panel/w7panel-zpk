@@ -5,8 +5,7 @@
 </template>
 
 <script>
-import myAxios from "./utils";
-import { getWujieAccessToken, setZpkToken } from "./utils/panel-token";
+import myAxios, { loginWithWujieAccessToken as loginRequest } from "./utils";
 export default {
 	data() {
 		return { userInfo: {} }
@@ -21,12 +20,7 @@ export default {
 	},
 	methods: {
 		async loginWithWujieAccessToken() {
-			const accessToken = getWujieAccessToken()
-			if (!accessToken) {
-				return
-			}
-			const res = await myAxios.post("/oidc/w7panel/login", { access_token: accessToken })
-			setZpkToken(res.data?.data?.token)
+			await loginRequest()
 		},
 		getUserInfo() {
 			return myAxios.get("/v2/api/user/cur-user/info").then(res => {

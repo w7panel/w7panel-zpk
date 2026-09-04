@@ -6,6 +6,8 @@
             :disabled="isAuthorDisabled"
             :placeholder="authorPlaceholder"
             :spellcheck="false"
+            inputmode="text"
+            pattern="[A-Za-z0-9]+"
             @input="inputAuthor"
         />
         <span class="w7-identifie__separator">-</span>
@@ -15,6 +17,8 @@
             :disabled="isIdentifieDisabled"
             :placeholder="identifiePlaceholder"
             :spellcheck="false"
+            inputmode="text"
+            pattern="[A-Za-z0-9]+"
             @input="inputIdentifie"
         />
     </div>
@@ -86,12 +90,26 @@ export default {
     },
     methods: {
         inputAuthor(e) {
-            this.updateValue('author', e.target.value);
+            this.inputPart('author', e);
         },
         inputIdentifie(e) {
-            this.updateValue('identifie', e.target.value);
+            this.inputPart('identifie', e);
         },
-        updateValue(type, value) {
+        inputPart(type, e) {
+            const value = String(e.target.value || '');
+            if (!/^[A-Za-z0-9]*$/.test(value)) {
+                // Reject invalid input instead of rewriting it. This keeps
+                // the component a source-level restriction, while legacy
+                // values loaded from storage remain untouched until edited.
+                e.target.value = type === 'author' ? this.currentAuthor : this.currentIdentifie;
+                return;
+            }
+            this.updateValue(type, value, e.target);
+        },
+        updateValue(type, value, input) {
+            if (input) {
+                input.value = value;
+            }
             const data = {
                 author: type === 'author' ? value : this.currentAuthor,
                 identifie: type === 'identifie' ? value : this.currentIdentifie,

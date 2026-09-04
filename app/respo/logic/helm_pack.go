@@ -78,7 +78,7 @@ type helmValuesOptions struct {
 }
 
 func NewHelmPack(manifest logic2.Manifest, subManifests []*logic2.Manifest, outputDir, chartVersion string, isSubFormula bool, sharedStorageTargetApp string) *HelmPack {
-	ApplyDependencyReleaseStartParams(&manifest)
+	PopulateManifestStartParamsWithDependencyReleaseNames(&manifest)
 	subManifestMap := make(map[string]logic2.Manifest)
 	if subManifests != nil {
 		for _, item := range subManifests {
@@ -118,7 +118,6 @@ func PackFormulaToHelmAndPack(formula Formula, rePack bool) (string, error) {
 	if !rePack && function.FileExists(helmZipPath) {
 		return helmZipPath, nil
 	}
-
 	err := PackManifestToHelm(*formula.Manifest, formula.AllManifest, helmDir, false, "")
 	if err != nil {
 		return "", err
@@ -144,42 +143,30 @@ func (hc *HelmPack) PackToHelm() error {
 		return err
 	}
 
+	if err := hc.prepareRemoteHelmSidecars(chartsDir); err != nil {
+		return err
+	}
+
 	if hc.Manifest.Application.Type == logic2.GatewayPluginApp {
-		if err := hc.prepareRemoteHelmCharts(chartsDir); err != nil {
-			return err
-		}
 		if err := hc.packGatewayPluginApp(helmDir, templatesDir); err != nil {
 			return err
 		}
 	} else if hc.isHelmPackage() {
-		err := hc.processHelmPkg(helmDir)
-		if err != nil {
-			return err
-		}
-		if err := hc.prepareRemoteHelmCharts(chartsDir); err != nil {
+		if err := hc.processHelmPkg(helmDir); err != nil {
 			return err
 		}
 		if err := hc.configureHelmSidecarHost(helmDir); err != nil {
 			return err
 		}
 	} else if hc.Manifest.Application.Type == logic2.Tradition_App {
-		if err := hc.prepareRemoteHelmCharts(chartsDir); err != nil {
-			return err
-		}
 		if err := hc.packTraditionApp(helmDir, templatesDir); err != nil {
 			return err
 		}
 	} else if hc.Manifest.Application.Type == logic2.EnvironmentApp {
-		if err := hc.prepareRemoteHelmCharts(chartsDir); err != nil {
-			return err
-		}
 		if err := hc.packEnvironmentApp(helmDir, templatesDir); err != nil {
 			return err
 		}
 	} else {
-		if err := hc.prepareRemoteHelmCharts(chartsDir); err != nil {
-			return err
-		}
 		if err := hc.packWorkloadApplication(helmDir, templatesDir, hc.defaultHelmValuesOptions(), true, nil); err != nil {
 			return err
 		}
@@ -566,9 +553,6 @@ func (hc *HelmPack) generateSubCharts(rootDir string) error {
 	}
 	mainChartName := hc.Manifest.Application.Identifie
 	for _, subManifest := range hc.SubManifest {
-		if hc.isEmbeddedHelmDependency(subManifest.Application.Identifie) {
-			continue
-		}
 		sharedStorageTargetApp := ""
 		if hasSharedPersistentStorage(hc.Manifest.Platform.Volumes, subManifest.Platform.Volumes) {
 			sharedStorageTargetApp = mainChartName
@@ -580,23 +564,6 @@ func (hc *HelmPack) generateSubCharts(rootDir string) error {
 	}
 
 	return nil
-}
-
-func (hc *HelmPack) isEmbeddedHelmDependency(identifie string) bool {
-	identifie = strings.TrimSpace(identifie)
-	if identifie == "" {
-		return false
-	}
-	for _, dependency := range hc.Manifest.Platform.Depends {
-		if !isEmbeddedHelmDependency(dependency) {
-			continue
-		}
-		dependencyIdentifie := strings.TrimSpace(dependency.Identifie)
-		if dependencyIdentifie == identifie || strings.ReplaceAll(dependencyIdentifie, "_", "-") == strings.ReplaceAll(identifie, "_", "-") {
-			return true
-		}
-	}
-	return false
 }
 
 func (hc *HelmPack) packWorkloadApplication(rootDir, templatesDir string, valuesOptions helmValuesOptions, generateIngress bool, generateTypeTemplates func(string) error) error {
@@ -817,8 +784,8 @@ func (hc *HelmPack) generateValuesYaml(rootDir string, options helmValuesOptions
 		"volumeClaimTemplates": hc.getVolumeClaimTemplateValues(hc.Manifest.Platform),
 		"defaultPort":          defaultPort,
 		"startParams":          hc.getStartParamsEnvValues(hc.Manifest.Platform),
-		"runtimeClass":         hc.getRuntimeClassValues(hc.Manifest.Platform),
-		"hostUsers":            hc.Manifest.Platform.HostUsers,
+		"runtimeClass":         hc.getRuntimeClassValues(platform),
+		"hostUsers":            platform.HostUsers,
 		"affinity":             options.workloadAffinity,
 		"jobAffinity":          options.jobAffinity,
 		"w7panelSidecars":      sidecarChartReferences(hc.Sidecars),
@@ -1192,11 +1159,10 @@ func writeMicroAppTemplate(rootDir string, application logic2.Application) error
 // 获取全局配置
 func (hc *HelmPack) getGlobalValues() map[string]interface{} {
 	return map[string]interface{}{
-		"name":                 hc.Manifest.Application.Identifie,
-		"namespace":            hc.Manifest.Application.Identifie,
-		"siteManagerNamespace": "",
-		"clusterDomain":        "cluster.local",
-		"imagePullSecrets":     []string{},
+		"name":             hc.Manifest.Application.Identifie,
+		"namespace":        hc.Manifest.Application.Identifie,
+		"clusterDomain":    "cluster.local",
+		"imagePullSecrets": []string{},
 		"cluster": map[string]interface{}{
 			"storageClassName": "",
 			"storageSize":      "1G",
@@ -1270,6 +1236,12 @@ func (hc *HelmPack) buildShellJobValues(items []logic2.Shell) []map[string]inter
 		case "custom":
 			shellWeight = 0
 			hookName = "custom"
+		case "pre-install,pre-upgrade":
+			// Internal managed tasks may need to run in both lifecycle phases
+			// while retaining one hook and the same ordering as the legacy
+			// dedicated installer Job.
+			shellWeight = -3
+			hookName = "pre-install,pre-upgrade"
 		}
 
 		jobs = append(jobs, map[string]interface{}{

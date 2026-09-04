@@ -125,10 +125,9 @@
                                             <div class="registry-alert-item">1. 运行环境会作为独立应用安装，同时保存为站点可选的运行环境模板；运行方式固定为 Deployment。</div>
                                             <div class="registry-alert-item mt-6">2. 新建或升级站点并选择此运行环境时，系统会根据模板准备站点需要的运行环境。这里的修改只会用于之后新建的环境，已创建的环境不会自动更新。</div>
                                             <div class="registry-alert-item mt-6">3. 独立安装时通过“环境版本”启动参数替换运行容器镜像中的 {version}；创建站点环境时也会使用同一模板。</div>
-                                            <div class="registry-alert-item mt-6">4. 系统会自动配置站点代码目录 /www/wwwroot 和服务目录 /www/server 的共享存储。</div>
-                                            <div class="registry-alert-item mt-6">5. 环境容器的启动命令可在页面下方“启动命令”中配置。</div>
-                                            <div class="registry-alert-item mt-6">6. 页面下方“脚本配置”中的安装、升级脚本只在安装或升级此制品时执行，站点管理新建环境时不会再次执行。</div>
-                                            <div class="registry-alert-item mt-6">7. 环境准备完成后，系统会使用 Nginx 模板配置站点并完成绑定。</div>
+                                            <div class="registry-alert-item mt-6">4. 环境容器的启动命令可在页面下方“启动命令”中配置。</div>
+                                            <div class="registry-alert-item mt-6">5. 页面下方“脚本配置”中的安装、升级脚本只在安装或升级此制品时执行，站点管理新建环境时不会再次执行。</div>
+                                            <div class="registry-alert-item mt-6">6. 环境准备完成后，系统会使用 Nginx 模板配置站点并完成绑定。</div>
                                         </a-alert>
                                         <div class="greybox" style="margin-bottom:0;">
                                             <div class="greybox-title">运行环境配置</div>
@@ -169,7 +168,17 @@
                                                     <span class="c-99 mt-6">关闭后使用持久存储保留容器系统层。</span>
                                                 </div>
                                             </a-form-item>
-                                            <a-form-item label="Nginx 模板" field="environmentNginxVhostTemplate" required
+                                            <a-form-item v-if="option?.edit" label="附加 Nginx 网关"
+                                                style="margin-bottom:18px;">
+                                                <div class="df df-c" style="align-items:flex-start;">
+                                                    <a-switch v-model="form.environmentNginxGateway"
+                                                        :disabled="environmentNginxGatewayChanging"
+                                                        @change="toggleEnvironmentNginxGateway" />
+                                                    <span class="c-99 mt-6">开启后会自动导入 w7-nginx 及其子应用；关闭时会删除已导入的 Nginx 子应用。</span>
+                                                </div>
+                                            </a-form-item>
+                                            <a-form-item v-if="form.environmentNginxGateway" label="Nginx 模板"
+                                                field="environmentNginxVhostTemplate"
                                                 style="margin-bottom:0;">
                                                 <div class="nginx-template-field">
                                                     <div class="nginx-template-input">
@@ -410,7 +419,7 @@
                                         <icon-exclamation-circle-fill class="fs-16 c-99 ml-4" />
                                     </a-tooltip>
                                     <a-tooltip v-else-if="form.type == 'environment'"
-                                        content="代码包为可选配置。请将项目根目录内容直接压缩，不要包含外层项目目录，例如：cd 项目目录 && zip -r app.zip .。安装环境时会在预安装阶段解压到 /www/wwwroot/&lt;站点域名&gt;，并随当前版本发布。"
+                                        content="代码包为可选配置。请将项目根目录内容直接压缩，不要包含外层项目目录，例如：cd 项目目录 && zip -r app.zip .。安装环境时会解压到 /www/wwwroot/&lt;站点域名&gt;，并随当前版本发布。"
                                         position="top">
                                         <icon-exclamation-circle-fill class="fs-16 c-99 ml-4" />
                                     </a-tooltip>
@@ -499,7 +508,7 @@
                             </a-form-item>
 
 
-                            <a-form-item v-if="form.type != 'helm' && form.type != 'environment' && form.type != 'system-image'" label="域名设置" class="mt-16">
+                            <a-form-item v-if="form.type != 'helm' && form.type != 'system-image'" label="域名设置" class="mt-16">
                                 <div v-if="form.ingress && form.ingress.length">
                                     {{ form.ingress.map(item => item.name || '未命名配置').join(', ') }}
                                 </div>
@@ -628,7 +637,7 @@
 
                     <div class="bg-white pb-24 mt-20 df ai-c">
                         <a-button v-if="option.pureManifest" :loading="submiting" type="primary" @click="submit(otherData)">确定提交</a-button>
-                        <a-button v-else :loading="submiting" type="primary" @click="submit()">确定提交</a-button>
+                        <a-button v-else :loading="submiting" :disabled="environmentNginxGatewayChanging" type="primary" @click="submit()">确定提交</a-button>
                     </div>
                 </a-form>
             </div>
@@ -751,52 +760,8 @@
             </div>
         </a-modal>
 
-        <a-modal v-model:visible="dependPicker.show" title="选择安装依赖" :width="840" :footer="false"
-                    modal-class="depend-picker-modal" @close="closeDependPicker">
-                    <div class="depend-picker-toolbar">
-                        <a-input v-model="dependPicker.keyword" placeholder="搜索制品名称或标识" allow-clear
-                            @keydown.enter="searchDependPicker">
-                            <template #suffix>
-                                <span class="depend-picker-search-action" @click="searchDependPicker">
-                                    <icon-search :size="16" />
-                                </span>
-                            </template>
-                        </a-input>
-                    </div>
-                    <a-tabs v-model:active-key="dependPicker.activeTab" @change="changeDependPickerTab">
-                        <a-tab-pane key="local" title="本地仓库"></a-tab-pane>
-                        <a-tab-pane key="official" title="官方仓库"></a-tab-pane>
-                    </a-tabs>
-                    <a-table :loading="dependPicker.loading" :data="dependPickerRows" :pagination="false"
-                        row-key="identifie" class="depend-picker-table" @row-click="selectDependFromPicker">
-                        <template #columns>
-                            <a-table-column title="制品">
-                                <template #cell="{ record }">
-                                    <div class="depend-picker-product">
-                                        <div class="depend-picker-product-name">{{ record.name || record.identifie }}</div>
-                                        <div class="depend-picker-product-identifie">{{ record.identifie }}</div>
-                                    </div>
-                                </template>
-                            </a-table-column>
-                            <a-table-column title="版本" :width="120">
-                                <template #cell="{ record }">
-                                    {{ record.version?.name || '-' }}
-                                </template>
-                            </a-table-column>
-                            <a-table-column title="操作" :width="100" align="center">
-                                <template #cell="{ record }">
-                                    <a-button type="text" size="small" @click.stop="selectDependFromPicker(record)">
-                                        选择
-                                    </a-button>
-                                </template>
-                            </a-table-column>
-                        </template>
-                    </a-table>
-                    <div class="depend-picker-footer">
-                        <a-pagination v-model:current="dependPicker.page" :page-size="dependPicker.pageSize"
-                            :total="dependPickerTotal" @change="changeDependPickerPage" />
-                    </div>
-                </a-modal>
+        <depend-picker v-model:visible="dependPicker.show" title="选择安装依赖" action-text="选择"
+            @select="selectDependFromPicker" @close="closeDependPicker" />
 
     </div>
 </template>
@@ -809,18 +774,24 @@ import formIngress from '@/components/form-ingress.vue';
 import w7Identifie from "@/components/w7-identifie.vue";
 import ManifestConfigTable from '@/components/manifest-config-table.vue';
 import ManifestConfigTableColumn from '@/components/manifest-config-table-column.vue';
+import dependPicker from '@/components/depend-picker.vue';
 import myAxios from '../utils/index';
 import {
-    createEnvironmentAppDependency,
-    getEnvironmentAppRootfsAnnotation,
+    environmentNginxGatewayAnnotation,
+    environmentSystemRebootRestoreAnnotation,
     isEnvironmentAppDependency,
     removeEnvironmentAppCodeStorage,
+    withEnvironmentAppIngress,
+    withEnvironmentAppStorage,
+    withEnvironmentAppSysbox,
 } from '@/utils/environment-app';
 import {
     applyTraditionEnvironmentDependencyStartParams,
     createTraditionEnvironmentDependency,
     normalizeTraditionInstall,
+    removeTraditionAppStorage,
     traditionInstallTypes,
+    withTraditionAppStorage,
 } from '@/utils/tradition-app';
 import {
     IconCheckCircleFill,
@@ -828,7 +799,6 @@ import {
     IconExclamationCircleFill,
     IconLoading,
     IconPlus,
-    IconSearch,
     IconUpload,
 } from '@arco-design/web-vue/es/icon';
 import { confirm, messageError, messageSuccess, messageWarning } from '@/utils/ui-feedback';
@@ -840,7 +810,8 @@ const environmentAnnotationKeys = {
     imageTemplate: 'w7.cc/image_template',
     imageVersion: 'w7.cc/image_version',
     nginxVhostTemplate: 'w7.cc/nginx_vhost_template',
-    systemRebootRestore: 'w7.cc/system-reboot-restore',
+    nginxGateway: environmentNginxGatewayAnnotation,
+    systemRebootRestore: environmentSystemRebootRestoreAnnotation,
 };
 
 const systemImageAnnotationKeys = {
@@ -951,7 +922,7 @@ const nginxTemplateExample = String.raw`server {
 }`;
 
 export default {
-    emits: ['writefile'],
+    emits: ['writefile', 'environment-nginx-gateway-change'],
     props: [
         'data',
         'submiting',
@@ -965,12 +936,12 @@ export default {
         w7Identifie,
         ManifestConfigTable,
         ManifestConfigTableColumn,
+        dependPicker,
         IconCheckCircleFill,
         IconClose,
         IconExclamationCircleFill,
         IconLoading,
         IconPlus,
-        IconSearch,
         IconUpload,
     },
     data() {
@@ -1022,6 +993,7 @@ export default {
                 environmentImageTemplate: '',
                 environmentImageVersion: [],
                 environmentSystemRebootRestore: true,
+                environmentNginxGateway: false,
                 environmentNginxVhostTemplate: '',
                 systemImageCategory: 'operating-system',
                 systemImageTemplate: '',
@@ -1161,9 +1133,16 @@ export default {
                 ],
                 environmentNginxVhostTemplate: [
                     {
-                        required: true,
+                        required: false,
                         message: '请输入 Nginx 模板',
                         trigger: 'blur',
+                        validator: (value, callback) => {
+                            if (!this.form.environmentNginxGateway || String(value || '').trim()) {
+                                callback();
+                            } else {
+                                callback('请输入 Nginx 模板');
+                            }
+                        },
                     },
                 ],
                 systemImageCategory: [
@@ -1249,20 +1228,7 @@ export default {
 
             dependPicker: {
                 show: false,
-                activeTab: 'local',
-                keyword: '',
-                page: 1,
-                pageSize: 8,
-                loading: false,
                 editIndex: -1,
-                lists: {
-                    local: [],
-                    official: [],
-                },
-                loaded: {
-                    local: false,
-                    official: false,
-                },
             },
 
             buildImageLogData: null,
@@ -1286,7 +1252,8 @@ export default {
             formulaSettingLoading: false,
             formulaSettingLoaded: false,
             formulaBaseInfo: null,
-            environmentPreviousDepends: null,
+            environmentNginxGatewayChanging: false,
+            environmentNginxGatewayAnnotationPresent: false,
             systemImageDependencyManaged: false,
             initialApplicationType: '',
             currentApplicationType: '',
@@ -1392,16 +1359,6 @@ export default {
                 return /^https?:\/\//i.test(icon) ? icon : `https://img.w7.cc${icon.startsWith('/') ? '' : '/'}${icon}`;
             };
         },
-        dependPickerCurrentList() {
-            return this.dependPicker.lists?.[this.dependPicker.activeTab] || [];
-        },
-        dependPickerRows() {
-            let start = (this.dependPicker.page - 1) * this.dependPicker.pageSize;
-            return this.dependPickerCurrentList.slice(start, start + this.dependPicker.pageSize);
-        },
-        dependPickerTotal() {
-            return this.dependPickerCurrentList.length;
-        },
     },
     watch: {
         'dependForm.identifie_before'() {
@@ -1418,11 +1375,14 @@ export default {
             }
         },
         'form.storage'(v) {
-            this.checkStartParams(v, 'storage', [
-                { mark: 'storage', name: 'global.cluster.storageRWmode', title: '读写模式', required: true, values_text: '%STORAGE_RW_MODE%', module_name: '' },
-                { mark: 'storage', name: 'global.cluster.storageSize', title: '存储大小', required: true, values_text: '%STORAGE_SIZE%', module_name: '' },
-                { mark: 'storage', name: 'global.cluster.storageClassName', title: '存储类', required: true, values_text: '%STORAGE_CLASS_NAME%', module_name: '' },
-            ])
+            const params = this.form.type == 'environment'
+                ? []
+                : [
+                    { mark: 'storage', name: 'global.cluster.storageRWmode', title: '读写模式', required: true, values_text: '%STORAGE_RW_MODE%', module_name: '' },
+                    { mark: 'storage', name: 'global.cluster.storageSize', title: '存储大小', required: true, values_text: '%STORAGE_SIZE%', module_name: '' },
+                    { mark: 'storage', name: 'global.cluster.storageClassName', title: '存储类', required: true, values_text: '%STORAGE_CLASS_NAME%', module_name: '' },
+                ];
+            this.checkStartParams(v, 'storage', params)
         },
         'form.mysql8'(v) {
             if (v && this.form.mysql5) { this.form.mysql5 = false; }
@@ -1478,6 +1438,9 @@ export default {
         },
         'option.app_ports'(v) {
             this.computedAppPort();
+            if (this.form.type == 'environment' && this.form.environmentNginxGateway) {
+                this.syncEnvironmentIngress(v);
+            }
         }
     },
     beforeUnmount() {
@@ -1505,6 +1468,47 @@ export default {
                 confirmButtonText: '覆盖并使用',
                 cancelButtonText: '取消',
                 onOk: applyExample,
+            });
+        },
+        toggleEnvironmentNginxGateway(value) {
+            if (this.form.type != 'environment' || this.option?.pureManifest
+                || this.environmentNginxGatewayChanging) {
+                return;
+            }
+            const enabled = Boolean(value);
+            const previous = !enabled;
+            // Keep the visible state unchanged until the confirmation and the
+            // parent-side import/removal have completed successfully.
+            this.form.environmentNginxGateway = previous;
+            const finish = (success) => {
+                this.environmentNginxGatewayChanging = false;
+                if (!success) {
+                    this.form.environmentNginxGateway = previous;
+                } else {
+                    this.form.environmentNginxGateway = enabled;
+                    // Rebuild only the managed ingress backend after the
+                    // parent has imported/removed the dependency.
+                    this.syncEnvironmentIngress();
+                }
+            };
+            const request = () => {
+                this.environmentNginxGatewayChanging = true;
+                this.$emit('environment-nginx-gateway-change', {
+                    enabled,
+                    finish,
+                });
+            };
+            confirm({
+                title: enabled ? '附加 Nginx 网关' : '关闭 Nginx 网关',
+                content: enabled
+                    ? '将从 https://zpk.fan.b2.sz.w7.com/zpk/respo/info/w7-nginx 自动导入 w7-nginx 及其子应用，是否继续？'
+                    : '关闭后会自动删除 w7-nginx 及其已导入的子应用，是否继续？',
+                confirmButtonText: enabled ? '导入并开启' : '删除并关闭',
+                cancelButtonText: '取消',
+                onOk: request,
+                onCancel: () => {
+                    this.form.environmentNginxGateway = previous;
+                },
             });
         },
         validateEnvironmentImageTemplate(value, callback) {
@@ -1593,7 +1597,7 @@ export default {
             let customParams = (this.form.startParams || []).filter(item => !fixedNames.has(item?.name));
             let params = [
                 { mark: 'environment', name: 'IMAGE_VERSION', title: '环境版本', required: true, values_text: versions.join('|'), module_name: '', description: '选择要安装的运行环境版本', type: 'select' },
-                { mark: 'environment-site', name: 'DOMAIN_URL', title: '站点域名', required: true, values_text: '%DOMAIN_URL%', module_name: '', description: '站点代码目录使用此域名隔离', type: 'text' },
+                { mark: 'environment-site', name: 'DOMAIN_URL', title: '站点域名', required: true, values_text: '%DOMAIN_URL%', module_name: '', description: '用于站点访问', type: 'text' },
             ];
             return [...params, ...customParams];
         },
@@ -1642,6 +1646,7 @@ export default {
                 this.containerPluginData.kind = 'Deployment';
             }
             this.fillDefaultShellContainer();
+            this.json.platform = withEnvironmentAppStorage(this.json.platform);
         },
         getEnvironmentMainContainer() {
             return this.json?.platform?.['container-v2']
@@ -1655,15 +1660,34 @@ export default {
         },
         applyEnvironmentRebootRestoreConfig() {
             if (this.form.type != 'environment' || !this.json?.platform) { return; }
-            if (!this.form.environmentSystemRebootRestore) {
-                this.json.platform.runtimeClassName = 'sysbox-runc';
-                this.json.platform.hostUsers = false;
-                return;
+            const result = withEnvironmentAppSysbox(
+                this.json.platform,
+                this.json.application?.annotation || {},
+                Boolean(this.form.environmentSystemRebootRestore),
+            );
+            this.json.platform = result.platform;
+            this.json.application = this.json.application || {};
+            this.json.application.annotation = result.annotations;
+        },
+        syncEnvironmentIngress(portSource = this.option?.app_ports || []) {
+            if (this.form.type != 'environment' || !this.json?.platform) {
+                return this.json?.platform?.ingress || [];
             }
-            delete this.json.platform.hostUsers;
-            if (this.json.platform.runtimeClassName == 'sysbox-runc') {
-                delete this.json.platform.runtimeClassName;
+            const applicationIdentifie = this.json?.application?.identifie
+                || ((this.form.author && this.form.identifie)
+                    ? `${this.form.author}-${this.form.identifie}`
+                    : this.identifie || '');
+            this.json.platform = withEnvironmentAppIngress(
+                this.json.platform,
+                applicationIdentifie,
+                Boolean(this.form.environmentNginxGateway),
+                portSource,
+            );
+            const ingress = JSON.parse(JSON.stringify(this.json.platform.ingress || []));
+            if (JSON.stringify(this.form.ingress || []) != JSON.stringify(ingress)) {
+                this.form.ingress = ingress;
             }
+            return ingress;
         },
         syncSystemImageConfig() {
             if (this.form.type != 'system-image') { return; }
@@ -1765,6 +1789,15 @@ export default {
             return this._formulaSettingPromise;
         },
         applyEnvironmentAnnotationForm(annotation = {}) {
+            this.environmentNginxGatewayAnnotationPresent = Object.prototype.hasOwnProperty.call(
+                annotation || {},
+                environmentAnnotationKeys.nginxGateway,
+            );
+            if (this.environmentNginxGatewayAnnotationPresent) {
+                const value = annotation[environmentAnnotationKeys.nginxGateway];
+                this.form.environmentNginxGateway = value === true
+                    || String(value).toLowerCase() == 'true';
+            }
             this.form.environmentImageLanguage = String(annotation[environmentAnnotationKeys.imageLanguage] || '');
             this.form.environmentImageTemplate = String(annotation[environmentAnnotationKeys.imageTemplate] || '');
             this.form.environmentImageVersion = this.normalizeEnvironmentVersions(annotation[environmentAnnotationKeys.imageVersion]);
@@ -1813,17 +1846,12 @@ export default {
                 [environmentAnnotationKeys.imageLanguage]: String(this.form.environmentImageLanguage || '').trim(),
                 [environmentAnnotationKeys.imageTemplate]: String(this.form.environmentImageTemplate || '').trim(),
                 [environmentAnnotationKeys.imageVersion]: versions.join(','),
-                [environmentAnnotationKeys.nginxVhostTemplate]: String(this.form.environmentNginxVhostTemplate || ''),
+                [environmentAnnotationKeys.nginxVhostTemplate]: this.form.environmentNginxGateway
+                    ? String(this.form.environmentNginxVhostTemplate || '')
+                    : '',
+                [environmentAnnotationKeys.nginxGateway]: String(Boolean(this.form.environmentNginxGateway)),
                 [environmentAnnotationKeys.systemRebootRestore]: String(Boolean(this.form.environmentSystemRebootRestore)),
             };
-            if (this.form.environmentSystemRebootRestore) {
-                if (this.json?.application?.annotation) {
-                    delete this.json.application.annotation[systemImageAnnotationKeys.rootfs];
-                }
-            } else {
-                const rootfs = getEnvironmentAppRootfsAnnotation(this.json);
-                if (rootfs) annotations[systemImageAnnotationKeys.rootfs] = rootfs;
-            }
             return annotations;
         },
         filterAnnotationsForType(annotation = {}, type = this.form.type) {
@@ -1845,7 +1873,8 @@ export default {
             }
             if (type != 'system-image') {
                 Object.values(systemImageAnnotationKeys)
-                    .filter(key => type != 'environment' || (key != environmentAnnotationKeys.imageVersion && key != systemImageAnnotationKeys.rootfs))
+                    .filter(key => type != 'environment'
+                        || ![systemImageAnnotationKeys.versions, systemImageAnnotationKeys.rootfs].includes(key))
                     .forEach(key => delete filtered[key]);
             } else {
                 let versions = this.normalizeEnvironmentVersions(this.form.systemImageVersions);
@@ -1897,9 +1926,19 @@ export default {
             }
             if (previousType == 'environment' && !['environment', 'system-image'].includes(nextType)) {
                 this.form.startParams = (this.form.startParams || [])
-                    .filter(item => !['IMAGE_VERSION', 'DOMAIN_URL'].includes(item?.name));
+                    .filter(item => ![
+                        'IMAGE_VERSION',
+                        'DOMAIN_URL',
+                        'global.cluster.storageRWmode',
+                        'global.cluster.storageSize',
+                        'global.cluster.storageClassName',
+                    ].includes(item?.name));
                 this.json.platform.startParams = this.serializeStartParams();
                 removeEnvironmentAppCodeStorage(this.json);
+                this.form.dependsIn = (this.form.dependsIn || [])
+                    .filter(item => !isEnvironmentAppDependency(item));
+                this.form.depends = (this.form.depends || [])
+                    .filter(item => !isEnvironmentAppDependency(item));
             }
             if (previousType != 'system-image' && nextType == 'system-image') {
                 delete this.json.source;
@@ -1915,6 +1954,7 @@ export default {
             }
             if (previousType == 'tradition' && nextType != 'tradition') {
                 delete this.json.platform.tradition;
+                this.json.platform = removeTraditionAppStorage(this.json.platform);
             }
             if (previousType == 'helm' && nextType != 'helm') {
                 delete this.json.platform.helm;
@@ -1982,25 +2022,21 @@ export default {
         },
         syncEnvironmentDependency() {
             if (this.form.type != 'environment') {
-                if (this._initializing) {
-                    this.environmentPreviousDepends = null;
-                } else if (this.environmentPreviousDepends !== null) {
-                    this.form.depends = this.environmentPreviousDepends;
-                    this.environmentPreviousDepends = null;
-                }
                 return;
             }
-            if (this.environmentPreviousDepends === null) {
-                let depends = JSON.parse(JSON.stringify(this.form.depends || []));
-                if (this.systemImageDependencyManaged) {
-                    depends = depends.filter(item => item?.identifie != 'w7panel-sysbox');
-                    this.systemImageDependencyManaged = false;
-                }
-                this.environmentPreviousDepends = this._initializing
-                    ? depends.filter(item => !isEnvironmentAppDependency(item) && item?.identifie != 'w7panel-sysbox')
-                    : depends;
+            if (this.environmentNginxGatewayChanging) {
+                return;
             }
-            this.form.depends = [createEnvironmentAppDependency()];
+            if (this.form.environmentNginxGateway) {
+                return;
+            }
+            // Nginx is optional for environment applications. When the switch
+            // is off, remove only the managed dependency and leave any other
+            // user-selected dependencies untouched.
+            this.form.depends = (this.form.depends || [])
+                .filter(item => !isEnvironmentAppDependency(item));
+            this.form.dependsIn = (this.form.dependsIn || [])
+                .filter(item => !isEnvironmentAppDependency(item));
         },
         syncSystemImageDependency() {
             let depends = Array.isArray(this.form.depends) ? this.form.depends : [];
@@ -2159,7 +2195,13 @@ export default {
                         module_name: o.module_name,
                         description: o.description || '',
                         hidden: Boolean(o.hidden),
-                    })
+                        ...(o.dependencySource?.identifie && o.dependencySource?.name ? {
+                            dependencySource: {
+                                identifie: o.dependencySource.identifie,
+                                name: o.dependencySource.name,
+                            },
+                        } : {}),
+                    });
                 }
             }
             return start;
@@ -2209,10 +2251,14 @@ export default {
 
                 this.applyPlatformShells();
 
-                this.json.platform.ingress = (this.form.ingress || []).map(i => ({
-                    name: i.name,
-                    routes: this.formatIngressRoutes(i.routes),
-                }));
+                if (this.form.type == 'environment') {
+                    this.syncEnvironmentIngress();
+                } else {
+                    this.json.platform.ingress = (this.form.ingress || []).map(i => ({
+                        name: i.name,
+                        routes: this.formatIngressRoutes(i.routes),
+                    }));
+                }
 
                 this.yaml = jsyaml.dump(this.json);
 
@@ -2368,55 +2414,11 @@ export default {
             if (this.form.type == 'environment') { return }
             this.dependPicker.show = true;
             this.dependPicker.editIndex = index;
-            this.dependPicker.page = 1;
-            if (!this.dependPicker.loaded?.[this.dependPicker.activeTab]) {
-                this.getDependPickerList();
-            }
         },
         closeDependPicker() {
             this.dependPicker.editIndex = -1;
         },
-        searchDependPicker() {
-            this.dependPicker.page = 1;
-            this.getDependPickerList();
-        },
-        changeDependPickerTab() {
-            this.dependPicker.page = 1;
-            this.getDependPickerList();
-        },
-        changeDependPickerPage(page) {
-            this.dependPicker.page = page;
-        },
-        getDependPickerList() {
-            let tab = this.dependPicker.activeTab;
-            this.dependPicker.loading = true;
-            let params = {
-                page: 1,
-                limit: 999,
-                keyword: this.dependPicker.keyword,
-            };
-            let request = tab == 'official'
-                ? myAxios.get('https://zpk.w7.cc/zpk/respo/list?status=2&status=99', {
-                    params,
-                    dontalert: true,
-                })
-                : myAxios.get('/respo/list', {
-                    params,
-                    dontalert: true,
-                });
-            return request.then(res => {
-                let list = this.normalizeDependList(res?.data?.data?.list || []);
-                this.dependPicker.lists[tab] = list;
-                this.dependPicker.loaded[tab] = true;
-                this.mergeDependsList(list);
-            }).catch(() => {
-                this.dependPicker.lists[tab] = [];
-                this.dependPicker.loaded[tab] = true;
-            }).finally(() => {
-                this.dependPicker.loading = false;
-            });
-        },
-        selectDependFromPicker(record) {
+        selectDependFromPicker(record, tab = 'local') {
             if (!record?.identifie) { return }
             let data = {
                 identifie: record.identifie,
@@ -2426,7 +2428,7 @@ export default {
                 subname: '',
                 required: false,
                 type: 'out',
-                from: this.dependPicker.activeTab == 'official' ? 'https://zpk.w7.cc' : '',
+                from: tab == 'official' ? 'https://zpk.w7.cc' : '',
             };
             let index = this.dependPicker.editIndex;
             if (index >= 0 && this.form.depends[index]) {
@@ -2437,7 +2439,7 @@ export default {
                 index = this.form.depends.length - 1;
             }
             this.dependPicker.show = false;
-            this.getSubDepends(index, this.dependPicker.activeTab);
+            this.getSubDepends(index, tab);
             this.changeForm();
         },
         getSubDepends(index, source = '') {
@@ -2646,7 +2648,6 @@ platform:
                         } catch { }
                     } else if (this.form.type == 'tradition') {
                         try {
-                            delete this.json.platform['volumes']
                             delete this.json.platform['volumeClaimTemplates']
                             delete this.json.platform.ingress
                             delete this.json.platform.runtimeClassName
@@ -2676,6 +2677,35 @@ platform:
             this.form.dependsIn[index] = data;
             this.changeForm();
             this.submit({ stop: true });
+        },
+        addImportedDependencies(dependencies = []) {
+            const imported = Array.isArray(dependencies) ? dependencies : [];
+            const importedIdentifies = new Set(imported.map(item => item?.identifie).filter(Boolean));
+            if (!importedIdentifies.size) { return; }
+            this.form.depends = (this.form.depends || [])
+                .filter(item => !importedIdentifies.has(item?.identifie));
+            const existing = new Set((this.form.dependsIn || []).map(item => item?.identifie).filter(Boolean));
+            imported.forEach(item => {
+                if (!item?.identifie || existing.has(item.identifie)) { return; }
+                this.form.dependsIn.push(item);
+                existing.add(item.identifie);
+            });
+            this.syncImportedDependenciesToManifest();
+        },
+        removeImportedDependencies(identifies = []) {
+            const importedIdentifies = new Set((identifies || []).filter(Boolean));
+            if (!importedIdentifies.size) { return; }
+            this.form.dependsIn = (this.form.dependsIn || [])
+                .filter(item => !importedIdentifies.has(item?.identifie));
+            this.form.depends = (this.form.depends || [])
+                .filter(item => !importedIdentifies.has(item?.identifie));
+            this.syncImportedDependenciesToManifest();
+        },
+        syncImportedDependenciesToManifest() {
+            this.json.platform = this.json.platform || {};
+            this.json.platform.depends = (this.form.dependsIn || [])
+                .concat(this.form.depends || []);
+            this.setYaml();
         },
 
 
@@ -2976,6 +3006,13 @@ platform:
                     this.getSubDepends(index);
                 })
 
+                if (this.form.type == 'environment' && !this.environmentNginxGatewayAnnotationPresent) {
+                    const hasLegacyNginx = [...this.form.dependsIn, ...this.form.depends]
+                        .some(item => isEnvironmentAppDependency(item));
+                    this.form.environmentNginxGateway = hasLegacyNginx
+                        || Boolean(String(this.form.environmentNginxVhostTemplate || '').trim());
+                }
+
                 let depend_yamls = j.platform?.helm?.depend_yamls || [];
                 depend_yamls = depend_yamls.map(i => {
                     return {
@@ -3007,7 +3044,6 @@ platform:
                 this.form.domain = true;
                 this.disabledDomainStartParams = true;
             }
-            this.environmentPreviousDepends = null;
             this.syncEnvironmentDependency();
             this.syncSystemImageDependency();
             this._initializing = false;
@@ -3094,7 +3130,6 @@ platform:
                     } catch { }
                 } else if (this.form.type == 'tradition') {
                     try {
-                        delete this.json.platform['volumes']
                         delete this.json.platform['volumeClaimTemplates']
                         delete this.json.platform.ingress
                         delete this.json.platform.runtimeClassName
@@ -3104,7 +3139,8 @@ platform:
                     this.form.startParams = this.environmentStartParams();
                     this.ensureEnvironmentContainerDefaults();
                     this.applyPlatformShells();
-                } else if (this.form.type == 'docker') {
+                    this.syncEnvironmentIngress();
+            } else if (this.form.type == 'docker') {
 
                     this.applyPlatformShells();
 
@@ -3269,6 +3305,7 @@ platform:
                 this.form.startParams = this.environmentStartParams();
                 this.ensureEnvironmentContainerDefaults();
                 this.applyEnvironmentRebootRestoreConfig();
+                this.syncEnvironmentIngress();
             } else {
                 delete j.platform.hostUsers;
                 if (j.platform.runtimeClassName == 'sysbox-runc') {
@@ -3277,6 +3314,7 @@ platform:
             }
 
             if (this.form.type == 'tradition') {
+                j.platform = withTraditionAppStorage(j.platform);
                 let environmentLanguage = j.platform?.tradition?.environmentLanguage || '';
                 try {
                     const selectedEnvironment = this.environmentList
@@ -3686,50 +3724,6 @@ platform:
 
 .shell-command-input :deep(.arco-textarea) {
     min-height: 180px;
-}
-
-.depend-picker-toolbar {
-    width: 320px;
-    margin-bottom: 12px;
-}
-
-.depend-picker-search-action {
-    display: inline-flex;
-    align-items: center;
-    color: #666;
-    cursor: pointer;
-}
-
-.depend-picker-table {
-    margin-top: 8px;
-}
-
-.depend-picker-product {
-    min-width: 0;
-    cursor: pointer;
-}
-
-.depend-picker-product-name,
-.depend-picker-product-identifie {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.depend-picker-product-name {
-    color: #333;
-}
-
-.depend-picker-product-identifie {
-    margin-top: 2px;
-    color: #999;
-    font-size: 12px;
-}
-
-.depend-picker-footer {
-    display: flex;
-    justify-content: flex-end;
-    margin-top: 16px;
 }
 
 .upfilebox {

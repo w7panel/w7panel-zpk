@@ -250,7 +250,7 @@ func buildGoodsDependencies(manifest commonlogic.Manifest) []goodsDependency {
 		if !isExternalDependency(dependency) {
 			continue
 		}
-		identify := strings.TrimSpace(dependency.Identifie)
+		identify := dependency.Identifie
 		goodsID := dependency.GoodsID
 		if identify == "" || goodsID <= 0 {
 			continue

@@ -1,12 +1,17 @@
 package logic
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
+	copy2 "github.com/otiai10/copy"
+	"github.com/w7panel/w7panel-zpk/common/function"
 	commonlogic "github.com/w7panel/w7panel-zpk/common/logic"
+	zpkservice "github.com/w7panel/w7panel-zpk/common/service/w7/zpk"
 	"sigs.k8s.io/yaml"
 )
 
@@ -21,9 +26,100 @@ type HelmSidecar struct {
 	Chart string `yaml:"chart" json:"chart"`
 }
 
+type helmChartDownload struct {
+	InfoURL string
+	Chart   string
+	Sidecar bool
+}
+
 type helmSidecarInfo struct {
 	InfoURL string
 	Chart   string
+}
+
+func (hc *HelmPack) prepareRemoteHelmSidecars(chartsDir string) error {
+	chartDownloads, err := requiredRemoteHelmCharts(hc.Manifest)
+	if err != nil {
+		return err
+	}
+	if len(chartDownloads) == 0 {
+		return nil
+	}
+
+	for _, chartDownload := range chartDownloads {
+		infoURL := chartDownload.InfoURL
+		chartName := chartDownload.Chart
+		workDir, err := os.MkdirTemp("", "w7panel-zpk-remote-helm-")
+		if err != nil {
+			return fmt.Errorf("创建远程 Helm 打包目录失败: %w", err)
+		}
+		defer os.RemoveAll(workDir)
+
+		sourceDir, err := downloadRemoteHelmChart(context.Background(), infoURL, workDir)
+		if err != nil {
+			return fmt.Errorf("下载远程 Helm 制品 %s 失败: %w", infoURL, err)
+		}
+		targetDir := filepath.Join(chartsDir, chartName)
+		if function.FileExists(targetDir) {
+			if err := os.RemoveAll(targetDir); err != nil {
+				return fmt.Errorf("清理已有远程 Helm Chart %s 失败: %w", chartName, err)
+			}
+		}
+		if err := copy2.Copy(sourceDir, targetDir); err != nil {
+			return fmt.Errorf("复制远程 Helm Chart %s 失败: %w", chartName, err)
+		}
+		hc.Sidecars = append(hc.Sidecars, HelmSidecar{Chart: chartName})
+	}
+	return nil
+}
+
+// downloadRemoteHelmChart downloads a ZPK Helm artifact from its formula info
+// endpoint and extracts it into a temporary chart directory.
+func downloadRemoteHelmChart(ctx context.Context, infoURL, workDir string) (string, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	requestCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+	defer cancel()
+
+	remoteInfo, err := (zpkservice.ZpkService{}).GetRemoteFormulaInfo(requestCtx, infoURL)
+	if err != nil {
+		return "", fmt.Errorf("获取制品信息失败: %w", err)
+	}
+	helmURL := strings.TrimSpace(remoteInfo.HelmURL)
+	if helmURL == "" {
+		return "", fmt.Errorf("制品信息缺少 helm_url")
+	}
+
+	archivePath := filepath.Join(workDir, "remote-helm.tgz")
+	if err := function.DownloadFile(requestCtx, helmURL, archivePath); err != nil {
+		return "", fmt.Errorf("下载 Helm 包失败: %w", err)
+	}
+	chartDir := filepath.Join(workDir, "chart")
+	if err := os.MkdirAll(chartDir, 0o755); err != nil {
+		return "", fmt.Errorf("创建 Helm 解包目录失败: %w", err)
+	}
+	if err := function.UnzipHelmPackage(archivePath, chartDir); err != nil {
+		return "", fmt.Errorf("解包 Helm 包失败: %w", err)
+	}
+	return chartDir, nil
+}
+
+func requiredRemoteHelmCharts(manifest commonlogic.Manifest) ([]helmChartDownload, error) {
+	charts := make([]helmChartDownload, 0)
+	seen := make(map[string]struct{})
+	for _, sidecar := range requiredSidecarInfoURLs(manifest.Application) {
+		if _, exists := seen[sidecar.Chart]; exists {
+			continue
+		}
+		seen[sidecar.Chart] = struct{}{}
+		charts = append(charts, helmChartDownload{
+			InfoURL: sidecar.InfoURL,
+			Chart:   sidecar.Chart,
+			Sidecar: true,
+		})
+	}
+	return charts, nil
 }
 
 func sidecarChartReferences(sidecars []HelmSidecar) []map[string]string {

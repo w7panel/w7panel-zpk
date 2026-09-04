@@ -99,6 +99,7 @@ func (provider *Provider) Register(httpServer *http_server.Server, console conso
 		group.Match([]string{"POST", "OPTIONS"}, "/add", middleware.DenyDomainReq{}.Process, middleware.Auth{}.Process, controller.Formula{}.Add)
 		group.Match([]string{"POST", "OPTIONS"}, "/delete", middleware.DenyDomainReq{}.Process, middleware.Auth{}.Process, controller.Formula{}.Delete)
 		group.Match([]string{"POST", "OPTIONS"}, "/manifest/file", middleware.DenyDomainReq{}.Process, middleware.Auth{}.Process, controller.FormulaAttach{}.SaveManifestFile)
+		group.Match([]string{"POST", "OPTIONS"}, "/manifest/import", middleware.DenyDomainReq{}.Process, middleware.Auth{}.Process, controller.Formula{}.ImportRemoteDependency)
 		group.Match([]string{"POST", "OPTIONS"}, "/manifest/path-tree", middleware.DenyDomainReq{}.Process, middleware.Auth{}.Process, controller.FormulaAttach{}.ManifestFiles)
 		group.Match([]string{"POST", "OPTIONS"}, "/share-file/file", middleware.DenyDomainReq{}.Process, middleware.Auth{}.Process, controller.FormulaAttach{}.SaveSharedFile)
 		group.Match([]string{"POST", "OPTIONS"}, "/share-file/path-tree", middleware.DenyDomainReq{}.Process, middleware.Auth{}.Process, controller.FormulaAttach{}.SharedFiles)

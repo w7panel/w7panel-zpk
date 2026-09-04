@@ -21,15 +21,13 @@ func (d *Depot) PersistSharedFile(formula *Formula, filename, content string) er
 	if err := d.SaveSharedFile(formula, filename, content); err != nil {
 		return err
 	}
-	if err := d.PackSharedFilesToOci(formula); err != nil {
+	if err := d.packSharedFilesToOci(formula); err != nil {
 		return fmt.Errorf("保存共享文件到 OCI 失败: %w", err)
 	}
 	return nil
 }
 
-// PackSharedFilesToOci packs the local shared working directory into the
-// dedicated OCI tag. Version tags intentionally do not contain these files.
-func (d *Depot) PackSharedFilesToOci(formula *Formula) error {
+func (d *Depot) packSharedFilesToOci(formula *Formula) error {
 	files, err := d.GetSharedFileList(formula)
 	if err != nil {
 		return err

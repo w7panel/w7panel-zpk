@@ -38,6 +38,13 @@ func (c Formula) Add(ctx *gin.Context) {
 	if !c.Validate(ctx, &params) {
 		return
 	}
+	// Keep the historical underscore-to-dash conversion for API clients that
+	// created artifacts before identifier validation was introduced. New UI
+	// input is restricted before it reaches this endpoint.
+	if err := logic.ValidateIdentifie(strings.ReplaceAll(params.Identifie, "_", "-")); err != nil {
+		c.JsonResponseWithError(ctx, err, http.StatusBadRequest)
+		return
+	}
 
 	depotLogin := c.getDepot()
 	err := depotLogin.AddFormula(params.Identifie, "1.0.0", logic2.User{}.GetUser(ctx))
@@ -71,6 +78,45 @@ func (c Formula) BaseInfo(ctx *gin.Context) {
 	c.JsonResponseWithoutError(ctx, map[string]interface{}{"latest_version": formula.Version})
 }
 
+// ImportRemoteDependency downloads a complete remote dependency manifest for
+// the editor. The editor owns the parent manifest and child-file writes, so
+// this endpoint only returns the downloaded application manifests.
+func (c Formula) ImportRemoteDependency(ctx *gin.Context) {
+	type ParamsValidate struct {
+		Dependency logic2.Depend `form:"dependency" json:"dependency" binding:"required"`
+	}
+	params := ParamsValidate{}
+	if !c.Validate(ctx, &params) {
+		return
+	}
+	if params.Dependency.Identifie == "" {
+		c.JsonResponseWithError(ctx, errors.New("依赖制品标识不能为空"), http.StatusBadRequest)
+		return
+	}
+	manifests, err := logic.ImportRemoteFormulaDependency(
+		ctx.Request.Context(),
+		params.Dependency,
+	)
+	if err != nil {
+		c.JsonResponseWithError(ctx, err, http.StatusInternalServerError)
+		return
+	}
+
+	result := make(map[string]string, len(manifests))
+	for _, manifest := range manifests {
+		if manifest == nil || manifest.Application.Identifie == "" {
+			continue
+		}
+		content, marshalErr := yaml.Marshal(manifest)
+		if marshalErr != nil {
+			c.JsonResponseWithError(ctx, marshalErr, http.StatusInternalServerError)
+			return
+		}
+		result[manifest.Application.Identifie] = string(content)
+	}
+	c.JsonResponseWithoutError(ctx, gin.H{"manifests": result})
+}
+
 func (c Formula) Info(ctx *gin.Context) {
 	type ParamsValidate struct {
 		Identifie    string `uri:"id" json:"identifie" binding:"required"`
@@ -85,12 +131,12 @@ func (c Formula) Info(ctx *gin.Context) {
 		Domain       string `form:"domain" json:"domain"`
 		AppIdentify  string `form:"app_identify" json:"app_identify"`
 		Reinstall    bool   `form:"reinstall" json:"reinstall"`
+		FullManifest bool   `form:"full_manifest" json:"full_manifest"`
 	}
 	params := ParamsValidate{}
 	if !c.Validate(ctx, &params) {
 		return
 	}
-
 	depotLogin := c.getDepot()
 	formula, err := depotLogin.GetFormula(params.Identifie, params.Version, nil)
 	if err != nil {
@@ -265,13 +311,7 @@ func (c Formula) Info(ctx *gin.Context) {
 		if formula.Manifest.Platform.Volumes == nil {
 			formula.Manifest.Platform.Volumes = make([]v1.Volume, 0)
 		}
-		needPvc := false
-		for _, item := range formula.Manifest.Platform.Volumes {
-			if item.PersistentVolumeClaim != nil {
-				needPvc = true
-				break
-			}
-		}
+		needPvc := manifestRequiresPvc(*formula.Manifest)
 		installFormulas = append(installFormulas, FormulaInstallInfo{
 			Name:        responseManifest.Application.Identifie,
 			Title:       responseManifest.Application.Name,
@@ -291,13 +331,7 @@ func (c Formula) Info(ctx *gin.Context) {
 					c.JsonResponseWithError(ctx, err, http.StatusInternalServerError)
 					return
 				}
-				ineedPvc := false
-				for _, iitem := range itemManifest.Platform.Volumes {
-					if iitem.PersistentVolumeClaim != nil {
-						ineedPvc = true
-						break
-					}
-				}
+				ineedPvc := manifestRequiresPvc(itemManifest)
 				if itemManifest.Platform.StartParams == nil {
 					itemManifest.Platform.StartParams = make([]logic2.StartParams, 0)
 				}
@@ -348,16 +382,7 @@ func (c Formula) Info(ctx *gin.Context) {
 		AppIdentify:     params.AppIdentify,
 	})
 
-	responseManifest.Version = 3
-	responseManifest.VersionV2 = 3
-	tmpContent, _ := yaml.Marshal(responseManifest)
-	responseManifestMap := map[string]interface{}{}
-	_ = yaml.Unmarshal(tmpContent, &responseManifestMap)
-	if platform, ok := responseManifestMap["platform"].(map[string]interface{}); ok {
-		delete(platform, "container")
-	}
-	tmpContent, _ = yaml.Marshal(responseManifestMap)
-	manifestContent := string(tmpContent)
+	manifestContent := marshalFormulaInfoManifest(responseManifest, params.FullManifest)
 	infoPath := replaceFormulaIdentifieInInfoPath(ctx.Request.URL.Path, params.Identifie, formula.Name)
 	infoURL := fmt.Sprintf("%s%s%s", schemaHttp, domain, infoPath)
 	query := url.Values{}
@@ -374,7 +399,7 @@ func (c Formula) Info(ctx *gin.Context) {
 		params.OrderSn,
 	)
 
-	c.JsonResponseWithoutError(ctx, gin.H{
+	response := gin.H{
 		"info_url":               infoURL,
 		"zip_url":                zipUrl,
 		"manifest":               manifestContent,
@@ -393,7 +418,17 @@ func (c Formula) Info(ctx *gin.Context) {
 		"install_formulas":       installFormulas,
 		"formula_type":           formula.Manifest.Application.Type,
 		"formula_is_plugin":      formulaIsPlugin,
-	})
+	}
+	if params.FullManifest {
+		// `helmURL` is the URL of the packaged root chart. It must not be
+		// inserted into `helm_urls`, whose entries describe the individual
+		// applications' own Helm attachments.
+		childManifests, helmURLs, zipURLs := buildCompleteFormulaInfo(formula, depotLogin)
+		response["child_manifests"] = childManifests
+		response["helm_urls"] = helmURLs
+		response["zip_urls"] = zipURLs
+	}
+	c.JsonResponseWithoutError(ctx, response)
 }
 
 func (c Formula) Detail(ctx *gin.Context) {
@@ -723,6 +758,76 @@ func (c Formula) UnInstallComplete(ctx *gin.Context) {
 		return
 	}
 	c.JsonSuccessResponse(ctx)
+}
+
+func manifestRequiresPvc(manifest logic2.Manifest) bool {
+	if manifest.Application.Type == logic2.EnvironmentApp {
+		return true
+	}
+	for _, volume := range manifest.Platform.Volumes {
+		if volume.PersistentVolumeClaim != nil {
+			return true
+		}
+	}
+	return false
+}
+
+func marshalFormulaInfoManifest(manifest logic2.Manifest, complete bool) string {
+	manifest.Version = 3
+	manifest.VersionV2 = 3
+	content, err := yaml.Marshal(manifest)
+	if err != nil {
+		return ""
+	}
+	if complete {
+		return string(content)
+	}
+	manifestMap := map[string]interface{}{}
+	if err := yaml.Unmarshal(content, &manifestMap); err != nil {
+		return string(content)
+	}
+	if platform, ok := manifestMap["platform"].(map[string]interface{}); ok {
+		delete(platform, "container")
+	}
+	content, err = yaml.Marshal(manifestMap)
+	if err != nil {
+		return ""
+	}
+	return string(content)
+}
+
+func buildCompleteFormulaInfo(
+	formula *logic.Formula,
+	depot *logic.Depot,
+) (map[string]string, map[string]string, map[string]string) {
+	childManifests := make(map[string]string)
+	helmURLs := make(map[string]string)
+	zipURLs := make(map[string]string)
+	if formula == nil || formula.Manifest == nil {
+		return childManifests, helmURLs, zipURLs
+	}
+	rootIdentify := formula.Manifest.Application.Identifie
+	for _, manifest := range formula.AllManifest {
+		if manifest == nil || manifest.Application.Identifie == "" {
+			continue
+		}
+		identifie := manifest.Application.Identifie
+		if identifie != rootIdentify {
+			childManifests[identifie] = marshalFormulaInfoManifest(*manifest, true)
+		}
+		if path := formula.HelmPaths[identifie]; strings.TrimSpace(path) != "" {
+			if helmURL, _ := depot.GetFormulaBackendZipDownloadUrlByApplication(manifest.Application, path, false); helmURL != "" {
+				helmURLs[identifie] = helmURL
+			}
+		}
+		if strings.HasPrefix(manifest.Source.Url, "file://") {
+			path := strings.TrimPrefix(manifest.Source.Url, "file://")
+			if zipURL, _ := depot.GetFormulaBackendZipDownloadUrlByApplication(manifest.Application, path, false); zipURL != "" {
+				zipURLs[identifie] = zipURL
+			}
+		}
+	}
+	return childManifests, helmURLs, zipURLs
 }
 
 func replaceFormulaIdentifieInInfoPath(path, requestedIdentifie, currentIdentifie string) string {

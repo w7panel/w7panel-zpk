@@ -132,7 +132,7 @@ Usage:
 - name: {{ $vol.name | quote }}
   {{- if $vol.persistentVolumeClaim }}
   persistentVolumeClaim:
-    claimName: {{ coalesce $vol.persistentVolumeClaim.claimName $root.Values.PVC_NAME | quote }}
+    claimName: {{ tpl (coalesce $vol.persistentVolumeClaim.claimName $root.Values.PVC_NAME) $root | quote }}
   {{- else }}
     {{- /* Reconstruct the volume spec without 'name' and 'persistentVolumeClaim' */}}
     {{- $spec := dict }}

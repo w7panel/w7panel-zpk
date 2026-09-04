@@ -9,9 +9,9 @@ import (
 const dependencyReleaseNameSuffix = "_RELEASE_NAME"
 
 func DependencyReleaseStartParamName(dependency logic.Depend) string {
-	identify := strings.TrimSpace(dependency.SubIdentifie)
+	identify := dependency.SubIdentifie
 	if identify == "" {
-		identify = strings.TrimSpace(dependency.Identifie)
+		identify = dependency.Identifie
 	}
 	identify = strings.ToUpper(strings.NewReplacer("-", "_", ".", "_").Replace(identify))
 	if identify == "" {
@@ -20,10 +20,11 @@ func DependencyReleaseStartParamName(dependency logic.Depend) string {
 	return identify + dependencyReleaseNameSuffix
 }
 
-// ApplyDependencyReleaseStartParams derives internal release-name parameters
-// from external dependencies. These parameters are runtime installation data,
-// not author-maintained manifest configuration.
-func ApplyDependencyReleaseStartParams(manifest *logic.Manifest) {
+// PopulateManifestStartParamsWithDependencyReleaseNames adds hidden
+// dependency release-name parameters to the current manifest's startParams.
+// These parameters are runtime installation data, not author-maintained
+// dependency configuration.
+func PopulateManifestStartParamsWithDependencyReleaseNames(manifest *logic.Manifest) {
 	if manifest == nil {
 		return
 	}
@@ -42,9 +43,9 @@ func ApplyDependencyReleaseStartParams(manifest *logic.Manifest) {
 			continue
 		}
 		generatedNames[name] = struct{}{}
-		moduleName := strings.TrimSpace(dependency.SubIdentifie)
+		moduleName := dependency.SubIdentifie
 		if moduleName == "" {
-			moduleName = strings.TrimSpace(dependency.Identifie)
+			moduleName = dependency.Identifie
 		}
 		generated = append(generated, logic.StartParams{
 			Name:       name,

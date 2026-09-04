@@ -25,17 +25,23 @@
                         <div v-for="(item, index) in depends" :key="item.identifie" style="position:relative;">
                             <a-button :type="dependsIndex == index ? 'primary' : 'secondary'"
                                 @click="dependsIndex = index; edit({ stop: true })">{{ item.identifie }}</a-button>
-                            <span @click="delDepend(index)" class="depend-close c-red fs-20 cursor">×</span>
+                            <span v-if="!isManagedDependency(item)" @click="delDepend(index)"
+                                class="depend-close c-red fs-20 cursor">×</span>
                         </div>
                         <a-button @click="openAddDepend">
                             <template #icon><icon-plus /></template>
                             添加子应用
+                        </a-button>
+                        <a-button @click="openImportDepend">
+                            <template #icon><icon-download /></template>
+                            导入子应用
                         </a-button>
                     </div>
                 </div>
                 <files-manifest v-show="dependsIndex == -1" :data="manifest" :version_id="version_id" ref="form"
                     :option="{ edit: true, imginstall: true, mainapp: true, app_ports: this.app_ports }"
                     :identifie="identifie" @addfile="addfileInside" @complete="complete"
+                    @environment-nginx-gateway-change="handleEnvironmentNginxGatewayChange"
                     @structure="structure"></files-manifest>
                 <files-manifest v-for="(item, index) in depends" :key="item.identifie" :ref="'depends' + index"
                     v-show="dependsIndex == index" :data="depends[index].manifest"
@@ -49,15 +55,28 @@
                 </a-empty>
             </div>
         </a-spin>
+
+        <depend-picker v-model:visible="importPicker.show" title="导入子应用" action-text="导入"
+            :action-loading="importPicker.importing" @select="importChild" @close="closeImportDepend" />
     </div>
 </template>
 
 <script>
 import myAxios from '@/utils';
 import filesManifest from '@/components/files-manifest.vue';
+import dependPicker from '@/components/depend-picker.vue';
 import jsyaml from "js-yaml";
 import { confirm, messageError, messageSuccess } from '@/utils/ui-feedback';
-import { IconArrowLeft, IconPlus } from '@arco-design/web-vue/es/icon';
+import {
+    childImportRepositoryBaseURL,
+    importChildApplication,
+    importedChildFilePath,
+    getImportedChildIdentifies,
+    saveImportedChildren,
+    removeImportedChildren,
+} from '@/utils/child-app-import';
+import { environmentNginxDependency } from '@/utils/environment-app';
+import { IconArrowLeft, IconDownload, IconPlus } from '@arco-design/web-vue/es/icon';
 const defaultManifest = `application:
     name: ''
     identifie: ''
@@ -73,7 +92,7 @@ platform:
 `;
 
 export default {
-    components: { filesManifest, IconArrowLeft, IconPlus },
+    components: { filesManifest, dependPicker, IconArrowLeft, IconDownload, IconPlus },
     data() {
         return {
             identifie: '',
@@ -91,6 +110,11 @@ export default {
             depends: [],
             dependsIndex: -1,
             deleteLoading: false,
+
+            importPicker: {
+                show: false,
+                importing: false,
+            },
 
             app_ports: [],
 
@@ -204,6 +228,7 @@ export default {
         },
         delDepend(index) {
             if (this.deleteLoading) { return }
+            if (this.isManagedDependency(this.depends[index])) { return }
             let file = this.tree.find(i => i.label == (this.depends[index]?.identifie) + '/manifest.yaml');
             if (file) {
                 myAxios.post('/respo/manifest/file', {
@@ -234,6 +259,163 @@ export default {
         openAddDepend() {
             this.dependsIndex = -1;
             this.$refs.form?.openAddDepend();
+        },
+        isManagedDependency(item) {
+            return this.$refs.form?.isEnvironmentFixedDependency?.(item) || false;
+        },
+        async persistEnvironmentManifest() {
+            const rootRef = this.$refs.form;
+            if (rootRef?.form?.type != 'environment' || !rootRef?.json) {
+                return;
+            }
+            // app_ports is rebuilt from the imported child manifests, so the
+            // gateway backend can use the dependency's declared service port.
+            this.updateAppPorts();
+            rootRef.syncEnvironmentIngress?.(this.app_ports);
+            const content = jsyaml.dump(rootRef.json);
+            await myAxios.post('/respo/manifest/file', {
+                identifie: this.identifie,
+                filename: 'manifest.yaml',
+                content,
+                version: this.version_id,
+            });
+        },
+        openImportDepend() {
+            this.importPicker.show = true;
+        },
+        closeImportDepend() {
+            this.importPicker.show = false;
+        },
+        async handleEnvironmentNginxGatewayChange({ enabled, finish } = {}) {
+            const done = typeof finish == 'function' ? finish : () => { };
+            try {
+                if (enabled) {
+                    const rootDependencies = this.$refs.form?.json?.platform?.depends || [];
+                    const hasDependency = rootDependencies.some(item =>
+                        item?.identifie == environmentNginxDependency.identifie
+                        && String(item?.from || '').trim())
+                        && Object.prototype.hasOwnProperty.call(
+                            this.list || {},
+                            importedChildFilePath(environmentNginxDependency.identifie),
+                        );
+                    if (!hasDependency) {
+                        const dependency = {
+                            identifie: environmentNginxDependency.identifie,
+                            name: environmentNginxDependency.name,
+                            subidentifie: '',
+                            subname: '',
+                            required: true,
+                            type: 'in',
+                            from: environmentNginxDependency.source,
+                        };
+                        const entries = await importChildApplication(myAxios, { dependency });
+                        const result = await saveImportedChildren(myAxios, {
+                            rootRef: this.$refs.form,
+                            rootIdentifie: this.identifie,
+                            versionId: this.version_id,
+                            entries,
+                            sourceDependency: dependency,
+                            existingDependencies: this.depends,
+                        });
+                        this.applyImportedChildrenResult(result);
+                    }
+                    done(true);
+                    await this.persistEnvironmentManifest();
+                    messageSuccess('Nginx 网关及其子应用导入成功');
+                    return;
+                }
+
+                const identifies = getImportedChildIdentifies(
+                    environmentNginxDependency.identifie,
+                    this.list,
+                    this.depends,
+                );
+                const result = await removeImportedChildren(myAxios, {
+                    rootRef: this.$refs.form,
+                    rootIdentifie: this.identifie,
+                    versionId: this.version_id,
+                    list: this.list,
+                    identifies,
+                });
+                this.applyRemovedChildrenResult(result);
+                done(true);
+                await this.persistEnvironmentManifest();
+                messageSuccess('Nginx 网关及其子应用已删除');
+            } catch (error) {
+                done(false);
+                messageError(error?.response?.data?.error || error?.message || (enabled
+                    ? '导入 Nginx 网关失败'
+                    : '删除 Nginx 网关失败'));
+            }
+        },
+        async importChild(record, tab = 'local') {
+            if (!record?.identifie || this.importPicker.importing) { return; }
+            const dependency = {
+                identifie: record.identifie,
+                goodsId: Number(record.goods_id || record.goodsId || record.id || 0),
+                name: record.name || record.identifie,
+                subidentifie: '',
+                subname: '',
+                required: true,
+                type: 'in',
+                from: childImportRepositoryBaseURL(tab),
+                version: record.version?.name || '',
+            };
+            this.importPicker.importing = true;
+            try {
+                const entries = await importChildApplication(myAxios, {
+                    dependency,
+                });
+                const result = await saveImportedChildren(myAxios, {
+                    rootRef: this.$refs.form,
+                    rootIdentifie: this.identifie,
+                    versionId: this.version_id,
+                    entries,
+                    sourceDependency: dependency,
+                    existingDependencies: this.depends,
+                });
+                this.applyImportedChildrenResult(result);
+                this.importPicker.show = false;
+                messageSuccess('子应用导入成功');
+            } catch (error) {
+                messageError(error?.response?.data?.error || error?.message || '导入子应用失败');
+            } finally {
+                this.importPicker.importing = false;
+            }
+        },
+        applyImportedChildrenResult({ imported = [], dependencies = [], rootManifest = '' } = {}) {
+            if (this.$refs.form?.form?.type != 'environment') {
+                this.manifest = rootManifest;
+            }
+            this.json = this.$refs.form?.json || {};
+            imported.forEach((entry, index) => {
+                const file = importedChildFilePath(entry.identifie);
+                this.list[file] = entry.manifest;
+                if (!this.tree.some(item => item.label === file)) {
+                    this.tree.push({ label: file });
+                }
+                this.depends.push({
+                    ...dependencies[index],
+                    manifest: entry.manifest,
+                    title: file,
+                });
+            });
+            // Keep the editor on the main application after importing child
+            // manifests; the user can switch to a child explicitly.
+            this.dependsIndex = -1;
+        },
+        applyRemovedChildrenResult({ existingFiles = [], rootManifest = '', identifies = [] } = {}) {
+            if (this.$refs.form?.form?.type != 'environment') {
+                this.manifest = rootManifest;
+            }
+            this.json = this.$refs.form?.json || {};
+            existingFiles.forEach(file => {
+                delete this.list[file];
+                this.tree = this.tree.filter(item => item.label != file);
+            });
+            const removed = new Set(identifies);
+            this.depends = this.depends.filter(item => !removed.has(item?.identifie));
+            this.dependsIndex = -1;
         },
         addfileInside(json, yaml, data) {
             this.deleteLoading = true;
@@ -297,7 +479,9 @@ export default {
                 if (this.json?.platform?.depends) {
                     this.dependsIndex = -1;
                     let depends = this.json?.platform?.depends || [];
-                    depends = depends.filter(i => i.type !== 'out' && !String(i.from || '').trim());
+                    depends = depends.filter(i => i.type !== 'out'
+                        && (!String(i.from || '').trim()
+                            || this.list[importedChildFilePath(i.identifie)] !== undefined));
                     depends = depends.map(i => {
                         i.manifest = this.list[i.identifie + '/manifest.yaml'] || defaultManifest;
                         i.title = i.identifie + '/manifest.yaml';

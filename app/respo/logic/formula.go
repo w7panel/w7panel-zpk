@@ -1,7 +1,9 @@
 package logic
 
 import (
+	"fmt"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -18,6 +20,27 @@ const (
 )
 
 const FORMULA_FREE_UPGRADE = 0
+
+var applicationIdentifiePattern = regexp.MustCompile(`^[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*$`)
+
+// IsValidIdentifie reports whether a new artifact or child-application
+// identifier uses the supported form. Existing data is still read through
+// the legacy underscore-to-dash compatibility paths.
+func IsValidIdentifie(value string) bool {
+	return applicationIdentifiePattern.MatchString(value)
+}
+
+// ValidateIdentifie validates an identifier at a new artifact/child
+// application input boundary. It intentionally does not normalize values.
+func ValidateIdentifie(value string) error {
+	if strings.TrimSpace(value) == "" {
+		return fmt.Errorf("应用标识不能为空")
+	}
+	if strings.TrimSpace(value) != value || !IsValidIdentifie(value) {
+		return fmt.Errorf("应用标识格式无效: %q，仅支持字母、数字和中划线，且不能以中划线开头或结尾", value)
+	}
+	return nil
+}
 
 func GetFormulaByName(formulaName string) *entity.Formula {
 	formulaName = strings.ReplaceAll(formulaName, "_", "-")

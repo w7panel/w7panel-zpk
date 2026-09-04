@@ -3,6 +3,47 @@ export const traditionInstallTypes = Object.freeze({
     extension: 'extension',
 });
 
+export const traditionStorageVolumeName = 'site-storage';
+
+/**
+ * Keep the traditional application's shared environment volume in the
+ * manifest. The editor deliberately stores an empty claimName; the Helm
+ * packer resolves it from the selected environment release at render time.
+ */
+export function withTraditionAppStorage(platform = {}) {
+    const nextPlatform = { ...(platform || {}) };
+    const volumes = [];
+    let storageVolume = null;
+    for (const volume of nextPlatform.volumes || []) {
+        if (volume?.name !== traditionStorageVolumeName) {
+            volumes.push(volume);
+            continue;
+        }
+        if (!storageVolume) {
+            storageVolume = {
+                ...volume,
+                persistentVolumeClaim: {
+                    ...(volume.persistentVolumeClaim || {}),
+                    claimName: '',
+                },
+            };
+        }
+    }
+    volumes.unshift(storageVolume || {
+        name: traditionStorageVolumeName,
+        persistentVolumeClaim: { claimName: '' },
+    });
+    nextPlatform.volumes = volumes;
+    return nextPlatform;
+}
+
+export function removeTraditionAppStorage(platform = {}) {
+    const nextPlatform = { ...(platform || {}) };
+    nextPlatform.volumes = (nextPlatform.volumes || [])
+        .filter(volume => volume?.name !== traditionStorageVolumeName);
+    return nextPlatform;
+}
+
 export function createTraditionEnvironmentDependency(environment) {
     const formulaURL = String(environment?.formula_url || '').trim();
     let from = '';

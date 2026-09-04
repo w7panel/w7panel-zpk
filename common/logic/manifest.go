@@ -178,15 +178,25 @@ type Shell struct {
 }
 
 type StartParams struct {
-	Name        string `yaml:"name" json:"name"`
-	Title       string `yaml:"title" json:"title"`
-	Description string `yaml:"description" json:"description"`
-	Mark        string `yaml:"mark" json:"mark"`
-	Required    bool   `yaml:"required" json:"required"`
-	Type        string `yaml:"type" json:"type"`
-	ValuesText  string `yaml:"values_text" json:"values_text"`
-	ModuleName  string `yaml:"module_name" json:"module_name"`
-	Hidden      bool   `yaml:"hidden,omitempty" json:"hidden,omitempty"`
+	Name             string                `yaml:"name" json:"name"`
+	Title            string                `yaml:"title" json:"title"`
+	Description      string                `yaml:"description" json:"description"`
+	Mark             string                `yaml:"mark" json:"mark"`
+	Required         bool                  `yaml:"required" json:"required"`
+	Type             string                `yaml:"type" json:"type"`
+	ValuesText       string                `yaml:"values_text" json:"values_text"`
+	ModuleName       string                `yaml:"module_name" json:"module_name"`
+	Hidden           bool                  `yaml:"hidden,omitempty" json:"hidden,omitempty"`
+	DependencySource *StartParamDependency `yaml:"dependencySource,omitempty" json:"dependencySource,omitempty"`
+}
+
+// StartParamDependency describes the application parameter from which a
+// start parameter is populated by the installation layer. The dependency is
+// intentionally attached to the consuming start parameter; no separate
+// export list is required on the provider manifest.
+type StartParamDependency struct {
+	Identifie string `yaml:"identifie" json:"identifie"` // provider artifact identifier
+	Name      string `yaml:"name" json:"name"`           // provider start parameter name
 }
 
 type Container struct {
@@ -329,6 +339,7 @@ type Depend struct {
 	GoodsID           int               `yaml:"goodsId,omitempty" json:"goodsId,omitempty"`
 	OrderSn           string            `yaml:"order_sn,omitempty" json:"order_sn,omitempty"`
 	Name              string            `yaml:"name" json:"name"`
+	Version           string            `yaml:"version,omitempty" json:"version,omitempty"`
 	From              string            `yaml:"from" json:"from"`
 	Required          bool              `yaml:"required" json:"required"`
 	Type              string            `yaml:"type" json:"type"`

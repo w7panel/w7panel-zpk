@@ -26,6 +26,44 @@ The artifact fixes environmentIdentifie; the installer only supplies releaseName
 {{- toJson $group -}}
 {{- end -}}
 
+{{/*
+Resolve the PVC used by the selected environment application. The PVC belongs
+to the dependency release, so read the claim from that release's workload
+instead of accepting a PVC_NAME from the traditional application or deriving
+a name from the release. The environment packer reserves the site-storage
+volume name for this shared claim, so other PVCs in the same workload are
+ignored.
+*/}}
+{{- define "tradition.environmentStorageClaimName" -}}
+{{- $releaseNameParam := printf "%s_RELEASE_NAME" (upper (replace "-" "_" .Values.tradition.environmentIdentifie)) -}}
+{{- $releaseName := required "传统应用必须指定环境应用 releaseName" (index .Values $releaseNameParam) -}}
+{{- $group := include "tradition.environmentAppGroup" . | fromJson -}}
+{{- $claimName := "" -}}
+{{- range $item := (default (list) (dig "status" "items" (list) $group)) -}}
+  {{- $kind := default "" (index $item "kind") -}}
+  {{- $name := default "" (index $item "name") -}}
+  {{- $apiVersion := default "apps/v1" (index $item "apiVersion") -}}
+  {{- if and (eq $claimName "") (ne $name "") (or (eq $kind "Deployment") (eq $kind "StatefulSet") (eq $kind "DaemonSet")) -}}
+    {{- $resource := lookup $apiVersion $kind .Release.Namespace $name -}}
+    {{- if $resource -}}
+      {{- $spec := default (dict) (index $resource "spec") -}}
+      {{- $template := default (dict) (index $spec "template") -}}
+      {{- $podSpec := default (dict) (index $template "spec") -}}
+      {{- range $volume := (default (list) (index $podSpec "volumes")) -}}
+        {{- $claim := dig "persistentVolumeClaim" "claimName" "" $volume -}}
+        {{- if and (eq (default "" (index $volume "name")) "site-storage") (eq $claimName "") (ne $claim "") -}}
+          {{- $claimName = $claim -}}
+        {{- end -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- if eq $claimName "" -}}
+  {{- fail (printf "环境应用 %s 的工作负载未找到 site-storage PVC claimName" $releaseName) -}}
+{{- end -}}
+{{- $claimName -}}
+{{- end -}}
+
 {{/* Return the selected environment domain as a filesystem-safe directory name. */}}
 {{- define "tradition.codeInstallDirectory" -}}
 {{- $group := include "tradition.environmentAppGroup" . | fromJson -}}

@@ -139,10 +139,6 @@ func (hc *HelmPack) PackToHelm() error {
 	function.CreateDirIfNotExist(chartsDir, os.ModePerm)
 	function.CreateDirIfNotExist(filesDir, os.ModePerm)
 
-	if err := hc.generateSubCharts(chartsDir); err != nil {
-		return err
-	}
-
 	if err := hc.prepareRemoteHelmSidecars(chartsDir); err != nil {
 		return err
 	}
@@ -172,6 +168,9 @@ func (hc *HelmPack) PackToHelm() error {
 		}
 	}
 
+	if err := hc.generateSubCharts(chartsDir); err != nil {
+		return err
+	}
 	if err := hc.generateSidecarHelpersTemplate(templatesDir); err != nil {
 		return err
 	}
@@ -179,12 +178,13 @@ func (hc *HelmPack) PackToHelm() error {
 		return err
 	}
 
-	if !hc.IsSubFormula {
-		if shouldPackageMicroApp(hc.Manifest) {
-			if err := hc.generateMicroAppTemplate(templatesDir, hc.Manifest); err != nil {
-				return err
-			}
+	if shouldPackageMicroApp(hc.Manifest) {
+		if err := hc.generateMicroAppTemplate(templatesDir, hc.Manifest); err != nil {
+			return err
 		}
+	}
+
+	if !hc.IsSubFormula {
 		if shouldGenerateRegisterSite(hc.Manifest) {
 			if err := hc.generateRegisterSiteJobTemplate(templatesDir, hc.Manifest); err != nil {
 				return err
@@ -817,20 +817,32 @@ func (hc *HelmPack) getSharedStorageWorkloadAffinityValues() map[string]interfac
 	if hc.SharedStorageTargetApp == "" {
 		return nil
 	}
-	return podAffinityByIdentify(hc.SharedStorageTargetApp)
+	// SharedStorageTargetApp remains the parent artifact identifier. Add the
+	// current release group as an additional selector expression so repeated
+	// installations cannot satisfy each other's RWO PVC affinity.
+	return podAffinityByGroupName("{{ .Release.Name }}", hc.SharedStorageTargetApp)
 }
 
 func (hc *HelmPack) getDefaultJobAffinityValues() map[string]interface{} {
-	return podAffinityByIdentify(hc.Manifest.Application.Identifie)
+	// Jobs use the same release-scoped grouping as workload affinity. Keep the
+	// application identifier as the second expression so a release containing
+	// multiple child applications does not match the wrong workload.
+	return podAffinityByGroupName("{{ .Release.Name }}", hc.Manifest.Application.Identifie)
 }
 
-func podAffinityByIdentify(identify string) map[string]interface{} {
+func podAffinityByGroupName(groupName string, identifies ...string) map[string]interface{} {
+	matchExpressions := []interface{}{map[string]interface{}{
+		"key": "w7.cc/group-name", "operator": "In", "values": []string{groupName},
+	}}
+	if len(identifies) > 0 && strings.TrimSpace(identifies[0]) != "" {
+		matchExpressions = append(matchExpressions, map[string]interface{}{
+			"key": "w7.cc/identifie", "operator": "In", "values": []string{identifies[0]},
+		})
+	}
 	return map[string]interface{}{"podAffinity": map[string]interface{}{
 		"requiredDuringSchedulingIgnoredDuringExecution": []interface{}{map[string]interface{}{
-			"labelSelector": map[string]interface{}{"matchExpressions": []interface{}{map[string]interface{}{
-				"key": "w7.cc/identifie", "operator": "In", "values": []string{identify},
-			}}},
-			"topologyKey": "kubernetes.io/hostname",
+			"labelSelector": map[string]interface{}{"matchExpressions": matchExpressions},
+			"topologyKey":   "kubernetes.io/hostname",
 		}},
 	}}
 }

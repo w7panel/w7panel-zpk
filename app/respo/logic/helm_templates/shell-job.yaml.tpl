@@ -46,7 +46,7 @@ spec:
       serviceAccountName: {{ include "common.serviceAccountName" $root }}
       {{- with $root.Values.jobAffinity }}
       affinity:
-        {{- toYaml . | nindent 8 }}
+        {{- tpl (toYaml .) $root | nindent 8 }}
       {{- end }}
       {{- if or $root.Values.volumes $jobSidecarVolumes }}
       volumes:

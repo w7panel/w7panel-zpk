@@ -26,14 +26,16 @@ unzip -oq "$tmp_zip" -d "$code_install_path"`
 // ReadWriteOnce storage on a node where that environment is running.
 func environmentPodAffinityValues(identify string) map[string]interface{} {
 	identify = strings.ToLower(strings.TrimSpace(strings.ReplaceAll(identify, "_", "-")))
-	return map[string]interface{}{"podAffinity": map[string]interface{}{
-		"requiredDuringSchedulingIgnoredDuringExecution": []interface{}{map[string]interface{}{
-			"labelSelector": map[string]interface{}{"matchExpressions": []interface{}{map[string]interface{}{
-				"key": "w7.cc/identifie", "operator": "In", "values": []string{identify},
-			}}},
-			"topologyKey": "kubernetes.io/hostname",
-		}},
-	}}
+	if identify == "" {
+		return nil
+	}
+	// Traditional applications are installed as a separate Helm release from
+	// the selected environment.  The hidden dependency start parameter carries
+	// that concrete release name at install time (and can differ for every
+	// environment instance), so do not match by the artifact identifier.
+	paramName := strings.ToUpper(strings.NewReplacer("-", "_", ".", "_").Replace(identify)) + dependencyReleaseNameSuffix
+	releaseName := fmt.Sprintf(`{{ default %q (index .Values %q) }}`, identify, paramName)
+	return podAffinityByGroupName(releaseName, identify)
 }
 
 // withTraditionAppStorageClaimName resolves the empty claimName persisted by

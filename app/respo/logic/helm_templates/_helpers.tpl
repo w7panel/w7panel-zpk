@@ -51,6 +51,30 @@ app: {{ include "common.fullname" . }}
 {{- end }}
 
 {{/*
+Render pod annotations from values. Annotation values may contain Helm
+expressions (for example, a release revision marker injected for an
+environment's imported Nginx child), so evaluate every value uniformly
+instead of special-casing a particular annotation key.
+*/}}
+{{- define "w7panel.podAnnotations" -}}
+{{- $root := . -}}
+{{- $annotations := dict -}}
+{{- range $key, $value := ($root.Values.podAnnotations | default dict) -}}
+  {{- $_ := set $annotations $key (tpl (toString $value) $root) -}}
+{{- end -}}
+{{- range $key, $value := ($root.Values.annotations | default dict) -}}
+  {{- $_ := set $annotations $key (tpl (toString $value) $root) -}}
+{{- end -}}
+{{- $sidecarAnnotations := include "w7panel.sidecars.podAnnotations" $root | fromYaml | default dict -}}
+{{- range $key, $value := $sidecarAnnotations -}}
+  {{- $_ := set $annotations $key (tpl (toString $value) $root) -}}
+{{- end -}}
+{{- if $annotations -}}
+{{- toYaml $annotations -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
 Create the name of the service account to use
 */}}
 {{- define "common.serviceAccountName" -}}
@@ -132,7 +156,12 @@ Usage:
 - name: {{ $vol.name | quote }}
   {{- if $vol.persistentVolumeClaim }}
   persistentVolumeClaim:
-    claimName: {{ tpl (coalesce $vol.persistentVolumeClaim.claimName $root.Values.PVC_NAME) $root | quote }}
+    {{ $claimName := dig "persistentVolumeClaim" "claimName" "" $vol }}
+    {{ $claim := toString $claimName }}
+    {{ if eq $claim "" }}
+      {{ $claim = toString (get $root.Values "PVC_NAME") }}
+    {{ end }}
+    claimName: {{ tpl $claim $root | quote }}
   {{- else }}
     {{- /* Reconstruct the volume spec without 'name' and 'persistentVolumeClaim' */}}
     {{- $spec := dict }}

@@ -127,7 +127,7 @@
                                             <div class="registry-alert-item mt-6">3. 独立安装时通过“环境版本”启动参数替换运行容器镜像中的 {version}；创建站点环境时也会使用同一模板。</div>
                                             <div class="registry-alert-item mt-6">4. 环境容器的启动命令可在页面下方“启动命令”中配置。</div>
                                             <div class="registry-alert-item mt-6">5. 页面下方“脚本配置”中的安装、升级脚本只在安装或升级此制品时执行，站点管理新建环境时不会再次执行。</div>
-                                            <div class="registry-alert-item mt-6">6. 环境准备完成后，系统会使用 Nginx 模板配置站点并完成绑定。</div>
+                                            <div class="registry-alert-item mt-6">6. 环境准备完成后，系统会使用 NGINX 模板配置站点并完成绑定。</div>
                                         </a-alert>
                                         <div class="greybox" style="margin-bottom:0;">
                                             <div class="greybox-title">运行环境配置</div>
@@ -168,16 +168,16 @@
                                                     <span class="c-99 mt-6">关闭后使用持久存储保留容器系统层。</span>
                                                 </div>
                                             </a-form-item>
-                                            <a-form-item v-if="option?.edit" label="附加 Nginx 网关"
+                                            <a-form-item v-if="option?.edit" label="附加 NGINX 网关"
                                                 style="margin-bottom:18px;">
                                                 <div class="df df-c" style="align-items:flex-start;">
                                                     <a-switch v-model="form.environmentNginxGateway"
                                                         :disabled="environmentNginxGatewayChanging"
                                                         @change="toggleEnvironmentNginxGateway" />
-                                                    <span class="c-99 mt-6">开启后会自动导入 w7-nginx 及其子应用；关闭时会删除已导入的 Nginx 子应用。</span>
+                                                    <span class="c-99 mt-6">开启后会自动导入 NGINX 及其子应用；关闭时会删除已导入的 NGINX 子应用。</span>
                                                 </div>
                                             </a-form-item>
-                                            <a-form-item v-if="form.environmentNginxGateway" label="Nginx 模板"
+                                            <a-form-item v-if="form.environmentNginxGateway" label="NGINX 模板"
                                                 field="environmentNginxVhostTemplate"
                                                 style="margin-bottom:0;">
                                                 <div class="nginx-template-field">
@@ -185,7 +185,7 @@
                                                         <a-textarea v-model="form.environmentNginxVhostTemplate"
                                                             class="nginx-template-textarea"
                                                             :auto-size="{minRows:10, maxRows:20}"
-                                                            :spellcheck="false" placeholder="请输入 Nginx vhost 模板"
+                                                            :spellcheck="false" placeholder="请输入 NGINX vhost 模板"
                                                             style="width:500px;" />
                                                         <a-button size="mini" type="text"
                                                             class="nginx-template-example-entry"
@@ -652,7 +652,7 @@
             </div>
         </a-drawer>
 
-        <a-drawer v-model:visible="nginxTemplateExampleVisible" :width="720" title="Nginx 模板示例"
+        <a-drawer v-model:visible="nginxTemplateExampleVisible" :width="720" title="NGINX 模板示例"
             unmount-on-close>
             <div class="nginx-template-example-panel">
                 <a-alert type="info" show-icon :closable="false">
@@ -777,7 +777,6 @@ import ManifestConfigTableColumn from '@/components/manifest-config-table-column
 import dependPicker from '@/components/depend-picker.vue';
 import myAxios from '../utils/index';
 import {
-    environmentNginxGatewayAnnotation,
     environmentSystemRebootRestoreAnnotation,
     isEnvironmentAppDependency,
     removeEnvironmentAppCodeStorage,
@@ -810,7 +809,7 @@ const environmentAnnotationKeys = {
     imageTemplate: 'w7.cc/image_template',
     imageVersion: 'w7.cc/image_version',
     nginxVhostTemplate: 'w7.cc/nginx_vhost_template',
-    nginxGateway: environmentNginxGatewayAnnotation,
+    nginxGateway: 'w7.cc/nginx-gateway',
     systemRebootRestore: environmentSystemRebootRestoreAnnotation,
 };
 
@@ -827,6 +826,8 @@ const isDerivedDependencyReleaseStartParam = item => Boolean(
 const isLegacyTraditionInstallDirectoryStartParam = (item, applicationType) => (
     applicationType === 'tradition' && item?.name === 'CODE_INSTALL_DIRECTORY'
 );
+
+const pvcNameStartParamName = 'PVC_NAME';
 
 const gatewayPluginAnnotationPrefix = 'w7.cc/plugin-';
 const gatewayPluginAnnotationKeys = ['w7.cc/official-app'];
@@ -855,8 +856,10 @@ const environmentLanguagePresets = [
 
 const nginxTemplatePlaceholders = [
     '{SERVER_NAME}',
+    '{LOG_DIR}',
     '{ROOT_DIR}',
     '{K8S_DOMAIN}',
+    '{UPSTREAM_APP_NAME}',
 ];
 
 const nginxTemplateExample = String.raw`server {
@@ -1134,13 +1137,13 @@ export default {
                 environmentNginxVhostTemplate: [
                     {
                         required: false,
-                        message: '请输入 Nginx 模板',
+                        message: '请输入 NGINX 模板',
                         trigger: 'blur',
                         validator: (value, callback) => {
                             if (!this.form.environmentNginxGateway || String(value || '').trim()) {
                                 callback();
                             } else {
-                                callback('请输入 Nginx 模板');
+                                callback('请输入 NGINX 模板');
                             }
                         },
                     },
@@ -1453,7 +1456,7 @@ export default {
             const applyExample = () => {
                 this.form.environmentNginxVhostTemplate = this.nginxTemplateExample;
                 this.nginxTemplateExampleVisible = false;
-                messageSuccess('已填入 Nginx 模板示例');
+                messageSuccess('已填入 NGINX 模板示例');
             };
             const currentTemplate = String(this.form.environmentNginxVhostTemplate || '').trim();
 
@@ -1463,7 +1466,7 @@ export default {
             }
 
             confirm({
-                title: '使用 Nginx 模板示例',
+                title: '使用 NGINX 模板示例',
                 content: '当前模板内容将被示例覆盖，是否继续？',
                 confirmButtonText: '覆盖并使用',
                 cancelButtonText: '取消',
@@ -1499,10 +1502,10 @@ export default {
                 });
             };
             confirm({
-                title: enabled ? '附加 Nginx 网关' : '关闭 Nginx 网关',
+                title: enabled ? '附加 NGINX 网关' : '关闭 NGINX 网关',
                 content: enabled
-                    ? '将从 https://zpk.fan.b2.sz.w7.com/zpk/respo/info/w7-nginx 自动导入 w7-nginx 及其子应用，是否继续？'
-                    : '关闭后会自动删除 w7-nginx 及其已导入的子应用，是否继续？',
+                    ? '将从 https://zpk.fan.b2.sz.w7.com/zpk/respo/info/w7-sitemanager-nginx 自动导入 NGINX 及其子应用，是否继续？'
+                    : '关闭后会自动删除 NGINX 及其已导入的子应用，是否继续？',
                 confirmButtonText: enabled ? '导入并开启' : '删除并关闭',
                 cancelButtonText: '取消',
                 onOk: request,
@@ -2175,7 +2178,32 @@ export default {
                 || ((this.disabledDomainStartParams || this.form.type == 'tradition') && this.isDomainStartParam(item))
                 || (this.json?.platform?.['volumeClaimTemplates']?.length && item.mark === 'storage')
         },
+        ensurePVCNameStartParam(volumes = this.json?.platform?.volumes) {
+            const hasPVC = (volumes || []).some(item => Boolean(item?.persistentVolumeClaim));
+            if (!hasPVC) { return; }
+
+            this.form.startParams = this.form.startParams || [];
+            if (this.form.startParams.some(item => (
+                String(item?.name || '').trim().toUpperCase() === pvcNameStartParamName
+            ))) {
+                return;
+            }
+
+            this.form.startParams.push({
+                name: pvcNameStartParamName,
+                title: 'PVC名称',
+                required: true,
+                values_text: '%PVC_NAME%',
+                module_name: '',
+                description: '安装时选择的 PVC 名称',
+                type: 'text',
+            });
+        },
         serializeStartParams() {
+            // PVC_NAME is installation input rather than an author-maintained
+            // value. Add it here as well as from the volume editor so old
+            // manifests are upgraded when they are saved.
+            this.ensurePVCNameStartParam();
             let start = [];
             let params = this.form.type == 'environment'
                 ? this.environmentStartParams()
@@ -2260,6 +2288,8 @@ export default {
                     }));
                 }
 
+                this.ensurePVCNameStartParam(data?.volumes);
+                this.json.platform.startParams = this.serializeStartParams();
                 this.yaml = jsyaml.dump(this.json);
 
                 this.computedAppPort(this.json.platform?.['container-v2']);
@@ -2962,6 +2992,8 @@ platform:
                     this.ensureEnvironmentContainerDefaults();
                     this.form.startParams = this.environmentStartParams();
                 }
+
+                this.ensurePVCNameStartParam(j?.platform?.volumes);
 
                 if (this.form.startParams?.length) {
                     this.form.startParams.forEach((i, index) => {

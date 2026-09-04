@@ -1,6 +1,6 @@
 const environmentApp = Object.freeze({
-    nginxDependencyIdentifie: 'w7-nginx',
-    nginxDependencyName: 'w7-nginx',
+    nginxDependencyIdentifie: 'w7-sitemanager-nginx',
+    nginxDependencyName: 'w7-sitemanager-nginx',
     nginxDependencySource: 'https://zpk.fan.b2.sz.w7.com',
     storageName: 'site-storage',
 });
@@ -18,6 +18,52 @@ export const environmentNginxDependency = Object.freeze({
 
 export function isEnvironmentAppDependency(record) {
     return record?.identifie == environmentApp.nginxDependencyIdentifie;
+}
+
+function cloneManifest(manifest = {}) {
+    if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest)) {
+        return {};
+    }
+    try {
+        return JSON.parse(JSON.stringify(manifest));
+    } catch {
+        return { ...manifest };
+    }
+}
+
+/**
+ * Bind w7-sitemanager-nginx's PVC startup parameter to the environment application's
+ * PVC parameter. The imported nginx manifest is returned as a copy so the
+ * caller can safely update its child file and editor state together.
+ */
+export function withEnvironmentNginxPvcDependencySource(
+    manifest = {},
+    mainApplicationIdentifie = '',
+) {
+    const nextManifest = cloneManifest(manifest);
+    const identifie = String(mainApplicationIdentifie || '').trim();
+    if (!identifie) {
+        return nextManifest;
+    }
+
+    const platform = nextManifest.platform || {};
+    const parameterLists = [platform.startParams, platform.container?.startParams]
+        .filter(Array.isArray);
+    for (const parameters of parameterLists) {
+        const pvcParameter = parameters.find(item =>
+            String(item?.name || '').trim().toLowerCase() === 'pvc_name');
+        if (!pvcParameter) {
+            continue;
+        }
+        const name = String(pvcParameter.name || '').trim();
+        pvcParameter.dependencySource = {
+            ...(pvcParameter.dependencySource || {}),
+            identifie,
+            name: name || 'PVC_NAME',
+        };
+        break;
+    }
+    return nextManifest;
 }
 
 export function removeEnvironmentAppCodeStorage(json) {

@@ -75,7 +75,10 @@ import {
     saveImportedChildren,
     removeImportedChildren,
 } from '@/utils/child-app-import';
-import { environmentNginxDependency } from '@/utils/environment-app';
+import {
+    environmentNginxDependency,
+    withEnvironmentNginxPvcDependencySource,
+} from '@/utils/environment-app';
 import { IconArrowLeft, IconDownload, IconPlus } from '@arco-design/web-vue/es/icon';
 const defaultManifest = `application:
     name: ''
@@ -280,6 +283,28 @@ export default {
                 version: this.version_id,
             });
         },
+        prepareEnvironmentNginxEntry(entry) {
+            if (!entry) { return { manifest: {}, changed: false }; }
+            let source = entry.data || entry.manifest || {};
+            if (typeof source == 'string') {
+                try {
+                    source = jsyaml.load(source) || {};
+                } catch {
+                    source = {};
+                }
+            }
+            const before = JSON.stringify(source);
+            const manifest = withEnvironmentNginxPvcDependencySource(
+                source,
+                this.getManifestIdentifie(this.$refs.form?.json, this.identifie),
+            );
+            entry.data = manifest;
+            entry.manifest = jsyaml.dump(manifest);
+            return {
+                manifest,
+                changed: JSON.stringify(manifest) != before,
+            };
+        },
         openImportDepend() {
             this.importPicker.show = true;
         },
@@ -309,6 +334,12 @@ export default {
                             from: environmentNginxDependency.source,
                         };
                         const entries = await importChildApplication(myAxios, { dependency });
+                        const nginxEntry = entries.find(entry =>
+                            entry?.identifie == environmentNginxDependency.identifie);
+                        if (!nginxEntry) {
+                            throw new Error('导入结果中缺少 NGINX 子应用 manifest');
+                        }
+                        this.prepareEnvironmentNginxEntry(nginxEntry);
                         const result = await saveImportedChildren(myAxios, {
                             rootRef: this.$refs.form,
                             rootIdentifie: this.identifie,
@@ -321,7 +352,7 @@ export default {
                     }
                     done(true);
                     await this.persistEnvironmentManifest();
-                    messageSuccess('Nginx 网关及其子应用导入成功');
+                    messageSuccess('NGINX 网关及其子应用导入成功');
                     return;
                 }
 
@@ -340,12 +371,12 @@ export default {
                 this.applyRemovedChildrenResult(result);
                 done(true);
                 await this.persistEnvironmentManifest();
-                messageSuccess('Nginx 网关及其子应用已删除');
+                messageSuccess('NGINX 网关及其子应用已删除');
             } catch (error) {
                 done(false);
                 messageError(error?.response?.data?.error || error?.message || (enabled
-                    ? '导入 Nginx 网关失败'
-                    : '删除 Nginx 网关失败'));
+                    ? '导入 NGINX 网关失败'
+                    : '删除 NGINX 网关失败'));
             }
         },
         async importChild(record, tab = 'local') {

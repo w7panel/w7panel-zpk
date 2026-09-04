@@ -300,7 +300,6 @@ func (c Formula) Info(ctx *gin.Context) {
 		Title       string               `json:"title"`
 		Required    bool                 `json:"required"`
 		StartParams []logic2.StartParams `json:"start_params"`
-		RequirePvc  bool                 `json:"requirepvc"`
 		Volumes     []v1.Volume          `json:"volumes"`
 	}
 	installFormulas := make([]FormulaInstallInfo, 0)
@@ -311,13 +310,15 @@ func (c Formula) Info(ctx *gin.Context) {
 		if formula.Manifest.Platform.Volumes == nil {
 			formula.Manifest.Platform.Volumes = make([]v1.Volume, 0)
 		}
-		needPvc := manifestRequiresPvc(*formula.Manifest)
+		responseManifest.Platform.StartParams = ensurePVCNameStartParam(
+			responseManifest.Platform.StartParams,
+			formula.Manifest.Platform.Volumes,
+		)
 		installFormulas = append(installFormulas, FormulaInstallInfo{
 			Name:        responseManifest.Application.Identifie,
 			Title:       responseManifest.Application.Name,
 			Required:    true,
 			StartParams: responseManifest.Platform.StartParams,
-			RequirePvc:  needPvc,
 			Volumes:     formula.Manifest.Platform.Volumes,
 		})
 		formulaRequiredMap := make(map[string]bool)
@@ -331,19 +332,21 @@ func (c Formula) Info(ctx *gin.Context) {
 					c.JsonResponseWithError(ctx, err, http.StatusInternalServerError)
 					return
 				}
-				ineedPvc := manifestRequiresPvc(itemManifest)
 				if itemManifest.Platform.StartParams == nil {
 					itemManifest.Platform.StartParams = make([]logic2.StartParams, 0)
 				}
 				if itemManifest.Platform.Volumes == nil {
 					itemManifest.Platform.Volumes = make([]v1.Volume, 0)
 				}
+				itemManifest.Platform.StartParams = ensurePVCNameStartParam(
+					itemManifest.Platform.StartParams,
+					itemManifest.Platform.Volumes,
+				)
 				installFormulas = append(installFormulas, FormulaInstallInfo{
 					Name:        itemManifest.Application.Identifie,
 					Title:       itemManifest.Application.Name,
 					Required:    formulaRequiredMap[itemManifest.Application.Identifie],
 					StartParams: itemManifest.Platform.StartParams,
-					RequirePvc:  ineedPvc,
 					Volumes:     itemManifest.Platform.Volumes,
 				})
 			}
@@ -760,16 +763,30 @@ func (c Formula) UnInstallComplete(ctx *gin.Context) {
 	c.JsonSuccessResponse(ctx)
 }
 
-func manifestRequiresPvc(manifest logic2.Manifest) bool {
-	if manifest.Application.Type == logic2.EnvironmentApp {
-		return true
-	}
-	for _, volume := range manifest.Platform.Volumes {
+func ensurePVCNameStartParam(params []logic2.StartParams, volumes []v1.Volume) []logic2.StartParams {
+	hasPVC := false
+	for _, volume := range volumes {
 		if volume.PersistentVolumeClaim != nil {
-			return true
+			hasPVC = true
+			break
 		}
 	}
-	return false
+	if !hasPVC {
+		return params
+	}
+	for _, param := range params {
+		if strings.EqualFold(strings.TrimSpace(param.Name), "PVC_NAME") {
+			return params
+		}
+	}
+	return append(append([]logic2.StartParams(nil), params...), logic2.StartParams{
+		Name:        "PVC_NAME",
+		Title:       "PVC名称",
+		Required:    true,
+		Type:        "text",
+		ValuesText:  "%PVC_NAME%",
+		Description: "安装时选择的 PVC 名称",
+	})
 }
 
 func marshalFormulaInfoManifest(manifest logic2.Manifest, complete bool) string {

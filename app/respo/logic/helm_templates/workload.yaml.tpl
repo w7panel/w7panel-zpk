@@ -37,6 +37,7 @@ spec:
       labels:
         {{- include "common.selectorLabels" . | nindent 8 }}
         w7.cc/identifie: {{ .Values.app.identify | quote }}
+        w7.cc/group-name: {{ .Release.Name }}
     spec:
       {{- $root := . }}
       {{- $rootCtx := $ }}
@@ -85,7 +86,7 @@ spec:
       serviceAccountName: {{ include "common.serviceAccountName" . }}
       {{- with .Values.affinity }}
       affinity:
-        {{- toYaml . | nindent 8 }}
+        {{- tpl (toYaml .) $rootCtx | nindent 8 }}
       {{- end }}
 
       containers:

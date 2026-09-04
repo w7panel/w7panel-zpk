@@ -16,23 +16,6 @@
 {{- end -}}
 {{- end -}}
 
-{{- define "w7panel.podAnnotations" -}}
-{{- $annotations := dict -}}
-{{- range $key, $value := (.Values.podAnnotations | default dict) -}}
-  {{- $_ := set $annotations $key $value -}}
-{{- end -}}
-{{- range $key, $value := (.Values.annotations | default dict) -}}
-  {{- $_ := set $annotations $key $value -}}
-{{- end -}}
-{{- $sidecarAnnotations := include "w7panel.sidecars.podAnnotations" . | fromYaml | default dict -}}
-{{- range $key, $value := $sidecarAnnotations -}}
-  {{- $_ := set $annotations $key $value -}}
-{{- end -}}
-{{- if $annotations -}}
-{{- toYaml $annotations -}}
-{{- end -}}
-{{- end -}}
-
 {{- define "w7panel.sidecars.mergeHostAliases" -}}
 {{- $root := .root -}}
 {{- $jobOnly := .jobOnly -}}

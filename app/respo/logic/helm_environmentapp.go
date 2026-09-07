@@ -5,14 +5,16 @@ import (
 	"strings"
 
 	logic2 "github.com/w7panel/w7panel-zpk/common/logic"
+	v1 "k8s.io/api/core/v1"
 )
 
 const (
 	environmentStorageVolumeName              = "site-storage"
-	managedCodeInstallShellImage              = "busybox:1.36.1"
+	managedCodeInstallShellImage              = "busybox:stable-uclibc"
 	environmentImageLanguageAnnotation        = "w7.cc/image_language"
 	environmentNginxVhostAnnotation           = "w7.cc/nginx_vhost_template"
 	environmentNginxRestartRevisionAnnotation = "w7.cc/nginx-restart-revision"
+	environmentNginxVhostJobTitle             = "安装环境 NGINX 配置"
 )
 
 // environmentCodeInstallShell is added to the generated chart as an internal
@@ -33,9 +35,7 @@ wget -q -O "$tmp_zip" "$code_package_url"
 unzip -oq "$tmp_zip" -d "$code_install_path"`
 
 // environmentNginxVhostShell writes the rendered site-manager vhost into the
-// same nginx-dir subtree consumed by the embedded w7-sitemanagernginx chart. It is kept
-// as a shell job (like environmentCodeInstallShell) so both lifecycle tasks
-// use the normal Helm shell-job renderer and hook handling.
+// nginx-dir subtree mounted from the embedded w7-sitemanagernginx application.
 const environmentNginxVhostShell = `{{- $rawDomain := toString .Values.DOMAIN_URL -}}
 {{- $domain := replace "https://" "" $rawDomain -}}
 {{- $domain = replace "http://" "" $domain -}}
@@ -92,6 +92,48 @@ func (hc *HelmPack) addEnvironmentAppValues(values map[string]interface{}) error
 			"nginxVhostTemplate": nginxVhostTemplate,
 		},
 	}
+	hc.applyEnvironmentNginxJobVolumeMounts(values)
+	return nil
+}
+
+func (hc *HelmPack) applyEnvironmentNginxJobVolumeMounts(values map[string]interface{}) {
+	volumeMounts := hc.environmentNginxVolumeMounts()
+	if len(volumeMounts) == 0 {
+		return
+	}
+	jobs, ok := values["jobs"].([]map[string]interface{})
+	if !ok {
+		return
+	}
+	for _, job := range jobs {
+		if job["title"] != environmentNginxVhostJobTitle {
+			continue
+		}
+		container, ok := job["container"].(map[string]interface{})
+		if !ok {
+			continue
+		}
+		container["volumeMounts"] = append([]v1.VolumeMount(nil), volumeMounts...)
+	}
+}
+
+func (hc *HelmPack) environmentNginxVolumeMounts() []v1.VolumeMount {
+	for _, child := range hc.SubManifest {
+		identify := strings.ToLower(strings.ReplaceAll(strings.TrimSpace(child.Application.Identifie), "_", "-"))
+		if identify != "w7-sitemanagernginx" {
+			continue
+		}
+		for _, container := range child.Platform.ContainerV2s {
+			if container.IsInitContainer {
+				continue
+			}
+			for _, mount := range container.VolumeMounts {
+				if mount.Name == environmentStorageVolumeName && mount.SubPath == "nginx-dir" {
+					return container.VolumeMounts
+				}
+			}
+		}
+	}
 	return nil
 }
 
@@ -104,10 +146,6 @@ func (hc *HelmPack) environmentAppHelmValuesOptions() helmValuesOptions {
 	// Keep image placeholders dynamic while preserving the storage/runtime
 	// contract already persisted by the environment editor.
 	options.platform = withEnvironmentAppImages(platform)
-	nginxVhostTemplate := ""
-	if value, ok := hc.Manifest.Application.Annotation[environmentNginxVhostAnnotation]; ok {
-		nginxVhostTemplate = strings.TrimSpace(environmentAnnotationString(value))
-	}
 	if strings.TrimSpace(hc.Manifest.Source.Url) != "" {
 		// Keep the legacy installer lifecycle: one pre-install,pre-upgrade
 		// hook with weight -3, rather than separate install/upgrade jobs.
@@ -121,9 +159,13 @@ func (hc *HelmPack) environmentAppHelmValuesOptions() helmValuesOptions {
 			},
 		)
 	}
+	nginxVhostTemplate := ""
+	if value, ok := hc.Manifest.Application.Annotation[environmentNginxVhostAnnotation]; ok {
+		nginxVhostTemplate = strings.TrimSpace(environmentAnnotationString(value))
+	}
 	if nginxVhostTemplate != "" {
 		options.platform.Shells = append(options.platform.Shells, logic2.Shell{
-			Title: "安装环境 Nginx 配置",
+			Title: environmentNginxVhostJobTitle,
 			Type:  "pre-install,pre-upgrade",
 			Image: managedCodeInstallShellImage,
 			Shell: environmentNginxVhostShell,
@@ -145,7 +187,7 @@ func (hc *HelmPack) packEnvironmentApp(rootDir, templatesDir string) error {
 }
 
 // prepareEnvironmentAppSubManifests applies environment-only metadata before
-// the generic sub-chart packer runs. This keeps Nginx knowledge out of the
+// the generic sub-chart packer runs. This keeps NGINX knowledge out of the
 // shared generateSubCharts loop while still making the imported child roll on
 // every Helm upgrade of an environment application.
 func (hc *HelmPack) prepareEnvironmentAppSubManifests() {

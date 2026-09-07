@@ -73,6 +73,7 @@ type helmValuesOptions struct {
 	platform                logic2.Platform
 	workloadAffinity        map[string]interface{}
 	jobAffinity             map[string]interface{}
+	jobPreferredAffinity    map[string]interface{}
 	addValues               func(map[string]interface{}) error
 	shellJobContainerValues func(logic2.Platform, string) map[string]interface{}
 }
@@ -742,6 +743,7 @@ func (hc *HelmPack) defaultHelmValuesOptions() helmValuesOptions {
 		platform:                hc.Manifest.Platform,
 		workloadAffinity:        hc.getSharedStorageWorkloadAffinityValues(),
 		jobAffinity:             hc.getDefaultJobAffinityValues(),
+		jobPreferredAffinity:    hc.getDefaultJobPreferredAffinityValues(),
 		shellJobContainerValues: hc.getShellJobContainerValues,
 	}
 }
@@ -788,6 +790,7 @@ func (hc *HelmPack) generateValuesYaml(rootDir string, options helmValuesOptions
 		"hostUsers":            platform.HostUsers,
 		"affinity":             options.workloadAffinity,
 		"jobAffinity":          options.jobAffinity,
+		"jobPreferredAffinity": options.jobPreferredAffinity,
 		"w7panelSidecars":      sidecarChartReferences(hc.Sidecars),
 	}
 	values["jobs"] = hc.buildJobValues(platform, options.shellJobContainerValues)
@@ -830,7 +833,11 @@ func (hc *HelmPack) getDefaultJobAffinityValues() map[string]interface{} {
 	return podAffinityByGroupName("{{ .Release.Name }}", hc.Manifest.Application.Identifie)
 }
 
-func podAffinityByGroupName(groupName string, identifies ...string) map[string]interface{} {
+func (hc *HelmPack) getDefaultJobPreferredAffinityValues() map[string]interface{} {
+	return preferredPodAffinityByGroupName("{{ .Release.Name }}", hc.Manifest.Application.Identifie)
+}
+
+func podAffinityTermByGroupName(groupName string, identifies ...string) map[string]interface{} {
 	matchExpressions := []interface{}{map[string]interface{}{
 		"key": "w7.cc/group-name", "operator": "In", "values": []string{groupName},
 	}}
@@ -839,10 +846,25 @@ func podAffinityByGroupName(groupName string, identifies ...string) map[string]i
 			"key": "w7.cc/identifie", "operator": "In", "values": []string{identifies[0]},
 		})
 	}
+	return map[string]interface{}{
+		"labelSelector": map[string]interface{}{"matchExpressions": matchExpressions},
+		"topologyKey":   "kubernetes.io/hostname",
+	}
+}
+
+func podAffinityByGroupName(groupName string, identifies ...string) map[string]interface{} {
 	return map[string]interface{}{"podAffinity": map[string]interface{}{
-		"requiredDuringSchedulingIgnoredDuringExecution": []interface{}{map[string]interface{}{
-			"labelSelector": map[string]interface{}{"matchExpressions": matchExpressions},
-			"topologyKey":   "kubernetes.io/hostname",
+		"requiredDuringSchedulingIgnoredDuringExecution": []interface{}{
+			podAffinityTermByGroupName(groupName, identifies...),
+		},
+	}}
+}
+
+func preferredPodAffinityByGroupName(groupName string, identifies ...string) map[string]interface{} {
+	return map[string]interface{}{"podAffinity": map[string]interface{}{
+		"preferredDuringSchedulingIgnoredDuringExecution": []interface{}{map[string]interface{}{
+			"weight":          100,
+			"podAffinityTerm": podAffinityTermByGroupName(groupName, identifies...),
 		}},
 	}}
 }
@@ -1116,7 +1138,7 @@ func (hc *HelmPack) generateMicroAppTemplate(rootDir string, manifest logic2.Man
 		return nil
 	}
 
-	menuConfigValues, backendConfigValues := buildMicroAppValues(manifest.Bindings)
+	menuConfigValues, backendConfigValues := buildMicroAppValues(manifest.Application.Identifie, manifest.Bindings)
 	configMap := map[string]interface{}{
 		"backend_config": backendConfigValues,
 		"bindings":       menuConfigValues,

@@ -31,9 +31,10 @@ spec:
         group: {{ $root.Release.Name }}
         w7.cc/group-name: {{ $root.Release.Name }}
         w7.cc/job-source: appgroup
-      {{- if $root.Values.podAnnotations }}
+      {{- $jobPodAnnotations := omit ($root.Values.podAnnotations | default dict) "sysbox/rootfs-rw-layer" }}
+      {{- if $jobPodAnnotations }}
       annotations:
-        {{- toYaml $root.Values.podAnnotations | nindent 8 }}
+        {{- toYaml $jobPodAnnotations | nindent 8 }}
       {{- end }}
     spec:
       restartPolicy: Never

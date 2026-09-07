@@ -29,7 +29,7 @@ spec:
         group: {{ $root.Release.Name }}
         w7.cc/group-name: {{ $root.Release.Name }}
         w7.cc/job-source: appgroup
-      {{- $podAnnotations := include "w7panel.podAnnotations" $root }}
+      {{- $podAnnotations := include "w7panel.jobPodAnnotations" $root }}
       {{- if $podAnnotations }}
       annotations:
         {{- $podAnnotations | nindent 8 }}
@@ -44,7 +44,11 @@ spec:
         {{- $jobSidecarHostAliases | nindent 8 }}
       {{- end }}
       serviceAccountName: {{ include "common.serviceAccountName" $root }}
-      {{- with $root.Values.jobAffinity }}
+      {{- $jobAffinity := $root.Values.jobAffinity }}
+      {{- if or (contains "pre-install" $job.type) (eq $job.type "post-delete") }}
+        {{- $jobAffinity = $root.Values.jobPreferredAffinity }}
+      {{- end }}
+      {{- with $jobAffinity }}
       affinity:
         {{- tpl (toYaml .) $root | nindent 8 }}
       {{- end }}

@@ -25,9 +25,25 @@ unzip -oq "$tmp_zip" -d "$code_install_path"`
 // environmentPodAffinityValues keeps workloads that use an environment's
 // ReadWriteOnce storage on a node where that environment is running.
 func environmentPodAffinityValues(identify string) map[string]interface{} {
+	releaseName, identify := environmentPodAffinityTarget(identify)
+	if releaseName == "" {
+		return nil
+	}
+	return podAffinityByGroupName(releaseName, identify)
+}
+
+func environmentPodPreferredAffinityValues(identify string) map[string]interface{} {
+	releaseName, identify := environmentPodAffinityTarget(identify)
+	if releaseName == "" {
+		return nil
+	}
+	return preferredPodAffinityByGroupName(releaseName, identify)
+}
+
+func environmentPodAffinityTarget(identify string) (string, string) {
 	identify = strings.ToLower(strings.TrimSpace(strings.ReplaceAll(identify, "_", "-")))
 	if identify == "" {
-		return nil
+		return "", ""
 	}
 	// Traditional applications are installed as a separate Helm release from
 	// the selected environment.  The hidden dependency start parameter carries
@@ -35,7 +51,7 @@ func environmentPodAffinityValues(identify string) map[string]interface{} {
 	// environment instance), so do not match by the artifact identifier.
 	paramName := strings.ToUpper(strings.NewReplacer("-", "_", ".", "_").Replace(identify)) + dependencyReleaseNameSuffix
 	releaseName := fmt.Sprintf(`{{ default %q (index .Values %q) }}`, identify, paramName)
-	return podAffinityByGroupName(releaseName, identify)
+	return releaseName, identify
 }
 
 // withTraditionAppStorageClaimName resolves the empty claimName persisted by
@@ -85,7 +101,6 @@ func (hc *HelmPack) addTraditionAppValues(values map[string]interface{}) error {
 
 	values["tradition"] = map[string]interface{}{
 		"codePackageUrl":       codePackageURL,
-		"affinity":             environmentPodAffinityValues(hc.Manifest.Platform.Tradition.EnvironmentName),
 		"environmentIdentifie": hc.Manifest.Platform.Tradition.EnvironmentName,
 	}
 	return nil
@@ -99,6 +114,7 @@ func (hc *HelmPack) traditionAppHelmValuesOptions() helmValuesOptions {
 	// container and mount its ReadWriteOnce PVC. Schedule them alongside the
 	// environment workload rather than the traditional release itself.
 	options.jobAffinity = environmentPodAffinityValues(hc.Manifest.Platform.Tradition.EnvironmentName)
+	options.jobPreferredAffinity = environmentPodPreferredAffinityValues(hc.Manifest.Platform.Tradition.EnvironmentName)
 	options.addValues = hc.addTraditionAppValues
 	options.shellJobContainerValues = func(logic2.Platform, string) map[string]interface{} {
 		return hc.getTraditionShellJobContainerValues()

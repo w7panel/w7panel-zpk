@@ -75,6 +75,18 @@ instead of special-casing a particular annotation key.
 {{- end -}}
 
 {{/*
+Render annotations for Job pods. Sysbox rootfs persistence belongs to the
+application workload and must not be attached to short-lived Job pods.
+*/}}
+{{- define "w7panel.jobPodAnnotations" -}}
+{{- $annotations := include "w7panel.podAnnotations" . | fromYaml | default dict -}}
+{{- $_ := unset $annotations "sysbox/rootfs-rw-layer" -}}
+{{- if $annotations -}}
+{{- toYaml $annotations -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
 Create the name of the service account to use
 */}}
 {{- define "common.serviceAccountName" -}}

@@ -74,6 +74,34 @@ func RemoteFormulaInfoURL(from, formulaIdentifie string) (string, error) {
 	return parsed.String(), nil
 }
 
+// RemoteFormulaVersionInfoURL returns the versioned formula-info endpoint.
+// An empty version keeps the latest-version endpoint for compatibility.
+func RemoteFormulaVersionInfoURL(from, formulaIdentifie, version string) (string, error) {
+	infoURL, err := RemoteFormulaInfoURL(from, formulaIdentifie)
+	if err != nil {
+		return "", err
+	}
+	version = strings.TrimSpace(version)
+	if version == "" {
+		return infoURL, nil
+	}
+	if version == "." || version == ".." || strings.ContainsAny(version, `/\\`) {
+		return "", fmt.Errorf("制品版本无效: %q", version)
+	}
+	parsed, err := url.Parse(infoURL)
+	if err != nil {
+		return "", fmt.Errorf("解析来源 URL 失败: %w", err)
+	}
+	const infoMarker = "/respo/info/"
+	markerIndex := strings.LastIndex(parsed.Path, infoMarker)
+	if markerIndex < 0 {
+		return "", fmt.Errorf("来源 URL 不是制品信息接口: %s", infoURL)
+	}
+	parsed.Path = parsed.Path[:markerIndex] + "/respo/v2/info/" + formulaIdentifie + "/" + version
+	parsed.RawPath = ""
+	return parsed.String(), nil
+}
+
 // WithCompleteManifest requests the extended info representation without
 // disturbing query parameters (for example order_sn) already present on the
 // endpoint.

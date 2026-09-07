@@ -28,7 +28,11 @@ func ImportRemoteFormulaDependency(
 		return nil, fmt.Errorf("远程依赖标识无效")
 	}
 
-	infoURL, err := zpkservice.RemoteFormulaInfoURL(dependency.From, identifie)
+	infoURL, err := zpkservice.RemoteFormulaVersionInfoURL(
+		dependency.From,
+		identifie,
+		dependency.Version,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -56,7 +60,12 @@ func ImportRemoteFormulaDependency(
 	}
 	imported := make([]*commonlogic.Manifest, 0, len(entries))
 	for _, entry := range entries {
-		manifest, err := importRemoteFormulaManifest(requestCtx, *remoteInfo, entry)
+		manifest, err := importRemoteFormulaManifest(
+			requestCtx,
+			*remoteInfo,
+			entry,
+			strings.TrimRight(strings.TrimSpace(dependency.From), "/"),
+		)
 		if err != nil {
 			return nil, fmt.Errorf("导入远程应用 %s 失败: %w", entry.Application.Identifie, err)
 		}
@@ -106,6 +115,7 @@ func importRemoteFormulaManifest(
 	ctx context.Context,
 	remoteInfo zpkservice.FormulaInfoResp,
 	remoteManifest commonlogic.Manifest,
+	sourceRepository string,
 ) (*commonlogic.Manifest, error) {
 	depot, err := NewDepot()
 	if err != nil {
@@ -128,7 +138,7 @@ func importRemoteFormulaManifest(
 		if helmURL == "" {
 			return nil, fmt.Errorf("制品信息缺少 %s 的 helm_url", identifie)
 		}
-		logicalHelmPath = remoteDependencyStoragePath(identifie+":helm", remoteVersion, ".tgz")
+		logicalHelmPath = remoteDependencyStoragePathForSource(sourceRepository, identifie+":helm", remoteVersion, ".tgz")
 		if err = downloadRemoteDependencyAsset(ctx, depot, helmURL, logicalHelmPath); err != nil {
 			return nil, fmt.Errorf("下载完整 Helm 包失败: %w", err)
 		}
@@ -136,7 +146,7 @@ func importRemoteFormulaManifest(
 	logicalBackendPath := ""
 	backendURL := remoteInfo.ZipURLs[identifie]
 	if backendURL != "" {
-		logicalBackendPath = remoteDependencyStoragePath(identifie+":backend", remoteVersion, ".zip")
+		logicalBackendPath = remoteDependencyStoragePathForSource(sourceRepository, identifie+":backend", remoteVersion, ".zip")
 		if err = downloadRemoteDependencyAsset(ctx, depot, backendURL, logicalBackendPath); err != nil {
 			return nil, fmt.Errorf("下载后端代码包失败: %w", err)
 		}
@@ -144,7 +154,7 @@ func importRemoteFormulaManifest(
 
 	logicalFrontendPaths := make(map[string]string)
 	if frontendURL := remoteInfo.WebZipURL[identifie]; frontendURL != "" {
-		logicalFrontendPath := remoteDependencyStoragePath(identifie+":frontend", remoteVersion, ".zip")
+		logicalFrontendPath := remoteDependencyStoragePathForSource(sourceRepository, identifie+":frontend", remoteVersion, ".zip")
 		if err = downloadRemoteDependencyAsset(ctx, depot, frontendURL, logicalFrontendPath); err != nil {
 			return nil, fmt.Errorf("下载前端代码包 %s 失败: %w", identifie, err)
 		}
@@ -196,8 +206,8 @@ func newImportedRemoteDependencyManifest(
 	return &manifest
 }
 
-func remoteDependencyStoragePath(assetName, version, extension string) string {
-	storageName := function.GetMd5(assetName + ":" + version)
+func remoteDependencyStoragePathForSource(sourceURL, assetName, version, extension string) string {
+	storageName := function.GetMd5(sourceURL + ":" + assetName + ":" + version)
 	return fmt.Sprintf("/Storage/%s/%s%s", time.Now().Format("200601"), storageName, extension)
 }
 

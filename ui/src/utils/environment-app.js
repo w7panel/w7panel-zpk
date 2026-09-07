@@ -1,6 +1,6 @@
 const environmentApp = Object.freeze({
-    nginxDependencyIdentifie: 'w7-sitemanager-nginx',
-    nginxDependencyName: 'w7-sitemanager-nginx',
+    nginxDependencyIdentifie: 'w7-sitemanagernginx',
+    nginxDependencyName: 'w7-sitemanagernginx',
     nginxDependencySource: 'https://zpk.fan.b2.sz.w7.com',
     storageName: 'site-storage',
 });
@@ -32,7 +32,7 @@ function cloneManifest(manifest = {}) {
 }
 
 /**
- * Bind w7-sitemanager-nginx's PVC startup parameter to the environment application's
+ * Bind w7-sitemanagernginx's PVC startup parameter to the environment application's
  * PVC parameter. The imported nginx manifest is returned as a copy so the
  * caller can safely update its child file and editor state together.
  */

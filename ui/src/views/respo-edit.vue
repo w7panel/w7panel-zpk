@@ -22,11 +22,38 @@
                     <div class="zpk-toolbar-left">
                         <a-button @click="dependsIndex = -1;"
                             :type="dependsIndex == -1 ? 'primary' : 'secondary'">主应用</a-button>
-                        <div v-for="(item, index) in depends" :key="item.identifie" style="position:relative;">
-                            <a-button :type="dependsIndex == index ? 'primary' : 'secondary'"
-                                @click="dependsIndex = index; edit({ stop: true })">{{ item.identifie }}</a-button>
-                            <span v-if="!isManagedDependency(item)" @click="delDepend(index)"
-                                class="depend-close c-red fs-20 cursor">×</span>
+                        <div v-for="(item, index) in depends" :key="item.identifie" class="depend-item">
+                            <div class="depend-tab">
+                                <a-button :type="dependsIndex == index ? 'primary' : 'secondary'"
+                                    @click="dependsIndex = index; edit({ stop: true })">{{ item.identifie }}</a-button>
+                                <span v-if="!isManagedDependency(item)" @click="delDepend(index)"
+                                    class="depend-close c-red fs-20 cursor"
+                                    :class="{ 'depend-close-with-update': childUpdates[item.identifie]?.available }">×</span>
+                                <a-popover v-if="childUpdates[item.identifie]?.available" position="bottom"
+                                    trigger="click" :content-style="{ padding: '6px 10px 16px' }">
+                                    <div class="child-update-trigger" @click.stop>
+                                        <icon-exclamation-circle-fill />
+                                        <span>新版本</span>
+                                    </div>
+                                    <template #content>
+                                        <div class="child-update-popover">
+                                            <div class="child-update-title">
+                                                <icon-exclamation-circle-fill />
+                                                <span>新版本</span>
+                                            </div>
+                                            <div class="child-update-description">
+                                                当前子应用有新版发布，可更新至
+                                                {{ childUpdates[item.identifie].latestVersion }}
+                                            </div>
+                                            <div class="child-update-actions">
+                                                <a-button size="small" type="primary"
+                                                    :loading="childUpdateLoading == item.identifie"
+                                                    @click="updateImportedChild(item)">立即更新</a-button>
+                                            </div>
+                                        </div>
+                                    </template>
+                                </a-popover>
+                            </div>
                         </div>
                         <a-button @click="openAddDepend">
                             <template #icon><icon-plus /></template>
@@ -69,8 +96,10 @@ import jsyaml from "js-yaml";
 import { confirm, messageError, messageSuccess } from '@/utils/ui-feedback';
 import {
     childImportRepositoryBaseURL,
+    fetchChildImportListFromSource,
     importChildApplication,
     importedChildFilePath,
+    isChildImportVersionNewer,
     getImportedChildIdentifies,
     saveImportedChildren,
     removeImportedChildren,
@@ -79,7 +108,12 @@ import {
     environmentNginxDependency,
     withEnvironmentNginxPvcDependencySource,
 } from '@/utils/environment-app';
-import { IconArrowLeft, IconDownload, IconPlus } from '@arco-design/web-vue/es/icon';
+import {
+    IconArrowLeft,
+    IconDownload,
+    IconExclamationCircleFill,
+    IconPlus,
+} from '@arco-design/web-vue/es/icon';
 const defaultManifest = `application:
     name: ''
     identifie: ''
@@ -95,7 +129,14 @@ platform:
 `;
 
 export default {
-    components: { filesManifest, dependPicker, IconArrowLeft, IconDownload, IconPlus },
+    components: {
+        filesManifest,
+        dependPicker,
+        IconArrowLeft,
+        IconDownload,
+        IconExclamationCircleFill,
+        IconPlus,
+    },
     data() {
         return {
             identifie: '',
@@ -118,6 +159,9 @@ export default {
                 show: false,
                 importing: false,
             },
+            childUpdates: {},
+            childUpdateLoading: '',
+            childUpdateCheckToken: 0,
 
             app_ports: [],
 
@@ -132,6 +176,7 @@ export default {
         this.getManifest();
     },
     beforeUnmount() {
+        this.childUpdateCheckToken++;
         window.removeEventListener('message', this.winMessage);
     },
     watch: {
@@ -414,6 +459,95 @@ export default {
                 this.importPicker.importing = false;
             }
         },
+        getImportedChildVersion(item) {
+            if (item?.version) { return String(item.version); }
+            try {
+                const manifest = jsyaml.load(item?.manifest || '') || {};
+                return String(manifest?.application?.version || '');
+            } catch {
+                return '';
+            }
+        },
+        async checkImportedChildUpdates() {
+            const checkToken = ++this.childUpdateCheckToken;
+            const dependencies = this.depends.filter(item => String(item?.from || '').trim());
+            this.childUpdates = {};
+            if (!dependencies.length) { return; }
+            const groups = new Map();
+            dependencies.forEach(item => {
+                const source = String(item.from).trim();
+                if (!groups.has(source)) { groups.set(source, []); }
+                groups.get(source).push(item);
+            });
+            const updates = {};
+            await Promise.all([...groups.entries()].map(async ([source, items]) => {
+                try {
+                    const list = await fetchChildImportListFromSource(myAxios, source, {
+                        page: 1,
+                        limit: 999,
+                    });
+                    const latestByIdentifie = new Map(list.map(record => [record.identifie, record]));
+                    items.forEach(item => {
+                        const record = latestByIdentifie.get(item.identifie);
+                        const latestVersion = String(record?.version?.name || '');
+                        const currentVersion = this.getImportedChildVersion(item);
+                        if (isChildImportVersionNewer(latestVersion, currentVersion)) {
+                            updates[item.identifie] = { available: true, latestVersion };
+                        }
+                    });
+                } catch {
+                    // 更新检测失败不影响 manifest 编辑。
+                }
+            }));
+            if (checkToken === this.childUpdateCheckToken) {
+                this.childUpdates = updates;
+            }
+        },
+        async updateImportedChild(item) {
+            const update = this.childUpdates[item?.identifie];
+            if (!item?.from || !update?.available || this.childUpdateLoading) { return; }
+            const dependency = {
+                identifie: item.identifie,
+                name: item.name || item.identifie,
+                subidentifie: '',
+                subname: '',
+                required: item.required ?? true,
+                type: 'in',
+                from: item.from,
+                version: update.latestVersion,
+            };
+            this.childUpdateLoading = item.identifie;
+            try {
+                const entries = await importChildApplication(myAxios, { dependency });
+                const rootEntry = entries.find(entry => entry?.identifie == item.identifie);
+                if (!rootEntry) {
+                    throw new Error(`导入结果中缺少 ${item.identifie} 子应用 manifest`);
+                }
+                if (item.identifie == environmentNginxDependency.identifie) {
+                    this.prepareEnvironmentNginxEntry(rootEntry);
+                }
+                const result = await saveImportedChildren(myAxios, {
+                    rootRef: this.$refs.form,
+                    rootIdentifie: this.identifie,
+                    versionId: this.version_id,
+                    entries,
+                    sourceDependency: dependency,
+                    existingDependencies: this.depends,
+                    existingManifests: this.list,
+                    replaceExisting: true,
+                });
+                this.applyImportedChildrenResult(result);
+                if (item.identifie == environmentNginxDependency.identifie) {
+                    await this.persistEnvironmentManifest();
+                }
+                await this.checkImportedChildUpdates();
+                messageSuccess(`子应用已更新到 ${update.latestVersion}`);
+            } catch (error) {
+                messageError(error?.response?.data?.error || error?.message || '更新子应用失败');
+            } finally {
+                this.childUpdateLoading = '';
+            }
+        },
         applyImportedChildrenResult({ imported = [], dependencies = [], rootManifest = '' } = {}) {
             if (this.$refs.form?.form?.type != 'environment') {
                 this.manifest = rootManifest;
@@ -425,11 +559,18 @@ export default {
                 if (!this.tree.some(item => item.label === file)) {
                     this.tree.push({ label: file });
                 }
-                this.depends.push({
+                const nextDependency = {
+                    ...(this.depends.find(item => item.identifie === entry.identifie) || {}),
                     ...dependencies[index],
                     manifest: entry.manifest,
                     title: file,
-                });
+                };
+                const existingIndex = this.depends.findIndex(item => item.identifie === entry.identifie);
+                if (existingIndex >= 0) {
+                    this.depends.splice(existingIndex, 1, nextDependency);
+                } else {
+                    this.depends.push(nextDependency);
+                }
             });
             // Keep the editor on the main application after importing child
             // manifests; the user can switch to a child explicitly.
@@ -521,6 +662,7 @@ export default {
                     this.depends = depends;
                 }
                 this.updateAppPorts();
+                this.checkImportedChildUpdates();
             }).finally(() => {
                 this.deleteLoading = false;
             });
@@ -687,6 +829,53 @@ export default {
     padding: 20px 20px 0;
 }
 
+.depend-item,
+.depend-tab {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+}
+
+.child-update-trigger,
+.child-update-title {
+    display: inline-flex;
+    align-items: center;
+    color: rgb(var(--red-7));
+}
+
+.child-update-trigger {
+    position: absolute;
+    top: -12px;
+    right: -18px;
+    z-index: 2;
+    gap: 2px;
+    padding: 0 3px;
+    font-size: 12px;
+    line-height: 18px;
+    white-space: nowrap;
+    background: #fff;
+    border-radius: 9px;
+    cursor: pointer;
+}
+
+.child-update-title {
+    gap: 4px;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.child-update-description {
+    margin-top: 10px;
+    color: rgba(0, 0, 0, 0.6);
+    text-align: center;
+}
+
+.child-update-actions {
+    display: flex;
+    justify-content: center;
+    margin-top: 10px;
+}
+
 .depend-close {
     position: absolute;
     top: -10px;
@@ -699,6 +888,11 @@ export default {
     line-height: 1;
     background: #fff;
     border-radius: 50%;
+}
+
+.depend-close-with-update {
+    right: auto;
+    left: -10px;
 }
 
 .manifest-empty {

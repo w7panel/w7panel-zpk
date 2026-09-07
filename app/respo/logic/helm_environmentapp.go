@@ -33,7 +33,7 @@ wget -q -O "$tmp_zip" "$code_package_url"
 unzip -oq "$tmp_zip" -d "$code_install_path"`
 
 // environmentNginxVhostShell writes the rendered site-manager vhost into the
-// same nginx-dir subtree consumed by the embedded w7-sitemanager-nginx chart. It is kept
+// same nginx-dir subtree consumed by the embedded w7-sitemanagernginx chart. It is kept
 // as a shell job (like environmentCodeInstallShell) so both lifecycle tasks
 // use the normal Helm shell-job renderer and hook handling.
 const environmentNginxVhostShell = `{{- $rawDomain := toString .Values.DOMAIN_URL -}}
@@ -155,7 +155,7 @@ func (hc *HelmPack) prepareEnvironmentAppSubManifests() {
 }
 
 // withEnvironmentNginxRestartAnnotation adds an upgrade marker only to the
-// imported w7-sitemanager-nginx child application. The child chart renders application
+// imported w7-sitemanagernginx child application. The child chart renders application
 // annotations into its Pod template, so changing the Helm release revision
 // causes that workload to roll by default.
 func withEnvironmentNginxRestartAnnotation(parent, child logic2.Manifest) logic2.Manifest {
@@ -163,7 +163,7 @@ func withEnvironmentNginxRestartAnnotation(parent, child logic2.Manifest) logic2
 		return child
 	}
 	identify := strings.ToLower(strings.ReplaceAll(strings.TrimSpace(child.Application.Identifie), "_", "-"))
-	if identify != "w7-sitemanager-nginx" {
+	if identify != "w7-sitemanagernginx" {
 		return child
 	}
 	annotations := make(map[string]interface{}, len(child.Application.Annotation)+1)

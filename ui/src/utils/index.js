@@ -100,7 +100,8 @@ function setRequestHeader(headers, name, value) {
 }
 
 myAxios.interceptors.request.use(config => {
-    if (isOfficialZpkRequest(config) || config._skipZpkTokenRefresh || isZpkLoginRequest(config)) {
+    if (isOfficialZpkRequest(config) || config._skipZpkAuth
+        || config._skipZpkTokenRefresh || isZpkLoginRequest(config)) {
         removeZpkAuthHeaders(config.headers);
         return config;
     }

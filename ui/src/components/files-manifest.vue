@@ -47,196 +47,6 @@
                                         <a-radio value="gateway-plugin">网关插件</a-radio>
                                     </a-radio-group>
 
-                                    <div v-if="form.type == 'gateway-plugin'" class="greybox mt-20"
-                                        style="margin-bottom:0;">
-                                        <div class="greybox-title">网关插件配置</div>
-                                        <a-form-item label="插件分类" field="gatewayPluginCategory"
-                                            style="margin-bottom:18px;">
-                                            <a-select v-model="form.gatewayPluginCategory" style="width:240px;"
-                                                @change="changeForm">
-                                                <a-option v-for="item in gatewayPluginCategoryOptions" :key="item.value"
-                                                    :value="item.value">{{ item.label }}</a-option>
-                                            </a-select>
-                                        </a-form-item>
-                                        <a-form-item label="运行时驱动" field="gatewayPluginDriver"
-                                            style="margin-bottom:18px;">
-                                            <a-select v-model="form.gatewayPluginDriver" style="width:240px;"
-                                                @change="changeForm">
-                                                <a-option value="higress-wasm/v1">Higress Wasm</a-option>
-                                            </a-select>
-                                        </a-form-item>
-                                        <a-form-item label="镜像地址" field="gatewayPluginUrl"
-                                            style="margin-bottom:18px;">
-                                            <a-input v-model="form.gatewayPluginUrl" size="large" style="width:500px;"
-                                                placeholder="oci://... 或 http(s)://..." @change="changeForm" />
-                                        </a-form-item>
-                                        <a-form-item label="执行阶段" field="gatewayPluginPhase"
-                                            style="margin-bottom:18px;">
-                                            <a-select v-model="form.gatewayPluginPhase" style="width:240px;"
-                                                @change="changeForm">
-                                                <a-option value="UNSPECIFIED_PHASE">默认阶段</a-option>
-                                                <a-option value="AUTHN">认证阶段</a-option>
-                                                <a-option value="AUTHZ">鉴权阶段</a-option>
-                                                <a-option value="STATS">统计阶段</a-option>
-                                            </a-select>
-                                        </a-form-item>
-                                        <a-form-item label="优先级" field="gatewayPluginPriority"
-                                            style="margin-bottom:18px;">
-                                            <div class="df df-c">
-                                                <a-input-number v-model="form.gatewayPluginPriority" :min="0" :max="1000"
-                                                    style="width:240px;" @change="changeForm" />
-                                                <span class="c-99 mt-6">同一执行阶段按优先级降序执行，数值越大越先执行；默认值为 0。</span>
-                                            </div>
-                                        </a-form-item>
-                                        <a-form-item label="支持范围" style="margin-bottom:18px;">
-                                            <div class="df df-c">
-                                                <div>
-                                                    <a-checkbox v-model="form.gatewayPluginSupportGlobal"
-                                                        @change="changeForm">支持全局配置</a-checkbox>
-                                                    <a-checkbox v-model="form.gatewayPluginSupportRule" class="ml-20"
-                                                        @change="changeForm">支持规则配置</a-checkbox>
-                                                </div>
-                                                <span class="c-99 mt-6">全局配置默认开启；规则配置会显示在应用域名管理的“更多”中。</span>
-                                            </div>
-                                        </a-form-item>
-                                        <a-form-item label="全局默认启用" style="margin-bottom:18px;">
-                                            <div class="df df-c">
-                                                <div>
-                                                    <a-switch v-model="form.gatewayPluginDefaultEnabled"
-                                                        :disabled="!form.gatewayPluginSupportGlobal" @change="changeForm" />
-                                                </div>
-                                                <span class="c-99 mt-6">仅作用于全局配置；关闭后可先完善配置，再到网关插件列表手动启用。</span>
-                                            </div>
-                                        </a-form-item>
-                                        <a-form-item label="默认配置" style="margin-bottom:0;">
-                                            <div class="df df-c">
-                                                <a-textarea v-model="form.gatewayPluginDefaultConfig" :rows="8"
-                                                    :spellcheck="false" placeholder="请输入 JSON 配置，默认为 {}"
-                                                    style="width:500px;" @change="changeForm" />
-                                                <span class="c-99 mt-6">请提供不含真实密钥的初始 JSON；安装后用户仍可在网关插件列表中修改。</span>
-                                            </div>
-                                        </a-form-item>
-                                    </div>
-
-                                    <a-spin v-if="form.type == 'environment'" :loading="formulaSettingLoading"
-                                        class="environment-config-spin">
-                                        <a-alert type="info" show-icon class="zpk-primary-alert mt-20 mb-20"
-                                            title="说明" :closable="false">
-                                            <div class="registry-alert-item">1. 运行环境会作为独立应用安装，同时保存为站点可选的运行环境模板；运行方式固定为 Deployment。</div>
-                                            <div class="registry-alert-item mt-6">2. 新建或升级站点并选择此运行环境时，系统会根据模板准备站点需要的运行环境。这里的修改只会用于之后新建的环境，已创建的环境不会自动更新。</div>
-                                            <div class="registry-alert-item mt-6">3. 独立安装时通过“环境版本”启动参数替换运行容器镜像中的 {version}；创建站点环境时也会使用同一模板。</div>
-                                            <div class="registry-alert-item mt-6">4. 环境容器的启动命令可在页面下方“启动命令”中配置。</div>
-                                            <div class="registry-alert-item mt-6">5. 页面下方“脚本配置”中的安装、升级脚本只在安装或升级此制品时执行，站点管理新建环境时不会再次执行。</div>
-                                            <div class="registry-alert-item mt-6">6. 环境准备完成后，系统会使用 NGINX 模板配置站点并完成绑定。</div>
-                                        </a-alert>
-                                        <div class="greybox" style="margin-bottom:0;">
-                                            <div class="greybox-title">运行环境配置</div>
-                                            <a-form-item label="环境语言" field="environmentImageLanguage" required
-                                                style="margin-bottom:18px;">
-                                                <a-select v-model="form.environmentImageLanguage" size="large"
-                                                    style="width:500px;" placeholder="请选择环境语言" allow-search
-                                                    @change="changeEnvironmentLanguage">
-                                                    <a-option v-for="option in environmentLanguageOptions"
-                                                        :key="option.value" :value="option.value"
-                                                        :label="option.label">
-                                                        {{ option.label }}
-                                                    </a-option>
-                                                </a-select>
-                                            </a-form-item>
-                                            <a-form-item label="镜像地址" field="environmentImageTemplate" required
-                                                style="margin-bottom:18px;">
-                                                <div class="df df-c">
-                                                    <a-input v-model="form.environmentImageTemplate" size="large"
-                                                        style="width:500px;" placeholder="例如 php:{version}-fpm-alpine"
-                                                        @change="syncEnvironmentRuntimeConfig" />
-                                                    <span class="c-99 mt-6">使用 {version} 作为运行环境版本占位符。</span>
-                                                </div>
-                                            </a-form-item>
-                                            <a-form-item label="环境版本" field="environmentImageVersion" required
-                                                style="margin-bottom:18px;">
-                                                <div class="df df-c">
-                                                    <a-input-tag v-model="form.environmentImageVersion" size="large"
-                                                        style="width:500px;" placeholder="输入版本后按回车，例如 8.1"
-                                                        allow-clear unique-value @change="syncEnvironmentVersionConfig" />
-                                                    <span class="c-99 mt-6">每次输入一个语言版本并按回车，可添加多个版本，例如 7.4、8.1。</span>
-                                                </div>
-                                            </a-form-item>
-                                            <a-form-item label="系统重启还原" style="margin-bottom:18px;">
-                                                <div class="df df-c" style="align-items:flex-start;">
-                                                    <a-switch v-model="form.environmentSystemRebootRestore"
-                                                        @change="syncEnvironmentRuntimeConfig" />
-                                                    <span class="c-99 mt-6">关闭后使用持久存储保留容器系统层。</span>
-                                                </div>
-                                            </a-form-item>
-                                            <a-form-item v-if="option?.edit" label="附加 NGINX 网关"
-                                                style="margin-bottom:18px;">
-                                                <div class="df df-c" style="align-items:flex-start;">
-                                                    <a-switch v-model="form.environmentNginxGateway"
-                                                        :disabled="environmentNginxGatewayChanging"
-                                                        @change="toggleEnvironmentNginxGateway" />
-                                                    <span class="c-99 mt-6">开启后会自动导入 NGINX 及其子应用；关闭时会删除已导入的 NGINX 子应用。</span>
-                                                </div>
-                                            </a-form-item>
-                                            <a-form-item v-if="form.environmentNginxGateway" label="NGINX 模板"
-                                                field="environmentNginxVhostTemplate"
-                                                style="margin-bottom:0;">
-                                                <div class="nginx-template-field">
-                                                    <div class="nginx-template-input">
-                                                        <a-textarea v-model="form.environmentNginxVhostTemplate"
-                                                            class="nginx-template-textarea"
-                                                            :auto-size="{minRows:10, maxRows:20}"
-                                                            :spellcheck="false" placeholder="请输入 NGINX vhost 模板"
-                                                            style="width:500px;" />
-                                                        <a-button size="mini" type="text"
-                                                            class="nginx-template-example-entry"
-                                                            @click="nginxTemplateExampleVisible = true">
-                                                            查看完整示例
-                                                        </a-button>
-                                                    </div>
-                                                    <span class="c-99 mt-6">用于为使用此运行环境的站点生成访问配置。</span>
-                                                </div>
-                                            </a-form-item>
-                                        </div>
-                                    </a-spin>
-
-                                    <a-alert v-if="form.type == 'system-image'" type="info" show-icon
-                                        class="zpk-primary-alert mt-20 mb-20" title="系统镜像说明"
-                                        :closable="false">
-                                        <div class="registry-alert-item">1. 系统镜像用于创建具备完整系统环境的轻量虚拟机，可以像普通主机一样运行系统服务。</div>
-                                        <div class="registry-alert-item mt-6">2. 底层系统数据会持久保存，实例重启后已安装的软件、系统配置和用户数据不会丢失。</div>
-                                    </a-alert>
-                                    <div v-if="form.type == 'system-image'" class="greybox"
-                                        style="margin-bottom:0;">
-                                        <div class="greybox-title">系统镜像配置</div>
-                                        <a-form-item label="分类" field="systemImageCategory" required
-                                            style="margin-bottom:18px;">
-                                            <a-select v-model="form.systemImageCategory" size="large"
-                                                style="width:500px;" @change="changeForm">
-                                                <a-option value="operating-system">操作系统</a-option>
-                                                <a-option value="site-management">建站管理</a-option>
-                                                <a-option value="enterprise-app">企业应用</a-option>
-                                            </a-select>
-                                        </a-form-item>
-                                        <a-form-item label="镜像地址" field="systemImageTemplate" required
-                                            style="margin-bottom:18px;">
-                                            <div class="df df-c">
-                                                <a-input v-model="form.systemImageTemplate" size="large"
-                                                    style="width:500px;" placeholder="例如 ubuntu:{version}"
-                                                    @change="syncSystemImageConfig" />
-                                                <span class="c-99 mt-6">使用 {version} 作为安装时所选系统版本的占位符。</span>
-                                            </div>
-                                        </a-form-item>
-                                        <a-form-item label="系统版本" field="systemImageVersions" required
-                                            style="margin-bottom:0;">
-                                            <div class="df df-c">
-                                                <a-input-tag v-model="form.systemImageVersions" size="large"
-                                                    style="width:500px;" placeholder="输入版本后按回车，例如 22.04"
-                                                    allow-clear unique-value @change="syncSystemImageConfig" />
-                                                <span class="c-99 mt-6">安装时用户从这里配置的版本中选择，所选版本会替换镜像地址中的 {version}。</span>
-                                            </div>
-                                        </a-form-item>
-                                    </div>
-
                                     <a-form-item v-if="form.type == 'helm'" class="mt-20" style="margin-bottom:10px;"
                                         label="启用helm配置">
                                         <a-switch v-model="form.helm.useHelm" @change="changeForm"></a-switch>
@@ -355,6 +165,198 @@
                                         </div>
                                     </div>
                                 </div>
+                            </a-form-item>
+
+                            <a-form-item v-if="form.type == 'gateway-plugin'" label="网关插件配置">
+                                <div class="greybox" style="margin-bottom:0;">
+                                    <a-form-item label="插件分类" field="gatewayPluginCategory"
+                                        style="margin-bottom:18px;">
+                                        <a-select v-model="form.gatewayPluginCategory" style="width:240px;"
+                                            @change="changeForm">
+                                            <a-option v-for="item in gatewayPluginCategoryOptions" :key="item.value"
+                                                :value="item.value">{{ item.label }}</a-option>
+                                        </a-select>
+                                    </a-form-item>
+                                    <a-form-item label="运行时驱动" field="gatewayPluginDriver"
+                                        style="margin-bottom:18px;">
+                                        <a-select v-model="form.gatewayPluginDriver" style="width:240px;"
+                                            @change="changeForm">
+                                            <a-option value="higress-wasm/v1">Higress Wasm</a-option>
+                                        </a-select>
+                                    </a-form-item>
+                                    <a-form-item label="镜像地址" field="gatewayPluginUrl"
+                                        style="margin-bottom:18px;">
+                                        <a-input v-model="form.gatewayPluginUrl" size="large" style="width:500px;"
+                                            placeholder="oci://... 或 http(s)://..." @change="changeForm" />
+                                    </a-form-item>
+                                    <a-form-item label="执行阶段" field="gatewayPluginPhase"
+                                        style="margin-bottom:18px;">
+                                        <a-select v-model="form.gatewayPluginPhase" style="width:240px;"
+                                            @change="changeForm">
+                                            <a-option value="UNSPECIFIED_PHASE">默认阶段</a-option>
+                                            <a-option value="AUTHN">认证阶段</a-option>
+                                            <a-option value="AUTHZ">鉴权阶段</a-option>
+                                            <a-option value="STATS">统计阶段</a-option>
+                                        </a-select>
+                                    </a-form-item>
+                                    <a-form-item label="优先级" field="gatewayPluginPriority"
+                                        style="margin-bottom:18px;">
+                                        <div class="df df-c">
+                                            <a-input-number v-model="form.gatewayPluginPriority" :min="0" :max="1000"
+                                                style="width:240px;" @change="changeForm" />
+                                            <span class="c-99 mt-6">同一执行阶段按优先级降序执行，数值越大越先执行；默认值为 0。</span>
+                                        </div>
+                                    </a-form-item>
+                                    <a-form-item label="支持范围" style="margin-bottom:18px;">
+                                        <div class="df df-c">
+                                            <div>
+                                                <a-checkbox v-model="form.gatewayPluginSupportGlobal"
+                                                    @change="changeForm">支持全局配置</a-checkbox>
+                                                <a-checkbox v-model="form.gatewayPluginSupportRule" class="ml-20"
+                                                    @change="changeForm">支持规则配置</a-checkbox>
+                                            </div>
+                                            <span class="c-99 mt-6">全局配置默认开启；规则配置会显示在应用域名管理的“更多”中。</span>
+                                        </div>
+                                    </a-form-item>
+                                    <a-form-item label="全局默认启用" style="margin-bottom:18px;">
+                                        <div class="df df-c">
+                                            <div>
+                                                <a-switch v-model="form.gatewayPluginDefaultEnabled"
+                                                    :disabled="!form.gatewayPluginSupportGlobal" @change="changeForm" />
+                                            </div>
+                                            <span class="c-99 mt-6">仅作用于全局配置；关闭后可先完善配置，再到网关插件列表手动启用。</span>
+                                        </div>
+                                    </a-form-item>
+                                    <a-form-item label="默认配置" style="margin-bottom:0;">
+                                        <div class="df df-c">
+                                            <a-textarea v-model="form.gatewayPluginDefaultConfig" :rows="8"
+                                                :spellcheck="false" placeholder="请输入 JSON 配置，默认为 {}"
+                                                style="width:500px;" @change="changeForm" />
+                                            <span class="c-99 mt-6">请提供不含真实密钥的初始 JSON；安装后用户仍可在网关插件列表中修改。</span>
+                                        </div>
+                                    </a-form-item>
+                                </div>
+                            </a-form-item>
+
+                            <a-alert v-if="form.type == 'system-image'" type="info" show-icon
+                                class="zpk-primary-alert mt-16 mb-20" title="系统镜像说明"
+                                :closable="false">
+                                <div class="registry-alert-item">1. 系统镜像用于创建具备完整系统环境的轻量虚拟机，可以像普通主机一样运行系统服务。</div>
+                                <div class="registry-alert-item mt-6">2. 底层系统数据会持久保存，实例重启后已安装的软件、系统配置和用户数据不会丢失。</div>
+                            </a-alert>
+
+                            <a-form-item v-if="form.type == 'system-image'" label="系统镜像配置">
+                                <div class="greybox" style="margin-bottom:0;">
+                                    <a-form-item label="分类" field="systemImageCategory" required
+                                        style="margin-bottom:18px;">
+                                        <a-select v-model="form.systemImageCategory" size="large"
+                                            style="width:500px;" @change="changeForm">
+                                            <a-option value="operating-system">操作系统</a-option>
+                                            <a-option value="site-management">建站管理</a-option>
+                                            <a-option value="enterprise-app">企业应用</a-option>
+                                        </a-select>
+                                    </a-form-item>
+                                    <a-form-item label="镜像地址" field="systemImageTemplate" required
+                                        style="margin-bottom:18px;">
+                                        <div class="df df-c">
+                                            <a-input v-model="form.systemImageTemplate" size="large"
+                                                style="width:500px;" placeholder="例如 ubuntu:{version}"
+                                                @change="syncSystemImageConfig" />
+                                            <span class="c-99 mt-6">使用 {version} 作为安装时所选系统版本的占位符。</span>
+                                        </div>
+                                    </a-form-item>
+                                    <a-form-item label="系统版本" field="systemImageVersions" required
+                                        style="margin-bottom:0;">
+                                        <div class="df df-c">
+                                            <a-input-tag v-model="form.systemImageVersions" size="large"
+                                                style="width:500px;" placeholder="输入版本后按回车，例如 22.04"
+                                                allow-clear unique-value @change="syncSystemImageConfig" />
+                                            <span class="c-99 mt-6">安装时用户从这里配置的版本中选择，所选版本会替换镜像地址中的 {version}。</span>
+                                        </div>
+                                    </a-form-item>
+                                </div>
+                            </a-form-item>
+
+                            <a-alert v-if="form.type == 'environment'" type="info" show-icon
+                                class="zpk-primary-alert mt-16 mb-20" title="说明" :closable="false">
+                                <div class="registry-alert-item">1. 运行环境会作为独立应用安装，同时保存为站点可选的运行环境模板；运行方式固定为 Deployment。</div>
+                                <div class="registry-alert-item mt-6">2. 新建或升级站点并选择此运行环境时，系统会根据模板准备站点需要的运行环境。这里的修改只会用于之后新建的环境，已创建的环境不会自动更新。</div>
+                                <div class="registry-alert-item mt-6">3. 独立安装时通过“环境版本”启动参数替换运行容器镜像中的 {version}；创建站点环境时也会使用同一模板。</div>
+                                <div class="registry-alert-item mt-6">4. 环境容器的启动命令可在页面下方“启动命令”中配置。</div>
+                                <div class="registry-alert-item mt-6">5. 页面下方“脚本配置”中的安装、升级脚本只在安装或升级此制品时执行，站点管理新建环境时不会再次执行。</div>
+                                <div class="registry-alert-item mt-6">6. 环境准备完成后，系统会使用 NGINX 模板配置站点并完成绑定。</div>
+                            </a-alert>
+
+                            <a-form-item v-if="form.type == 'environment'" label="运行环境配置"
+                                class="environment-config-item">
+                                <a-spin :loading="formulaSettingLoading" class="environment-config-spin">
+                                    <div class="greybox" style="margin-bottom:0;">
+                                        <a-form-item label="环境语言" field="environmentImageLanguage" required
+                                            style="margin-bottom:18px;">
+                                            <a-select v-model="form.environmentImageLanguage" size="large"
+                                                style="width:500px;" placeholder="请选择环境语言" allow-search
+                                                @change="changeEnvironmentLanguage">
+                                                <a-option v-for="option in environmentLanguageOptions"
+                                                    :key="option.value" :value="option.value" :label="option.label">
+                                                    {{ option.label }}
+                                                </a-option>
+                                            </a-select>
+                                        </a-form-item>
+                                        <a-form-item label="镜像地址" field="environmentImageTemplate" required
+                                            style="margin-bottom:18px;">
+                                            <div class="df df-c">
+                                                <a-input v-model="form.environmentImageTemplate" size="large"
+                                                    style="width:500px;" placeholder="例如 php:{version}-fpm-alpine"
+                                                    @change="syncEnvironmentRuntimeConfig" />
+                                                <span class="c-99 mt-6">使用 {version} 作为运行环境版本占位符。</span>
+                                            </div>
+                                        </a-form-item>
+                                        <a-form-item label="环境版本" field="environmentImageVersion" required
+                                            style="margin-bottom:18px;">
+                                            <div class="df df-c">
+                                                <a-input-tag v-model="form.environmentImageVersion" size="large"
+                                                    style="width:500px;" placeholder="输入版本后按回车，例如 8.1"
+                                                    allow-clear unique-value @change="syncEnvironmentVersionConfig" />
+                                                <span class="c-99 mt-6">每次输入一个语言版本并按回车，可添加多个版本，例如 7.4、8.1。</span>
+                                            </div>
+                                        </a-form-item>
+                                        <a-form-item label="系统重启还原" style="margin-bottom:18px;">
+                                            <div class="df df-c" style="align-items:flex-start;">
+                                                <a-switch v-model="form.environmentSystemRebootRestore"
+                                                    @change="syncEnvironmentRuntimeConfig" />
+                                                <span class="c-99 mt-6">关闭后使用持久存储保留容器系统层。</span>
+                                            </div>
+                                        </a-form-item>
+                                        <a-form-item v-if="option?.edit" label="NGINX 网关"
+                                            style="margin-bottom:18px;">
+                                            <div class="df df-c" style="align-items:flex-start;">
+                                                <a-switch v-model="form.environmentNginxGateway"
+                                                    :disabled="environmentNginxGatewayChanging"
+                                                    @change="toggleEnvironmentNginxGateway" />
+                                                <span class="c-99 mt-6">开启后安装时会将 NGINX 服务作为对外网关，用于转发请求至后端服务。</span>
+                                                <span class="c-99 mt-6">常用于 PHP-FPM FastCGI 等无法直接提供 HTTP 服务的场景；若后端可直接提供 HTTP 服务，则无需启用。</span>
+                                            </div>
+                                        </a-form-item>
+                                        <a-form-item v-if="form.environmentNginxGateway" label="NGINX 模板"
+                                            field="environmentNginxVhostTemplate" style="margin-bottom:0;">
+                                            <div class="nginx-template-field">
+                                                <div class="nginx-template-input">
+                                                    <a-textarea v-model="form.environmentNginxVhostTemplate"
+                                                        class="nginx-template-textarea"
+                                                        :auto-size="{minRows:10, maxRows:20}"
+                                                        :spellcheck="false" placeholder="请输入 NGINX vhost 模板"
+                                                        style="width:500px;" />
+                                                    <a-button size="mini" type="text"
+                                                        class="nginx-template-example-entry"
+                                                        @click="nginxTemplateExampleVisible = true">
+                                                        查看完整示例
+                                                    </a-button>
+                                                </div>
+                                                <span class="c-99 mt-6">用于为使用此运行环境的站点生成访问配置。</span>
+                                            </div>
+                                        </a-form-item>
+                                    </div>
+                                </a-spin>
                             </a-form-item>
 
                             <a-form-item v-if="form.type == 'tradition'" label="环境类型">
@@ -804,7 +806,6 @@ import { confirm, messageError, messageSuccess, messageWarning } from '@/utils/u
 import emitWujieEvent from '@/utils/wujie-event';
 
 const environmentAnnotationKeys = {
-    parent: 'w7.cc/parent',
     imageLanguage: 'w7.cc/image_language',
     imageTemplate: 'w7.cc/image_template',
     imageVersion: 'w7.cc/image_version',
@@ -1502,9 +1503,9 @@ export default {
                 });
             };
             confirm({
-                title: enabled ? '附加 NGINX 网关' : '关闭 NGINX 网关',
+                title: enabled ? '开启 NGINX 网关' : '关闭 NGINX 网关',
                 content: enabled
-                    ? '将从 https://zpk.fan.b2.sz.w7.com/zpk/respo/info/w7-sitemanager-nginx 自动导入 NGINX 及其子应用，是否继续？'
+                    ? '将从 https://zpk.fan.b2.sz.w7.com/zpk/respo/info/w7-sitemanagernginx 自动导入 NGINX 及其子应用，是否继续？'
                     : '关闭后会自动删除 NGINX 及其已导入的子应用，是否继续？',
                 confirmButtonText: enabled ? '导入并开启' : '删除并关闭',
                 cancelButtonText: '取消',
@@ -1827,17 +1828,6 @@ export default {
                 .map(item => item.trim())
                 .filter(Boolean))];
         },
-        getEnvironmentParentIdentifie() {
-            // AppGroup parent follows the complete application identifier
-            // (author-identifie), rather than a fixed environment name.
-            const currentIdentifie = this.form.author && this.form.identifie
-                ? `${this.form.author}-${this.form.identifie}`
-                : (this.json?.application?.identifie || this.form.identifie || this.identifie || '');
-            return String(currentIdentifie)
-                .trim()
-                .replaceAll('_', '-')
-                .toLowerCase();
-        },
         changeEnvironmentLanguage(value) {
             this.form.environmentSystemRebootRestore = String(value || '').toLowerCase() != 'php';
         },
@@ -1845,7 +1835,6 @@ export default {
             let versions = this.normalizeEnvironmentVersions(this.form.environmentImageVersion);
             this.form.environmentImageVersion = versions;
             const annotations = {
-                [environmentAnnotationKeys.parent]: this.getEnvironmentParentIdentifie(),
                 [environmentAnnotationKeys.imageLanguage]: String(this.form.environmentImageLanguage || '').trim(),
                 [environmentAnnotationKeys.imageTemplate]: String(this.form.environmentImageTemplate || '').trim(),
                 [environmentAnnotationKeys.imageVersion]: versions.join(','),
@@ -2191,7 +2180,7 @@ export default {
 
             this.form.startParams.push({
                 name: pvcNameStartParamName,
-                title: 'PVC名称',
+                title: '存储',
                 required: true,
                 values_text: '%PVC_NAME%',
                 module_name: '',
@@ -2719,6 +2708,27 @@ platform:
                 if (!item?.identifie || existing.has(item.identifie)) { return; }
                 this.form.dependsIn.push(item);
                 existing.add(item.identifie);
+            });
+            this.syncImportedDependenciesToManifest();
+        },
+        replaceImportedDependencies(dependencies = []) {
+            const replacements = new Map((dependencies || [])
+                .filter(item => item?.identifie)
+                .map(item => [item.identifie, item]));
+            if (!replacements.size) { return; }
+            const replaced = new Set();
+            const replace = items => (items || []).map(item => {
+                const replacement = replacements.get(item?.identifie);
+                if (!replacement) { return item; }
+                replaced.add(item.identifie);
+                return { ...item, ...replacement };
+            });
+            this.form.dependsIn = replace(this.form.dependsIn);
+            this.form.depends = replace(this.form.depends);
+            replacements.forEach((item, identifie) => {
+                if (!replaced.has(identifie)) {
+                    this.form.dependsIn.push(item);
+                }
             });
             this.syncImportedDependenciesToManifest();
         },

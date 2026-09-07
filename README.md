@@ -19,3 +19,5 @@ openssl req -new -x509 -key registry-key.pem -out registry-cert.pem -days 365 -s
 绑定冲突使用 HTTP 409 返回结构化 `data`，其中包含 `conflict_reason`、原绑定 `domain`、`panel_url`、`panel_device_sn` 和 `app_identify`，供面板安装接口生成可操作的错误提示，并支持跳转原面板定位原应用。用户确认强制覆盖后可通过 `reinstall=true` 重新安装；该标记只允许非升级安装跳过旧绑定，升级仍严格校验应用标识。
 
 网关插件 WasmPlugin 与配置 MicroApp 统一写入相同的 `metadata.labels["w7.cc/group-name"]` 归组关联，不再生成 `w7.cc/plugin-microapp` 注解。
+
+子应用导入会按选择的制品版本读取完整 manifest，并将附件来源纳入本地存储键，避免不同仓库中的同名同版本附件相互覆盖。子文件全部保存成功后才更新主 manifest；导入失败会恢复导入前的主 manifest。带 `from` 的子应用会通过原制品列表接口检查新版本，并支持在编辑页重新导入更新。

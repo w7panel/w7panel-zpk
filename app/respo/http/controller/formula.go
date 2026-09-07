@@ -781,7 +781,7 @@ func ensurePVCNameStartParam(params []logic2.StartParams, volumes []v1.Volume) [
 	}
 	return append(append([]logic2.StartParams(nil), params...), logic2.StartParams{
 		Name:        "PVC_NAME",
-		Title:       "PVC名称",
+		Title:       "存储",
 		Required:    true,
 		Type:        "text",
 		ValuesText:  "%PVC_NAME%",

@@ -24,11 +24,10 @@ spec:
       {{- include "zpk.selectorLabels" . | nindent 6 }}
   template:
     metadata:
+      {{- $podAnnotations := include "w7panel.podAnnotations" . | fromYaml | default dict }}
+      {{- $_ := set $podAnnotations "zpk.w7.cc/registry-jwt-rotate-nonce" (default "" .Values.global.registryJwt.rotateNonce) }}
       annotations:
-        zpk.w7.cc/registry-jwt-rotate-nonce: {{ default "" .Values.global.registryJwt.rotateNonce | quote }}
-        {{- with .Values.podAnnotations }}
-        {{- toYaml . | nindent 8 }}
-        {{- end }}
+        {{- toYaml $podAnnotations | nindent 8 }}
       labels:
         {{- include "zpk.selectorLabels" . | nindent 8 }}
     spec:
@@ -39,6 +38,16 @@ spec:
       serviceAccountName: {{ include "zpk.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- $sidecarHostAliases := include "w7panel.sidecars.hostAliases" . }}
+      {{- if $sidecarHostAliases }}
+      hostAliases:
+        {{- $sidecarHostAliases | nindent 8 }}
+      {{- end }}
+      {{- $sidecarInitContainers := include "w7panel.sidecars.initContainers" . }}
+      {{- if $sidecarInitContainers }}
+      initContainers:
+        {{- $sidecarInitContainers | nindent 8 }}
+      {{- end }}
       containers:
         - name: {{ include "zpk.fullname" . }}
           securityContext:
@@ -101,6 +110,8 @@ spec:
               port: http
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+        {{- include "w7panel.sidecars.containers" . | nindent 8 }}
+      {{- $sidecarVolumes := include "w7panel.sidecars.volumes" . }}
       volumes:
         - name: registry-jwt-volume
           secret:
@@ -108,6 +119,7 @@ spec:
         - name: pvc-storage
           persistentVolumeClaim:
             claimName: {{ include "zpk.storageClaimName" . }}
+        {{- $sidecarVolumes | nindent 8 }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

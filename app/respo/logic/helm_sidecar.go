@@ -15,11 +15,6 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
-const (
-	sidecarHostContractAnnotation = "w7.cc/sidecar-host-contract"
-	sidecarHostContractV1         = "v1"
-)
-
 // HelmSidecar identifies a sidecar chart packaged as a local library
 // dependency. The chart name is the sidecar artifact identifier.
 type HelmSidecar struct {
@@ -149,27 +144,15 @@ func (*HelmPack) generateSidecarResourcesTemplate(templatesDir string) error {
 }
 
 // configureHelmSidecarHost registers sidecar chart references in a user
-// supplied Helm chart. The workload templates themselves are never rewritten:
-// the chart must explicitly opt in to the v1 host contract and provide the
-// required include points. The generated sidecar helpers read each sidecar's
-// contract directly from the child Chart metadata at render time.
+// supplied Helm chart. The workload templates themselves are never rewritten;
+// they only need to provide the required include points. The generated sidecar
+// helpers read each sidecar's contract directly from the child Chart metadata
+// at render time.
 func (hc *HelmPack) configureHelmSidecarHost(chartDir string) error {
 	if len(hc.Sidecars) == 0 {
 		return nil
 	}
 
-	chartPath := filepath.Join(chartDir, "Chart.yaml")
-	chartData, err := os.ReadFile(chartPath)
-	if err != nil {
-		return fmt.Errorf("读取宿主 Helm Chart.yaml 失败: %w", err)
-	}
-	metadata := ChartYAML{}
-	if err := yaml.Unmarshal(chartData, &metadata); err != nil {
-		return fmt.Errorf("解析宿主 Helm Chart.yaml 失败: %w", err)
-	}
-	if metadata.Annotations[sidecarHostContractAnnotation] != sidecarHostContractV1 {
-		return nil
-	}
 	valuesPath := filepath.Join(chartDir, "values.yaml")
 	values := make(map[string]interface{})
 	if data, readErr := os.ReadFile(valuesPath); readErr == nil {

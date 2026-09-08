@@ -16,6 +16,30 @@
 {{- end -}}
 {{- end -}}
 
+{{/*
+Render pod annotations from values. Annotation values may contain Helm
+expressions (for example, a release revision marker injected for an
+environment's imported Nginx child), so evaluate every value uniformly
+instead of special-casing a particular annotation key.
+*/}}
+{{- define "w7panel.podAnnotations" -}}
+{{- $root := . -}}
+{{- $annotations := dict -}}
+{{- range $key, $value := ($root.Values.podAnnotations | default dict) -}}
+  {{- $_ := set $annotations $key (tpl (toString $value) $root) -}}
+{{- end -}}
+{{- range $key, $value := ($root.Values.annotations | default dict) -}}
+  {{- $_ := set $annotations $key (tpl (toString $value) $root) -}}
+{{- end -}}
+{{- $sidecarAnnotations := include "w7panel.sidecars.podAnnotations" $root | fromYaml | default dict -}}
+{{- range $key, $value := $sidecarAnnotations -}}
+  {{- $_ := set $annotations $key (tpl (toString $value) $root) -}}
+{{- end -}}
+{{- if $annotations -}}
+{{- toYaml $annotations -}}
+{{- end -}}
+{{- end -}}
+
 {{- define "w7panel.sidecars.mergeHostAliases" -}}
 {{- $root := .root -}}
 {{- $jobOnly := .jobOnly -}}

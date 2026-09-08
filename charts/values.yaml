@@ -25,6 +25,8 @@ serviceAccount:
 
 podAnnotations: {}
 
+w7panelSidecars: []
+
 podSecurityContext: {}
   # fsGroup: 2000
 

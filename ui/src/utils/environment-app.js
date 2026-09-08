@@ -1,7 +1,7 @@
 const environmentApp = Object.freeze({
     nginxDependencyIdentifie: 'w7-sitemanagernginx',
     nginxDependencyName: 'w7-sitemanagernginx',
-    nginxDependencySource: 'https://zpk.fan.b2.sz.w7.com',
+    nginxDependencySource: 'https://zpk.w7.cc',
     storageName: 'site-storage',
 });
 

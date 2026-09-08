@@ -380,10 +380,13 @@
                                 </a-select>
                             </a-form-item>
                             <a-form-item v-if="form.type == 'tradition'" label="应用类型">
-                                <a-radio-group v-model="form.installType" @change="changeForm">
-                                    <a-radio :value="traditionInstallTypes.site">整站应用</a-radio>
-                                    <a-radio :value="traditionInstallTypes.extension">扩展</a-radio>
-                                </a-radio-group>
+                                <div class="df df-c" style="align-items:flex-start;">
+                                    <a-radio-group v-model="form.installType" @change="changeForm">
+                                        <a-radio :value="traditionInstallTypes.site">整站应用</a-radio>
+                                        <a-radio :value="traditionInstallTypes.extension">扩展</a-radio>
+                                    </a-radio-group>
+                                    <span class="c-99 mt-6">整站应用用于发布完整站点；扩展用于发布安装到已有站点中的附加功能。</span>
+                                </div>
                             </a-form-item>
                             <a-form-item
                                 v-if="form.type != 'system-image' && form.type != 'gateway-plugin' && (!option || !option.pureManifest && form.type != 'docker' && form.type != 'light' && form.type != 'helm')"
@@ -1505,7 +1508,7 @@ export default {
             confirm({
                 title: enabled ? '开启 NGINX 网关' : '关闭 NGINX 网关',
                 content: enabled
-                    ? '将从 https://zpk.fan.b2.sz.w7.com/zpk/respo/info/w7-sitemanagernginx 自动导入 NGINX 及其子应用，是否继续？'
+                    ? '将从 https://zpk.w7.cc/zpk/respo/info/w7-sitemanagernginx 自动导入 NGINX 及其子应用，是否继续？'
                     : '关闭后会自动删除 NGINX 及其已导入的子应用，是否继续？',
                 confirmButtonText: enabled ? '导入并开启' : '删除并关闭',
                 cancelButtonText: '取消',

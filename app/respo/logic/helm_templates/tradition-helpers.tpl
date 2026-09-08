@@ -35,16 +35,17 @@ volume name for this shared claim, so other PVCs in the same workload are
 ignored.
 */}}
 {{- define "tradition.environmentStorageClaimName" -}}
-{{- $releaseNameParam := printf "%s_RELEASE_NAME" (upper (replace "-" "_" .Values.tradition.environmentIdentifie)) -}}
-{{- $releaseName := required "传统应用必须指定环境应用 releaseName" (index .Values $releaseNameParam) -}}
-{{- $group := include "tradition.environmentAppGroup" . | fromJson -}}
+{{- $root := . -}}
+{{- $releaseNameParam := printf "%s_RELEASE_NAME" (upper (replace "-" "_" $root.Values.tradition.environmentIdentifie)) -}}
+{{- $releaseName := required "传统应用必须指定环境应用 releaseName" (index $root.Values $releaseNameParam) -}}
+{{- $group := include "tradition.environmentAppGroup" $root | fromJson -}}
 {{- $claimName := "" -}}
 {{- range $item := (default (list) (dig "status" "items" (list) $group)) -}}
   {{- $kind := default "" (index $item "kind") -}}
   {{- $name := default "" (index $item "name") -}}
   {{- $apiVersion := default "apps/v1" (index $item "apiVersion") -}}
   {{- if and (eq $claimName "") (ne $name "") (or (eq $kind "Deployment") (eq $kind "StatefulSet") (eq $kind "DaemonSet")) -}}
-    {{- $resource := lookup $apiVersion $kind .Release.Namespace $name -}}
+    {{- $resource := lookup $apiVersion $kind $root.Release.Namespace $name -}}
     {{- if $resource -}}
       {{- $spec := default (dict) (index $resource "spec") -}}
       {{- $template := default (dict) (index $spec "template") -}}

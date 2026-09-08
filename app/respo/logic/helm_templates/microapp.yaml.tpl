@@ -25,7 +25,7 @@
 apiVersion: w7panel.w7.com/v1alpha1
 kind: MicroApp
 metadata:
-  name: {{ $releaseName }}
+  name: __MICROAPP_RESOURCE_NAME__
   labels:
     w7.cc/identifie: "__APPLICATION_IDENTIFY__"
     w7.cc/version: "__APPLICATION_VERSION__"

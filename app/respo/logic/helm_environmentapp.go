@@ -14,6 +14,7 @@ const (
 	environmentImageLanguageAnnotation        = "w7.cc/image_language"
 	environmentNginxVhostAnnotation           = "w7.cc/nginx_vhost_template"
 	environmentNginxRestartRevisionAnnotation = "w7.cc/nginx-restart-revision"
+	environmentCodeUninstallJobTitle          = "卸载环境代码"
 	environmentNginxVhostJobTitle             = "安装环境 NGINX 配置"
 	environmentNginxVhostUninstallJobTitle    = "卸载环境 NGINX 配置"
 )
@@ -34,6 +35,17 @@ tmp_zip="$(mktemp /tmp/environment-code.XXXXXX)"
 trap 'rm -f "$tmp_zip"' EXIT
 wget -q -O "$tmp_zip" "$code_package_url"
 unzip -oq "$tmp_zip" -d "$code_install_path"`
+
+// environmentCodeUninstallShell removes only the environment's domain
+// directory from the shared site-storage PVC. The PVC itself remains intact.
+const environmentCodeUninstallShell = `set -eu
+domain_url={{ .Values.DOMAIN_URL | quote }}
+: "${domain_url:?DOMAIN_URL is required}"
+case "$domain_url" in
+  .|..|*[!A-Za-z0-9._,-]*) echo "refusing to remove invalid environment code path" >&2; exit 1 ;;
+esac
+code_install_path="/www/wwwroot/$domain_url"
+rm -rf -- "$code_install_path"`
 
 // environmentNginxVhostShell writes the rendered site-manager vhost into the
 // nginx-dir subtree mounted from the embedded w7-sitemanagernginx application.
@@ -157,16 +169,22 @@ func (hc *HelmPack) environmentAppHelmValuesOptions() helmValuesOptions {
 	// Keep image placeholders dynamic while preserving the storage/runtime
 	// contract already persisted by the environment editor.
 	options.platform = withEnvironmentAppImages(platform)
+	options.platform.Shells = append([]logic2.Shell(nil), options.platform.Shells...)
 	if strings.TrimSpace(hc.Manifest.Source.Url) != "" {
 		// Keep the legacy installer lifecycle: one pre-install,pre-upgrade
 		// hook with weight -3, rather than separate install/upgrade jobs.
-		options.platform.Shells = append(
-			append([]logic2.Shell(nil), options.platform.Shells...),
+		options.platform.Shells = append(options.platform.Shells,
 			logic2.Shell{
 				Title: "安装环境代码",
 				Type:  "pre-install,pre-upgrade",
 				Image: managedCodeInstallShellImage,
 				Shell: environmentCodeInstallShell,
+			},
+			logic2.Shell{
+				Title: environmentCodeUninstallJobTitle,
+				Type:  "uninstall",
+				Image: managedCodeInstallShellImage,
+				Shell: environmentCodeUninstallShell,
 			},
 		)
 	}

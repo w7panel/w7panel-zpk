@@ -13,7 +13,7 @@ import (
 // mount path already includes the environment's domain, so the archive is
 // extracted directly into that directory.
 const traditionCodeInstallShell = `set -eu
-code_install_path={{ printf "/www/wwwroot/%s" (include "tradition.codeInstallDirectory" .) | quote }}
+code_install_path={{ print "/www/wwwroot/" (include "tradition.codeInstallDirectory" .) | quote }}
 code_package_url={{ .Values.tradition.codePackageUrl | quote }}
 test -n "$code_package_url"
 mkdir -p "$code_install_path"
@@ -21,6 +21,19 @@ tmp_zip="$(mktemp /tmp/tradition-code.XXXXXX)"
 trap 'rm -f "$tmp_zip"' EXIT
 wget -q -O "$tmp_zip" "$code_package_url"
 unzip -oq "$tmp_zip" -d "$code_install_path"`
+
+// traditionCodeUninstallShell clears the site directory while keeping the
+// subPath mount point itself. Removing the mount point directly would fail
+// with "device or resource busy" inside the Job container.
+const traditionCodeUninstallShell = `set -eu
+code_install_path={{ print "/www/wwwroot/" (include "tradition.codeInstallDirectory" .) | quote }}
+case "$code_install_path" in
+  /www/wwwroot/?*) ;;
+  *) echo "refusing to clean invalid traditional application path" >&2; exit 1 ;;
+esac
+if [ -d "$code_install_path" ]; then
+  find "$code_install_path" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} \;
+fi`
 
 // environmentPodAffinityValues keeps workloads that use an environment's
 // ReadWriteOnce storage on a node where that environment is running.
@@ -149,6 +162,11 @@ func (hc *HelmPack) getTraditionAppShells() []logic2.Shell {
 			Type:  "pre-install,pre-upgrade",
 			Image: managedCodeInstallShellImage,
 			Shell: traditionCodeInstallShell,
+		}, logic2.Shell{
+			Title: "卸载传统应用代码",
+			Type:  "uninstall",
+			Image: managedCodeInstallShellImage,
+			Shell: traditionCodeUninstallShell,
 		})
 	}
 	if image := hc.getTraditionRuntimeImage(); image != "" {

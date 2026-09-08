@@ -47,7 +47,7 @@ func WithMicroAppBindings(application logic2.Application, names []string, bindin
 			if len(replacements) == 0 {
 				return nil
 			}
-			return writeMicroAppTemplate(filepath.Join(chartDir, "templates"), application)
+			return writeMicroAppTemplate(filepath.Join(chartDir, "templates"), application, false)
 		})
 	}
 }

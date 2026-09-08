@@ -1154,10 +1154,10 @@ func (hc *HelmPack) generateMicroAppTemplate(rootDir string, manifest logic2.Man
 		return err
 	}
 
-	return writeMicroAppTemplate(rootDir, manifest.Application)
+	return writeMicroAppTemplate(rootDir, manifest.Application, hc.IsSubFormula)
 }
 
-func writeMicroAppTemplate(rootDir string, application logic2.Application) error {
+func writeMicroAppTemplate(rootDir string, application logic2.Application, isSubFormula bool) error {
 	microAppFilePath := filepath.Join(rootDir, "microapp.yaml")
 	if function.FileExists(microAppFilePath) {
 		return nil
@@ -1179,12 +1179,17 @@ func writeMicroAppTemplate(rootDir string, application logic2.Application) error
 	if err != nil {
 		return err
 	}
+	microAppResourceName := "{{ $releaseName }}"
+	if isSubFormula {
+		microAppResourceName = "{{ $fullName }}"
+	}
 	microAppTemplate = renderHelmTemplatePlaceholders(microAppTemplate, map[string]string{
-		"__APPLICATION_TYPE__":     application.Type,
-		"__APPLICATION_IDENTIFY__": application.Identifie,
-		"__APPLICATION_VERSION__":  application.Version,
-		"__MANIFEST_TYPE__":        manifestType,
-		"__APP_TITLE__":            strconv.Quote(appName),
+		"__APPLICATION_TYPE__":       application.Type,
+		"__APPLICATION_IDENTIFY__":   application.Identifie,
+		"__APPLICATION_VERSION__":    application.Version,
+		"__MANIFEST_TYPE__":          manifestType,
+		"__APP_TITLE__":              strconv.Quote(appName),
+		"__MICROAPP_RESOURCE_NAME__": microAppResourceName,
 	})
 
 	return writeFile(microAppFilePath, microAppTemplate)

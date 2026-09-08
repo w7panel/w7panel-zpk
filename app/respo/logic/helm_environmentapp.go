@@ -15,6 +15,7 @@ const (
 	environmentNginxVhostAnnotation           = "w7.cc/nginx_vhost_template"
 	environmentNginxRestartRevisionAnnotation = "w7.cc/nginx-restart-revision"
 	environmentNginxVhostJobTitle             = "安装环境 NGINX 配置"
+	environmentNginxVhostUninstallJobTitle    = "卸载环境 NGINX 配置"
 )
 
 // environmentCodeInstallShell is added to the generated chart as an internal
@@ -57,6 +58,16 @@ nginx_vhost_config_b64={{ $config | b64enc | quote }}
 mkdir -p /www/server/nginx/conf.d
 echo -n "$nginx_vhost_config_b64" | base64 -d > "/www/server/nginx/conf.d/$nginx_vhost_file"
 test -s "/www/server/nginx/conf.d/$nginx_vhost_file"`
+
+const environmentNginxVhostUninstallShell = `{{- $rawDomain := toString .Values.DOMAIN_URL -}}
+{{- $domain := replace "https://" "" $rawDomain -}}
+{{- $domain = replace "http://" "" $domain -}}
+{{- $domain = trimSuffix "/" $domain -}}
+{{- $serverName := replace "," " " $domain -}}
+{{- $primaryDomain := first (splitList " " (trimAll " " $serverName)) -}}
+set -eu
+nginx_vhost_file={{ print $primaryDomain ".conf" | quote }}
+rm -f -- "/www/server/nginx/conf.d/$nginx_vhost_file"`
 
 func withEnvironmentAppImages(platform logic2.Platform) logic2.Platform {
 	platform.ContainerV2s = append([]logic2.ContainerV2(nil), platform.ContainerV2s...)
@@ -106,7 +117,7 @@ func (hc *HelmPack) applyEnvironmentNginxJobVolumeMounts(values map[string]inter
 		return
 	}
 	for _, job := range jobs {
-		if job["title"] != environmentNginxVhostJobTitle {
+		if job["title"] != environmentNginxVhostJobTitle && job["title"] != environmentNginxVhostUninstallJobTitle {
 			continue
 		}
 		container, ok := job["container"].(map[string]interface{})
@@ -164,12 +175,20 @@ func (hc *HelmPack) environmentAppHelmValuesOptions() helmValuesOptions {
 		nginxVhostTemplate = strings.TrimSpace(environmentAnnotationString(value))
 	}
 	if nginxVhostTemplate != "" {
-		options.platform.Shells = append(options.platform.Shells, logic2.Shell{
-			Title: environmentNginxVhostJobTitle,
-			Type:  "pre-install,pre-upgrade",
-			Image: managedCodeInstallShellImage,
-			Shell: environmentNginxVhostShell,
-		})
+		options.platform.Shells = append(options.platform.Shells,
+			logic2.Shell{
+				Title: environmentNginxVhostJobTitle,
+				Type:  "pre-install,pre-upgrade",
+				Image: managedCodeInstallShellImage,
+				Shell: environmentNginxVhostShell,
+			},
+			logic2.Shell{
+				Title: environmentNginxVhostUninstallJobTitle,
+				Type:  "uninstall",
+				Image: managedCodeInstallShellImage,
+				Shell: environmentNginxVhostUninstallShell,
+			},
+		)
 	}
 	options.addValues = hc.addEnvironmentAppValues
 	return options

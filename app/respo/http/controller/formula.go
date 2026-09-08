@@ -398,7 +398,8 @@ func (c Formula) Info(ctx *gin.Context) {
 		infoURL += "?" + query.Encode()
 	}
 
-	marketBindings := logic.BuildArtifactMarketBindings(
+	zpkMarketHelmOptions := logic.BuildZpkMarketHelmOptions(
+		formula.Manifest.Application,
 		facade.GetConfig().GetString("setting.depot_market.frontend_url"),
 		formula.GoodsId,
 		params.OrderSn,
@@ -418,7 +419,7 @@ func (c Formula) Info(ctx *gin.Context) {
 		"ticket":                 ticket,
 		"service_expire":         formulaExpire,
 		"goods_id":               formula.GoodsId,
-		"helm_url":               depotLogin.GetFormulaHelmDownloadURLWithMarketBindings(formula, marketBindings),
+		"helm_url":               depotLogin.GetFormulaDynamicHelmDownloadURL(formula, zpkMarketHelmOptions...),
 		"tags":                   formula.Tags,
 		"install_formulas":       installFormulas,
 		"formula_type":           formula.Manifest.Application.Type,

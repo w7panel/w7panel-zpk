@@ -330,16 +330,13 @@ func (self *Depot) GetFormulaBackendZipDownloadUrlByApplication(application logi
 	return zipUrl, token
 }
 
-func (self *Depot) GetFormulaHelmDownloadURLWithMarketBindings(formula *Formula, bindings []logic.Bindings) string {
+func (self *Depot) GetFormulaDynamicHelmDownloadURL(formula *Formula, options ...DynamicHelmPackageOption) string {
 	helmPath, err := PackFormulaToHelmAndPack(*formula, false)
 	if err != nil {
 		slog.Error("pack helm err", "formula", formula, "err", err)
 	}
-	if helmPath != "" && len(bindings) > 0 {
-		dynamicPackagePath, err := BuildDynamicHelmPackage(
-			helmPath,
-			WithMicroAppBindings(formula.Manifest.Application, []string{"other"}, bindings),
-		)
+	if helmPath != "" && len(options) > 0 {
+		dynamicPackagePath, err := BuildDynamicHelmPackage(helmPath, options...)
 		if err != nil {
 			slog.Error("pack dynamic helm err", "formula", formula, "err", err)
 		}

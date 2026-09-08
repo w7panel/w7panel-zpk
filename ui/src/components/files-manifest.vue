@@ -2201,7 +2201,8 @@ export default {
         serializeStartParams() {
             // PVC_NAME is installation input rather than an author-maintained
             // value. Add it here as well as from the volume editor so old
-            // manifests are upgraded when they are saved.
+            // manifests are upgraded when they are saved. Traditional apps
+            // resolve the environment PVC at Helm render time and skip it.
             this.ensurePVCNameStartParam();
             let start = [];
             let params = this.form.type == 'environment'
@@ -2209,8 +2210,7 @@ export default {
                 : this.form.startParams;
             params = (params || []).filter(item => item?.mark !== 'environment-release'
                 && !isDerivedDependencyReleaseStartParam(item)
-                && !isLegacyTraditionInstallDirectoryStartParam(item, this.form.type)
-                && !(this.form.type == 'tradition' && this.isPVCNameStartParam(item)));
+                && !isLegacyTraditionInstallDirectoryStartParam(item, this.form.type));
             for (let i in params) {
                 let o = params[i];
                 if (o.name) {

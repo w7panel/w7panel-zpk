@@ -41,7 +41,7 @@ func WithMicroAppBindings(application logic2.Application, names []string, bindin
 	}
 	return func(options *dynamicHelmPackageOptions) error {
 		return options.addTransform(cacheValue, func(chartDir string) error {
-			if err := replaceHelmChartMicroAppBindings(chartDir, application.Identifie, replacementNames, replacements); err != nil {
+			if err := replaceHelmChartMicroAppBindings(chartDir, replacementNames, replacements); err != nil {
 				return err
 			}
 			if len(replacements) == 0 {
@@ -52,16 +52,17 @@ func WithMicroAppBindings(application logic2.Application, names []string, bindin
 	}
 }
 
-func buildMicroAppValues(applicationIdentifie string, bindings []logic2.Bindings) ([]map[string]interface{}, []map[string]interface{}) {
+func buildMicroAppValues(bindings []logic2.Bindings) ([]map[string]interface{}, []map[string]interface{}) {
 	menuConfigs := make([]map[string]interface{}, 0, len(bindings))
 	backendConfigs := make([]map[string]interface{}, 0, len(bindings))
 	for _, binding := range bindings {
-		renderedFrontendProps := renderHelmValuesPlaceholdersMap(binding.BackendConfig.FrontendProps)
-		frontendProps := make(map[string]string, len(renderedFrontendProps)+1)
-		for key, value := range renderedFrontendProps {
-			frontendProps[key] = value
+		frontendProps := renderHelmValuesPlaceholdersMap(binding.BackendConfig.FrontendProps)
+		values := make(map[string]string, len(frontendProps)+1)
+		for key, value := range frontendProps {
+			values[key] = value
 		}
-		frontendProps["app_identify"] = applicationIdentifie
+		values["app_name"] = `{{ include "common.fullname" . }}`
+		frontendProps = values
 		menuConfigs = append(menuConfigs, map[string]interface{}{
 			"title":   binding.Title,
 			"name":    binding.Name,
@@ -85,7 +86,7 @@ func buildMicroAppValues(applicationIdentifie string, bindings []logic2.Bindings
 	return menuConfigs, backendConfigs
 }
 
-func replaceHelmChartMicroAppBindings(chartDir, applicationIdentifie string, names []string, replacements []logic2.Bindings) error {
+func replaceHelmChartMicroAppBindings(chartDir string, names []string, replacements []logic2.Bindings) error {
 	valuesPath := filepath.Join(chartDir, "values.yaml")
 	valuesContent, err := os.ReadFile(valuesPath)
 	if err != nil {
@@ -105,7 +106,7 @@ func replaceHelmChartMicroAppBindings(chartDir, applicationIdentifie string, nam
 	}
 	menuValues := removeMicroAppValues(values["bindings"], "name", nameSet)
 	backendValues := removeMicroAppValues(values["backend_config"], "role", nameSet)
-	replacementMenus, replacementBackends := buildMicroAppValues(applicationIdentifie, replacements)
+	replacementMenus, replacementBackends := buildMicroAppValues(replacements)
 	for _, replacement := range replacementMenus {
 		menuValues = append(menuValues, replacement)
 	}

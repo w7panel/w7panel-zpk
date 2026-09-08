@@ -1138,7 +1138,7 @@ func (hc *HelmPack) generateMicroAppTemplate(rootDir string, manifest logic2.Man
 		return nil
 	}
 
-	menuConfigValues, backendConfigValues := buildMicroAppValues(manifest.Application.Identifie, manifest.Bindings)
+	menuConfigValues, backendConfigValues := buildMicroAppValues(manifest.Bindings)
 	configMap := map[string]interface{}{
 		"backend_config": backendConfigValues,
 		"bindings":       menuConfigValues,

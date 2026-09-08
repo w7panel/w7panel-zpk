@@ -243,6 +243,8 @@ func (hc *HelmPack) processHelmPkg(rootDir string) error {
 			}
 		}
 		defer os.Remove(localHelmZipPath)
+		// charts/ 中可能已经包含 prepareRemoteHelmSidecars 提前准备的 Sidecar Chart。
+		// 解包时只能合并目录，不可以删除整个 charts/，否则会丢失已准备好的 Sidecar。
 		err := function.UnzipHelmPackage(localHelmZipPath, rootDir)
 		if err != nil {
 			return err

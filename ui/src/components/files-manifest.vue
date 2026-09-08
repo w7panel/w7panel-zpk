@@ -572,8 +572,8 @@
                                         </manifest-config-table-column>
                                         <manifest-config-table-column title="操作" width="100px">
                                             <template #cell="{ record, index }">
-                                                <span v-if="!isSystemImageFixedStartParam(record) && !isEnvironmentFixedStartParam(record)" class="c-blue cursor handle" @click="openSpDesc(record)">编辑描述</span>
-                                                <span v-if="!isSystemImageFixedStartParam(record) && !isEnvironmentFixedStartParam(record)" class="c-blue cursor handle"
+                                                <span v-if="!isFixedStartParam(record)" class="c-blue cursor handle" @click="openSpDesc(record)">编辑描述</span>
+                                                <span v-if="!isFixedStartParam(record)" class="c-blue cursor handle"
                                                     @click="form.startParams.splice(index, 1); getStart();">删除</span>
                                             </template>
                                         </manifest-config-table-column>
@@ -2161,20 +2161,30 @@ export default {
                 'global.cluster.storageClassName',
             ].includes(item?.name);
         },
-        computedSpDisabled(item) {
+        isPVCNameStartParam(item) {
+            return String(item?.name || '').trim().toUpperCase() === pvcNameStartParamName;
+        },
+        isFixedStartParam(item) {
             return this.isSystemImageFixedStartParam(item)
                 || this.isEnvironmentFixedStartParam(item)
+                || this.isPVCNameStartParam(item);
+        },
+        computedSpDisabled(item) {
+            return this.isFixedStartParam(item)
                 || ((this.disabledDomainStartParams || this.form.type == 'tradition') && this.isDomainStartParam(item))
                 || (this.json?.platform?.['volumeClaimTemplates']?.length && item.mark === 'storage')
         },
         ensurePVCNameStartParam(volumes = this.json?.platform?.volumes) {
+            if (this.form.type == 'tradition') {
+                this.form.startParams = (this.form.startParams || [])
+                    .filter(item => !this.isPVCNameStartParam(item));
+                return;
+            }
             const hasPVC = (volumes || []).some(item => Boolean(item?.persistentVolumeClaim));
             if (!hasPVC) { return; }
 
             this.form.startParams = this.form.startParams || [];
-            if (this.form.startParams.some(item => (
-                String(item?.name || '').trim().toUpperCase() === pvcNameStartParamName
-            ))) {
+            if (this.form.startParams.some(item => this.isPVCNameStartParam(item))) {
                 return;
             }
 
@@ -2199,7 +2209,8 @@ export default {
                 : this.form.startParams;
             params = (params || []).filter(item => item?.mark !== 'environment-release'
                 && !isDerivedDependencyReleaseStartParam(item)
-                && !isLegacyTraditionInstallDirectoryStartParam(item, this.form.type));
+                && !isLegacyTraditionInstallDirectoryStartParam(item, this.form.type)
+                && !(this.form.type == 'tradition' && this.isPVCNameStartParam(item)));
             for (let i in params) {
                 let o = params[i];
                 if (o.name) {

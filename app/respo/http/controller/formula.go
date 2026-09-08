@@ -313,6 +313,7 @@ func (c Formula) Info(ctx *gin.Context) {
 		responseManifest.Platform.StartParams = ensurePVCNameStartParam(
 			responseManifest.Platform.StartParams,
 			formula.Manifest.Platform.Volumes,
+			responseManifest.Application.Type,
 		)
 		installFormulas = append(installFormulas, FormulaInstallInfo{
 			Name:        responseManifest.Application.Identifie,
@@ -341,6 +342,7 @@ func (c Formula) Info(ctx *gin.Context) {
 				itemManifest.Platform.StartParams = ensurePVCNameStartParam(
 					itemManifest.Platform.StartParams,
 					itemManifest.Platform.Volumes,
+					itemManifest.Application.Type,
 				)
 				installFormulas = append(installFormulas, FormulaInstallInfo{
 					Name:        itemManifest.Application.Identifie,
@@ -763,7 +765,19 @@ func (c Formula) UnInstallComplete(ctx *gin.Context) {
 	c.JsonSuccessResponse(ctx)
 }
 
-func ensurePVCNameStartParam(params []logic2.StartParams, volumes []v1.Volume) []logic2.StartParams {
+const pvcNameStartParamName = "PVC_NAME"
+
+func ensurePVCNameStartParam(params []logic2.StartParams, volumes []v1.Volume, applicationType string) []logic2.StartParams {
+	if applicationType == logic2.Tradition_App {
+		result := make([]logic2.StartParams, 0, len(params))
+		for _, param := range params {
+			if strings.EqualFold(strings.TrimSpace(param.Name), pvcNameStartParamName) {
+				continue
+			}
+			result = append(result, param)
+		}
+		return result
+	}
 	hasPVC := false
 	for _, volume := range volumes {
 		if volume.PersistentVolumeClaim != nil {
@@ -775,12 +789,12 @@ func ensurePVCNameStartParam(params []logic2.StartParams, volumes []v1.Volume) [
 		return params
 	}
 	for _, param := range params {
-		if strings.EqualFold(strings.TrimSpace(param.Name), "PVC_NAME") {
+		if strings.EqualFold(strings.TrimSpace(param.Name), pvcNameStartParamName) {
 			return params
 		}
 	}
 	return append(append([]logic2.StartParams(nil), params...), logic2.StartParams{
-		Name:        "PVC_NAME",
+		Name:        pvcNameStartParamName,
 		Title:       "存储",
 		Required:    true,
 		Type:        "text",

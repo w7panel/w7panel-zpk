@@ -32,11 +32,11 @@ function cloneManifest(manifest = {}) {
 }
 
 /**
- * Bind w7-sitemanagernginx's PVC startup parameter to the environment application's
- * PVC parameter. The imported nginx manifest is returned as a copy so the
- * caller can safely update its child file and editor state together.
+ * Bind w7-sitemanagernginx's PVC startup parameter to the environment application.
+ * The installer resolves the parameter by module_name from the current package
+ * list before checking an already installed external dependency.
  */
-export function withEnvironmentNginxPvcDependencySource(
+export function withEnvironmentNginxPvcModuleName(
     manifest = {},
     mainApplicationIdentifie = '',
 ) {
@@ -55,12 +55,9 @@ export function withEnvironmentNginxPvcDependencySource(
         if (!pvcParameter) {
             continue;
         }
-        const name = String(pvcParameter.name || '').trim();
-        pvcParameter.dependencySource = {
-            ...(pvcParameter.dependencySource || {}),
-            identifie,
-            name: name || 'PVC_NAME',
-        };
+        pvcParameter.module_name = identifie;
+        pvcParameter.hidden = true;
+        delete pvcParameter.dependencySource;
         break;
     }
     return nextManifest;

@@ -155,8 +155,8 @@ func (hc *HelmPack) generateTraditionAppTemplates(rootDir string) error {
 func (hc *HelmPack) getTraditionAppShells() []logic2.Shell {
 	shells := append([]logic2.Shell(nil), hc.Manifest.Platform.Shells...)
 	if strings.TrimSpace(hc.Manifest.Source.Url) != "" {
-		// Keep the legacy installer lifecycle: one pre-install,pre-upgrade
-		// hook with weight -3, rather than separate install/upgrade jobs.
+		// Keep one highest-priority pre-install,pre-upgrade hook rather than
+		// separate install/upgrade jobs.
 		shells = append(shells, logic2.Shell{
 			Title: "安装传统应用代码",
 			Type:  "pre-install,pre-upgrade",

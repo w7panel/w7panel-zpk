@@ -1250,6 +1250,11 @@ func (hc *HelmPack) buildShellJobValues(items []logic2.Shell) []map[string]inter
 		shellWeight := 0
 		hookName := ""
 		switch item.Type {
+		case "pre-install,pre-upgrade":
+			// The shared install/upgrade preparation must run before every other
+			// shell hook in either lifecycle phase.
+			shellWeight = -6
+			hookName = "pre-install,pre-upgrade"
 		case "requireinstall":
 			shellWeight = -5
 			hookName = "pre-install"
@@ -1263,10 +1268,10 @@ func (hc *HelmPack) buildShellJobValues(items []logic2.Shell) []map[string]inter
 			shellWeight = -3
 			hookName = "post-install"
 		case "post-install":
-			shellWeight = -3
+			shellWeight = -2
 			hookName = "post-install"
 		case "upgrade":
-			shellWeight = -2
+			shellWeight = -3
 			hookName = "post-upgrade"
 		case "post-upgrade":
 			shellWeight = -2
@@ -1277,12 +1282,6 @@ func (hc *HelmPack) buildShellJobValues(items []logic2.Shell) []map[string]inter
 		case "custom":
 			shellWeight = 0
 			hookName = "custom"
-		case "pre-install,pre-upgrade":
-			// Internal managed tasks may need to run in both lifecycle phases
-			// while retaining one hook and the same ordering as the legacy
-			// dedicated installer Job.
-			shellWeight = -3
-			hookName = "pre-install,pre-upgrade"
 		}
 
 		jobs = append(jobs, map[string]interface{}{

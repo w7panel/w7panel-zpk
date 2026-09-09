@@ -106,7 +106,7 @@ import {
 } from '@/utils/child-app-import';
 import {
     environmentNginxDependency,
-    withEnvironmentNginxPvcDependencySource,
+    withEnvironmentNginxPvcModuleName,
 } from '@/utils/environment-app';
 import {
     IconArrowLeft,
@@ -339,7 +339,7 @@ export default {
                 }
             }
             const before = JSON.stringify(source);
-            const manifest = withEnvironmentNginxPvcDependencySource(
+            const manifest = withEnvironmentNginxPvcModuleName(
                 source,
                 this.getManifestIdentifie(this.$refs.form?.json, this.identifie),
             );

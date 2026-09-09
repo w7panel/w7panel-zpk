@@ -87,6 +87,31 @@ export function applyTraditionEnvironmentDependencyStartParams(
     });
 }
 
+export function withTraditionEnvironmentStartParams(startParams, environmentName) {
+    const managedNames = new Set(['DOMAIN_URL', 'PVC_NAME']);
+    const params = (startParams || []).filter(param => (
+        !managedNames.has(String(param?.name || '').trim().toUpperCase())
+    ));
+    const moduleName = String(environmentName || '').trim();
+    if (!moduleName) {
+        return params;
+    }
+    return params.concat([
+        {
+            name: 'DOMAIN_URL',
+            values_text: '%DOMAIN_URL%',
+            module_name: moduleName,
+            hidden: true,
+        },
+        {
+            name: 'PVC_NAME',
+            values_text: '%PVC_NAME%',
+            module_name: moduleName,
+            hidden: true,
+        },
+    ]);
+}
+
 export function normalizeTraditionInstall(form) {
     const installType = form.installType == traditionInstallTypes.extension
         ? traditionInstallTypes.extension

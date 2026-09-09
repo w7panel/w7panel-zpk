@@ -782,6 +782,7 @@ import ManifestConfigTableColumn from '@/components/manifest-config-table-column
 import dependPicker from '@/components/depend-picker.vue';
 import myAxios from '../utils/index';
 import {
+    environmentSysboxRootfsAnnotation,
     environmentSystemRebootRestoreAnnotation,
     isEnvironmentAppDependency,
     removeEnvironmentAppCodeStorage,
@@ -796,6 +797,7 @@ import {
     removeTraditionAppStorage,
     traditionInstallTypes,
     withTraditionAppStorage,
+    withTraditionEnvironmentStartParams,
 } from '@/utils/tradition-app';
 import {
     IconCheckCircleFill,
@@ -1261,7 +1263,7 @@ export default {
             formulaBaseInfo: null,
             environmentNginxGatewayChanging: false,
             environmentNginxGatewayAnnotationPresent: false,
-            systemImageDependencyManaged: false,
+            sysboxDependencyManaged: false,
             initialApplicationType: '',
             currentApplicationType: '',
             gatewayPluginCategoryOptions,
@@ -1663,6 +1665,7 @@ export default {
             if (this.form.type != 'environment') { return; }
             this.ensureEnvironmentContainerDefaults(true);
             this.applyEnvironmentRebootRestoreConfig();
+            this.syncSysboxDependency();
             this.changeForm();
         },
         applyEnvironmentRebootRestoreConfig() {
@@ -2006,7 +2009,7 @@ export default {
         },
         isEnvironmentFixedDependency(record) {
             return (this.form.type == 'environment' && isEnvironmentAppDependency(record))
-                || (this.form.type == 'system-image' && record?.identifie == 'w7panel-sysbox')
+                || (this.requiresSysboxDependency() && record?.identifie == 'w7panel-sysbox')
                 || this.isTraditionEnvironmentDependency(record);
         },
         isTraditionEnvironmentDependency(record) {
@@ -2033,17 +2036,22 @@ export default {
             this.form.dependsIn = (this.form.dependsIn || [])
                 .filter(item => !isEnvironmentAppDependency(item));
         },
-        syncSystemImageDependency() {
+        requiresSysboxDependency() {
+            if (this.form.type == 'system-image') { return true }
+            if (this.form.type != 'environment') { return false }
+            return Boolean(this.json.application?.annotation?.[environmentSysboxRootfsAnnotation]);
+        },
+        syncSysboxDependency() {
             let depends = Array.isArray(this.form.depends) ? this.form.depends : [];
-            if (this.form.type != 'system-image') {
-                if (this.systemImageDependencyManaged) {
+            if (!this.requiresSysboxDependency()) {
+                if (this.sysboxDependencyManaged) {
                     this.form.depends = depends.filter(item => item?.identifie != 'w7panel-sysbox');
-                    this.systemImageDependencyManaged = false;
+                    this.sysboxDependencyManaged = false;
                 }
                 return;
             }
 
-            this.systemImageDependencyManaged = true;
+            this.sysboxDependencyManaged = true;
             let dependency = {
                 identifie: 'w7panel-sysbox',
                 name: '微擎sysbox',
@@ -2226,14 +2234,11 @@ export default {
                         module_name: o.module_name,
                         description: o.description || '',
                         hidden: Boolean(o.hidden),
-                        ...(o.dependencySource?.identifie && o.dependencySource?.name ? {
-                            dependencySource: {
-                                identifie: o.dependencySource.identifie,
-                                name: o.dependencySource.name,
-                            },
-                        } : {}),
                     });
                 }
+            }
+            if (this.form.type == 'tradition') {
+                return withTraditionEnvironmentStartParams(start, this.form.environmentName);
             }
             return start;
         },
@@ -3101,7 +3106,7 @@ platform:
                 this.disabledDomainStartParams = true;
             }
             this.syncEnvironmentDependency();
-            this.syncSystemImageDependency();
+            this.syncSysboxDependency();
             this._initializing = false;
         },
         getPanelData() {
@@ -3162,7 +3167,7 @@ platform:
 
                 try {
                     this.syncEnvironmentDependency();
-                    this.syncSystemImageDependency();
+                    this.syncSysboxDependency();
                     await this.saveFormulaTypeSetting();
                     await this.ensureDefaultTypeTags();
                     this.changeForm();
@@ -3276,7 +3281,7 @@ platform:
                 this.syncSystemImageConfig();
             }
             this.syncEnvironmentDependency();
-            this.syncSystemImageDependency();
+            this.syncSysboxDependency();
 
             this.changeForm();
         },
@@ -3368,6 +3373,7 @@ platform:
                     delete j.platform.runtimeClassName;
                 }
             }
+            this.syncSysboxDependency();
 
             if (this.form.type == 'tradition') {
                 j.platform = withTraditionAppStorage(j.platform);

@@ -171,8 +171,8 @@ func (hc *HelmPack) environmentAppHelmValuesOptions() helmValuesOptions {
 	options.platform = withEnvironmentAppImages(platform)
 	options.platform.Shells = append([]logic2.Shell(nil), options.platform.Shells...)
 	if strings.TrimSpace(hc.Manifest.Source.Url) != "" {
-		// Keep the legacy installer lifecycle: one pre-install,pre-upgrade
-		// hook with weight -3, rather than separate install/upgrade jobs.
+		// Keep one highest-priority pre-install,pre-upgrade hook rather than
+		// separate install/upgrade jobs.
 		options.platform.Shells = append(options.platform.Shells,
 			logic2.Shell{
 				Title: "安装环境代码",

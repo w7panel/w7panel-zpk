@@ -294,7 +294,6 @@ func (c Formula) Info(ctx *gin.Context) {
 		c.JsonResponseWithError(ctx, err, http.StatusInternalServerError)
 		return
 	}
-
 	type FormulaInstallInfo struct {
 		Name        string               `json:"name"`
 		Title       string               `json:"title"`
@@ -313,7 +312,6 @@ func (c Formula) Info(ctx *gin.Context) {
 		responseManifest.Platform.StartParams = ensurePVCNameStartParam(
 			responseManifest.Platform.StartParams,
 			formula.Manifest.Platform.Volumes,
-			responseManifest.Application.Type,
 		)
 		installFormulas = append(installFormulas, FormulaInstallInfo{
 			Name:        responseManifest.Application.Identifie,
@@ -342,7 +340,6 @@ func (c Formula) Info(ctx *gin.Context) {
 				itemManifest.Platform.StartParams = ensurePVCNameStartParam(
 					itemManifest.Platform.StartParams,
 					itemManifest.Platform.Volumes,
-					itemManifest.Application.Type,
 				)
 				installFormulas = append(installFormulas, FormulaInstallInfo{
 					Name:        itemManifest.Application.Identifie,
@@ -768,17 +765,7 @@ func (c Formula) UnInstallComplete(ctx *gin.Context) {
 
 const pvcNameStartParamName = "PVC_NAME"
 
-func ensurePVCNameStartParam(params []logic2.StartParams, volumes []v1.Volume, applicationType string) []logic2.StartParams {
-	if applicationType == logic2.Tradition_App {
-		result := make([]logic2.StartParams, 0, len(params))
-		for _, param := range params {
-			if strings.EqualFold(strings.TrimSpace(param.Name), pvcNameStartParamName) {
-				continue
-			}
-			result = append(result, param)
-		}
-		return result
-	}
+func ensurePVCNameStartParam(params []logic2.StartParams, volumes []v1.Volume) []logic2.StartParams {
 	hasPVC := false
 	for _, volume := range volumes {
 		if volume.PersistentVolumeClaim != nil {

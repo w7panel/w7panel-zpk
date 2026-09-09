@@ -419,12 +419,12 @@
                                     </files-upload>
                                     <div class="c-blue cursor ml-20" @click="deleteUpload">删除</div>
                                     <a-tooltip v-if="form.type == 'tradition'"
-                                        content="整站应用请从项目根目录打包，扩展应用请从扩展所在目录打包；压缩包根目录就是安装内容，请不要包含外层项目目录。安装后解压到 /www/wwwroot/&lt;站点域名&gt;。"
+                                        content="请进入代码所在目录后打包，压缩包根目录应直接包含安装内容，不要包含外层目录。整站应用请进入项目根目录，扩展请进入扩展目录。例如：cd 项目目录 && zip -r app.zip .。安装时会解压到 /www/wwwroot/&lt;站点域名&gt;，并随当前版本发布。"
                                         position="top">
                                         <icon-exclamation-circle-fill class="fs-16 c-99 ml-4" />
                                     </a-tooltip>
                                     <a-tooltip v-else-if="form.type == 'environment'"
-                                        content="代码包为可选配置。请将项目根目录内容直接压缩，不要包含外层项目目录，例如：cd 项目目录 && zip -r app.zip .。安装环境时会解压到 /www/wwwroot/&lt;站点域名&gt;，并随当前版本发布。"
+                                        content="代码包为可选配置。请进入项目根目录后打包，压缩包根目录应直接包含安装内容，不要包含外层目录。例如：cd 项目目录 && zip -r app.zip .。安装时会解压到 /www/wwwroot/&lt;站点域名&gt;，并随当前版本发布。"
                                         position="top">
                                         <icon-exclamation-circle-fill class="fs-16 c-99 ml-4" />
                                     </a-tooltip>

@@ -1,9 +1,10 @@
 import axios from "axios";
 import { alert, message } from './ui-feedback';
 import { getPanelToken, getWujieAccessToken, getZpkToken, setZpkToken } from './panel-token';
-import { getZpkBaseURL } from './request-base';
+import { getMicroAppProxyBase, getZpkBaseURL } from './request-base';
 import { isOfficialZpkRequest, removeZpkAuthHeaders } from './request-auth';
 
+const proxyBase = getMicroAppProxyBase();
 const myAxios = axios.create({
     baseURL: getZpkBaseURL(),
     timeout: 90000
@@ -99,9 +100,28 @@ function setRequestHeader(headers, name, value) {
     headers[name] = value;
 }
 
+function isMicroAppProxyRequest(config) {
+    if (!proxyBase) {
+        return false;
+    }
+
+    try {
+        const requestURL = new URL(myAxios.getUri(config), window.location.origin);
+        const proxyURL = new URL(proxyBase, window.location.origin);
+        const proxyPath = proxyURL.pathname.replace(/\/+$/, '');
+
+        return requestURL.origin === proxyURL.origin
+            && (requestURL.pathname === proxyPath || requestURL.pathname.startsWith(`${proxyPath}/`));
+    } catch {
+        return false;
+    }
+}
+
 myAxios.interceptors.request.use(config => {
     config.headers = config.headers || {};
-    setRequestHeader(config.headers, 'X-W7Panel-Token', getPanelToken());
+    if (isMicroAppProxyRequest(config)) {
+        setRequestHeader(config.headers, 'X-W7Panel-Token', getPanelToken());
+    }
 
     if (isOfficialZpkRequest(config) || config._skipZpkAuth
         || config._skipZpkTokenRefresh || isZpkLoginRequest(config)) {

@@ -100,15 +100,16 @@ function setRequestHeader(headers, name, value) {
 }
 
 myAxios.interceptors.request.use(config => {
+    config.headers = config.headers || {};
+    setRequestHeader(config.headers, 'X-W7Panel-Token', getPanelToken());
+
     if (isOfficialZpkRequest(config) || config._skipZpkAuth
         || config._skipZpkTokenRefresh || isZpkLoginRequest(config)) {
         removeZpkAuthHeaders(config.headers);
         return config;
     }
 
-    config.headers = config.headers || {};
     setRequestHeader(config.headers, 'X-Zpk-Token', getZpkToken());
-    setRequestHeader(config.headers, 'X-W7Panel-Token', getPanelToken());
     return config
 }, err => Promise.reject(err))
 

@@ -2,7 +2,7 @@ const OFFICIAL_ZPK_ORIGINS = new Set([
     'https://zpk.w7.cc',
     'https://api.zm.w7.com',
 ]);
-const ZPK_AUTH_HEADERS = ['X-Zpk-Token', 'X-W7Panel-Token'];
+const ZPK_AUTH_HEADERS = ['X-Zpk-Token'];
 
 function getRequestUrl(config = {}) {
     const url = String(config.url || '');

@@ -1,4 +1,4 @@
-package logic
+package formula
 
 import (
 	"encoding/base64"
@@ -21,15 +21,7 @@ type TicketInfo struct {
 	AppIdentify     string `json:"app_identify"`
 }
 
-type Ticket struct {
-}
-
-func IsFormulaPlugin(formulaType, traditionInstallType string) bool {
-	return formulaType == "gateway-plugin" ||
-		(formulaType == "tradition" && traditionInstallType == "extension")
-}
-
-func (l Ticket) GetTicket(ticketInfo TicketInfo) (string, error) {
+func CreateTicket(ticketInfo TicketInfo) (string, error) {
 	key := function.GetMd5(facade.GetConfig().GetString("setting.secret"))
 	content, err := json.Marshal(ticketInfo)
 	if err != nil {
@@ -42,7 +34,7 @@ func (l Ticket) GetTicket(ticketInfo TicketInfo) (string, error) {
 	return encodeURLSafeTicket(ticket)
 }
 
-func (l Ticket) ParseTicket(ticket string) (*TicketInfo, error) {
+func ParseTicket(ticket string) (*TicketInfo, error) {
 	key := function.GetMd5(facade.GetConfig().GetString("setting.secret"))
 	aesTicket, err := decodeURLSafeTicket(ticket)
 	if err != nil {

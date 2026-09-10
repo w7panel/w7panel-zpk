@@ -12,7 +12,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/w7panel/w7panel-zpk/app/respo/logic"
+	attachlogic "github.com/w7panel/w7panel-zpk/app/respo/logic/attach"
+	formulalogic "github.com/w7panel/w7panel-zpk/app/respo/logic/formula"
 	"github.com/w7panel/w7panel-zpk/common/function"
 	logic2 "github.com/w7panel/w7panel-zpk/common/logic"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/core/err_handler"
@@ -39,7 +40,7 @@ func (c Attach) Upload(ctx *gin.Context) {
 		return
 	}
 
-	storageLocalClient := logic.GetLocalClient()
+	storageLocalClient := attachlogic.GetLocalClient()
 
 	pathInfo := function.GetPathInfo(params.Filename)
 	saveFileName := fmt.Sprintf("/Storage/%s/%s%s", time.Now().Format("200601"), params.FileMd5, pathInfo.Extension)
@@ -72,7 +73,7 @@ func (c Attach) Upload(ctx *gin.Context) {
 				c.JsonResponseWithServerError(ctx, errors.New("请上传文件"))
 				return
 			}
-			uploadSavePath, _ := logic.GetLocalClient().PresignUrl(saveFileName)
+			uploadSavePath, _ := attachlogic.GetLocalClient().PresignUrl(saveFileName)
 			ctx.SaveUploadedFile(fileHeader, uploadSavePath.Url)
 
 			saveFileName = "file://" + saveFileName
@@ -114,9 +115,9 @@ func (c Attach) Download(ctx *gin.Context) {
 		return
 	}
 
-	stableToken, err := logic.ParseBackendZipDownloadToken(params.Token)
+	attachmentToken, err := attachlogic.ParsePermanentAttachmentDownloadToken(params.Token)
 	if err == nil {
-		c.downloadZipFile(ctx, params.Token, stableToken.ZipPath)
+		c.downloadZipFile(ctx, params.Token, attachmentToken.Path)
 		return
 	}
 
@@ -124,7 +125,7 @@ func (c Attach) Download(ctx *gin.Context) {
 }
 
 func (c Attach) downloadZipFile(ctx *gin.Context, token, path string) {
-	file, err := logic.GetLocalClient().GetFile(path)
+	file, err := attachlogic.GetLocalClient().GetFile(path)
 	if err != nil {
 		c.JsonResponseWithServerError(ctx, err)
 		return
@@ -218,7 +219,7 @@ func (c Attach) GetFrontendZipFileContent(ctx *gin.Context) {
 	}
 
 	if formula.GoodsId > 0 && formula.InstallServiceFee > 0 {
-		ticketInfo, err := logic.Ticket{}.ParseTicket(params.Ticket)
+		ticketInfo, err := formulalogic.ParseTicket(params.Ticket)
 		slog.Info("ticket解析", "ticket", params.Ticket, "info", ticketInfo, "err", err)
 		if err != nil {
 			c.JsonResponseWithServerError(ctx, err)

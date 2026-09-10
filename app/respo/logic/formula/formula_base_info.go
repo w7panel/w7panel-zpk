@@ -1,4 +1,4 @@
-package logic
+package formula
 
 import (
 	"github.com/w7panel/w7panel-zpk/common/accessor"
@@ -10,6 +10,12 @@ const (
 	rootCAInjectionAnnotationKey   = "w7.cc/inject-root-ca"
 	rootCAInjectionAnnotationValue = "true"
 )
+
+// IsFormulaPlugin reports whether an artifact is installed as a platform plugin.
+func IsFormulaPlugin(formulaType, traditionInstallType string) bool {
+	return formulaType == "gateway-plugin" ||
+		(formulaType == "tradition" && traditionInstallType == "extension")
+}
 
 func syncRegisterSiteAnnotation(annotation map[string]interface{}, registerSite bool) map[string]interface{} {
 	if !registerSite {

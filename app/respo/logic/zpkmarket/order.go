@@ -1,32 +1,30 @@
-package logic
+package zpkmarket
 
 import (
 	"log/slog"
 	"strconv"
 
+	formulalogic "github.com/w7panel/w7panel-zpk/app/respo/logic/formula"
 	"github.com/w7panel/w7panel-zpk/common/dao"
 	"github.com/w7panel/w7panel-zpk/common/service/w7"
 	zpk_market "github.com/w7panel/w7panel-zpk/common/service/w7/zpk-market"
 )
 
-type Order struct {
-}
-
-func (l Order) DiscardUsedOrder(ticketInfo TicketInfo) error {
+func DiscardUsedOrder(ticketInfo formulalogic.TicketInfo) error {
 	if ticketInfo.ConsoleUid <= 0 || ticketInfo.OrderSn == "" {
 		return nil
 	}
 	return w7.ZpkMarketSdk.DiscardUsedOrder(ticketInfo.ConsoleUid, ticketInfo.OrderSn)
 }
 
-func (l Order) UseOrder(ticketInfo TicketInfo, panelDeviceSN, panelURL string) error {
+func UseOrder(ticketInfo formulalogic.TicketInfo, panelDeviceSN, panelURL string) error {
 	if ticketInfo.ConsoleUid <= 0 || ticketInfo.OrderSn == "" {
 		return nil
 	}
 	return w7.ZpkMarketSdk.UseOrder(ticketInfo.ConsoleUid, ticketInfo.OrderSn, ticketInfo.FormulaVersion, ticketInfo.FormulaType, ticketInfo.FormulaIsPlugin, ticketInfo.IsUpgrade, ticketInfo.Reinstall, panelDeviceSN, panelURL, ticketInfo.AppIdentify, ticketInfo.Domain)
 }
 
-func (l Order) CheckFormulaCanInstallOrUpgrade(formula Formula, consoleUid int32, orderSn string, isUpgrade, reinstall bool, domain, appIdentify string) zpk_market.FormulaInstallCheckResult {
+func CheckFormulaCanInstallOrUpgrade(formula formulalogic.Formula, consoleUid int32, orderSn string, isUpgrade, reinstall bool, domain, appIdentify string) zpk_market.FormulaInstallCheckResult {
 	slog.Info("check formula install permission",
 		"formula_identify", formula.Name,
 		"formula_version", formula.Version,
@@ -52,7 +50,7 @@ func (l Order) CheckFormulaCanInstallOrUpgrade(formula Formula, consoleUid int32
 	return ret
 }
 
-func (l Order) GetFormulaCanUpgradeVersion(formula Formula, consoleUid int32, orderSn string) (zpk_market.FormulaUpgradeVersionResult, error) {
+func GetFormulaCanUpgradeVersion(formula formulalogic.Formula, consoleUid int32, orderSn string) (zpk_market.FormulaUpgradeVersionResult, error) {
 	slog.Info("check formula upgrade permission",
 		"formula_identify", formula.Name,
 		"console_uid", consoleUid,
@@ -93,7 +91,7 @@ func (l Order) GetFormulaCanUpgradeVersion(formula Formula, consoleUid int32, or
 		realVersion, err := dao.Q.Version.
 			Where(dao.Q.Version.FormulaID.Eq(formulaID)).
 			Where(dao.Q.Version.Name.Like(response.Version + ".%")).
-			Where(dao.Q.Version.PublishStatus.In(FormulaPublishStatusSuccess, 0)).
+			Where(dao.Q.Version.PublishStatus.In(formulalogic.FormulaPublishStatusSuccess, 0)).
 			Order(dao.Q.Version.ID.Desc()).First()
 		if err != nil {
 			return response, err

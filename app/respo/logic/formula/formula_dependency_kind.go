@@ -1,4 +1,4 @@
-package logic
+package formula
 
 import (
 	commonlogic "github.com/w7panel/w7panel-zpk/common/logic"

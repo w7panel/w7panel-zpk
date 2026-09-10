@@ -1,4 +1,4 @@
-package logic
+package formula
 
 import (
 	"strings"
@@ -6,9 +6,9 @@ import (
 	"github.com/w7panel/w7panel-zpk/common/logic"
 )
 
-const dependencyReleaseNameSuffix = "_RELEASE_NAME"
+const DependencyReleaseNameSuffix = "_RELEASE_NAME"
 
-func DependencyReleaseStartParamName(dependency logic.Depend) string {
+func dependencyReleaseStartParamName(dependency logic.Depend) string {
 	identify := dependency.SubIdentifie
 	if identify == "" {
 		identify = dependency.Identifie
@@ -17,7 +17,7 @@ func DependencyReleaseStartParamName(dependency logic.Depend) string {
 	if identify == "" {
 		return ""
 	}
-	return identify + dependencyReleaseNameSuffix
+	return identify + DependencyReleaseNameSuffix
 }
 
 // PopulateManifestStartParamsWithDependencyReleaseNames adds hidden
@@ -35,7 +35,7 @@ func PopulateManifestStartParamsWithDependencyReleaseNames(manifest *logic.Manif
 		if !isExternalDependency(dependency) {
 			continue
 		}
-		name := DependencyReleaseStartParamName(dependency)
+		name := dependencyReleaseStartParamName(dependency)
 		if name == "" {
 			continue
 		}

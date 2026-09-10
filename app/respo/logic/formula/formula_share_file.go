@@ -1,4 +1,4 @@
-package logic
+package formula
 
 import (
 	"encoding/json"

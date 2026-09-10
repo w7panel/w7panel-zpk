@@ -1,14 +1,17 @@
-package logic
+package helm
 
 import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 
+	formulalogic "github.com/w7panel/w7panel-zpk/app/respo/logic/formula"
 	"github.com/w7panel/w7panel-zpk/common/function"
+	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"golang.org/x/sync/singleflight"
 )
 
@@ -99,6 +102,36 @@ func BuildDynamicHelmPackage(helmPath string, options ...DynamicHelmPackageOptio
 	}
 
 	return dynamicPackagePath, nil
+}
+
+// GetFormulaDynamicHelmDownloadURL packages a formula and registers the
+// resulting archive in the depot's temporary download mapping.
+func GetFormulaDynamicHelmDownloadURL(
+	depot *formulalogic.Depot,
+	formula *formulalogic.Formula,
+	options ...DynamicHelmPackageOption,
+) string {
+	helmPath, err := PackFormulaToHelmAndPack(*formula, false)
+	if err != nil {
+		slog.Error("pack helm err", "formula", formula, "err", err)
+	}
+	if helmPath != "" && len(options) > 0 {
+		dynamicPackagePath, err := BuildDynamicHelmPackage(helmPath, options...)
+		if err != nil {
+			slog.Error("pack dynamic helm err", "formula", formula, "err", err)
+		}
+		helmPath = dynamicPackagePath
+	}
+
+	if helmPath == "" {
+		return ""
+	}
+
+	token := function.GetRandomString(20)
+	domain := facade.GetConfig().GetString("setting.depot.external_domain")
+	helmPackageURL := fmt.Sprintf("https://%s/zpk/zip/download/%s", domain, token)
+	depot.DownloadMapping.Store(token, strings.TrimPrefix(helmPath, depot.GetBasePath()))
+	return helmPackageURL
 }
 
 func dynamicHelmCacheKey(helmPath string, cacheParts [][]byte) (string, error) {

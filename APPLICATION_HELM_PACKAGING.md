@@ -784,19 +784,23 @@ helm_pack_environment_standalone_test.go: undefined: withEnvironmentAppStorage
 | 主题 | 文件 |
 | --- | --- |
 | manifest 模型与旧版兼容 | `common/logic/manifest.go` |
-| 总打包入口和通用模板 values | `app/respo/logic/helm_pack.go` |
-| 传统应用打包 | `app/respo/logic/helm_traditionapp.go` |
-| 运行环境打包 | `app/respo/logic/helm_environmentapp.go` |
-| MicroApp 生成/动态替换 | `app/respo/logic/helm_microapp.go`、`app/respo/logic/helm_dynamic_pack.go` |
-| sidecar 下载、契约与 Job 接入 | `app/respo/logic/helm_sidecar.go`、`app/respo/logic/helm_templates/_w7panel-sidecars.tpl`、`app/respo/logic/helm_templates/shell-job.yaml.tpl`、`HELM_SIDECAR.md` |
+| 总打包入口和通用模板 values | `app/respo/logic/helm/helm_pack.go` |
+| 传统应用打包 | `app/respo/logic/helm/helm_traditionapp.go` |
+| 运行环境打包 | `app/respo/logic/helm/helm_environmentapp.go` |
+| MicroApp 生成/动态替换 | `app/respo/logic/helm/helm_microapp.go`、`app/respo/logic/helm/helm_dynamic_pack.go` |
+| sidecar 下载、契约与 Job 接入 | `app/respo/logic/helm/helm_sidecar.go`、`app/respo/logic/helm/helm_templates/_w7panel-sidecars.tpl`、`app/respo/logic/helm/helm_templates/shell-job.yaml.tpl`、`HELM_SIDECAR.md` |
 | ZPK 自身部署 Chart 的 sidecar 接入 | `charts/templates/_w7panel-sidecars.tpl`、`charts/templates/w7panel-sidecar-resources.yaml`、`charts/templates/deployment.yaml` |
-| Helm 仓库下载 | `app/respo/logic/helm_repository.go` |
+| Helm 仓库下载 | `app/respo/logic/helm/helm_repository.go` |
 | tgz 安全解包/打包 | `common/function/helm.go` |
-| 依赖 releaseName | `app/respo/logic/formula_dependency_release.go`、`app/respo/logic/formula_dependency_start_params.go` |
-| 远程子应用导入 | `app/respo/logic/formula_remote_dependency.go`、`ui/src/utils/child-app-import.js` |
+| 依赖订单查询与 releaseName | `app/respo/logic/zpkmarket/dependency_release.go`、`app/respo/logic/formula/formula_dependency_release_name.go`、`app/respo/logic/formula/formula_dependency_start_params.go` |
+| 云端商品发布与 DevCenter NotApp 导入 | `app/respo/logic/goods/publish.go`、`app/respo/logic/goods/notapp_import.go` |
+| ZPK Market 订单授权 | `app/respo/logic/zpkmarket/order.go` |
+| 制品安装票据 | `app/respo/logic/formula/ticket.go` |
+| 远程子应用导入 | `app/respo/logic/formula/formula_child_app_import.go`、`ui/src/utils/child-app-import.js` |
 | 环境/传统 manifest 整形 | `ui/src/utils/environment-app.js`、`ui/src/utils/tradition-app.js` |
 | 五类应用编辑器 | `ui/src/components/files-manifest.vue` |
-| 制品本地/OCI 存储 | `app/respo/logic/depot.go`、`app/respo/logic/formula_share_file.go`、`common/logic/oci_pack.go` |
+| 制品本地/OCI 存储 | `app/respo/logic/formula/depot.go`、`app/respo/logic/formula/formula_share_file.go`、`common/logic/oci_pack.go` |
+| 附件存储、永久下载 Token 与 ZIP 缓存 | `app/respo/logic/attach/attach.go`、`app/respo/logic/attach/storage.go` |
 | 上传/下载 | `app/respo/http/controller/attach.go` |
 | info/helm_url/install_formulas | `app/respo/http/controller/formula.go` |
 | ZPK 自身部署和 PVC | `charts/templates/deployment.yaml`、`charts/templates/pvc.yaml` |

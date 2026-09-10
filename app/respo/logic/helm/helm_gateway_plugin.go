@@ -1,4 +1,4 @@
-package logic
+package helm
 
 import (
 	"errors"

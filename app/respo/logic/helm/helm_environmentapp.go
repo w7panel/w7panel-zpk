@@ -1,9 +1,10 @@
-package logic
+package helm
 
 import (
 	"fmt"
 	"strings"
 
+	formulalogic "github.com/w7panel/w7panel-zpk/app/respo/logic/formula"
 	logic2 "github.com/w7panel/w7panel-zpk/common/logic"
 	v1 "k8s.io/api/core/v1"
 )
@@ -272,7 +273,7 @@ func environmentAppCodePackageURL(manifest logic2.Manifest) string {
 	if strings.TrimSpace(manifest.Source.Url) == "" {
 		return ""
 	}
-	depot, _ := NewDepot()
+	depot, _ := formulalogic.NewDepot()
 	codePackageURL, _ := depot.GetFormulaBackendZipDownloadUrlByApplication(
 		manifest.Application,
 		strings.TrimPrefix(manifest.Source.Url, "file://"),

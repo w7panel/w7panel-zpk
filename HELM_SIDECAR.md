@@ -348,11 +348,11 @@ helm template test-release <host-chart> --debug
 
 | 内容 | 文件 |
 | --- | --- |
-| Sidecar 来源、下载和 values 注入 | `app/respo/logic/helm_sidecar.go` |
-| 打包顺序与 dependency 生成 | `app/respo/logic/helm_pack.go` |
-| Sidecar 聚合 helper | `app/respo/logic/helm_templates/_w7panel-sidecars.tpl` |
-| Shell Job 接入 | `app/respo/logic/helm_templates/shell-job.yaml.tpl` |
-| Job annotations 处理 | `app/respo/logic/helm_templates/_helpers.tpl` |
-| 生成型 Workload 插槽 | `app/respo/logic/helm_templates/workload.yaml.tpl` |
+| Sidecar 来源、下载和 values 注入 | `app/respo/logic/helm/helm_sidecar.go` |
+| 打包顺序与 dependency 生成 | `app/respo/logic/helm/helm_pack.go` |
+| Sidecar 聚合 helper | `app/respo/logic/helm/helm_templates/_w7panel-sidecars.tpl` |
+| Shell Job 接入 | `app/respo/logic/helm/helm_templates/shell-job.yaml.tpl` |
+| Job annotations 处理 | `app/respo/logic/helm/helm_templates/_helpers.tpl` |
+| 生成型 Workload 插槽 | `app/respo/logic/helm/helm_templates/workload.yaml.tpl` |
 | ZPK 自身部署 Chart | `charts/templates/_w7panel-sidecars.tpl`、`charts/templates/deployment.yaml` |
 | 五类应用总览 | `APPLICATION_HELM_PACKAGING.md` |

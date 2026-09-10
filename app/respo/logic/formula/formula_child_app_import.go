@@ -1,4 +1,4 @@
-package logic
+package formula
 
 import (
 	"context"
@@ -14,12 +14,12 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
-// ImportRemoteFormulaDependency downloads one remote dependency and returns
+// ImportRemoteChildApplicationsFromRemoteDepend downloads one remote child application and returns
 // every application manifest contained in its complete info response. It is
 // used by the child-application import API. It does not mutate or persist any
 // local formula state; callers decide how to attach the returned manifests to
 // their own formula.
-func ImportRemoteFormulaDependency(
+func ImportRemoteChildApplicationsFromRemoteDepend(
 	ctx context.Context,
 	dependency commonlogic.Depend,
 ) ([]*commonlogic.Manifest, error) {

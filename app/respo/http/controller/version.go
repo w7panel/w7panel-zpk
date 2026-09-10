@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/w7panel/w7panel-zpk/app/respo/logic"
+	formulalogic "github.com/w7panel/w7panel-zpk/app/respo/logic/formula"
 	"github.com/w7panel/w7panel-zpk/common/dao"
 	"github.com/w7panel/w7panel-zpk/common/entity"
 	logic2 "github.com/w7panel/w7panel-zpk/common/logic"
@@ -100,7 +101,7 @@ func (c Version) Publish(ctx *gin.Context) {
 	}
 
 	c.JsonResponseWithoutError(ctx, gin.H{
-		"status":  logic.SYNC_STATUS_PROCESS,
+		"status":  formulalogic.SYNC_STATUS_PROCESS,
 		"message": "发起打包成功",
 	})
 	return
@@ -128,7 +129,7 @@ func (c Version) Unpublish(ctx *gin.Context) {
 		c.JsonResponseWithServerError(ctx, err)
 		return
 	}
-	if currentVersion.PublishStatus != logic.FormulaPublishStatusSuccess && currentVersion.PublishStatus != 0 {
+	if currentVersion.PublishStatus != formulalogic.FormulaPublishStatusSuccess && currentVersion.PublishStatus != 0 {
 		c.JsonResponseWithServerError(ctx, errors.New("当前版本不是已发布状态"))
 		return
 	}
@@ -136,7 +137,7 @@ func (c Version) Unpublish(ctx *gin.Context) {
 	prevVersion, err := dao.Q.Version.
 		Where(dao.Q.Version.FormulaID.Eq(formula.ID)).
 		Where(dao.Q.Version.ID.Lt(currentVersion.ID)).
-		Where(dao.Q.Version.PublishStatus.In(logic.FormulaPublishStatusSuccess, 0)).
+		Where(dao.Q.Version.PublishStatus.In(formulalogic.FormulaPublishStatusSuccess, 0)).
 		Order(dao.Q.Version.ID.Desc()).
 		First()
 	if err != nil || prevVersion == nil {
@@ -212,7 +213,7 @@ func (c Version) GetList(ctx *gin.Context) {
 	list := make([]versionListItem, 0, len(result))
 	for i, item := range result {
 		if item.PublishStatus == 0 {
-			result[i].PublishStatus = logic.FormulaPublishStatusSuccess
+			result[i].PublishStatus = formulalogic.FormulaPublishStatusSuccess
 		}
 		list = append(list, versionListItem{
 			Version:   result[i],

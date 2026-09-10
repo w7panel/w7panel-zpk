@@ -1,4 +1,4 @@
-package logic
+package helm
 
 import (
 	"bytes"
@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	copy2 "github.com/otiai10/copy"
+	formulalogic "github.com/w7panel/w7panel-zpk/app/respo/logic/formula"
 	"github.com/w7panel/w7panel-zpk/common/function"
 	logic2 "github.com/w7panel/w7panel-zpk/common/logic"
 	v1 "k8s.io/api/core/v1"
@@ -79,7 +80,7 @@ type helmValuesOptions struct {
 }
 
 func NewHelmPack(manifest logic2.Manifest, subManifests []*logic2.Manifest, outputDir, chartVersion string, isSubFormula bool, sharedStorageTargetApp string) *HelmPack {
-	PopulateManifestStartParamsWithDependencyReleaseNames(&manifest)
+	formulalogic.PopulateManifestStartParamsWithDependencyReleaseNames(&manifest)
 	subManifestMap := make(map[string]logic2.Manifest)
 	if subManifests != nil {
 		for _, item := range subManifests {
@@ -112,8 +113,8 @@ func PackManifestToHelm(manifest logic2.Manifest, subManifest []*logic2.Manifest
 	return packer.PackToHelm()
 }
 
-func PackFormulaToHelmAndPack(formula Formula, rePack bool) (string, error) {
-	depot, _ := NewDepot()
+func PackFormulaToHelmAndPack(formula formulalogic.Formula, rePack bool) (string, error) {
+	depot, _ := formulalogic.NewDepot()
 	helmDir := filepath.Join(filepath.Join(depot.GetBasePath(), "Helm", "Formula"))
 	helmZipPath := filepath.Join(filepath.Dir(helmDir), strings.ReplaceAll(formula.Manifest.Application.Identifie, "-", "_")+"-"+strconv.Itoa(int(formula.VersionId))+".tgz")
 	if !rePack && function.FileExists(helmZipPath) {
@@ -213,7 +214,7 @@ func (hc *HelmPack) isHelmPackage() bool {
 func (hc *HelmPack) processHelmPkg(rootDir string) error {
 	dependHelmYamlInHelm := false
 	if hc.Manifest.Platform.Helm.ChartName != "" || hc.Manifest.Platform.Helm.Repository != "" {
-		depot, _ := NewDepot()
+		depot, _ := formulalogic.NewDepot()
 		helmLocalRelativePath := depot.GetHelmLocalRelativePath(hc.Manifest.Platform.Helm)
 		localHelmZipPath := ""
 		if helmLocalRelativePath != "" {
@@ -1357,7 +1358,7 @@ func (hc *HelmPack) getBuildImageValues(container logic2.ContainerV2, applicatio
 		return make([]map[string]interface{}, 0)
 	}
 
-	depot, _ := NewDepot()
+	depot, _ := formulalogic.NewDepot()
 	zipUrl, _ := depot.GetFormulaBackendZipDownloadUrlByApplication(
 		application, strings.TrimPrefix(hc.Manifest.Source.Url, "file://"), false,
 	)

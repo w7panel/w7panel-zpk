@@ -1,4 +1,4 @@
-package logic
+package goods
 
 import (
 	"context"
@@ -14,28 +14,26 @@ import (
 	"time"
 
 	copy2 "github.com/otiai10/copy"
+	formulalogic "github.com/w7panel/w7panel-zpk/app/respo/logic/formula"
 	"github.com/w7panel/w7panel-zpk/common/accessor"
 	"github.com/w7panel/w7panel-zpk/common/dao"
 	"github.com/w7panel/w7panel-zpk/common/entity"
 	"github.com/w7panel/w7panel-zpk/common/function"
 	logic2 "github.com/w7panel/w7panel-zpk/common/logic"
 	"github.com/w7panel/w7panel-zpk/common/service/w7"
-	"github.com/w7panel/w7panel-zpk/common/service/w7/devcenter"
+	devcenterapi "github.com/w7panel/w7panel-zpk/common/service/w7/devcenter"
 	"sigs.k8s.io/yaml"
 )
 
-type CloudApp struct {
-}
-
-func (l CloudApp) UnpackNotAppToFormula(notAppId int, user *entity.RegistryUser, consoleUid int32) error {
-	notAppInfo, err := w7.DevCenterNotAppSdk.GetNotAppInfo(devcenter.NotAppInfoReq{
+func ImportNotAppToFormula(notAppId int, user *entity.RegistryUser, consoleUid int32) error {
+	notAppInfo, err := w7.DevCenterNotAppSdk.GetNotAppInfo(devcenterapi.NotAppInfoReq{
 		ConsoleUid: consoleUid,
 		Id:         notAppId,
 	})
 	if err != nil {
 		return err
 	}
-	notAppBranch, err := w7.DevCenterNotAppSdk.GetNotAppBranch(devcenter.NotApp{
+	notAppBranch, err := w7.DevCenterNotAppSdk.GetNotAppBranch(devcenterapi.NotApp{
 		Id:         notAppId,
 		ConsoleUid: consoleUid,
 	})
@@ -43,7 +41,7 @@ func (l CloudApp) UnpackNotAppToFormula(notAppId int, user *entity.RegistryUser,
 		return err
 	}
 	//同步价格
-	appBranchInfo, err := w7.DevCenterNotAppSdk.GetNotAppBranchInfo(devcenter.NotAppBranchInfoReq{
+	appBranchInfo, err := w7.DevCenterNotAppSdk.GetNotAppBranchInfo(devcenterapi.NotAppBranchInfoReq{
 		ConsoleUid: consoleUid,
 		AppId:      notAppId,
 		BranchId:   notAppBranch.Id,
@@ -51,14 +49,14 @@ func (l CloudApp) UnpackNotAppToFormula(notAppId int, user *entity.RegistryUser,
 	if err != nil {
 		return err
 	}
-	appServicePackages, err := w7.DevCenterNotAppSdk.GetNotAppServicePackages(devcenter.GetNotAppServicePackagesReq{
+	appServicePackages, err := w7.DevCenterNotAppSdk.GetNotAppServicePackages(devcenterapi.GetNotAppServicePackagesReq{
 		ConsoleUid: consoleUid,
 		AppId:      notAppId,
 	})
 	if err != nil {
 		return err
 	}
-	versionPrices, err := w7.DevCenterNotAppSdk.GetNotAppBranchVersionPriceList(devcenter.GetNotAppBranchVersionPriceListReq{
+	versionPrices, err := w7.DevCenterNotAppSdk.GetNotAppBranchVersionPriceList(devcenterapi.GetNotAppBranchVersionPriceListReq{
 		ConsoleUid: consoleUid,
 		AppId:      notAppId,
 		BranchId:   notAppBranch.Id,
@@ -66,7 +64,7 @@ func (l CloudApp) UnpackNotAppToFormula(notAppId int, user *entity.RegistryUser,
 	if err != nil {
 		return err
 	}
-	notAppBranchVersions, err := w7.DevCenterNotAppSdk.NotAppBranchVersionList(devcenter.NotAppVersionListReq{
+	notAppBranchVersions, err := w7.DevCenterNotAppSdk.NotAppBranchVersionList(devcenterapi.NotAppVersionListReq{
 		ConsoleUid: consoleUid,
 		AppId:      notAppId,
 		BranchId:   notAppBranch.Id,
@@ -76,7 +74,7 @@ func (l CloudApp) UnpackNotAppToFormula(notAppId int, user *entity.RegistryUser,
 	if err != nil {
 		return err
 	}
-	var latestVersion devcenter.NotAppBranchVersion
+	var latestVersion devcenterapi.NotAppBranchVersion
 	for _, item := range notAppBranchVersions.List {
 		if item.Status == 3 {
 			latestVersion = item
@@ -90,11 +88,11 @@ func (l CloudApp) UnpackNotAppToFormula(notAppId int, user *entity.RegistryUser,
 	goodsProductId := 0
 	goodsPrice := float64(0)
 	supportCrossUpgrade := 0
-	goodsLabels := make([]devcenter.Label, 0)
+	goodsLabels := make([]devcenterapi.Label, 0)
 	goodsExt := make(map[string]interface{})
 	crossUpgradeFormulas := make([]accessor.CrossUpgradeFormula, 0)
 	if notAppInfo.GoodsId > 0 {
-		goodsInfo, err := w7.DevCenterGoodsSdk.PublishGoodsInfo(devcenter.PublishGoodsInfoReq{
+		goodsInfo, err := w7.DevCenterGoodsSdk.PublishGoodsInfo(devcenterapi.PublishGoodsInfoReq{
 			ConsoleUid: int(consoleUid),
 			Id:         notAppInfo.GoodsId,
 		})
@@ -160,13 +158,13 @@ func (l CloudApp) UnpackNotAppToFormula(notAppId int, user *entity.RegistryUser,
 	}
 
 	formulaName := strings.TrimSuffix(notAppInfo.Name, strconv.Itoa(int(consoleUid)))
-	existsFormula := GetFormulaByName(formulaName)
-	err = l.unpackNotAppVersionToFormula(*notAppInfo, latestVersion, user, consoleUid)
+	existsFormula := formulalogic.GetFormulaByName(formulaName)
+	err = unpackNotAppVersionToFormula(*notAppInfo, latestVersion, user, consoleUid)
 	if err != nil && existsFormula == nil {
-		DeleteFormulaByName(formulaName)
+		formulalogic.DeleteFormulaByName(formulaName)
 		return err
 	}
-	curFormula := GetFormulaByName(formulaName)
+	curFormula := formulalogic.GetFormulaByName(formulaName)
 	if curFormula == nil {
 		return errors.New("重新获取制品失败")
 	}
@@ -239,8 +237,8 @@ func (l CloudApp) UnpackNotAppToFormula(notAppId int, user *entity.RegistryUser,
 	return nil
 }
 
-func (l CloudApp) unpackNotAppVersionToFormula(notAppInfo devcenter.NotApp, notAppVersion devcenter.NotAppBranchVersion, user *entity.RegistryUser, consoleUid int32) error {
-	depot, _ := NewDepot()
+func unpackNotAppVersionToFormula(notAppInfo devcenterapi.NotApp, notAppVersion devcenterapi.NotAppBranchVersion, user *entity.RegistryUser, consoleUid int32) error {
+	depot, _ := formulalogic.NewDepot()
 	notAppDelativeDir := filepath.Join("notapp_unpack", notAppInfo.Name)
 	notAppDir := filepath.Join(depot.GetBasePath(), notAppDelativeDir)
 	backendZipPath := filepath.Join(notAppDir, "backend/backend.zip")
@@ -254,7 +252,7 @@ func (l CloudApp) unpackNotAppVersionToFormula(notAppInfo devcenter.NotApp, notA
 
 	//下载代码包
 	for _, item := range notAppVersion.SupportTypes {
-		md5, err := w7.DevCenterNotAppSdk.NotAppBranchVersionAttach(devcenter.NotAppVersionAttachReq{
+		md5, err := w7.DevCenterNotAppSdk.NotAppBranchVersionAttach(devcenterapi.NotAppVersionAttachReq{
 			ConsoleUid:  consoleUid,
 			AppId:       notAppInfo.Id,
 			BranchId:    notAppVersion.BranchId,
@@ -308,7 +306,7 @@ func (l CloudApp) unpackNotAppVersionToFormula(notAppInfo devcenter.NotApp, notA
 
 	webZipPath := ""
 	if function.FileExists(frontendZipPath) {
-		webZipPath, err = l.unpackNotAppVersionFrontendPkg(curFormula, frontendZipPath, remoteNotAppName)
+		webZipPath, err = unpackNotAppVersionFrontendPkg(curFormula, frontendZipPath, remoteNotAppName)
 		slog.Info("unpackNotAppVersionFrontendPkg", "formula", curFormula.Name, "version", notAppVersion.Version, "remoteNotAppName", remoteNotAppName, "err", err)
 		if err != nil {
 			return err
@@ -316,7 +314,7 @@ func (l CloudApp) unpackNotAppVersionToFormula(notAppInfo devcenter.NotApp, notA
 	}
 	codeZipPath := ""
 	if function.FileExists(backendZipPath) {
-		codeZipPath, err = l.unpackNotAppVersionBackendPkg(curFormula, backendZipPath, remoteNotAppName)
+		codeZipPath, err = unpackNotAppVersionBackendPkg(curFormula, backendZipPath, remoteNotAppName)
 		slog.Info("unpackNotAppVersionBackendPkg", "formula", curFormula.Name, "version", notAppVersion.Version, "remoteNotAppName", remoteNotAppName, "err", err)
 		if err != nil {
 			return err
@@ -376,8 +374,8 @@ func (l CloudApp) unpackNotAppVersionToFormula(notAppInfo devcenter.NotApp, notA
 	})
 }
 
-func (l CloudApp) unpackNotAppVersionBackendPkg(formula *Formula, zipPath string, remoteNotAppName string) (string, error) {
-	depot, _ := NewDepot()
+func unpackNotAppVersionBackendPkg(formula *formulalogic.Formula, zipPath string, remoteNotAppName string) (string, error) {
+	depot, _ := formulalogic.NewDepot()
 	backendDir := filepath.Dir(zipPath)
 	slog.Info("执行命令", "cmd", "unzip", zipPath)
 	cmd := exec.Command("unzip", zipPath, "-d", backendDir)
@@ -446,7 +444,7 @@ func (l CloudApp) unpackNotAppVersionBackendPkg(formula *Formula, zipPath string
 	return formulaBackendSavePath, nil
 }
 
-func (l CloudApp) unpackNotAppVersionFrontendPkg(formula *Formula, zipPath string, remoteNotAppName string) (string, error) {
+func unpackNotAppVersionFrontendPkg(formula *formulalogic.Formula, zipPath string, remoteNotAppName string) (string, error) {
 	frontendDir := filepath.Dir(zipPath)
 	slog.Info("执行命令", "cmd", "unzip", zipPath)
 	cmd := exec.Command("unzip", zipPath, "-d", frontendDir)
@@ -469,7 +467,7 @@ func (l CloudApp) unpackNotAppVersionFrontendPkg(formula *Formula, zipPath strin
 		return "", err
 	}
 
-	depot, _ := NewDepot()
+	depot, _ := formulalogic.NewDepot()
 	err = copy2.Copy(filepath.Join(frontendDir, formula.Name+"_frontend.zip"), filepath.Join(depot.GetBasePath(), formulaFrontendSavePath))
 	if err != nil {
 		return "", err

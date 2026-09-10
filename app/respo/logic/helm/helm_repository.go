@@ -1,4 +1,4 @@
-package logic
+package helm
 
 import (
 	"fmt"
@@ -11,6 +11,7 @@ import (
 	"time"
 
 	copy2 "github.com/otiai10/copy"
+	formulalogic "github.com/w7panel/w7panel-zpk/app/respo/logic/formula"
 	"github.com/w7panel/w7panel-zpk/common/function"
 	"golang.org/x/sync/singleflight"
 	"helm.sh/helm/v3/pkg/cli"
@@ -55,7 +56,7 @@ func (l HelmRepository) DownloadChart(repoURL, chartName, version, outputDir str
 }
 
 func (l HelmRepository) GetRepositoryEntityIndex(repoURL string) (*repo.IndexFile, error) {
-	depot, _ := NewDepot()
+	depot, _ := formulalogic.NewDepot()
 	md5 := function.GetMd5(repoURL)
 	localPath := filepath.Join(depot.GetBasePath(), "helm_charts", md5+".yaml")
 	forceUpdate := false

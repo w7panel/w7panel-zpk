@@ -7,6 +7,8 @@ import (
 	"sort"
 
 	"github.com/hashicorp/go-version"
+	formulalogic "github.com/w7panel/w7panel-zpk/app/respo/logic/formula"
+	goodslogic "github.com/w7panel/w7panel-zpk/app/respo/logic/goods"
 	"github.com/w7panel/w7panel-zpk/common/dao"
 	"github.com/w7panel/w7panel-zpk/common/entity"
 	"github.com/w7panel/w7panel-zpk/common/service/w7/devcenter"
@@ -15,7 +17,7 @@ import (
 type Version struct {
 }
 
-func (l Version) FindNextUpgrade(formula *Formula, currentVerStr string, maxVersion string) (*entity.Version, error) {
+func (l Version) FindNextUpgrade(formula *formulalogic.Formula, currentVerStr string, maxVersion string) (*entity.Version, error) {
 	curVersion, _ := dao.Q.Version.Where(dao.Q.Version.FormulaID.Eq(formula.ID)).Where(dao.Q.Version.Name.Eq(currentVerStr)).First()
 	if curVersion == nil {
 		return nil, errors.New("当前版本不存在")
@@ -26,7 +28,7 @@ func (l Version) FindNextUpgrade(formula *Formula, currentVerStr string, maxVers
 		allVersions, _ = dao.Q.Version.
 			Where(dao.Q.Version.FormulaID.Eq(formula.ID)).
 			Where(dao.Q.Version.ID.Lte(formula.LatestVersionId)).
-			Where(dao.Q.Version.PublishStatus.In(FormulaPublishStatusSuccess, 0)).
+			Where(dao.Q.Version.PublishStatus.In(formulalogic.FormulaPublishStatusSuccess, 0)).
 			Find()
 	} else {
 		maxVersionModel, _ := dao.Q.Version.Where(dao.Q.Version.FormulaID.Eq(formula.ID)).Where(dao.Q.Version.Name.Eq(maxVersion)).First()
@@ -36,7 +38,7 @@ func (l Version) FindNextUpgrade(formula *Formula, currentVerStr string, maxVers
 		allVersions, _ = dao.Q.Version.
 			Where(dao.Q.Version.FormulaID.Eq(formula.ID)).
 			Where(dao.Q.Version.ID.Lte(maxVersionModel.ID)).
-			Where(dao.Q.Version.PublishStatus.In(FormulaPublishStatusSuccess, 0)).
+			Where(dao.Q.Version.PublishStatus.In(formulalogic.FormulaPublishStatusSuccess, 0)).
 			Find()
 	}
 	if allVersions == nil || len(allVersions) == 0 {
@@ -111,10 +113,10 @@ func (l Version) FindNextUpgrade(formula *Formula, currentVerStr string, maxVers
 	return versionMap[sortVersionNames[nextVersionIndex]], nil
 }
 
-func (c Version) PublishFormula(consoleUid int32, formula *Formula) error {
+func (c Version) PublishFormula(consoleUid int32, formula *formulalogic.Formula) error {
 	// 如果没有zip包，只有镜像时，不需要打包发布
 	// 将文件打包到 Storage 目录，需要同步的再进行同步
-	depot, _ := NewDepot()
+	depot, _ := formulalogic.NewDepot()
 	err := depot.Pack(formula, false)
 	if err != nil {
 		return err
@@ -127,7 +129,7 @@ func (c Version) PublishFormula(consoleUid int32, formula *Formula) error {
 		if formula.ConsoleUid > 0 && formula.ConsoleUid != consoleUid {
 			return errors.New("当前面板绑定的微擎云端账号与该制品所属账号不一致，请切换账号后重试")
 		}
-		err = FormulaGoods{}.PublishGoods(formula, devcenter.PublishGoodsReq{
+		err = goodslogic.PublishGoods(formula, devcenter.PublishGoodsReq{
 			ConsoleUid: int(consoleUid),
 		})
 		if err != nil {

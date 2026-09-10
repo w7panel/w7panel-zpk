@@ -4,7 +4,8 @@ import (
 	"log/slog"
 
 	"github.com/spf13/cobra"
-	"github.com/w7panel/w7panel-zpk/app/respo/logic"
+	"github.com/w7panel/w7panel-zpk/app/respo/logic/formula"
+	"github.com/w7panel/w7panel-zpk/app/respo/logic/helm"
 	"github.com/w7panel/w7panel-zpk/common/dao"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/console"
 )
@@ -28,14 +29,14 @@ func (pack Pack) Handle(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	depot, _ := logic.NewDepot()
+	depot, _ := formula.NewDepot()
 	for _, item := range list {
 		formula, err := depot.GetFormula(item.Name, "", nil)
 		if err != nil {
 			slog.Error("GetFormula err", "name", item.Name, "err", err)
 			continue
 		}
-		path, err := logic.PackFormulaToHelmAndPack(*formula, true)
+		path, err := helm.PackFormulaToHelmAndPack(*formula, true)
 		if err != nil {
 			slog.Error("packFormulaToHelmAndPack err", "name", item.Name, "err", err)
 			continue

@@ -7,6 +7,7 @@ import (
 	"github.com/w7panel/w7panel-zpk/app/respo/command"
 	"github.com/w7panel/w7panel-zpk/app/respo/http/controller"
 	"github.com/w7panel/w7panel-zpk/app/respo/logic"
+	"github.com/w7panel/w7panel-zpk/app/respo/logic/formula"
 	logic2 "github.com/w7panel/w7panel-zpk/app/system/logic"
 	"github.com/w7panel/w7panel-zpk/common/entity"
 	"github.com/w7panel/w7panel-zpk/common/middleware"
@@ -70,7 +71,7 @@ func (provider *Provider) normalizeFormulaNames() error {
 }
 
 func (p Provider) registerEvent() {
-	_ = facade.GetEvent().Subscribe(registry.RegistryRepositoryAfterPushedEvent, logic.Depot{}.OnRepositoryPushed)
+	_ = facade.GetEvent().Subscribe(registry.RegistryRepositoryAfterPushedEvent, formula.Depot{}.OnRepositoryPushed)
 }
 
 func (provider *Provider) Register(httpServer *http_server.Server, console console.Console) {
@@ -99,7 +100,7 @@ func (provider *Provider) Register(httpServer *http_server.Server, console conso
 		group.Match([]string{"POST", "OPTIONS"}, "/add", middleware.DenyDomainReq{}.Process, middleware.Auth{}.Process, controller.Formula{}.Add)
 		group.Match([]string{"POST", "OPTIONS"}, "/delete", middleware.DenyDomainReq{}.Process, middleware.Auth{}.Process, controller.Formula{}.Delete)
 		group.Match([]string{"POST", "OPTIONS"}, "/manifest/file", middleware.DenyDomainReq{}.Process, middleware.Auth{}.Process, controller.FormulaAttach{}.SaveManifestFile)
-		group.Match([]string{"POST", "OPTIONS"}, "/manifest/import", middleware.DenyDomainReq{}.Process, middleware.Auth{}.Process, controller.Formula{}.ImportRemoteDependency)
+		group.Match([]string{"POST", "OPTIONS"}, "/manifest/import", middleware.DenyDomainReq{}.Process, middleware.Auth{}.Process, controller.Formula{}.ImportRemoteChildApplications)
 		group.Match([]string{"POST", "OPTIONS"}, "/manifest/path-tree", middleware.DenyDomainReq{}.Process, middleware.Auth{}.Process, controller.FormulaAttach{}.ManifestFiles)
 		group.Match([]string{"POST", "OPTIONS"}, "/share-file/file", middleware.DenyDomainReq{}.Process, middleware.Auth{}.Process, controller.FormulaAttach{}.SaveSharedFile)
 		group.Match([]string{"POST", "OPTIONS"}, "/share-file/path-tree", middleware.DenyDomainReq{}.Process, middleware.Auth{}.Process, controller.FormulaAttach{}.SharedFiles)
@@ -160,7 +161,7 @@ func (provider *Provider) Register(httpServer *http_server.Server, console conso
 	})
 
 	// 初始化本地仓库
-	err := logic.RegisterDepot()
+	err := formula.RegisterDepot()
 	if err != nil {
 		panic(err)
 	}
@@ -170,7 +171,7 @@ func (provider *Provider) Register(httpServer *http_server.Server, console conso
 		slog.Error("tag reset fail", "err", err)
 	}
 
-	depot, _ := logic.NewDepot()
+	depot, _ := formula.NewDepot()
 	err = depot.InitDepotEnv()
 	if err != nil {
 		panic(err)

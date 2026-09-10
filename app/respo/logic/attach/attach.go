@@ -1,15 +1,21 @@
-package logic
+package attach
 
 import (
 	"crypto/sha256"
+	"encoding/base64"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/w7panel/w7panel-zpk/common/function"
+	logic2 "github.com/w7panel/w7panel-zpk/common/logic"
 	"github.com/w7panel/w7panel-zpk/common/service"
+	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 )
 
 var zipCacheLocks sync.Map
@@ -25,6 +31,60 @@ const (
 
 type zipCacheLock struct {
 	mu sync.Mutex
+}
+
+type PermanentAttachmentDownloadToken struct {
+	Path      string `json:"zip_path"`
+	Identifie string `json:"identifie"`
+	Version   string `json:"version"`
+}
+
+// CreatePermanentAttachmentDownloadToken creates a permanent token for downloading a formula attachment.
+func CreatePermanentAttachmentDownloadToken(application logic2.Application, attachmentPath string) (string, error) {
+	if strings.TrimSpace(attachmentPath) == "" {
+		return "", errors.New("attachment path is empty")
+	}
+	payload, err := json.Marshal(PermanentAttachmentDownloadToken{
+		Path: attachmentPath, Identifie: application.Identifie, Version: application.Version,
+	})
+	if err != nil {
+		return "", err
+	}
+	encrypted, err := function.AesEncrypt(string(payload), permanentAttachmentDownloadTokenEncryptionKey())
+	if err != nil {
+		return "", err
+	}
+	ciphertext, err := base64.StdEncoding.DecodeString(encrypted)
+	if err != nil {
+		return "", err
+	}
+	// Keep the public token compact: the encrypted payload (including its
+	// random IV) is enough for the download endpoint and is URL-safe encoded
+	// without the standard Base64 padding.
+	return base64.RawURLEncoding.EncodeToString(ciphertext), nil
+}
+
+func ParsePermanentAttachmentDownloadToken(token string) (*PermanentAttachmentDownloadToken, error) {
+	ciphertext, err := base64.RawURLEncoding.DecodeString(token)
+	if err != nil {
+		return nil, errors.New("invalid permanent attachment token encoding")
+	}
+	payload, err := function.AesDecrypt(base64.StdEncoding.EncodeToString(ciphertext), permanentAttachmentDownloadTokenEncryptionKey())
+	if err != nil {
+		return nil, errors.New("invalid permanent attachment token payload")
+	}
+	result := &PermanentAttachmentDownloadToken{}
+	if err = json.Unmarshal([]byte(payload), result); err != nil {
+		return nil, errors.New("invalid permanent attachment token payload")
+	}
+	if strings.TrimSpace(result.Path) == "" || result.Identifie == "" || result.Version == "" {
+		return nil, errors.New("incomplete permanent attachment token payload")
+	}
+	return result, nil
+}
+
+func permanentAttachmentDownloadTokenEncryptionKey() string {
+	return function.GetMd5(facade.GetConfig().GetString("setting.secret"))
 }
 
 type Attach struct {

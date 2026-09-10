@@ -1,4 +1,4 @@
-package logic
+package goods
 
 import (
 	"encoding/json"
@@ -7,6 +7,8 @@ import (
 	"os"
 	"strings"
 
+	attachlogic "github.com/w7panel/w7panel-zpk/app/respo/logic/attach"
+	formulalogic "github.com/w7panel/w7panel-zpk/app/respo/logic/formula"
 	"github.com/w7panel/w7panel-zpk/common/accessor"
 	"github.com/w7panel/w7panel-zpk/common/dao"
 	"github.com/w7panel/w7panel-zpk/common/entity"
@@ -18,10 +20,7 @@ import (
 )
 
 const FormulaVersionElse = 9999
-const ServicePackageEnable = 2
-
-type FormulaGoods struct {
-}
+const servicePackageEnable = 2
 
 type goodsDependency struct {
 	Identifie string `json:"identifie"`
@@ -29,8 +28,8 @@ type goodsDependency struct {
 	Required  bool   `json:"required"`
 }
 
-func (l FormulaGoods) uploadImage(formula *Formula) (string, error) {
-	iconFile, err := GetLocalClient().GetFile(formula.GetIconRelativePath())
+func uploadFormulaImage(formula *formulalogic.Formula) (string, error) {
+	iconFile, err := attachlogic.GetLocalClient().GetFile(formula.GetIconRelativePath())
 	iconPath := ""
 	if err == nil {
 		iconPath = iconFile.Name()
@@ -56,8 +55,8 @@ func (l FormulaGoods) uploadImage(formula *Formula) (string, error) {
 	return img.Attach.Path, nil
 }
 
-func (l FormulaGoods) PublishGoods(formula *Formula, publishGoodsReq devcenter.PublishGoodsReq) error {
-	iconPath, err := l.uploadImage(formula)
+func PublishGoods(formula *formulalogic.Formula, publishGoodsReq devcenter.PublishGoodsReq) error {
+	iconPath, err := uploadFormulaImage(formula)
 	if err != nil {
 		return err
 	}
@@ -115,7 +114,7 @@ func (l FormulaGoods) PublishGoods(formula *Formula, publishGoodsReq devcenter.P
 	servicePackages := make([]devcenter.NotAppServicePackage, 0)
 	if enableServicePackageFee && formula.ServicePackages != nil && formula.ServicePackages.List != nil {
 		for _, item := range formula.ServicePackages.List {
-			if item.IsEnable == ServicePackageEnable {
+			if item.IsEnable == servicePackageEnable {
 				servicePackages = append(servicePackages, item)
 			}
 		}
@@ -220,7 +219,7 @@ func (l FormulaGoods) PublishGoods(formula *Formula, publishGoodsReq devcenter.P
 }
 
 func buildApplicationTypeExtra(manifest commonlogic.Manifest) map[string]interface{} {
-	formulaIsPlugin := IsFormulaPlugin(
+	formulaIsPlugin := formulalogic.IsFormulaPlugin(
 		manifest.Application.Type,
 		manifest.Platform.Tradition.InstallType,
 	)
@@ -247,7 +246,7 @@ func buildGoodsDependencies(manifest commonlogic.Manifest) []goodsDependency {
 	dependencies := make([]goodsDependency, 0, len(manifest.Platform.Depends))
 	seen := make(map[string]struct{}, len(manifest.Platform.Depends))
 	for _, dependency := range manifest.Platform.Depends {
-		if !isExternalDependency(dependency) {
+		if dependency.Type != "out" {
 			continue
 		}
 		identify := dependency.Identifie

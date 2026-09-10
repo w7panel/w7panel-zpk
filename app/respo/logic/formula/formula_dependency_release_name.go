@@ -1,4 +1,4 @@
-package logic
+package formula
 
 import (
 	"crypto/rand"
@@ -6,51 +6,24 @@ import (
 	"strings"
 
 	commonlogic "github.com/w7panel/w7panel-zpk/common/logic"
-	"github.com/w7panel/w7panel-zpk/common/service/w7"
 )
 
 const dependencyReleaseSuffixLen = 12
 
 type DependencyOrderBinding struct {
-	AppIdentify string `json:"app_identify"`
-	OrderSn     string `json:"order_sn"`
+	Identify       string `json:"identify"`
+	AppReleaseName string `json:"app_release_name"`
+	OrderSn        string `json:"order_sn"`
 }
 
-func ResolveManifestDependencyReleaseNames(manifest *commonlogic.Manifest, consoleUID int32, orderSn string) error {
-	bindings := make(map[string]DependencyOrderBinding)
-	if manifest == nil {
-		return nil
-	}
-	hasExternalDependency := false
-	for _, dependency := range manifest.Platform.Depends {
-		if isExternalDependency(dependency) {
-			hasExternalDependency = true
-			break
-		}
-	}
-	if strings.TrimSpace(orderSn) != "" && hasExternalDependency {
-		marketBindings, err := w7.ZpkMarketSdk.GetDependencyOrders(consoleUID, orderSn)
-		if err != nil {
-			return fmt.Errorf("查询依赖订单失败: %w", err)
-		}
-		for identify, binding := range marketBindings {
-			bindings[identify] = DependencyOrderBinding{
-				AppIdentify: binding.AppIdentify,
-				OrderSn:     binding.OrderSn,
-			}
-		}
-	}
-	return ResolveDependencyReleaseNames(manifest, bindings)
-}
-
-func ResolveDependencyReleaseNames(manifest *commonlogic.Manifest, bindings map[string]DependencyOrderBinding) error {
+func ConfigureManifestExternalDependencies(manifest *commonlogic.Manifest, bindings []DependencyOrderBinding) error {
 	if manifest == nil {
 		return nil
 	}
 	bindingsByIdentifie := make(map[string]DependencyOrderBinding, len(bindings))
-	for identify, binding := range bindings {
-		if identify != "" {
-			bindingsByIdentifie[identify] = binding
+	for _, binding := range bindings {
+		if binding.Identify != "" {
+			bindingsByIdentifie[binding.Identify] = binding
 		}
 	}
 	manifest.Platform.Depends = append([]commonlogic.Depend(nil), manifest.Platform.Depends...)
@@ -65,8 +38,8 @@ func ResolveDependencyReleaseNames(manifest *commonlogic.Manifest, bindings map[
 		if hasBinding {
 			dependency.OrderSn = strings.TrimSpace(binding.OrderSn)
 		}
-		if hasBinding && binding.AppIdentify != "" {
-			dependency.ReleaseName = binding.AppIdentify
+		if hasBinding && binding.AppReleaseName != "" {
+			dependency.ReleaseName = binding.AppReleaseName
 			dependency.ReleaseNameFixed = true
 			continue
 		}

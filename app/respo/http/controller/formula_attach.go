@@ -10,7 +10,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/w7panel/w7panel-zpk/app/respo/logic"
+	attachlogic "github.com/w7panel/w7panel-zpk/app/respo/logic/attach"
+	formulalogic "github.com/w7panel/w7panel-zpk/app/respo/logic/formula"
 	"github.com/w7panel/w7panel-zpk/common/dao"
 	"github.com/w7panel/w7panel-zpk/common/entity"
 	logic2 "github.com/w7panel/w7panel-zpk/common/logic"
@@ -48,13 +49,13 @@ func (c FormulaAttach) SaveManifestFile(ctx *gin.Context) {
 	if !c.Validate(ctx, &params) {
 		return
 	}
-	normalizedFilename, err := logic.NormalizeFormulaFilePath(params.Filename)
+	normalizedFilename, err := formulalogic.NormalizeFormulaFilePath(params.Filename)
 	if err != nil {
 		c.JsonResponseWithError(ctx, err, 500)
 		return
 	}
 	params.Filename = normalizedFilename
-	if !logic.IsFormulaManifestPath(params.Filename) {
+	if !formulalogic.IsFormulaManifestPath(params.Filename) {
 		c.JsonResponseWithError(ctx, fmt.Errorf("manifest 接口不支持文件: %s", params.Filename), 500)
 		return
 	}
@@ -87,7 +88,7 @@ func (c FormulaAttach) SaveManifestFile(ctx *gin.Context) {
 
 		if formula.Manifest.Source.Url != manifest.Source.Url {
 			if strings.HasPrefix(formula.Manifest.Source.Url, "file://") {
-				file, err := logic.GetLocalClient().GetFile(formula.ZipPath)
+				file, err := attachlogic.GetLocalClient().GetFile(formula.ZipPath)
 				if err == nil {
 					os.Remove(file.Name())
 				}
@@ -186,7 +187,7 @@ func (c FormulaAttach) SaveSharedFile(ctx *gin.Context) {
 	if !c.Validate(ctx, &params) {
 		return
 	}
-	if logic.IsFormulaManifestPath(params.Filename) {
+	if formulalogic.IsFormulaManifestPath(params.Filename) {
 		c.JsonResponseWithError(ctx, fmt.Errorf("share-file 接口不支持 manifest 文件: %s", params.Filename), 500)
 		return
 	}
@@ -258,7 +259,7 @@ func (c FormulaAttach) EditIcon(ctx *gin.Context) {
 	}
 	iconPath := formula.GetIconRelativePath()
 	content, _ := io.ReadAll(uploadFile)
-	localStore := logic.GetLocalClient()
+	localStore := attachlogic.GetLocalClient()
 
 	err = localStore.UploadByContent(iconPath, string(content))
 	if err != nil {
@@ -286,7 +287,7 @@ func (c FormulaAttach) GetIcon(ctx *gin.Context) {
 		return
 	}
 
-	iconFile, err := logic.GetLocalClient().GetFile(formula.GetIconRelativePath())
+	iconFile, err := attachlogic.GetLocalClient().GetFile(formula.GetIconRelativePath())
 	if err == nil {
 		ctx.Header("Content-Type", "application/png")
 		ctx.File(iconFile.Name())

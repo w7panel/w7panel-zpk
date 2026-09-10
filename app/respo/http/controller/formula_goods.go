@@ -7,7 +7,8 @@ import (
 	"sort"
 
 	"github.com/gin-gonic/gin"
-	"github.com/w7panel/w7panel-zpk/app/respo/logic"
+	formulalogic "github.com/w7panel/w7panel-zpk/app/respo/logic/formula"
+	goodslogic "github.com/w7panel/w7panel-zpk/app/respo/logic/goods"
 	"github.com/w7panel/w7panel-zpk/common/accessor"
 	"github.com/w7panel/w7panel-zpk/common/dao"
 	"github.com/w7panel/w7panel-zpk/common/entity"
@@ -59,8 +60,8 @@ func (c FormulaGoods) GetCanFeeUpgradeVersions(ctx *gin.Context) {
 			}
 		}
 	}
-	if !slices.Contains(canUpgradeVersion, logic.FormulaVersionElse) {
-		canUpgradeVersion = append(canUpgradeVersion, logic.FormulaVersionElse)
+	if !slices.Contains(canUpgradeVersion, goodslogic.FormulaVersionElse) {
+		canUpgradeVersion = append(canUpgradeVersion, goodslogic.FormulaVersionElse)
 	}
 
 	c.JsonResponseWithoutError(ctx, canUpgradeVersion)
@@ -230,7 +231,7 @@ func (c FormulaGoods) GetCrossUpgradeFormulaCandidates(ctx *gin.Context) {
 
 	query := dao.Q.Formula.Where(dao.Q.Formula.ID.Neq(formula.ID)).
 		Where(dao.Q.Formula.GoodsID.Gt(0)).
-		Where(dao.Q.Formula.Status.In(logic.FORMULA_DISPLAY, logic.FORMULA_RECOMMEND)).
+		Where(dao.Q.Formula.Status.In(formulalogic.FORMULA_DISPLAY, formulalogic.FORMULA_RECOMMEND)).
 		Order(dao.Q.Formula.ID.Desc())
 	user := logic2.User{}.GetUser(ctx)
 	if user != nil && !(logic2.User{}).IsAdminUser(user) {

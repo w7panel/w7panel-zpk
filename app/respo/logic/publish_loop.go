@@ -7,15 +7,14 @@ import (
 	"slices"
 	"sync"
 
+	formulalogic "github.com/w7panel/w7panel-zpk/app/respo/logic/formula"
+	"github.com/w7panel/w7panel-zpk/app/respo/logic/helm"
 	"github.com/w7panel/w7panel-zpk/common/dao"
 	"github.com/w7panel/w7panel-zpk/common/entity"
 )
 
 const (
-	FormulaPublishStatusPending = int32(1)
-	FormulaPublishStatusSuccess = int32(2)
-	FormulaPublishStatusFail    = int32(3)
-	formulaPublishWorkerCount   = 5
+	formulaPublishWorkerCount = 5
 )
 
 type formulaPublishTask struct {
@@ -69,7 +68,7 @@ func (l *FormulaPublishLoop) Add(formulaIdentify, versionName string, versionId 
 		return nil
 	}
 
-	err := updateVersionPublishState(nil, versionId, FormulaPublishStatusPending, "")
+	err := updateVersionPublishState(nil, versionId, formulalogic.FormulaPublishStatusPending, "")
 	if err != nil {
 		l.pending.Delete(l.taskKey(task))
 		return err
@@ -80,7 +79,7 @@ func (l *FormulaPublishLoop) Add(formulaIdentify, versionName string, versionId 
 }
 
 func (l *FormulaPublishLoop) Recover() error {
-	versions, err := dao.Q.Version.Where(dao.Q.Version.PublishStatus.Eq(FormulaPublishStatusPending)).Find()
+	versions, err := dao.Q.Version.Where(dao.Q.Version.PublishStatus.Eq(formulalogic.FormulaPublishStatusPending)).Find()
 	if err != nil {
 		return err
 	}
@@ -128,7 +127,7 @@ func (l *FormulaPublishLoop) run(workerID int, queue <-chan formulaPublishTask) 
 		err := l.handle(task)
 		slog.Info("run formula publish task complete", "worker_id", workerID, "task", task, "err", err)
 		if err != nil {
-			err1 := updateVersionPublishState(nil, task.VersionId, FormulaPublishStatusFail, err.Error())
+			err1 := updateVersionPublishState(nil, task.VersionId, formulalogic.FormulaPublishStatusFail, err.Error())
 			slog.Error("formula publish task failed", "worker_id", workerID, "task", task, "err", err, "err1", err1)
 		}
 
@@ -137,17 +136,17 @@ func (l *FormulaPublishLoop) run(workerID int, queue <-chan formulaPublishTask) 
 }
 
 func (l *FormulaPublishLoop) handle(task formulaPublishTask) error {
-	depot, _ := NewDepot()
+	depot, _ := formulalogic.NewDepot()
 	formula, err := depot.GetFormula(task.formulaIdentify, task.VersionName, nil)
 	if err != nil {
 		return err
 	}
 
-	if _, err = PackFormulaToHelmAndPack(*formula, true); err != nil {
+	if _, err = helm.PackFormulaToHelmAndPack(*formula, true); err != nil {
 		return err
 	}
 
-	err = updateVersionPublishState(formula, task.VersionId, FormulaPublishStatusSuccess, "")
+	err = updateVersionPublishState(formula, task.VersionId, formulalogic.FormulaPublishStatusSuccess, "")
 	if err != nil {
 		return err
 	}
@@ -182,9 +181,9 @@ func hashFormulaIdentify(formulaIdentify string) uint32 {
 	return hasher.Sum32()
 }
 
-func updateVersionPublishState(formula *Formula, versionID int32, status int32, failReason string) error {
+func updateVersionPublishState(formula *formulalogic.Formula, versionID int32, status int32, failReason string) error {
 	return dao.Q.Transaction(func(tx *dao.Query) error {
-		if formula != nil && status == FormulaPublishStatusSuccess {
+		if formula != nil && status == formulalogic.FormulaPublishStatusSuccess {
 			updateFormula := entity.Formula{
 				VersionLatestID: versionID,
 			}

@@ -1,4 +1,4 @@
-package logic
+package formula
 
 import (
 	"fmt"
@@ -20,6 +20,12 @@ const (
 )
 
 const FORMULA_FREE_UPGRADE = 0
+
+const (
+	FormulaPublishStatusPending = int32(1)
+	FormulaPublishStatusSuccess = int32(2)
+	FormulaPublishStatusFail    = int32(3)
+)
 
 var applicationIdentifiePattern = regexp.MustCompile(`^[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*$`)
 

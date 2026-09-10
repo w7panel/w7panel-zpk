@@ -1,9 +1,10 @@
-package logic
+package helm
 
 import (
 	"fmt"
 	"strings"
 
+	formulalogic "github.com/w7panel/w7panel-zpk/app/respo/logic/formula"
 	logic2 "github.com/w7panel/w7panel-zpk/common/logic"
 	v1 "k8s.io/api/core/v1"
 )
@@ -62,7 +63,7 @@ func environmentPodAffinityTarget(identify string) (string, string) {
 	// the selected environment.  The hidden dependency start parameter carries
 	// that concrete release name at install time (and can differ for every
 	// environment instance), so do not match by the artifact identifier.
-	paramName := strings.ToUpper(strings.NewReplacer("-", "_", ".", "_").Replace(identify)) + dependencyReleaseNameSuffix
+	paramName := strings.ToUpper(strings.NewReplacer("-", "_", ".", "_").Replace(identify)) + formulalogic.DependencyReleaseNameSuffix
 	releaseName := fmt.Sprintf(`{{ default %q (index .Values %q) }}`, identify, paramName)
 	return releaseName, identify
 }
@@ -105,7 +106,7 @@ func (hc *HelmPack) addTraditionAppValues(values map[string]interface{}) error {
 		return fmt.Errorf("传统应用必须配置代码包")
 	}
 	codePackageURL := ""
-	depot, _ := NewDepot()
+	depot, _ := formulalogic.NewDepot()
 	codePackageURL, _ = depot.GetFormulaBackendZipDownloadUrlByApplication(
 		hc.Manifest.Application,
 		strings.TrimPrefix(hc.Manifest.Source.Url, "file://"),

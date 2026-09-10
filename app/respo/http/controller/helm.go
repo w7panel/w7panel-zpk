@@ -4,7 +4,7 @@ import (
 	"errors"
 
 	"github.com/gin-gonic/gin"
-	"github.com/w7panel/w7panel-zpk/app/respo/logic"
+	"github.com/w7panel/w7panel-zpk/app/respo/logic/helm"
 )
 
 type Helm struct {
@@ -20,7 +20,7 @@ func (c Helm) GetHelmRepositoryCharts(ctx *gin.Context) {
 		return
 	}
 
-	index, err := logic.HelmRepository{}.GetRepositoryEntityIndex(params.RepositoryUrl)
+	index, err := helm.HelmRepository{}.GetRepositoryEntityIndex(params.RepositoryUrl)
 	if err != nil {
 		c.JsonResponseWithServerError(ctx, err)
 		return
@@ -46,7 +46,7 @@ func (c Helm) GetHelmRepositoryChartVersions(ctx *gin.Context) {
 		return
 	}
 
-	index, err := logic.HelmRepository{}.GetRepositoryEntityIndex(params.RepositoryUrl)
+	index, err := helm.HelmRepository{}.GetRepositoryEntityIndex(params.RepositoryUrl)
 	if err != nil {
 		c.JsonResponseWithServerError(ctx, err)
 		return

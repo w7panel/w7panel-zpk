@@ -1,4 +1,4 @@
-package logic
+package formula
 
 import (
 	"archive/zip"
@@ -18,6 +18,7 @@ import (
 	"syscall"
 
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
+	attachlogic "github.com/w7panel/w7panel-zpk/app/respo/logic/attach"
 	"github.com/w7panel/w7panel-zpk/common/dao"
 	"github.com/w7panel/w7panel-zpk/common/entity"
 	"github.com/w7panel/w7panel-zpk/common/function"
@@ -317,9 +318,9 @@ func (self *Depot) GetFormulaBackendZipDownloadUrlByApplication(application logi
 		token = function.GetRandomString(20)
 	} else {
 		var err error
-		token, err = createBackendZipDownloadToken(application, zipPath)
+		token, err = attachlogic.CreatePermanentAttachmentDownloadToken(application, zipPath)
 		if err != nil {
-			slog.Error("create backend zip download token failed", "identifie", application.Identifie, "version", application.Version, "err", err)
+			slog.Error("create permanent attachment download token failed", "identifie", application.Identifie, "version", application.Version, "err", err)
 			return "", ""
 		}
 	}
@@ -328,29 +329,6 @@ func (self *Depot) GetFormulaBackendZipDownloadUrlByApplication(application logi
 	zipUrl := fmt.Sprintf("https://%s/zpk/zip/download/%s", domain, token)
 
 	return zipUrl, token
-}
-
-func (self *Depot) GetFormulaDynamicHelmDownloadURL(formula *Formula, options ...DynamicHelmPackageOption) string {
-	helmPath, err := PackFormulaToHelmAndPack(*formula, false)
-	if err != nil {
-		slog.Error("pack helm err", "formula", formula, "err", err)
-	}
-	if helmPath != "" && len(options) > 0 {
-		dynamicPackagePath, err := BuildDynamicHelmPackage(helmPath, options...)
-		if err != nil {
-			slog.Error("pack dynamic helm err", "formula", formula, "err", err)
-		}
-		helmPath = dynamicPackagePath
-	}
-
-	if helmPath != "" {
-		token := function.GetRandomString(20)
-		domain := facade.GetConfig().GetString("setting.depot.external_domain")
-		helmPackageUrl := fmt.Sprintf("https://%s/zpk/zip/download/%s", domain, token)
-		self.DownloadMapping.Store(token, strings.TrimPrefix(helmPath, self.GetBasePath()))
-		return helmPackageUrl
-	}
-	return ""
 }
 
 func (self *Depot) DeleteFormula(formula *Formula) error {
@@ -551,7 +529,7 @@ func (self *Depot) GetFrontendZipFileContent(formula *Formula, path string) ([]b
 
 	zipPath := filepath.Join(self.basePath, formula.WebZipPaths[formula.Name])
 	cacheRoot := filepath.Join(os.TempDir(), "w7panel-zpk", "zip_file_cache")
-	return Attach{}.GetZipFileContent(cacheRoot, zipPath, path)
+	return attachlogic.Attach{}.GetZipFileContent(cacheRoot, zipPath, path)
 }
 
 func (self *Depot) Copy(src *Formula, dest *Formula) error {
@@ -894,7 +872,7 @@ func (self *Depot) unPackIconFromOCI(formula *Formula) error {
 
 func (self *Depot) getOciManifest(formula *Formula) (*remote.Repository, *v1.Manifest, error) {
 	ociTag := self.GetFormulaOciTag(formula)
-	slog.Info("开始解包项目:", formula.Name, "tag", ociTag)
+	slog.Info("开始解包项目", "formula", formula.Name, "tag", ociTag)
 	remoteOci, err := logic.GetDefaultRemoteOci(logic.GetFormulaOciName(formula.Name))
 	if err != nil {
 		return nil, nil, err

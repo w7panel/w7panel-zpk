@@ -10,6 +10,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/w7panel/w7panel-zpk/app/respo/logic"
+	formulalogic "github.com/w7panel/w7panel-zpk/app/respo/logic/formula"
+	"github.com/w7panel/w7panel-zpk/app/respo/logic/helm"
+	"github.com/w7panel/w7panel-zpk/app/respo/logic/zpkmarket"
 	"github.com/w7panel/w7panel-zpk/common/accessor"
 	"github.com/w7panel/w7panel-zpk/common/dao"
 	"github.com/w7panel/w7panel-zpk/common/entity"
@@ -41,7 +44,7 @@ func (c Formula) Add(ctx *gin.Context) {
 	// Keep the historical underscore-to-dash conversion for API clients that
 	// created artifacts before identifier validation was introduced. New UI
 	// input is restricted before it reaches this endpoint.
-	if err := logic.ValidateIdentifie(strings.ReplaceAll(params.Identifie, "_", "-")); err != nil {
+	if err := formulalogic.ValidateIdentifie(strings.ReplaceAll(params.Identifie, "_", "-")); err != nil {
 		c.JsonResponseWithError(ctx, err, http.StatusBadRequest)
 		return
 	}
@@ -78,10 +81,10 @@ func (c Formula) BaseInfo(ctx *gin.Context) {
 	c.JsonResponseWithoutError(ctx, map[string]interface{}{"latest_version": formula.Version})
 }
 
-// ImportRemoteDependency downloads a complete remote dependency manifest for
+// ImportRemoteChildApplications downloads complete remote child application manifests for
 // the editor. The editor owns the parent manifest and child-file writes, so
 // this endpoint only returns the downloaded application manifests.
-func (c Formula) ImportRemoteDependency(ctx *gin.Context) {
+func (c Formula) ImportRemoteChildApplications(ctx *gin.Context) {
 	type ParamsValidate struct {
 		Dependency logic2.Depend `form:"dependency" json:"dependency" binding:"required"`
 	}
@@ -93,7 +96,7 @@ func (c Formula) ImportRemoteDependency(ctx *gin.Context) {
 		c.JsonResponseWithError(ctx, errors.New("依赖制品标识不能为空"), http.StatusBadRequest)
 		return
 	}
-	manifests, err := logic.ImportRemoteFormulaDependency(
+	manifests, err := formulalogic.ImportRemoteChildApplicationsFromRemoteDepend(
 		ctx.Request.Context(),
 		params.Dependency,
 	)
@@ -167,7 +170,7 @@ func (c Formula) Info(ctx *gin.Context) {
 				return
 			}
 		} else {
-			checkResult := logic.Order{}.CheckFormulaCanInstallOrUpgrade(*formula, consoleUid, params.OrderSn, params.IsUpgrade > 0, params.Reinstall, params.Domain, params.AppIdentify)
+			checkResult := zpkmarket.CheckFormulaCanInstallOrUpgrade(*formula, consoleUid, params.OrderSn, params.IsUpgrade > 0, params.Reinstall, params.Domain, params.AppIdentify)
 			if checkResult.EntitlementStatus == zpk_market.EntitlementStatusTrialExpired {
 				marketURL := strings.TrimRight(facade.GetConfig().GetString("setting.depot_market.frontend_url"), "/")
 				if marketURL != "" {
@@ -208,7 +211,7 @@ func (c Formula) Info(ctx *gin.Context) {
 			if checkResult.OrderSn != "" {
 				params.OrderSn = checkResult.OrderSn
 			}
-			upgradeResult, checkErr := logic.Order{}.GetFormulaCanUpgradeVersion(*formula, consoleUid, params.OrderSn)
+			upgradeResult, checkErr := zpkmarket.GetFormulaCanUpgradeVersion(*formula, consoleUid, params.OrderSn)
 			slog.Info("formula upgrade result resolved",
 				"upgrade_result", upgradeResult,
 				"err", checkErr,
@@ -250,7 +253,7 @@ func (c Formula) Info(ctx *gin.Context) {
 			version, _ = dao.Version.
 				Where(dao.Version.FormulaID.Eq(formula.ID)).
 				Where(dao.Q.Version.Name.Eq(params.CurVersion)).
-				Where(dao.Q.Version.PublishStatus.In(logic.FormulaPublishStatusSuccess, 0)).
+				Where(dao.Q.Version.PublishStatus.In(formulalogic.FormulaPublishStatusSuccess, 0)).
 				First()
 		}
 	}
@@ -290,7 +293,12 @@ func (c Formula) Info(ctx *gin.Context) {
 			}
 		}
 	}
-	if err = logic.ResolveManifestDependencyReleaseNames(&responseManifest, consoleUid, params.OrderSn); err != nil {
+	dependencyOrderBindings, err := zpkmarket.GetDependencyOrderBindings(consoleUid, params.OrderSn)
+	if err != nil {
+		c.JsonResponseWithError(ctx, err, http.StatusInternalServerError)
+		return
+	}
+	if err = formulalogic.ConfigureManifestExternalDependencies(&responseManifest, dependencyOrderBindings); err != nil {
 		c.JsonResponseWithError(ctx, err, http.StatusInternalServerError)
 		return
 	}
@@ -327,7 +335,7 @@ func (c Formula) Info(ctx *gin.Context) {
 		for _, item := range formula.AllManifest {
 			if item.Application.Identifie != formula.Manifest.Application.Identifie {
 				itemManifest := *item
-				if err = logic.ResolveManifestDependencyReleaseNames(&itemManifest, consoleUid, params.OrderSn); err != nil {
+				if err = formulalogic.ConfigureManifestExternalDependencies(&itemManifest, dependencyOrderBindings); err != nil {
 					c.JsonResponseWithError(ctx, err, http.StatusInternalServerError)
 					return
 				}
@@ -367,11 +375,11 @@ func (c Formula) Info(ctx *gin.Context) {
 			crossUpgradeFormulas = append(crossUpgradeFormulas, item)
 		}
 	}
-	formulaIsPlugin := logic.IsFormulaPlugin(
+	formulaIsPlugin := formulalogic.IsFormulaPlugin(
 		formula.Manifest.Application.Type,
 		formula.Manifest.Platform.Tradition.InstallType,
 	)
-	ticket, _ := logic.Ticket{}.GetTicket(logic.TicketInfo{
+	ticket, _ := formulalogic.CreateTicket(formulalogic.TicketInfo{
 		FormulaId:       formula.ID,
 		ConsoleUid:      consoleUid,
 		FormulaVersion:  version.Name,
@@ -395,7 +403,7 @@ func (c Formula) Info(ctx *gin.Context) {
 		infoURL += "?" + query.Encode()
 	}
 
-	zpkMarketHelmOptions := logic.BuildZpkMarketHelmOptions(
+	zpkMarketHelmOptions := zpkmarket.BuildHelmOptions(
 		formula.Manifest.Application,
 		facade.GetConfig().GetString("setting.depot_market.frontend_url"),
 		formula.GoodsId,
@@ -416,7 +424,7 @@ func (c Formula) Info(ctx *gin.Context) {
 		"ticket":                 ticket,
 		"service_expire":         formulaExpire,
 		"goods_id":               formula.GoodsId,
-		"helm_url":               depotLogin.GetFormulaDynamicHelmDownloadURL(formula, zpkMarketHelmOptions...),
+		"helm_url":               helm.GetFormulaDynamicHelmDownloadURL(depotLogin, formula, zpkMarketHelmOptions...),
 		"tags":                   formula.Tags,
 		"install_formulas":       installFormulas,
 		"formula_type":           formula.Manifest.Application.Type,
@@ -465,7 +473,7 @@ func (c Formula) Detail(ctx *gin.Context) {
 	err = dao.Version.
 		Where(dao.Version.FormulaID.Eq(formula.ID)).
 		Limit(10).Select(dao.Version.Name, dao.Version.ID, dao.Version.Description).
-		Where(dao.Q.Version.PublishStatus.In(logic.FormulaPublishStatusSuccess, 0)).
+		Where(dao.Q.Version.PublishStatus.In(formulalogic.FormulaPublishStatusSuccess, 0)).
 		Order(dao.Version.ID.Desc()).
 		Scan(&versionList)
 	if err != nil {
@@ -527,8 +535,8 @@ func (c Formula) List(ctx *gin.Context) {
 		params.Page = 1
 	}
 	if len(params.Status) == 0 {
-		params.Status = append(params.Status, logic.FORMULA_DISPLAY)
-		params.Status = append(params.Status, logic.FORMULA_RECOMMEND)
+		params.Status = append(params.Status, formulalogic.FORMULA_DISPLAY)
+		params.Status = append(params.Status, formulalogic.FORMULA_RECOMMEND)
 	}
 
 	type ResultNode struct {
@@ -724,13 +732,13 @@ func (c Formula) InstallComplete(ctx *gin.Context) {
 		return
 	}
 
-	ticketInfo, err := logic.Ticket{}.ParseTicket(params.Ticket)
+	ticketInfo, err := formulalogic.ParseTicket(params.Ticket)
 	slog.Info("核销订单", "ticket", params.Ticket, "info", ticketInfo, "err", err)
 	if err != nil {
 		c.JsonResponseWithError(ctx, err, 500)
 		return
 	}
-	err = logic.Order{}.UseOrder(*ticketInfo, params.PanelDeviceSN, params.PanelURL)
+	err = zpkmarket.UseOrder(*ticketInfo, params.PanelDeviceSN, params.PanelURL)
 	slog.Info("核销订单完成", "ticket", params.Ticket, "info", ticketInfo, "err", err)
 	if err != nil {
 		c.JsonResponseWithError(ctx, err, 500)
@@ -748,13 +756,13 @@ func (c Formula) UnInstallComplete(ctx *gin.Context) {
 		return
 	}
 
-	ticketInfo, err := logic.Ticket{}.ParseTicket(params.Ticket)
+	ticketInfo, err := formulalogic.ParseTicket(params.Ticket)
 	slog.Info("废弃订单", "ticket", params.Ticket, "info", ticketInfo, "err", err)
 	if err != nil {
 		c.JsonResponseWithError(ctx, err, 500)
 		return
 	}
-	err = logic.Order{}.DiscardUsedOrder(*ticketInfo)
+	err = zpkmarket.DiscardUsedOrder(*ticketInfo)
 	slog.Info("废弃订单完成", "ticket", params.Ticket, "info", ticketInfo, "err", err)
 	if err != nil {
 		c.JsonResponseWithError(ctx, err, 500)
@@ -816,8 +824,8 @@ func marshalFormulaInfoManifest(manifest logic2.Manifest, complete bool) string 
 }
 
 func buildCompleteFormulaInfo(
-	formula *logic.Formula,
-	depot *logic.Depot,
+	formula *formulalogic.Formula,
+	depot *formulalogic.Depot,
 ) (map[string]string, map[string]string, map[string]string) {
 	childManifests := make(map[string]string)
 	helmURLs := make(map[string]string)

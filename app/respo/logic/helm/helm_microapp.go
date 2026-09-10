@@ -1,4 +1,4 @@
-package logic
+package helm
 
 import (
 	"fmt"
@@ -50,6 +50,58 @@ func WithMicroAppBindings(application logic2.Application, names []string, bindin
 			return writeMicroAppTemplate(filepath.Join(chartDir, "templates"), application, false)
 		})
 	}
+}
+
+// WithMicroAppSubchart adds an independent MicroApp chart without changing
+// the root chart's values or MicroApp template.
+func WithMicroAppSubchart(chartName string, application logic2.Application, bindings []logic2.Bindings) DynamicHelmPackageOption {
+	chartName = strings.TrimSpace(chartName)
+	bindingsCopy := append([]logic2.Bindings(nil), bindings...)
+	templateConfig := newMicroAppTemplateConfig(application)
+	cacheValue := struct {
+		Kind           string                 `json:"kind"`
+		ChartName      string                 `json:"chart_name"`
+		TemplateConfig microAppTemplateConfig `json:"template_config"`
+		Bindings       []logic2.Bindings      `json:"bindings"`
+	}{
+		Kind:           "microapp-subchart",
+		ChartName:      chartName,
+		TemplateConfig: templateConfig,
+		Bindings:       bindingsCopy,
+	}
+	return func(options *dynamicHelmPackageOptions) error {
+		if chartName == "" || chartName == "." || filepath.Base(chartName) != chartName {
+			return fmt.Errorf("MicroApp Chart 名称无效: %q", chartName)
+		}
+		return options.addTransform(cacheValue, func(chartDir string) error {
+			return writeMicroAppSubchart(chartDir, chartName, application, bindingsCopy)
+		})
+	}
+}
+
+func writeMicroAppSubchart(chartDir, chartName string, application logic2.Application, bindings []logic2.Bindings) error {
+	subchartDir := filepath.Join(chartDir, "charts", chartName)
+	if err := os.MkdirAll(filepath.Join(subchartDir, "templates"), 0755); err != nil {
+		return fmt.Errorf("创建 MicroApp Chart 目录失败: %w", err)
+	}
+	if err := writeYAMLFile(filepath.Join(subchartDir, "Chart.yaml"), ChartYAML{
+		APIVersion: "v2",
+		Name:       chartName,
+		Version:    "0.1.0",
+		Type:       "application",
+		AppVersion: application.Version,
+	}); err != nil {
+		return err
+	}
+
+	manifest := logic2.Manifest{
+		Application: application,
+		Bindings:    bindings,
+	}
+	return (&HelmPack{IsSubFormula: true}).generateMicroAppTemplate(
+		filepath.Join(subchartDir, "templates"),
+		manifest,
+	)
 }
 
 func buildMicroAppValues(bindings []logic2.Bindings) ([]map[string]interface{}, []map[string]interface{}) {

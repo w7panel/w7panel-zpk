@@ -5,8 +5,29 @@ import (
 	"strings"
 
 	formulalogic "github.com/w7panel/w7panel-zpk/app/respo/logic/formula"
+	commonlogic "github.com/w7panel/w7panel-zpk/common/logic"
 	"github.com/w7panel/w7panel-zpk/common/service/w7"
 )
+
+func GetFormulaInfoDependencyOrderBindings(
+	consoleUID int32,
+	orderSN string,
+	responseManifest commonlogic.Manifest,
+	allManifests []*commonlogic.Manifest,
+	includeChildManifests bool,
+) ([]formulalogic.DependencyOrderBinding, error) {
+	if formulalogic.HasExternalDependencies(responseManifest) {
+		return GetDependencyOrderBindings(consoleUID, orderSN)
+	}
+	if includeChildManifests {
+		for _, manifest := range allManifests {
+			if formulalogic.HasExternalDependencies(*manifest) {
+				return GetDependencyOrderBindings(consoleUID, orderSN)
+			}
+		}
+	}
+	return []formulalogic.DependencyOrderBinding{}, nil
+}
 
 func GetDependencyOrderBindings(consoleUID int32, orderSN string) ([]formulalogic.DependencyOrderBinding, error) {
 	bindings := make([]formulalogic.DependencyOrderBinding, 0)

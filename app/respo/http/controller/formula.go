@@ -293,7 +293,13 @@ func (c Formula) Info(ctx *gin.Context) {
 			}
 		}
 	}
-	dependencyOrderBindings, err := zpkmarket.GetDependencyOrderBindings(consoleUid, params.OrderSn)
+	dependencyOrderBindings, err := zpkmarket.GetFormulaInfoDependencyOrderBindings(
+		consoleUid,
+		params.OrderSn,
+		responseManifest,
+		formula.AllManifest,
+		params.CName == "",
+	)
 	if err != nil {
 		c.JsonResponseWithError(ctx, err, http.StatusInternalServerError)
 		return

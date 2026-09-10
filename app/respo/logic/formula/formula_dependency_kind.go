@@ -10,3 +10,14 @@ import (
 func isExternalDependency(dependency commonlogic.Depend) bool {
 	return dependency.Type == "out"
 }
+
+// HasExternalDependencies reports whether a manifest contains dependencies
+// that are installed as separate application releases.
+func HasExternalDependencies(manifest commonlogic.Manifest) bool {
+	for _, dependency := range manifest.Platform.Depends {
+		if isExternalDependency(dependency) {
+			return true
+		}
+	}
+	return false
+}

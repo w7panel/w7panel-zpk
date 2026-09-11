@@ -381,21 +381,16 @@ func (c Formula) Info(ctx *gin.Context) {
 			crossUpgradeFormulas = append(crossUpgradeFormulas, item)
 		}
 	}
-	formulaIsPlugin := formulalogic.IsFormulaPlugin(
-		formula.Manifest.Application.Type,
-		formula.Manifest.Platform.Tradition.InstallType,
-	)
 	ticket, _ := formulalogic.CreateTicket(formulalogic.TicketInfo{
-		FormulaId:       formula.ID,
-		ConsoleUid:      consoleUid,
-		FormulaVersion:  version.Name,
-		FormulaType:     formula.Manifest.Application.Type,
-		FormulaIsPlugin: formulaIsPlugin,
-		OrderSn:         params.OrderSn,
-		IsUpgrade:       params.IsUpgrade > 0,
-		Reinstall:       params.Reinstall,
-		Domain:          params.Domain,
-		AppIdentify:     params.AppIdentify,
+		FormulaId:      formula.ID,
+		ConsoleUid:     consoleUid,
+		FormulaVersion: version.Name,
+		FormulaType:    formula.Manifest.Application.Type,
+		OrderSn:        params.OrderSn,
+		IsUpgrade:      params.IsUpgrade > 0,
+		Reinstall:      params.Reinstall,
+		Domain:         params.Domain,
+		AppIdentify:    params.AppIdentify,
 	})
 
 	manifestContent := marshalFormulaInfoManifest(responseManifest, params.FullManifest)
@@ -434,7 +429,6 @@ func (c Formula) Info(ctx *gin.Context) {
 		"tags":                   formula.Tags,
 		"install_formulas":       installFormulas,
 		"formula_type":           formula.Manifest.Application.Type,
-		"formula_is_plugin":      formulaIsPlugin,
 	}
 	if params.FullManifest {
 		// `helmURL` is the URL of the packaged root chart. It must not be

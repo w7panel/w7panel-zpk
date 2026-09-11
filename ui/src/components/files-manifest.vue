@@ -40,9 +40,9 @@
 
                                     <a-radio-group v-model="form.type" @change="changeFormtype">
                                         <a-radio value="docker">原生应用</a-radio>
-                                        <a-radio value="tradition">传统应用</a-radio>
                                         <a-radio value="helm">K8sYaml</a-radio>
-                                        <a-radio value="environment">运行环境</a-radio>
+                                        <a-radio value="tradition">传统应用</a-radio>
+                                        <a-radio value="app-plugin">应用插件</a-radio>
                                         <a-radio value="system-image">系统镜像</a-radio>
                                         <a-radio value="gateway-plugin">网关插件</a-radio>
                                     </a-radio-group>
@@ -277,71 +277,71 @@
                                 </div>
                             </a-form-item>
 
-                            <a-alert v-if="form.type == 'environment'" type="info" show-icon
+                            <a-alert v-if="form.type == 'tradition'" type="info" show-icon
                                 class="zpk-primary-alert mt-16 mb-20" title="说明" :closable="false">
-                                <div class="registry-alert-item">1. 运行环境会作为独立应用安装，同时保存为站点可选的运行环境模板；运行方式固定为 Deployment。</div>
-                                <div class="registry-alert-item mt-6">2. 新建或升级站点并选择此运行环境时，系统会根据模板准备站点需要的运行环境。这里的修改只会用于之后新建的环境，已创建的环境不会自动更新。</div>
-                                <div class="registry-alert-item mt-6">3. 独立安装时通过“环境版本”启动参数替换运行容器镜像中的 {version}；创建站点环境时也会使用同一模板。</div>
-                                <div class="registry-alert-item mt-6">4. 环境容器的启动命令可在页面下方“启动命令”中配置。</div>
-                                <div class="registry-alert-item mt-6">5. 页面下方“脚本配置”中的安装、升级脚本只在安装或升级此制品时执行，站点管理新建环境时不会再次执行。</div>
-                                <div class="registry-alert-item mt-6">6. 环境准备完成后，系统会使用 NGINX 模板配置站点并完成绑定。</div>
+                                <div class="registry-alert-item">1. 传统应用会作为独立应用安装，同时保存为站点可选的传统应用模板；运行方式固定为 Deployment。</div>
+                                <div class="registry-alert-item mt-6">2. 新建或升级站点并选择此传统应用时，系统会根据模板创建站点所需的传统应用实例。这里的修改只会用于之后创建的实例，已创建的实例不会自动更新。</div>
+                                <div class="registry-alert-item mt-6">3. 独立安装时通过“传统应用版本”启动参数替换运行容器镜像中的 {version}；为站点创建实例时也会使用同一模板。</div>
+                                <div class="registry-alert-item mt-6">4. 传统应用容器的启动命令可在页面下方“启动命令”中配置。</div>
+                                <div class="registry-alert-item mt-6">5. 页面下方“脚本配置”中的安装、升级脚本只在安装或升级此制品时执行，站点管理创建传统应用实例时不会再次执行。</div>
+                                <div class="registry-alert-item mt-6">6. 传统应用准备完成后，系统会使用 NGINX 模板配置站点并完成绑定。</div>
                             </a-alert>
 
-                            <a-form-item v-if="form.type == 'environment'" label="运行环境配置"
-                                class="environment-config-item">
-                                <a-spin :loading="formulaSettingLoading" class="environment-config-spin">
+                            <a-form-item v-if="form.type == 'tradition'" label="传统应用配置"
+                                class="tradition-config-item">
+                                <a-spin :loading="formulaSettingLoading" class="tradition-config-spin">
                                     <div class="greybox" style="margin-bottom:0;">
-                                        <a-form-item label="环境语言" field="environmentImageLanguage" required
+                                        <a-form-item label="应用语言" field="traditionImageLanguage" required
                                             style="margin-bottom:18px;">
-                                            <a-select v-model="form.environmentImageLanguage" size="large"
-                                                style="width:500px;" placeholder="请选择环境语言" allow-search
-                                                @change="changeEnvironmentLanguage">
-                                                <a-option v-for="option in environmentLanguageOptions"
+                                            <a-select v-model="form.traditionImageLanguage" size="large"
+                                                style="width:500px;" placeholder="请选择应用语言" allow-search
+                                                @change="changeTraditionLanguage">
+                                                <a-option v-for="option in traditionLanguageOptions"
                                                     :key="option.value" :value="option.value" :label="option.label">
                                                     {{ option.label }}
                                                 </a-option>
                                             </a-select>
                                         </a-form-item>
-                                        <a-form-item label="镜像地址" field="environmentImageTemplate" required
+                                        <a-form-item label="镜像地址" field="traditionImageTemplate" required
                                             style="margin-bottom:18px;">
                                             <div class="df df-c">
-                                                <a-input v-model="form.environmentImageTemplate" size="large"
+                                                <a-input v-model="form.traditionImageTemplate" size="large"
                                                     style="width:500px;" placeholder="例如 php:{version}-fpm-alpine"
-                                                    @change="syncEnvironmentRuntimeConfig" />
-                                                <span class="c-99 mt-6">使用 {version} 作为运行环境版本占位符。</span>
+                                                    @change="syncTraditionRuntimeConfig" />
+                                                <span class="c-99 mt-6">使用 {version} 作为传统应用版本占位符。</span>
                                             </div>
                                         </a-form-item>
-                                        <a-form-item label="环境版本" field="environmentImageVersion" required
+                                        <a-form-item label="传统应用版本" field="traditionImageVersion" required
                                             style="margin-bottom:18px;">
                                             <div class="df df-c">
-                                                <a-input-tag v-model="form.environmentImageVersion" size="large"
+                                                <a-input-tag v-model="form.traditionImageVersion" size="large"
                                                     style="width:500px;" placeholder="输入版本后按回车，例如 8.1"
-                                                    allow-clear unique-value @change="syncEnvironmentVersionConfig" />
+                                                    allow-clear unique-value @change="syncTraditionVersionConfig" />
                                                 <span class="c-99 mt-6">每次输入一个语言版本并按回车，可添加多个版本，例如 7.4、8.1。</span>
                                             </div>
                                         </a-form-item>
                                         <a-form-item label="系统重启还原" style="margin-bottom:18px;">
                                             <div class="df df-c" style="align-items:flex-start;">
-                                                <a-switch v-model="form.environmentSystemRebootRestore"
-                                                    @change="syncEnvironmentRuntimeConfig" />
+                                                <a-switch v-model="form.traditionSystemRebootRestore"
+                                                    @change="syncTraditionRuntimeConfig" />
                                                 <span class="c-99 mt-6">关闭后使用持久存储保留容器系统层。</span>
                                             </div>
                                         </a-form-item>
                                         <a-form-item v-if="option?.edit" label="NGINX 网关"
                                             style="margin-bottom:18px;">
                                             <div class="df df-c" style="align-items:flex-start;">
-                                                <a-switch v-model="form.environmentNginxGateway"
-                                                    :disabled="environmentNginxGatewayChanging"
-                                                    @change="toggleEnvironmentNginxGateway" />
+                                                <a-switch v-model="form.traditionNginxGateway"
+                                                    :disabled="traditionNginxGatewayChanging"
+                                                    @change="toggleTraditionNginxGateway" />
                                                 <span class="c-99 mt-6">开启后安装时会将 NGINX 服务作为对外网关，用于转发请求至后端服务。</span>
                                                 <span class="c-99 mt-6">常用于 PHP-FPM FastCGI 等无法直接提供 HTTP 服务的场景；若后端可直接提供 HTTP 服务，则无需启用。</span>
                                             </div>
                                         </a-form-item>
-                                        <a-form-item v-if="form.environmentNginxGateway" label="NGINX 模板"
-                                            field="environmentNginxVhostTemplate" style="margin-bottom:0;">
+                                        <a-form-item v-if="form.traditionNginxGateway" label="NGINX 模板"
+                                            field="traditionNginxVhostTemplate" style="margin-bottom:0;">
                                             <div class="nginx-template-field">
                                                 <div class="nginx-template-input">
-                                                    <a-textarea v-model="form.environmentNginxVhostTemplate"
+                                                    <a-textarea v-model="form.traditionNginxVhostTemplate"
                                                         class="nginx-template-textarea"
                                                         :auto-size="{minRows:10, maxRows:20}"
                                                         :spellcheck="false" placeholder="请输入 NGINX vhost 模板"
@@ -352,41 +352,32 @@
                                                         查看完整示例
                                                     </a-button>
                                                 </div>
-                                                <span class="c-99 mt-6">用于为使用此运行环境的站点生成访问配置。</span>
+                                                <span class="c-99 mt-6">用于为使用此传统应用的站点生成访问配置。</span>
                                             </div>
                                         </a-form-item>
                                     </div>
                                 </a-spin>
                             </a-form-item>
 
-                            <a-form-item v-if="form.type == 'tradition'" label="环境类型">
+                            <a-form-item v-if="form.type == 'app-plugin'" label="依赖传统应用">
                                 <div class="df df-ww env-sel">
-                                    <div v-for="item in environmentList" :key="item.identifie"
-                                        :class="{ 'active': form.environmentName == item.identifie }"
+                                    <div v-for="item in traditionList" :key="item.identifie"
+                                        :class="{ 'active': form.traditionName == item.identifie }"
                                         @click="changeEnv(item)" class="env-item df df-c ai-c cursor">
-                                        <img :src="environmentIcon(item.icon)" class="img" alt="" />
+                                        <img :src="traditionIcon(item.icon)" class="img" alt="" />
                                         <div class="lh-1">{{ item.name }}</div>
-                                        <input type="radio" v-model="form.environmentName" :value="item.identifie"
+                                        <input type="radio" v-model="form.traditionName" :value="item.identifie"
                                             style="display:none;" />
                                     </div>
                                 </div>
                             </a-form-item>
-                            <a-form-item v-if="form.type == 'tradition'" label="环境版本">
-                                <a-select v-model="form.environmentVersion" placeholder="请选择" @change="changeForm"
+                            <a-form-item v-if="form.type == 'app-plugin'" label="依赖应用版本">
+                                <a-select v-model="form.traditionVersion" placeholder="请选择" @change="changeForm"
                                     size="large" style="width:500px;">
                                     <a-option
-                                        v-for="(item, index) in environmentList?.find?.(i => i.identifie == form.environmentName)?.versions || []"
+                                        v-for="(item, index) in traditionList?.find?.(i => i.identifie == form.traditionName)?.versions || []"
                                         :key="index" :label="item" :value="item"></a-option>
                                 </a-select>
-                            </a-form-item>
-                            <a-form-item v-if="form.type == 'tradition'" label="应用类型">
-                                <div class="df df-c" style="align-items:flex-start;">
-                                    <a-radio-group v-model="form.installType" @change="changeForm">
-                                        <a-radio :value="traditionInstallTypes.site">整站应用</a-radio>
-                                        <a-radio :value="traditionInstallTypes.extension">扩展</a-radio>
-                                    </a-radio-group>
-                                    <span class="c-99 mt-6">整站应用用于发布完整站点；扩展用于发布安装到已有站点中的附加功能。</span>
-                                </div>
                             </a-form-item>
                             <a-form-item
                                 v-if="form.type != 'system-image' && form.type != 'gateway-plugin' && (!option || !option.pureManifest && form.type != 'docker' && form.type != 'light' && form.type != 'helm')"
@@ -418,18 +409,18 @@
                                         </div>
                                     </files-upload>
                                     <div class="c-blue cursor ml-20" @click="deleteUpload">删除</div>
-                                    <a-tooltip v-if="form.type == 'tradition'"
-                                        content="请进入代码所在目录后打包，压缩包根目录应直接包含安装内容，不要包含外层目录。整站应用请进入项目根目录，扩展请进入扩展目录。例如：cd 项目目录 && zip -r app.zip .。安装时会解压到 /www/wwwroot/&lt;站点域名&gt;，并随当前版本发布。"
+                                    <a-tooltip v-if="form.type == 'app-plugin'"
+                                        content="请进入应用插件代码根目录后打包，压缩包根目录应直接包含安装内容，不要包含外层目录。例如：cd 应用插件目录 && zip -r app.zip .。安装时会解压到 /www/wwwroot/&lt;站点域名&gt;，并随当前版本发布。"
                                         position="top">
                                         <icon-exclamation-circle-fill class="fs-16 c-99 ml-4" />
                                     </a-tooltip>
-                                    <a-tooltip v-else-if="form.type == 'environment'"
+                                    <a-tooltip v-else-if="form.type == 'tradition'"
                                         content="代码包为可选配置。请进入项目根目录后打包，压缩包根目录应直接包含安装内容，不要包含外层目录。例如：cd 项目目录 && zip -r app.zip .。安装时会解压到 /www/wwwroot/&lt;站点域名&gt;，并随当前版本发布。"
                                         position="top">
                                         <icon-exclamation-circle-fill class="fs-16 c-99 ml-4" />
                                     </a-tooltip>
                                 </div>
-                                <div v-if="zip.hasDockerfile === false && !['environment', 'tradition'].includes(form.type)" class="c-red mt-10">没有检测到Dockerfile文件，请重新上传
+                                <div v-if="zip.hasDockerfile === false && !['tradition', 'app-plugin'].includes(form.type)" class="c-red mt-10">没有检测到Dockerfile文件，请重新上传
                                 </div>
                             </a-form-item>
 
@@ -503,7 +494,7 @@
                         </div>
                     </div>
 
-                    <div v-if="form.type != 'helm' && form.type != 'tradition' && form.type != 'gateway-plugin' && form.type != 'system-image'" class="bg-white com-line mt-20">
+                    <div v-if="form.type != 'helm' && form.type != 'app-plugin' && form.type != 'gateway-plugin' && form.type != 'system-image'" class="bg-white com-line mt-20">
                         <div class="mt-16">
                             <a-form-item label="应用配置">
                                 <div v-if="form.containers && form.containers.length">
@@ -587,7 +578,7 @@
 
                         <a-form-item class="mt-20" label="安装依赖">
                             <manifest-config-table :rows="form.depends" table-class="install-depend-table"
-                                :add-text="form.type == 'environment' ? '' : '添加安装依赖'"
+                                :add-text="form.type == 'tradition' ? '' : '添加安装依赖'"
                                 @add="openDependPicker()">
                                 <template #columns>
                                     <manifest-config-table-column data-index="identifie" title="名称" width="36%">
@@ -601,7 +592,7 @@
                                                         {{ record.identifie }}
                                                     </div>
                                                 </div>
-                                                <a-button v-if="!isEnvironmentFixedDependency(record)" type="text" size="mini"
+                                                <a-button v-if="!isTraditionFixedDependency(record)" type="text" size="mini"
                                                     @click="openDependPicker(index)">
                                                     {{ record.identifie ? '更换' : '选择' }}
                                                 </a-button>
@@ -613,7 +604,7 @@
                                             <a-select v-model="record.subidentifie" size="large"
                                                 @change="record.subname = getSubDependName(index, record.subidentifie); changeForm()"
                                                 placeholder="请选择"
-                                                :disabled="!record.identifie || isEnvironmentFixedDependency(record)">
+                                                :disabled="!record.identifie || isTraditionFixedDependency(record)">
                                                 <a-option v-for="(name, identifie) in getSubDependsOptions(index)"
                                                     :key="identifie" :label="name" :value="identifie"></a-option>
                                             </a-select>
@@ -621,7 +612,7 @@
                                     </manifest-config-table-column>
                                     <manifest-config-table-column data-index="required" title="必须安装" width="10%">
                                         <template #cell="{ record }">
-                                            <a-switch v-model="record.required" :disabled="isEnvironmentFixedDependency(record)"
+                                            <a-switch v-model="record.required" :disabled="isTraditionFixedDependency(record)"
                                                 @change="changeForm" />
                                         </template>
                                     </manifest-config-table-column>
@@ -630,7 +621,7 @@
                                     </manifest-config-table-column>
                                     <manifest-config-table-column title="操作" width="8%">
                                         <template #cell="{ index }">
-                                            <span v-if="!isEnvironmentFixedDependency(form.depends[index])" class="c-blue cursor"
+                                            <span v-if="!isTraditionFixedDependency(form.depends[index])" class="c-blue cursor"
                                                 @click="form.depends.splice(index, 1); changeForm();">删除</span>
                                             <span v-else class="c-99">固定</span>
                                         </template>
@@ -642,7 +633,7 @@
 
                     <div class="bg-white pb-24 mt-20 df ai-c">
                         <a-button v-if="option.pureManifest" :loading="submiting" type="primary" @click="submit(otherData)">确定提交</a-button>
-                        <a-button v-else :loading="submiting" :disabled="environmentNginxGatewayChanging" type="primary" @click="submit()">确定提交</a-button>
+                        <a-button v-else :loading="submiting" :disabled="traditionNginxGatewayChanging" type="primary" @click="submit()">确定提交</a-button>
                     </div>
                 </a-form>
             </div>
@@ -727,17 +718,17 @@
 
         <a-modal v-model:visible="shellConfig.show" title="配置脚本任务" :width="720" :footer="false">
             <a-alert type="info" show-icon class="zpk-primary-alert mb-20" title="提示" :closable="false">
-                <div class="registry-alert-item">脚本会以独立任务运行，运行环境决定任务使用的镜像、容器 env 和目录挂载。</div>
+                <div class="registry-alert-item">脚本会以独立任务运行，执行容器决定任务使用的镜像、容器 env 和目录挂载。</div>
                 <div class="registry-alert-item mt-6">启动参数会同时注入任务的 env 环境，可在脚本中通过环境变量读取。</div>
-                <div class="registry-alert-item mt-6">传统应用固定使用所选运行环境的应用容器。</div>
+                <div class="registry-alert-item mt-6">应用插件固定使用所选传统应用的应用容器。</div>
             </a-alert>
             <a-form v-if="shellConfig.item" :model="shellConfig.item" label-align="left"
                 class="manifest-dialog-form shell-config-form"
                 :label-col-props="{ flex: '0 0 90px' }" :wrapper-col-props="{ flex: '1' }">
-                <a-form-item label="运行环境">
-                    <span v-if="form.type == 'tradition'" class="c-99">使用所选环境应用容器</span>
+                <a-form-item label="执行容器">
+                    <span v-if="form.type == 'app-plugin'" class="c-99">使用所选传统应用容器</span>
                     <a-select v-else v-model="shellConfig.item.container" class="shell-config-control"
-                        :placeholder="hasShellContainerOptions ? '请选择运行环境' : '请先在应用配置中添加容器'"
+                        :placeholder="hasShellContainerOptions ? '请选择执行容器' : '请先在应用配置中添加容器'"
                         :disabled="!hasShellContainerOptions" allow-clear style="width:100%;" @change="changeForm">
                         <a-option v-for="item in shellContainerOptions" :key="item.value" :label="item.label"
                             :value="item.value"></a-option>
@@ -782,23 +773,21 @@ import ManifestConfigTableColumn from '@/components/manifest-config-table-column
 import dependPicker from '@/components/depend-picker.vue';
 import myAxios from '../utils/index';
 import {
-    environmentSysboxRootfsAnnotation,
-    environmentSystemRebootRestoreAnnotation,
-    isEnvironmentAppDependency,
-    removeEnvironmentAppCodeStorage,
-    withEnvironmentAppIngress,
-    withEnvironmentAppStorage,
-    withEnvironmentAppSysbox,
-} from '@/utils/environment-app';
-import {
-    applyTraditionEnvironmentDependencyStartParams,
-    createTraditionEnvironmentDependency,
-    normalizeTraditionInstall,
-    removeTraditionAppStorage,
-    traditionInstallTypes,
+    traditionSysboxRootfsAnnotation,
+    traditionSystemRebootRestoreAnnotation,
+    isTraditionAppDependency,
+    removeTraditionAppCodeStorage,
+    withTraditionAppIngress,
     withTraditionAppStorage,
-    withTraditionEnvironmentStartParams,
+    withTraditionAppSysbox,
 } from '@/utils/tradition-app';
+import {
+    applyPluginTraditionDependencyStartParams,
+    createPluginTraditionDependency,
+    removePluginAppStorage,
+    withPluginAppStorage,
+    withPluginTraditionStartParams,
+} from '@/utils/plugin-app';
 import {
     IconCheckCircleFill,
     IconClose,
@@ -810,27 +799,23 @@ import {
 import { confirm, messageError, messageSuccess, messageWarning } from '@/utils/ui-feedback';
 import emitWujieEvent from '@/utils/wujie-event';
 
-const environmentAnnotationKeys = {
+const traditionAnnotationKeys = {
     imageLanguage: 'w7.cc/image_language',
     imageTemplate: 'w7.cc/image_template',
     imageVersion: 'w7.cc/image_version',
     nginxVhostTemplate: 'w7.cc/nginx_vhost_template',
     nginxGateway: 'w7.cc/nginx-gateway',
-    systemRebootRestore: environmentSystemRebootRestoreAnnotation,
+    systemRebootRestore: traditionSystemRebootRestoreAnnotation,
 };
 
 const systemImageAnnotationKeys = {
     category: 'w7.cc/system_image_category',
-    versions: environmentAnnotationKeys.imageVersion,
+    versions: traditionAnnotationKeys.imageVersion,
     rootfs: 'sysbox/rootfs-rw-layer',
 };
 
 const isDerivedDependencyReleaseStartParam = item => Boolean(
     item?.hidden && /_RELEASE_NAME$/.test(item?.name || '')
-);
-
-const isLegacyTraditionInstallDirectoryStartParam = (item, applicationType) => (
-    applicationType === 'tradition' && item?.name === 'CODE_INSTALL_DIRECTORY'
 );
 
 const pvcNameStartParamName = 'PVC_NAME';
@@ -849,7 +834,7 @@ const gatewayPluginCategoryOptions = [
     { label: '自定义', value: 'custom' },
 ];
 
-const environmentLanguagePresets = [
+const traditionLanguagePresets = [
     { label: 'PHP', value: 'php' },
     { label: 'Java', value: 'java' },
     { label: 'Node.js', value: 'nodejs' },
@@ -931,7 +916,7 @@ const nginxTemplateExample = String.raw`server {
 }`;
 
 export default {
-    emits: ['writefile', 'environment-nginx-gateway-change'],
+    emits: ['writefile', 'tradition-nginx-gateway-change'],
     props: [
         'data',
         'submiting',
@@ -998,12 +983,12 @@ export default {
                 gatewayPluginSupportRule: false,
                 gatewayPluginDefaultEnabled: true,
                 gatewayPluginDefaultConfig: '{}',
-                environmentImageLanguage: '',
-                environmentImageTemplate: '',
-                environmentImageVersion: [],
-                environmentSystemRebootRestore: true,
-                environmentNginxGateway: false,
-                environmentNginxVhostTemplate: '',
+                traditionImageLanguage: '',
+                traditionImageTemplate: '',
+                traditionImageVersion: [],
+                traditionSystemRebootRestore: true,
+                traditionNginxGateway: false,
+                traditionNginxVhostTemplate: '',
                 systemImageCategory: 'operating-system',
                 systemImageTemplate: '',
                 systemImageVersions: [],
@@ -1037,9 +1022,8 @@ export default {
                     kv: [],
                 },
                 entry: 'public',
-                environmentName: '',
-                environmentVersion: '',
-                installType: traditionInstallTypes.site,
+                traditionName: '',
+                traditionVersion: '',
                 cmd: [''],
 
             },
@@ -1117,36 +1101,36 @@ export default {
                 gatewayPluginPriority: [
                     { required: true, message: '请输入优先级', trigger: 'change' },
                 ],
-                environmentImageLanguage: [
+                traditionImageLanguage: [
                     {
                         required: true,
-                        message: '请选择环境语言',
+                        message: '请选择应用语言',
                         trigger: 'change',
                     },
                 ],
-                environmentImageTemplate: [
+                traditionImageTemplate: [
                     {
                         required: true,
                         message: '请输入镜像地址',
                         trigger: 'blur',
-                        validator: (value, callback) => this.validateEnvironmentImageTemplate(value, callback),
+                        validator: (value, callback) => this.validateTraditionImageTemplate(value, callback),
                     },
                 ],
-                environmentImageVersion: [
+                traditionImageVersion: [
                     {
                         required: true,
-                        message: '请输入环境版本',
+                        message: '请输入传统应用版本',
                         trigger: 'change',
-                        validator: (value, callback) => this.validateEnvironmentImageVersions(value, callback),
+                        validator: (value, callback) => this.validateTraditionImageVersions(value, callback),
                     },
                 ],
-                environmentNginxVhostTemplate: [
+                traditionNginxVhostTemplate: [
                     {
                         required: false,
                         message: '请输入 NGINX 模板',
                         trigger: 'blur',
                         validator: (value, callback) => {
-                            if (!this.form.environmentNginxGateway || String(value || '').trim()) {
+                            if (!this.form.traditionNginxGateway || String(value || '').trim()) {
                                 callback();
                             } else {
                                 callback('请输入 NGINX 模板');
@@ -1253,7 +1237,7 @@ export default {
 
             containerPluginData: {},
 
-            environmentList: [],
+            traditionList: [],
             versionList: [],
             commandList: [],
 
@@ -1261,8 +1245,8 @@ export default {
             formulaSettingLoading: false,
             formulaSettingLoaded: false,
             formulaBaseInfo: null,
-            environmentNginxGatewayChanging: false,
-            environmentNginxGatewayAnnotationPresent: false,
+            traditionNginxGatewayChanging: false,
+            traditionNginxGatewayAnnotationPresent: false,
             sysboxDependencyManaged: false,
             initialApplicationType: '',
             currentApplicationType: '',
@@ -1274,13 +1258,13 @@ export default {
     },
     created() {
         this.getDependsList();
-        this.getEnvironmentList();
+        this.getTraditionList();
         this.baseurl = window?.$wujie?.props?.url || '';
         hljs.configure({ ignoreUnescapedHTML: true });
         this.init(this.data);
         if (!this.option?.pureManifest) {
             this.getTag();
-            if (['environment', 'gateway-plugin'].includes(this.form.type)) {
+            if (['tradition', 'gateway-plugin'].includes(this.form.type)) {
                 this.loadFormulaSetting().catch(() => { });
             }
         } else {
@@ -1313,18 +1297,15 @@ export default {
     },
 
     computed: {
-        traditionInstallTypes() {
-            return traditionInstallTypes;
-        },
-        environmentLanguageOptions() {
-            let currentLanguage = String(this.form.environmentImageLanguage || '').trim();
-            if (currentLanguage && !environmentLanguagePresets.some(option => option.value == currentLanguage)) {
+        traditionLanguageOptions() {
+            let currentLanguage = String(this.form.traditionImageLanguage || '').trim();
+            if (currentLanguage && !traditionLanguagePresets.some(option => option.value == currentLanguage)) {
                 return [
                     { label: `${currentLanguage}（已有值）`, value: currentLanguage },
-                    ...environmentLanguagePresets,
+                    ...traditionLanguagePresets,
                 ];
             }
-            return environmentLanguagePresets;
+            return traditionLanguagePresets;
         },
         helmChartOptions() {
             return this.filterAutocompleteOptions(this.helmCharts, this.helmChartKeyword);
@@ -1332,8 +1313,8 @@ export default {
         helmChartVersionOptions() {
             return this.filterAutocompleteOptions(this.helmChartVersions, this.helmChartVersionKeyword);
         },
-        selectedEnvironment() {
-            return this.environmentList?.find?.(i => i.identifie == this.form.environmentName) || null;
+        selectedTradition() {
+            return this.traditionList?.find?.(i => i.identifie == this.form.traditionName) || null;
         },
         shellTypeOptions() {
             return [
@@ -1357,12 +1338,12 @@ export default {
                 }));
         },
         hasShellContainerOptions() {
-            return this.form.type != 'tradition' && this.shellContainerOptions.length > 0;
+            return this.form.type != 'app-plugin' && this.shellContainerOptions.length > 0;
         },
         defaultShellContainer() {
             return this.hasShellContainerOptions ? this.shellContainerOptions[0].value : '';
         },
-        environmentIcon() {
+        traditionIcon() {
             return icon => {
                 if (!icon) return '';
                 return /^https?:\/\//i.test(icon) ? icon : `https://img.w7.cc${icon.startsWith('/') ? '' : '/'}${icon}`;
@@ -1379,12 +1360,12 @@ export default {
 
         data() {
             this.init(this.data);
-            if (!this.option?.pureManifest && ['environment', 'gateway-plugin', 'system-image'].includes(this.form.type)) {
+            if (!this.option?.pureManifest && ['tradition', 'gateway-plugin', 'system-image'].includes(this.form.type)) {
                 this.loadFormulaSetting().catch(() => { });
             }
         },
         'form.storage'(v) {
-            const params = this.form.type == 'environment'
+            const params = this.form.type == 'tradition'
                 ? []
                 : [
                     { mark: 'storage', name: 'global.cluster.storageRWmode', title: '读写模式', required: true, values_text: '%STORAGE_RW_MODE%', module_name: '' },
@@ -1447,8 +1428,8 @@ export default {
         },
         'option.app_ports'(v) {
             this.computedAppPort();
-            if (this.form.type == 'environment' && this.form.environmentNginxGateway) {
-                this.syncEnvironmentIngress(v);
+            if (this.form.type == 'tradition' && this.form.traditionNginxGateway) {
+                this.syncTraditionIngress(v);
             }
         }
     },
@@ -1460,11 +1441,11 @@ export default {
     methods: {
         useNginxTemplateExample() {
             const applyExample = () => {
-                this.form.environmentNginxVhostTemplate = this.nginxTemplateExample;
+                this.form.traditionNginxVhostTemplate = this.nginxTemplateExample;
                 this.nginxTemplateExampleVisible = false;
                 messageSuccess('已填入 NGINX 模板示例');
             };
-            const currentTemplate = String(this.form.environmentNginxVhostTemplate || '').trim();
+            const currentTemplate = String(this.form.traditionNginxVhostTemplate || '').trim();
 
             if (!currentTemplate || currentTemplate == this.nginxTemplateExample.trim()) {
                 applyExample();
@@ -1479,30 +1460,30 @@ export default {
                 onOk: applyExample,
             });
         },
-        toggleEnvironmentNginxGateway(value) {
-            if (this.form.type != 'environment' || this.option?.pureManifest
-                || this.environmentNginxGatewayChanging) {
+        toggleTraditionNginxGateway(value) {
+            if (this.form.type != 'tradition' || this.option?.pureManifest
+                || this.traditionNginxGatewayChanging) {
                 return;
             }
             const enabled = Boolean(value);
             const previous = !enabled;
             // Keep the visible state unchanged until the confirmation and the
             // parent-side import/removal have completed successfully.
-            this.form.environmentNginxGateway = previous;
+            this.form.traditionNginxGateway = previous;
             const finish = (success) => {
-                this.environmentNginxGatewayChanging = false;
+                this.traditionNginxGatewayChanging = false;
                 if (!success) {
-                    this.form.environmentNginxGateway = previous;
+                    this.form.traditionNginxGateway = previous;
                 } else {
-                    this.form.environmentNginxGateway = enabled;
+                    this.form.traditionNginxGateway = enabled;
                     // Rebuild only the managed ingress backend after the
                     // parent has imported/removed the dependency.
-                    this.syncEnvironmentIngress();
+                    this.syncTraditionIngress();
                 }
             };
             const request = () => {
-                this.environmentNginxGatewayChanging = true;
-                this.$emit('environment-nginx-gateway-change', {
+                this.traditionNginxGatewayChanging = true;
+                this.$emit('tradition-nginx-gateway-change', {
                     enabled,
                     finish,
                 });
@@ -1516,11 +1497,11 @@ export default {
                 cancelButtonText: '取消',
                 onOk: request,
                 onCancel: () => {
-                    this.form.environmentNginxGateway = previous;
+                    this.form.traditionNginxGateway = previous;
                 },
             });
         },
-        validateEnvironmentImageTemplate(value, callback) {
+        validateTraditionImageTemplate(value, callback) {
             let template = String(value || '').trim();
             if (!template) {
                 callback('请输入镜像地址');
@@ -1542,10 +1523,10 @@ export default {
             }
             callback();
         },
-        validateEnvironmentImageVersions(value, callback) {
-            let versions = this.normalizeEnvironmentVersions(value);
+        validateTraditionImageVersions(value, callback) {
+            let versions = this.normalizeApplicationVersions(value);
             if (!versions.length) {
-                callback('请输入至少一个环境版本');
+                callback('请输入至少一个传统应用版本');
                 return;
             }
             let invalidVersions = [...new Set(versions.filter(version => !/^[A-Za-z0-9_][A-Za-z0-9._-]{0,127}$/.test(version)))];
@@ -1571,14 +1552,14 @@ export default {
             callback();
         },
         validateSystemImageVersions(value, callback) {
-            let versions = this.normalizeEnvironmentVersions(value);
+            let versions = this.normalizeApplicationVersions(value);
             if (!versions.length) { callback('请输入至少一个系统版本'); return; }
             let invalid = versions.filter(version => !/^[A-Za-z0-9_][A-Za-z0-9._-]{0,127}$/.test(version));
             if (invalid.length) { callback('系统版本格式不正确：' + invalid.slice(0, 3).join('、')); return; }
             callback();
         },
         systemImageStartParams() {
-            let versions = this.normalizeEnvironmentVersions(this.form.systemImageVersions);
+            let versions = this.normalizeApplicationVersions(this.form.systemImageVersions);
             let fixedNames = new Set([
                 'IMAGE_VERSION',
                 'global.cluster.storageRWmode',
@@ -1594,8 +1575,8 @@ export default {
                 ...customParams,
             ];
         },
-        environmentStartParams() {
-            let versions = this.normalizeEnvironmentVersions(this.form.environmentImageVersion);
+        traditionStartParams() {
+            let versions = this.normalizeApplicationVersions(this.form.traditionImageVersion);
             let fixedNames = new Set([
                 'IMAGE_VERSION',
                 'DOMAIN_URL',
@@ -1605,23 +1586,23 @@ export default {
             ]);
             let customParams = (this.form.startParams || []).filter(item => !fixedNames.has(item?.name));
             let params = [
-                { mark: 'environment', name: 'IMAGE_VERSION', title: '环境版本', required: true, values_text: versions.join('|'), module_name: '', description: '选择要安装的运行环境版本', type: 'select' },
+                { mark: 'tradition', name: 'IMAGE_VERSION', title: '传统应用版本', required: true, values_text: versions.join('|'), module_name: '', description: '选择要安装的传统应用版本', type: 'select' },
                 { mark: 'environment-site', name: 'DOMAIN_URL', title: '站点域名', required: true, values_text: '%DOMAIN_URL%', module_name: '', description: '用于站点访问', type: 'text' },
             ];
             return [...params, ...customParams];
         },
-        hasEnvironmentCodePackage() {
-            return this.form.type == 'environment'
+        hasTraditionCodePackage() {
+            return this.form.type == 'tradition'
                 && Boolean(String(this.zip?.url || this.json?.source?.url || '').trim());
         },
-        syncEnvironmentVersionConfig() {
-            if (this.form.type != 'environment') { return; }
-            this.form.environmentImageVersion = this.normalizeEnvironmentVersions(this.form.environmentImageVersion);
-            this.form.startParams = this.environmentStartParams();
+        syncTraditionVersionConfig() {
+            if (this.form.type != 'tradition') { return; }
+            this.form.traditionImageVersion = this.normalizeApplicationVersions(this.form.traditionImageVersion);
+            this.form.startParams = this.traditionStartParams();
             this.changeForm();
         },
-        ensureEnvironmentContainerDefaults(forceImage = false) {
-            if (this.form.type != 'environment') { return; }
+        ensureTraditionContainerDefaults(forceImage = false) {
+            if (this.form.type != 'tradition') { return; }
             this.json.platform = this.json.platform || {};
             delete this.json.platform.container;
             let containers = Array.isArray(this.json.platform['container-v2'])
@@ -1632,13 +1613,13 @@ export default {
                 mainContainer = {
                     name: (this.form.author && this.form.identifie)
                         ? `${this.form.author}-${this.form.identifie}`
-                        : (this.json?.application?.identifie || 'environment'),
+                        : (this.json?.application?.identifie || 'tradition'),
                     image: '',
                     imagePullPolicy: 'IfNotPresent',
                 };
                 containers.unshift(mainContainer);
             }
-            let imageTemplate = String(this.form.environmentImageTemplate || '').trim();
+            let imageTemplate = String(this.form.traditionImageTemplate || '').trim();
             if (forceImage || !String(mainContainer.image || '').trim()) {
                 mainContainer.image = imageTemplate;
             }
@@ -1655,42 +1636,42 @@ export default {
                 this.containerPluginData.kind = 'Deployment';
             }
             this.fillDefaultShellContainer();
-            this.json.platform = withEnvironmentAppStorage(this.json.platform);
+            this.json.platform = withTraditionAppStorage(this.json.platform);
         },
-        getEnvironmentMainContainer() {
+        getTraditionMainContainer() {
             return this.json?.platform?.['container-v2']
                 ?.find(item => !item?.isInitContainer);
         },
-        syncEnvironmentRuntimeConfig() {
-            if (this.form.type != 'environment') { return; }
-            this.ensureEnvironmentContainerDefaults(true);
-            this.applyEnvironmentRebootRestoreConfig();
+        syncTraditionRuntimeConfig() {
+            if (this.form.type != 'tradition') { return; }
+            this.ensureTraditionContainerDefaults(true);
+            this.applyTraditionRebootRestoreConfig();
             this.syncSysboxDependency();
             this.changeForm();
         },
-        applyEnvironmentRebootRestoreConfig() {
-            if (this.form.type != 'environment' || !this.json?.platform) { return; }
-            const result = withEnvironmentAppSysbox(
+        applyTraditionRebootRestoreConfig() {
+            if (this.form.type != 'tradition' || !this.json?.platform) { return; }
+            const result = withTraditionAppSysbox(
                 this.json.platform,
                 this.json.application?.annotation || {},
-                Boolean(this.form.environmentSystemRebootRestore),
+                Boolean(this.form.traditionSystemRebootRestore),
             );
             this.json.platform = result.platform;
             this.json.application = this.json.application || {};
             this.json.application.annotation = result.annotations;
         },
-        syncEnvironmentIngress(portSource = this.option?.app_ports || []) {
-            if (this.form.type != 'environment' || !this.json?.platform) {
+        syncTraditionIngress(portSource = this.option?.app_ports || []) {
+            if (this.form.type != 'tradition' || !this.json?.platform) {
                 return this.json?.platform?.ingress || [];
             }
             const applicationIdentifie = this.json?.application?.identifie
                 || ((this.form.author && this.form.identifie)
                     ? `${this.form.author}-${this.form.identifie}`
                     : this.identifie || '');
-            this.json.platform = withEnvironmentAppIngress(
+            this.json.platform = withTraditionAppIngress(
                 this.json.platform,
                 applicationIdentifie,
-                Boolean(this.form.environmentNginxGateway),
+                Boolean(this.form.traditionNginxGateway),
                 portSource,
             );
             const ingress = JSON.parse(JSON.stringify(this.json.platform.ingress || []));
@@ -1701,7 +1682,7 @@ export default {
         },
         syncSystemImageConfig() {
             if (this.form.type != 'system-image') { return; }
-            this.form.systemImageVersions = this.normalizeEnvironmentVersions(this.form.systemImageVersions);
+            this.form.systemImageVersions = this.normalizeApplicationVersions(this.form.systemImageVersions);
             this.form.startParams = this.systemImageStartParams();
             this.form.storage = true;
             this.json.platform = this.json.platform || {};
@@ -1785,7 +1766,7 @@ export default {
                     throw new Error('制品基础信息为空');
                 }
                 this.formulaBaseInfo = JSON.parse(JSON.stringify(baseInfo));
-                this.applyEnvironmentAnnotationForm(baseInfo.annotation || {});
+                this.applyTraditionAnnotationForm(baseInfo.annotation || {});
                 this.applySystemImageAnnotationForm(baseInfo.annotation || {});
                 if (this.form.type == 'gateway-plugin') {
                     this.form.once = true;
@@ -1798,35 +1779,35 @@ export default {
             });
             return this._formulaSettingPromise;
         },
-        applyEnvironmentAnnotationForm(annotation = {}) {
-            this.environmentNginxGatewayAnnotationPresent = Object.prototype.hasOwnProperty.call(
+        applyTraditionAnnotationForm(annotation = {}) {
+            this.traditionNginxGatewayAnnotationPresent = Object.prototype.hasOwnProperty.call(
                 annotation || {},
-                environmentAnnotationKeys.nginxGateway,
+                traditionAnnotationKeys.nginxGateway,
             );
-            if (this.environmentNginxGatewayAnnotationPresent) {
-                const value = annotation[environmentAnnotationKeys.nginxGateway];
-                this.form.environmentNginxGateway = value === true
+            if (this.traditionNginxGatewayAnnotationPresent) {
+                const value = annotation[traditionAnnotationKeys.nginxGateway];
+                this.form.traditionNginxGateway = value === true
                     || String(value).toLowerCase() == 'true';
             }
-            this.form.environmentImageLanguage = String(annotation[environmentAnnotationKeys.imageLanguage] || '');
-            this.form.environmentImageTemplate = String(annotation[environmentAnnotationKeys.imageTemplate] || '');
-            this.form.environmentImageVersion = this.normalizeEnvironmentVersions(annotation[environmentAnnotationKeys.imageVersion]);
-            this.form.environmentNginxVhostTemplate = String(annotation[environmentAnnotationKeys.nginxVhostTemplate] || '');
-            const restoreValue = annotation[environmentAnnotationKeys.systemRebootRestore];
-            this.form.environmentSystemRebootRestore = restoreValue === undefined || restoreValue === null || restoreValue === ''
-                ? String(this.form.environmentImageLanguage || '').toLowerCase() != 'php'
+            this.form.traditionImageLanguage = String(annotation[traditionAnnotationKeys.imageLanguage] || '');
+            this.form.traditionImageTemplate = String(annotation[traditionAnnotationKeys.imageTemplate] || '');
+            this.form.traditionImageVersion = this.normalizeApplicationVersions(annotation[traditionAnnotationKeys.imageVersion]);
+            this.form.traditionNginxVhostTemplate = String(annotation[traditionAnnotationKeys.nginxVhostTemplate] || '');
+            const restoreValue = annotation[traditionAnnotationKeys.systemRebootRestore];
+            this.form.traditionSystemRebootRestore = restoreValue === undefined || restoreValue === null || restoreValue === ''
+                ? String(this.form.traditionImageLanguage || '').toLowerCase() != 'php'
                 : String(restoreValue).toLowerCase() == 'true';
-            if (this.form.type == 'environment') {
-                this.ensureEnvironmentContainerDefaults();
-                this.form.startParams = this.environmentStartParams();
-                this.applyEnvironmentRebootRestoreConfig();
+            if (this.form.type == 'tradition') {
+                this.ensureTraditionContainerDefaults();
+                this.form.startParams = this.traditionStartParams();
+                this.applyTraditionRebootRestoreConfig();
             }
         },
         applySystemImageAnnotationForm(annotation = {}) {
             this.form.systemImageCategory = String(annotation[systemImageAnnotationKeys.category] || 'operating-system');
-            this.form.systemImageVersions = this.normalizeEnvironmentVersions(annotation[systemImageAnnotationKeys.versions]);
+            this.form.systemImageVersions = this.normalizeApplicationVersions(annotation[systemImageAnnotationKeys.versions]);
         },
-        normalizeEnvironmentVersions(value) {
+        normalizeApplicationVersions(value) {
             let values = Array.isArray(value) ? value : String(value || '').split(/[,，\n]/);
             return [...new Set(values
                 .map(item => String(item || ''))
@@ -1834,31 +1815,31 @@ export default {
                 .map(item => item.trim())
                 .filter(Boolean))];
         },
-        changeEnvironmentLanguage(value) {
-            this.form.environmentSystemRebootRestore = String(value || '').toLowerCase() != 'php';
+        changeTraditionLanguage(value) {
+            this.form.traditionSystemRebootRestore = String(value || '').toLowerCase() != 'php';
         },
-        getEnvironmentAnnotations() {
-            let versions = this.normalizeEnvironmentVersions(this.form.environmentImageVersion);
-            this.form.environmentImageVersion = versions;
+        getTraditionAnnotations() {
+            let versions = this.normalizeApplicationVersions(this.form.traditionImageVersion);
+            this.form.traditionImageVersion = versions;
             const annotations = {
-                [environmentAnnotationKeys.imageLanguage]: String(this.form.environmentImageLanguage || '').trim(),
-                [environmentAnnotationKeys.imageTemplate]: String(this.form.environmentImageTemplate || '').trim(),
-                [environmentAnnotationKeys.imageVersion]: versions.join(','),
-                [environmentAnnotationKeys.nginxVhostTemplate]: this.form.environmentNginxGateway
-                    ? String(this.form.environmentNginxVhostTemplate || '')
+                [traditionAnnotationKeys.imageLanguage]: String(this.form.traditionImageLanguage || '').trim(),
+                [traditionAnnotationKeys.imageTemplate]: String(this.form.traditionImageTemplate || '').trim(),
+                [traditionAnnotationKeys.imageVersion]: versions.join(','),
+                [traditionAnnotationKeys.nginxVhostTemplate]: this.form.traditionNginxGateway
+                    ? String(this.form.traditionNginxVhostTemplate || '')
                     : '',
-                [environmentAnnotationKeys.nginxGateway]: String(Boolean(this.form.environmentNginxGateway)),
-                [environmentAnnotationKeys.systemRebootRestore]: String(Boolean(this.form.environmentSystemRebootRestore)),
+                [traditionAnnotationKeys.nginxGateway]: String(Boolean(this.form.traditionNginxGateway)),
+                [traditionAnnotationKeys.systemRebootRestore]: String(Boolean(this.form.traditionSystemRebootRestore)),
             };
             return annotations;
         },
         filterAnnotationsForType(annotation = {}, type = this.form.type) {
             let filtered = { ...(annotation || {}) };
-            if (type != 'environment' && type != 'system-image') {
-                Object.values(environmentAnnotationKeys).forEach(key => delete filtered[key]);
+            if (type != 'tradition' && type != 'system-image') {
+                Object.values(traditionAnnotationKeys).forEach(key => delete filtered[key]);
             } else if (type == 'system-image') {
-                Object.values(environmentAnnotationKeys)
-                    .filter(key => key != environmentAnnotationKeys.imageVersion)
+                Object.values(traditionAnnotationKeys)
+                    .filter(key => key != traditionAnnotationKeys.imageVersion)
                     .forEach(key => delete filtered[key]);
             }
             Object.keys(filtered)
@@ -1866,16 +1847,16 @@ export default {
                     && (key.startsWith(gatewayPluginAnnotationPrefix)
                         || gatewayPluginAnnotationKeys.includes(key)))
                 .forEach(key => delete filtered[key]);
-            if (type == 'environment') {
-                Object.assign(filtered, this.getEnvironmentAnnotations());
+            if (type == 'tradition') {
+                Object.assign(filtered, this.getTraditionAnnotations());
             }
             if (type != 'system-image') {
                 Object.values(systemImageAnnotationKeys)
-                    .filter(key => type != 'environment'
+                    .filter(key => type != 'tradition'
                         || ![systemImageAnnotationKeys.versions, systemImageAnnotationKeys.rootfs].includes(key))
                     .forEach(key => delete filtered[key]);
             } else {
-                let versions = this.normalizeEnvironmentVersions(this.form.systemImageVersions);
+                let versions = this.normalizeApplicationVersions(this.form.systemImageVersions);
                 Object.assign(filtered, {
                     [systemImageAnnotationKeys.category]: this.form.systemImageCategory || 'operating-system',
                     [systemImageAnnotationKeys.versions]: versions.join(','),
@@ -1922,7 +1903,7 @@ export default {
                 this.form.containers = [];
                 this.form.cmd = [''];
             }
-            if (previousType == 'environment' && !['environment', 'system-image'].includes(nextType)) {
+            if (previousType == 'tradition' && !['tradition', 'system-image'].includes(nextType)) {
                 this.form.startParams = (this.form.startParams || [])
                     .filter(item => ![
                         'IMAGE_VERSION',
@@ -1932,11 +1913,11 @@ export default {
                         'global.cluster.storageClassName',
                     ].includes(item?.name));
                 this.json.platform.startParams = this.serializeStartParams();
-                removeEnvironmentAppCodeStorage(this.json);
+                removeTraditionAppCodeStorage(this.json);
                 this.form.dependsIn = (this.form.dependsIn || [])
-                    .filter(item => !isEnvironmentAppDependency(item));
+                    .filter(item => !isTraditionAppDependency(item));
                 this.form.depends = (this.form.depends || [])
-                    .filter(item => !isEnvironmentAppDependency(item));
+                    .filter(item => !isTraditionAppDependency(item));
             }
             if (previousType != 'system-image' && nextType == 'system-image') {
                 delete this.json.source;
@@ -1950,9 +1931,9 @@ export default {
                 this.form.ingress = [];
                 this.form.domain = false;
             }
-            if (previousType == 'tradition' && nextType != 'tradition') {
-                delete this.json.platform.tradition;
-                this.json.platform = removeTraditionAppStorage(this.json.platform);
+            if (previousType == 'app-plugin' && nextType != 'app-plugin') {
+                delete this.json.platform.plugin;
+                this.json.platform = removePluginAppStorage(this.json.platform);
             }
             if (previousType == 'helm' && nextType != 'helm') {
                 delete this.json.platform.helm;
@@ -1962,8 +1943,8 @@ export default {
             }
         },
         shouldSaveFormulaTypeSetting() {
-            if (['environment', 'gateway-plugin', 'system-image'].includes(this.form.type)) { return true }
-            return ['environment', 'gateway-plugin', 'system-image'].includes(this.initialApplicationType)
+            if (['tradition', 'gateway-plugin', 'system-image'].includes(this.form.type)) { return true }
+            return ['tradition', 'gateway-plugin', 'system-image'].includes(this.initialApplicationType)
                 && this.form.type != this.initialApplicationType;
         },
         async saveFormulaTypeSetting() {
@@ -1977,7 +1958,7 @@ export default {
                 annotation: this.filterAnnotationsForType(baseInfo.annotation || {}),
                 once: this.form.type == 'gateway-plugin'
                     ? true
-                    : (['environment', 'system-image'].includes(this.form.type) ? false : Boolean(baseInfo.once)),
+                    : (['tradition', 'system-image'].includes(this.form.type) ? false : Boolean(baseInfo.once)),
             };
             await myAxios.post('/respo/setting/set', {
                 identifie: this.identifie,
@@ -1985,13 +1966,14 @@ export default {
             });
             if (this.form.type == 'gateway-plugin') {
                 this.form.once = true;
-            } else if (['environment', 'system-image'].includes(this.form.type)) {
+            } else if (['tradition', 'system-image'].includes(this.form.type)) {
                 this.form.once = false;
             }
             this.formulaBaseInfo = JSON.parse(JSON.stringify(nextBaseInfo));
         },
         getDefaultTypeTagName(type = this.form.type) {
-            if (type == 'environment') { return '运行环境' }
+            if (type == 'app-plugin') { return '应用插件' }
+            if (type == 'tradition') { return '传统应用' }
             if (type == 'system-image') { return '系统镜像' }
             if (type == 'gateway-plugin') { return '网关插件' }
             return '';
@@ -2007,39 +1989,39 @@ export default {
                 name,
             })));
         },
-        isEnvironmentFixedDependency(record) {
-            return (this.form.type == 'environment' && isEnvironmentAppDependency(record))
+        isTraditionFixedDependency(record) {
+            return (this.form.type == 'tradition' && isTraditionAppDependency(record))
                 || (this.requiresSysboxDependency() && record?.identifie == 'w7panel-sysbox')
-                || this.isTraditionEnvironmentDependency(record);
+                || this.isPluginTraditionDependency(record);
         },
-        isTraditionEnvironmentDependency(record) {
-            if (this.form.type != 'tradition') { return false }
+        isPluginTraditionDependency(record) {
+            if (this.form.type != 'app-plugin') { return false }
             const dependencyIdentify = String(record?.identifie || '').replaceAll('_', '-');
-            const environmentIdentify = String(this.form.environmentName || '').replaceAll('_', '-');
-            return Boolean(environmentIdentify) && dependencyIdentify == environmentIdentify;
+            const traditionIdentify = String(this.form.traditionName || '').replaceAll('_', '-');
+            return Boolean(traditionIdentify) && dependencyIdentify == traditionIdentify;
         },
-        syncEnvironmentDependency() {
-            if (this.form.type != 'environment') {
+        syncTraditionDependency() {
+            if (this.form.type != 'tradition') {
                 return;
             }
-            if (this.environmentNginxGatewayChanging) {
+            if (this.traditionNginxGatewayChanging) {
                 return;
             }
-            if (this.form.environmentNginxGateway) {
+            if (this.form.traditionNginxGateway) {
                 return;
             }
-            // Nginx is optional for environment applications. When the switch
+            // Nginx is optional for traditional applications. When the switch
             // is off, remove only the managed dependency and leave any other
             // user-selected dependencies untouched.
             this.form.depends = (this.form.depends || [])
-                .filter(item => !isEnvironmentAppDependency(item));
+                .filter(item => !isTraditionAppDependency(item));
             this.form.dependsIn = (this.form.dependsIn || [])
-                .filter(item => !isEnvironmentAppDependency(item));
+                .filter(item => !isTraditionAppDependency(item));
         },
         requiresSysboxDependency() {
             if (this.form.type == 'system-image') { return true }
-            if (this.form.type != 'environment') { return false }
-            return Boolean(this.json.application?.annotation?.[environmentSysboxRootfsAnnotation]);
+            if (this.form.type != 'tradition') { return false }
+            return Boolean(this.json.application?.annotation?.[traditionSysboxRootfsAnnotation]);
         },
         syncSysboxDependency() {
             let depends = Array.isArray(this.form.depends) ? this.form.depends : [];
@@ -2090,7 +2072,7 @@ export default {
             if (!record) { return }
             const item = { ...record };
             if (item.container === undefined) { item.container = ''; }
-            if (this.form.type != 'tradition' && !item.container && this.defaultShellContainer) {
+            if (this.form.type != 'app-plugin' && !item.container && this.defaultShellContainer) {
                 item.container = this.defaultShellContainer;
             }
             if (item.shell === undefined) { item.shell = ''; }
@@ -2102,11 +2084,11 @@ export default {
         },
         getShellTaskStatus(record) {
             if (!record?.shell) { return '未配置' }
-            if (this.form.type == 'tradition') { return '所选环境应用容器' }
-            return record.container || this.defaultShellContainer || '默认运行环境';
+            if (this.form.type == 'app-plugin') { return '所选传统应用容器' }
+            return record.container || this.defaultShellContainer || '默认执行容器';
         },
         fillDefaultShellContainer() {
-            if (this.form.type == 'tradition' || !this.defaultShellContainer) { return }
+            if (this.form.type == 'app-plugin' || !this.defaultShellContainer) { return }
             (this.form.shell || []).forEach(item => {
                 if (item && !item.container) {
                     item.container = this.defaultShellContainer;
@@ -2163,8 +2145,8 @@ export default {
                 'global.cluster.storageClassName',
             ].includes(item?.name);
         },
-        isEnvironmentFixedStartParam(item) {
-            return this.form.type == 'environment' && [
+        isTraditionFixedStartParam(item) {
+            return this.form.type == 'tradition' && [
                 'IMAGE_VERSION',
                 'DOMAIN_URL',
                 'global.cluster.storageRWmode',
@@ -2177,16 +2159,16 @@ export default {
         },
         isFixedStartParam(item) {
             return this.isSystemImageFixedStartParam(item)
-                || this.isEnvironmentFixedStartParam(item)
+                || this.isTraditionFixedStartParam(item)
                 || this.isPVCNameStartParam(item);
         },
         computedSpDisabled(item) {
             return this.isFixedStartParam(item)
-                || ((this.disabledDomainStartParams || this.form.type == 'tradition') && this.isDomainStartParam(item))
+                || ((this.disabledDomainStartParams || this.form.type == 'app-plugin') && this.isDomainStartParam(item))
                 || (this.json?.platform?.['volumeClaimTemplates']?.length && item.mark === 'storage')
         },
         ensurePVCNameStartParam(volumes = this.json?.platform?.volumes) {
-            if (this.form.type == 'tradition') {
+            if (this.form.type == 'app-plugin') {
                 this.form.startParams = (this.form.startParams || [])
                     .filter(item => !this.isPVCNameStartParam(item));
                 return;
@@ -2212,16 +2194,15 @@ export default {
         serializeStartParams() {
             // PVC_NAME is installation input rather than an author-maintained
             // value. Add it here as well as from the volume editor so old
-            // manifests are upgraded when they are saved. Traditional apps
-            // resolve the environment PVC at Helm render time and skip it.
+            // manifests are upgraded when they are saved. Plugins resolve the
+            // traditional application's PVC at Helm render time and skip it.
             this.ensurePVCNameStartParam();
             let start = [];
-            let params = this.form.type == 'environment'
-                ? this.environmentStartParams()
+            let params = this.form.type == 'tradition'
+                ? this.traditionStartParams()
                 : this.form.startParams;
             params = (params || []).filter(item => item?.mark !== 'environment-release'
-                && !isDerivedDependencyReleaseStartParam(item)
-                && !isLegacyTraditionInstallDirectoryStartParam(item, this.form.type));
+                && !isDerivedDependencyReleaseStartParam(item));
             for (let i in params) {
                 let o = params[i];
                 if (o.name) {
@@ -2237,8 +2218,8 @@ export default {
                     });
                 }
             }
-            if (this.form.type == 'tradition') {
-                return withTraditionEnvironmentStartParams(start, this.form.environmentName);
+            if (this.form.type == 'app-plugin') {
+                return withPluginTraditionStartParams(start, this.form.traditionName);
             }
             return start;
         },
@@ -2287,8 +2268,8 @@ export default {
 
                 this.applyPlatformShells();
 
-                if (this.form.type == 'environment') {
-                    this.syncEnvironmentIngress();
+                if (this.form.type == 'tradition') {
+                    this.syncTraditionIngress();
                 } else {
                     this.json.platform.ingress = (this.form.ingress || []).map(i => ({
                         name: i.name,
@@ -2308,46 +2289,46 @@ export default {
             this.disabledDomainStartParams = !!v;
         },
         async changeEnv(item) {
-            if (!item.identifie || item.identifie == this.form.environmentName) { return }
+            if (!item.identifie || item.identifie == this.form.traditionName) { return }
 
             this.form.depends = this.form.depends?.filter?.(i => !i.temporary) || []
             let findIndex = this.form.depends?.findIndex(i => i.identifie == item.identifie && i.name == item.name)
             if (findIndex != -1) {
                 this.form.depends[findIndex] = {
                     ...this.form.depends[findIndex],
-                    ...createTraditionEnvironmentDependency(item),
+                    ...createPluginTraditionDependency(item),
                 };
             } else {
-                this.form.depends.push(createTraditionEnvironmentDependency(item))
+                this.form.depends.push(createPluginTraditionDependency(item))
             }
 
-            this.form.environmentName = item.identifie;
-            this.form.environmentImageTemplate = String(
+            this.form.traditionName = item.identifie;
+            this.form.traditionImageTemplate = String(
                 item.image_template || item.image || item.extra?.image || ''
             ).trim();
-            this.form.environmentVersion = '';
+            this.form.traditionVersion = '';
 
             if (item.versions?.length) {
-                this.form.environmentVersion = item.versions[0];
+                this.form.traditionVersion = item.versions[0];
             }
             this.getStart();
             this.changeForm();
         },
-        getEnvironmentList() {
-            // 运行环境列表由制品市场提供，支持版本使用接口返回的 support_version 字段。
+        getTraditionList() {
+            // 传统应用列表由制品市场提供，支持版本使用接口返回的 support_version 字段。
             // 该接口与市场前端（zm.w7.com）使用同一 API，避免继续依赖旧的 zpk.w7.cc 数据源。
             const listUrl = 'https://api.zm.w7.com/zpk-market/formula/list';
             myAxios.post(listUrl, {
                 status: [2, 99],
                 page: 1,
                 limit: 99,
-                tag: '运行环境',
+                tag: '传统应用',
             }, { dontalert: true }).then(res => {
-                const environmentList = res.data?.data?.list || [];
-                this.environmentList = environmentList.map(item => {
+                const traditionList = res.data?.data?.list || [];
+                this.traditionList = traditionList.map(item => {
                     const identifie = item.identifie || item.identify || item.identifier
                         || item.formula_identifie || item.formula_identify || '';
-                    const environmentLanguage = String(item.environment_language || '').trim();
+                    const traditionLanguage = String(item.environment_language || '').trim();
                     const imageTemplate = String(
                         item.image_template || item.image || item.extra?.image || ''
                     ).trim();
@@ -2359,14 +2340,14 @@ export default {
                         ...item,
                         identifie,
                         name: item.name || item.formula_name || item.title || identifie,
-                        environment_language: environmentLanguage,
+                        environment_language: traditionLanguage,
                         image_template: imageTemplate,
                         versions,
                     };
                 }).filter(item => item.identifie);
                 this.form.depends?.map?.((item, index) => {
-                    if (this.form.type == 'tradition' && this.environmentList?.length) {
-                        let now = this.environmentList.find(i => i.identifie == this.form.environmentName);
+                    if (this.form.type == 'app-plugin' && this.traditionList?.length) {
+                        let now = this.traditionList.find(i => i.identifie == this.form.traditionName);
                         if (now) {
                             if (item.name == now.name && item.identifie == now.identifie) {
                                 item.goodsId = Number(now.goods_id || now.goodsId || now.id || 0);
@@ -2376,7 +2357,7 @@ export default {
                     }
                 })
             }).catch(() => {
-                this.environmentList = [];
+                this.traditionList = [];
             });
         },
         getChartInfo() {
@@ -2449,7 +2430,7 @@ export default {
             this.dependsList = obj;
         },
         openDependPicker(index = -1) {
-            if (this.form.type == 'environment') { return }
+            if (this.form.type == 'tradition') { return }
             this.dependPicker.show = true;
             this.dependPicker.editIndex = index;
         },
@@ -2684,7 +2665,7 @@ platform:
                             delete this.json.platform.ingress
                             delete this.json.platform.runtimeClassName
                         } catch { }
-                    } else if (this.form.type == 'tradition') {
+                    } else if (this.form.type == 'app-plugin') {
                         try {
                             delete this.json.platform['volumeClaimTemplates']
                             delete this.json.platform.ingress
@@ -2850,9 +2831,9 @@ platform:
                 this.json.source.type = 'zip';
                 this.json.source.url = url;
                 this.zip.url = url;
-                if (this.form.type == 'environment') {
-                    this.form.startParams = this.environmentStartParams();
-                    this.ensureEnvironmentContainerDefaults();
+                if (this.form.type == 'tradition') {
+                    this.form.startParams = this.traditionStartParams();
+                    this.ensureTraditionContainerDefaults();
                     this.json.platform.startParams = this.serializeStartParams();
                 }
                 this.setYaml();
@@ -2874,9 +2855,9 @@ platform:
                     this.zip.name = '';
                     this.zip.url = '';
                     delete this.json.source;
-                    if (this.form.type == 'environment') {
-                        this.form.startParams = this.environmentStartParams();
-                        this.ensureEnvironmentContainerDefaults();
+                    if (this.form.type == 'tradition') {
+                        this.form.startParams = this.traditionStartParams();
+                        this.ensureTraditionContainerDefaults();
                         this.json.platform.startParams = this.serializeStartParams();
                     }
                     this.setYaml();
@@ -2918,7 +2899,12 @@ platform:
                     j.application.author = i.match(/^([^-]+)-(.+)$/)[1];
                 }
                 this.form.once = j.application?.once || false;
-                this.form.type = j.application.type === 'front' ? 'docker' : (j.application.type || 'docker');
+                const applicationType = j.application.type === 'front' ? 'docker' : (j.application.type || 'docker');
+                if (applicationType === 'environment') {
+                    this.form.type = 'tradition';
+                } else {
+                    this.form.type = applicationType;
+                }
             }
             this.initialApplicationType = this.form.type;
             this.currentApplicationType = this.form.type;
@@ -2958,7 +2944,7 @@ platform:
             this.form.gatewayPluginSupportRule = gatewayPluginSupports.rule === true;
             this.form.gatewayPluginDefaultEnabled = gatewayPlugin.defaultEnabled !== false;
             this.form.gatewayPluginDefaultConfig = JSON.stringify(gatewayPlugin.defaultConfig || {}, null, 2);
-            this.applyEnvironmentAnnotationForm(j?.application?.annotation || {});
+            this.applyTraditionAnnotationForm(j?.application?.annotation || {});
             this.applySystemImageAnnotationForm(j?.application?.annotation || {});
             this.form.systemImageTemplate = j?.platform?.['container-v2']?.[0]?.image || '';
 
@@ -2982,10 +2968,9 @@ platform:
 
             if (j.platform) {
 
-                this.form.environmentName = j.platform?.tradition?.environmentName || '';
-                this.form.environmentVersion = j.platform?.tradition?.environmentVersion || '';
-                this.form.environmentImageTemplate = j.platform?.tradition?.environmentImageTemplate || '';
-                this.form.installType = j.platform?.tradition?.installType || traditionInstallTypes.site;
+                this.form.traditionName = j.platform?.plugin?.traditionName || '';
+                this.form.traditionVersion = j.platform?.plugin?.traditionVersion || '';
+                this.form.traditionImageTemplate = j.platform?.plugin?.traditionImageTemplate || '';
                 if (this.form.type == 'system-image') {
                     let command = j.platform?.['container-v2']?.[0]?.command;
                     this.form.cmd = Array.isArray(command) && command.length
@@ -3010,16 +2995,15 @@ platform:
                 let startParams = j?.platform?.startParams;
                 this.form.startParams = JSON.parse(JSON.stringify(startParams?.length ? startParams : []))
                     .filter(item => item?.mark !== 'environment-release'
-                        && !isDerivedDependencyReleaseStartParam(item)
-                        && !isLegacyTraditionInstallDirectoryStartParam(item, this.form.type));
+                        && !isDerivedDependencyReleaseStartParam(item));
 
                 if (this.form.type == 'system-image') {
                     this.form.startParams = this.systemImageStartParams();
                     this.form.storage = true;
                     this.ensureSystemImageContainer();
-                } else if (this.form.type == 'environment') {
-                    this.ensureEnvironmentContainerDefaults();
-                    this.form.startParams = this.environmentStartParams();
+                } else if (this.form.type == 'tradition') {
+                    this.ensureTraditionContainerDefaults();
+                    this.form.startParams = this.traditionStartParams();
                 }
 
                 this.ensurePVCNameStartParam(j?.platform?.volumes);
@@ -3051,13 +3035,13 @@ platform:
                 this.form.depends = j.platform?.depends?.filter(i => i.type == 'out' || String(i.from || '').trim()) || [];
 
                 this.form.depends.map((item, index) => {
-                    if (this.isTraditionEnvironmentDependency(item)) {
+                    if (this.isPluginTraditionDependency(item)) {
                         item.temporary = true;
                         item.required = true;
                         item.multipleInstances = true;
                     }
-                    if (this.form.type == 'tradition' && this.environmentList?.length) {
-                        let now = this.environmentList.find(i => i.identifie == this.form.environmentName);
+                    if (this.form.type == 'app-plugin' && this.traditionList?.length) {
+                        let now = this.traditionList.find(i => i.identifie == this.form.traditionName);
                         if (now) {
                             if (item.identifie == now.identifie && item.name == now.name) {
                                 item.temporary = true;
@@ -3067,11 +3051,11 @@ platform:
                     this.getSubDepends(index);
                 })
 
-                if (this.form.type == 'environment' && !this.environmentNginxGatewayAnnotationPresent) {
+                if (this.form.type == 'tradition' && !this.traditionNginxGatewayAnnotationPresent) {
                     const hasLegacyNginx = [...this.form.dependsIn, ...this.form.depends]
-                        .some(item => isEnvironmentAppDependency(item));
-                    this.form.environmentNginxGateway = hasLegacyNginx
-                        || Boolean(String(this.form.environmentNginxVhostTemplate || '').trim());
+                        .some(item => isTraditionAppDependency(item));
+                    this.form.traditionNginxGateway = hasLegacyNginx
+                        || Boolean(String(this.form.traditionNginxVhostTemplate || '').trim());
                 }
 
                 let depend_yamls = j.platform?.helm?.depend_yamls || [];
@@ -3101,11 +3085,11 @@ platform:
                     this.getChartInfo();
                 }
             }
-            if (this.form.type != 'helm' && this.form.type != 'tradition' && this.form.ingress?.length) {
+            if (this.form.type != 'helm' && this.form.type != 'app-plugin' && this.form.ingress?.length) {
                 this.form.domain = true;
                 this.disabledDomainStartParams = true;
             }
-            this.syncEnvironmentDependency();
+            this.syncTraditionDependency();
             this.syncSysboxDependency();
             this._initializing = false;
         },
@@ -3149,8 +3133,8 @@ platform:
 
             this.$refs.formref.validate(async (errors) => {
                 if (errors) {
-                    messageWarning(this.form.type == 'environment'
-                        ? '请检查运行环境配置中的错误项'
+                    messageWarning(this.form.type == 'tradition'
+                        ? '请检查传统应用配置中的错误项'
                         : '必填项不能为空');
                     return;
                 }
@@ -3166,7 +3150,7 @@ platform:
                 }
 
                 try {
-                    this.syncEnvironmentDependency();
+                    this.syncTraditionDependency();
                     this.syncSysboxDependency();
                     await this.saveFormulaTypeSetting();
                     await this.ensureDefaultTypeTags();
@@ -3189,18 +3173,18 @@ platform:
                         delete this.json.platform.ingress
                         delete this.json.platform.runtimeClassName
                     } catch { }
-                } else if (this.form.type == 'tradition') {
+                } else if (this.form.type == 'app-plugin') {
                     try {
                         delete this.json.platform['volumeClaimTemplates']
                         delete this.json.platform.ingress
                         delete this.json.platform.runtimeClassName
                     } catch { }
                     this.applyPlatformShells();
-                } else if (this.form.type == 'environment') {
-                    this.form.startParams = this.environmentStartParams();
-                    this.ensureEnvironmentContainerDefaults();
+                } else if (this.form.type == 'tradition') {
+                    this.form.startParams = this.traditionStartParams();
+                    this.ensureTraditionContainerDefaults();
                     this.applyPlatformShells();
-                    this.syncEnvironmentIngress();
+                    this.syncTraditionIngress();
             } else if (this.form.type == 'docker') {
 
                     this.applyPlatformShells();
@@ -3227,9 +3211,9 @@ platform:
             if (!nextType || nextType == previousType) { return }
             const typeNames = {
                 docker: '原生应用',
-                tradition: '传统应用',
+                'app-plugin': '应用插件',
                 helm: 'K8sYaml',
-                environment: '运行环境',
+                tradition: '传统应用',
                 'system-image': '系统镜像',
                 'gateway-plugin': '网关插件',
             };
@@ -3254,7 +3238,7 @@ platform:
             if (this.form.type == 'gateway-plugin') {
                 this.form.once = true;
             }
-            if (['environment', 'gateway-plugin', 'system-image'].includes(this.form.type)) {
+            if (['tradition', 'gateway-plugin', 'system-image'].includes(this.form.type)) {
                 this.loadFormulaSetting().catch(() => { });
             }
             if (!['light', 'system-image'].includes(this.form.type) && this.zip.url) {
@@ -3262,7 +3246,7 @@ platform:
                 this.json.source.type = 'zip';
                 this.json.source.url = this.zip.url;
             }
-            if (!['tradition', 'system-image'].includes(this.form.type) && this.web.url) {
+            if (!['app-plugin', 'system-image'].includes(this.form.type) && this.web.url) {
                 if (!this.json.web) { this.json.web = {}; }
                 this.json.web.type = 'zip';
                 this.json.web.url = this.web.url;
@@ -3272,7 +3256,7 @@ platform:
 
                 if (this.json.source) { delete this.json.source; }
             }
-            if (this.form.type == 'tradition') {
+            if (this.form.type == 'app-plugin') {
                 this.getStart();
 
                 if (this.json.web) { delete this.json.web; }
@@ -3280,7 +3264,7 @@ platform:
             if (this.form.type == 'system-image') {
                 this.syncSystemImageConfig();
             }
-            this.syncEnvironmentDependency();
+            this.syncTraditionDependency();
             this.syncSysboxDependency();
 
             this.changeForm();
@@ -3312,13 +3296,13 @@ platform:
                 j.application.type = this.form.type;
                 if (this.form.type == 'gateway-plugin') {
                     this.form.once = true;
-                } else if (['environment', 'system-image'].includes(this.form.type)) {
+                } else if (['tradition', 'system-image'].includes(this.form.type)) {
                     this.form.once = false;
                 }
-                j.application.once = ['environment', 'system-image'].includes(this.form.type)
+                j.application.once = ['tradition', 'system-image'].includes(this.form.type)
                     ? false
                     : Boolean(this.form.once);
-                if (this.form.type != 'tradition') {
+                if (this.form.type != 'app-plugin') {
                     this.form.language = '';
                 }
             }
@@ -3358,15 +3342,15 @@ platform:
             j.platform = j.platform || {};
 
             if (this.form.type == 'system-image') {
-                this.form.systemImageVersions = this.normalizeEnvironmentVersions(this.form.systemImageVersions);
+                this.form.systemImageVersions = this.normalizeApplicationVersions(this.form.systemImageVersions);
                 this.form.startParams = this.systemImageStartParams();
                 this.ensureSystemImageContainer();
-            } else if (this.form.type == 'environment') {
-                this.form.environmentImageVersion = this.normalizeEnvironmentVersions(this.form.environmentImageVersion);
-                this.form.startParams = this.environmentStartParams();
-                this.ensureEnvironmentContainerDefaults();
-                this.applyEnvironmentRebootRestoreConfig();
-                this.syncEnvironmentIngress();
+            } else if (this.form.type == 'tradition') {
+                this.form.traditionImageVersion = this.normalizeApplicationVersions(this.form.traditionImageVersion);
+                this.form.startParams = this.traditionStartParams();
+                this.ensureTraditionContainerDefaults();
+                this.applyTraditionRebootRestoreConfig();
+                this.syncTraditionIngress();
             } else {
                 delete j.platform.hostUsers;
                 if (j.platform.runtimeClassName == 'sysbox-runc') {
@@ -3375,22 +3359,19 @@ platform:
             }
             this.syncSysboxDependency();
 
-            if (this.form.type == 'tradition') {
-                j.platform = withTraditionAppStorage(j.platform);
-                let environmentLanguage = j.platform?.tradition?.environmentLanguage || '';
+            if (this.form.type == 'app-plugin') {
+                j.platform = withPluginAppStorage(j.platform);
+                let traditionLanguage = j.platform?.plugin?.traditionLanguage || '';
                 try {
-                    const selectedEnvironment = this.environmentList
-                        ?.find?.(i => i.identifie == this.form.environmentName);
-                    environmentLanguage = selectedEnvironment?.environment_language || environmentLanguage;
+                    const selectedTradition = this.traditionList
+                        ?.find?.(i => i.identifie == this.form.traditionName);
+                    traditionLanguage = selectedTradition?.environment_language || traditionLanguage;
                 } catch { }
-                const traditionInstall = normalizeTraditionInstall(this.form);
-                this.form.installType = traditionInstall.installType;
-                j.platform.tradition = {
-                    environmentName: this.form.environmentName,
-                    environmentVersion: this.form.environmentVersion,
-                    environmentLanguage: environmentLanguage,
-                    environmentImageTemplate: this.form.environmentImageTemplate,
-                    installType: traditionInstall.installType,
+                j.platform.plugin = {
+                    traditionName: this.form.traditionName,
+                    traditionVersion: this.form.traditionVersion,
+                    traditionLanguage,
+                    traditionImageTemplate: this.form.traditionImageTemplate,
                 }
             }
 
@@ -3407,11 +3388,11 @@ platform:
 
 
                 let dependencies = this.form.dependsIn.concat(this.form.depends);
-                if (this.form.type == 'tradition') {
-                    dependencies = applyTraditionEnvironmentDependencyStartParams(
+                if (this.form.type == 'app-plugin') {
+                    dependencies = applyPluginTraditionDependencyStartParams(
                         dependencies,
-                        this.form.environmentName,
-                        this.form.environmentVersion,
+                        this.form.traditionName,
+                        this.form.traditionVersion,
                     );
                 }
                 j.platform.depends = dependencies;
@@ -3524,7 +3505,7 @@ platform:
 }
 </script>
 <style scoped>
-.environment-config-spin {
+.tradition-config-spin {
     display: block;
     width: 100%;
 }

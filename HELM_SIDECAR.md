@@ -45,11 +45,11 @@ depends:
     from: https://zpk.w7.cc
 ```
 
-环境应用需要确保 `w7-sitemanagernginx` 已经作为子 manifest 导入；打包器随后才会对这个子应用补充环境专属配置并生成子 Chart。
+传统应用需要确保 `w7-sitemanagernginx` 已经作为子 manifest 导入；打包器随后才会对这个子应用补充传统应用专属配置并生成子 Chart。
 
 ## 3. Sidecar 下载和打包流程
 
-Sidecar 准备发生在原生、传统、环境、Helm 和系统镜像等应用类型分流之前，流程如下：
+Sidecar 准备发生在原生、应用插件、传统应用、Helm 和系统镜像等应用类型分流之前，流程如下：
 
 1. `requiredSidecarInfoURLs` 根据 `application.registerSite` 计算所需 sidecar，并按 `Chart` 名称去重。
 2. 请求 sidecar 的 ZPK info URL，从响应中读取 `data.helm_url`；请求上下文超时为 2 分钟。
@@ -290,8 +290,8 @@ annotations:
 | 应用类型 | Workload sidecar | Shell Job sidecar | 说明 |
 | --- | --- | --- | --- |
 | 原生应用 | 已接入通用 Workload | 已接入公共 Shell Job | Deployment、StatefulSet、DaemonSet 共用模板 |
-| 传统应用 | 没有常驻 Workload | 已接入公共 Shell Job | Sidecar 只能影响安装、升级、卸载等 Job |
-| 运行环境 | 已接入环境 Workload | 公共 Shell Job 可接入 | 具体代码/生命周期 Job 取决于所用模板 |
+| 应用插件 | 没有常驻 Workload | 已接入公共 Shell Job | Sidecar 只能影响安装、升级、卸载等 Job |
+| 传统应用 | 已接入传统应用 Workload | 公共 Shell Job 可接入 | 具体代码/生命周期 Job 取决于所用模板 |
 | Helm/K8sYaml 应用 | 不自动接入用户 Workload | 不自动接入用户 Job | 用户模板必须显式调用 helper |
 | 系统镜像 | 已接入通用 Workload | 已接入公共 Shell Job | Job 会移除 Sysbox rootfs 持久层 annotation |
 
@@ -308,7 +308,7 @@ Sidecar 框架没有固定存储，也不自动创建、选择或回收 PVC。�
 - `sidecar-volumes-template` 可以输出 `emptyDir`、Secret、ConfigMap、PVC 等合法 Pod volume。
 - container/init/job container template 需要自行输出与 volume 对应的 `volumeMounts`。
 - 引用 PVC 时，PVC 必须由安装方、宿主 Chart 或 `sidecar-resources-template` 创建。
-- Sidecar 框架不会自动解释或传递环境应用使用的 `PVC_NAME` 协议。
+- Sidecar 框架不会自动解释或传递传统应用使用的 `PVC_NAME` 协议。
 - Job 只有在 sidecar 声明 Job container template 时才会带入该 sidecar 的 volumes。
 - `sidecar-resources-template` 可以输出 PVC、ConfigMap、Service、RBAC 等对象，但命名、升级、删除和 hook 语义由 sidecar 自己负责。
 

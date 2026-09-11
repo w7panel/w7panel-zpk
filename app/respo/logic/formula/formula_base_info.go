@@ -12,9 +12,8 @@ const (
 )
 
 // IsFormulaPlugin reports whether an artifact is installed as a platform plugin.
-func IsFormulaPlugin(formulaType, traditionInstallType string) bool {
-	return formulaType == "gateway-plugin" ||
-		(formulaType == "tradition" && traditionInstallType == "extension")
+func IsFormulaPlugin(formulaType string) bool {
+	return formulaType == "gateway-plugin" || formulaType == "app-plugin"
 }
 
 func syncRegisterSiteAnnotation(annotation map[string]interface{}, registerSite bool) map[string]interface{} {

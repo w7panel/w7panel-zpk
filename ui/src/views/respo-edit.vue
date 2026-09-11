@@ -68,7 +68,7 @@
                 <files-manifest v-show="dependsIndex == -1" :data="manifest" :version_id="version_id" ref="form"
                     :option="{ edit: true, imginstall: true, mainapp: true, app_ports: this.app_ports }"
                     :identifie="identifie" @addfile="addfileInside" @complete="complete"
-                    @environment-nginx-gateway-change="handleEnvironmentNginxGatewayChange"
+                    @tradition-nginx-gateway-change="handleTraditionNginxGatewayChange"
                     @structure="structure"></files-manifest>
                 <files-manifest v-for="(item, index) in depends" :key="item.identifie" :ref="'depends' + index"
                     v-show="dependsIndex == index" :data="depends[index].manifest"
@@ -105,9 +105,9 @@ import {
     removeImportedChildren,
 } from '@/utils/child-app-import';
 import {
-    environmentNginxDependency,
-    withEnvironmentNginxPvcModuleName,
-} from '@/utils/environment-app';
+    traditionNginxDependency,
+    withTraditionNginxPvcModuleName,
+} from '@/utils/tradition-app';
 import {
     IconArrowLeft,
     IconDownload,
@@ -309,17 +309,17 @@ export default {
             this.$refs.form?.openAddDepend();
         },
         isManagedDependency(item) {
-            return this.$refs.form?.isEnvironmentFixedDependency?.(item) || false;
+            return this.$refs.form?.isTraditionFixedDependency?.(item) || false;
         },
-        async persistEnvironmentManifest() {
+        async persistTraditionManifest() {
             const rootRef = this.$refs.form;
-            if (rootRef?.form?.type != 'environment' || !rootRef?.json) {
+            if (rootRef?.form?.type != 'tradition' || !rootRef?.json) {
                 return;
             }
             // app_ports is rebuilt from the imported child manifests, so the
             // gateway backend can use the dependency's declared service port.
             this.updateAppPorts();
-            rootRef.syncEnvironmentIngress?.(this.app_ports);
+            rootRef.syncTraditionIngress?.(this.app_ports);
             const content = jsyaml.dump(rootRef.json);
             await myAxios.post('/respo/manifest/file', {
                 identifie: this.identifie,
@@ -328,7 +328,7 @@ export default {
                 version: this.version_id,
             });
         },
-        prepareEnvironmentNginxEntry(entry) {
+        prepareTraditionNginxEntry(entry) {
             if (!entry) { return { manifest: {}, changed: false }; }
             let source = entry.data || entry.manifest || {};
             if (typeof source == 'string') {
@@ -339,7 +339,7 @@ export default {
                 }
             }
             const before = JSON.stringify(source);
-            const manifest = withEnvironmentNginxPvcModuleName(
+            const manifest = withTraditionNginxPvcModuleName(
                 source,
                 this.getManifestIdentifie(this.$refs.form?.json, this.identifie),
             );
@@ -356,35 +356,35 @@ export default {
         closeImportDepend() {
             this.importPicker.show = false;
         },
-        async handleEnvironmentNginxGatewayChange({ enabled, finish } = {}) {
+        async handleTraditionNginxGatewayChange({ enabled, finish } = {}) {
             const done = typeof finish == 'function' ? finish : () => { };
             try {
                 if (enabled) {
                     const rootDependencies = this.$refs.form?.json?.platform?.depends || [];
                     const hasDependency = rootDependencies.some(item =>
-                        item?.identifie == environmentNginxDependency.identifie
+                        item?.identifie == traditionNginxDependency.identifie
                         && String(item?.from || '').trim())
                         && Object.prototype.hasOwnProperty.call(
                             this.list || {},
-                            importedChildFilePath(environmentNginxDependency.identifie),
+                            importedChildFilePath(traditionNginxDependency.identifie),
                         );
                     if (!hasDependency) {
                         const dependency = {
-                            identifie: environmentNginxDependency.identifie,
-                            name: environmentNginxDependency.name,
+                            identifie: traditionNginxDependency.identifie,
+                            name: traditionNginxDependency.name,
                             subidentifie: '',
                             subname: '',
                             required: true,
                             type: 'in',
-                            from: environmentNginxDependency.source,
+                            from: traditionNginxDependency.source,
                         };
                         const entries = await importChildApplication(myAxios, { dependency });
                         const nginxEntry = entries.find(entry =>
-                            entry?.identifie == environmentNginxDependency.identifie);
+                            entry?.identifie == traditionNginxDependency.identifie);
                         if (!nginxEntry) {
                             throw new Error('导入结果中缺少 NGINX 子应用 manifest');
                         }
-                        this.prepareEnvironmentNginxEntry(nginxEntry);
+                        this.prepareTraditionNginxEntry(nginxEntry);
                         const result = await saveImportedChildren(myAxios, {
                             rootRef: this.$refs.form,
                             rootIdentifie: this.identifie,
@@ -396,13 +396,13 @@ export default {
                         this.applyImportedChildrenResult(result);
                     }
                     done(true);
-                    await this.persistEnvironmentManifest();
+                    await this.persistTraditionManifest();
                     messageSuccess('NGINX 网关及其子应用导入成功');
                     return;
                 }
 
                 const identifies = getImportedChildIdentifies(
-                    environmentNginxDependency.identifie,
+                    traditionNginxDependency.identifie,
                     this.list,
                     this.depends,
                 );
@@ -415,7 +415,7 @@ export default {
                 });
                 this.applyRemovedChildrenResult(result);
                 done(true);
-                await this.persistEnvironmentManifest();
+                await this.persistTraditionManifest();
                 messageSuccess('NGINX 网关及其子应用已删除');
             } catch (error) {
                 done(false);
@@ -523,8 +523,8 @@ export default {
                 if (!rootEntry) {
                     throw new Error(`导入结果中缺少 ${item.identifie} 子应用 manifest`);
                 }
-                if (item.identifie == environmentNginxDependency.identifie) {
-                    this.prepareEnvironmentNginxEntry(rootEntry);
+                if (item.identifie == traditionNginxDependency.identifie) {
+                    this.prepareTraditionNginxEntry(rootEntry);
                 }
                 const result = await saveImportedChildren(myAxios, {
                     rootRef: this.$refs.form,
@@ -537,8 +537,8 @@ export default {
                     replaceExisting: true,
                 });
                 this.applyImportedChildrenResult(result);
-                if (item.identifie == environmentNginxDependency.identifie) {
-                    await this.persistEnvironmentManifest();
+                if (item.identifie == traditionNginxDependency.identifie) {
+                    await this.persistTraditionManifest();
                 }
                 await this.checkImportedChildUpdates();
                 messageSuccess(`子应用已更新到 ${update.latestVersion}`);
@@ -549,7 +549,7 @@ export default {
             }
         },
         applyImportedChildrenResult({ imported = [], dependencies = [], rootManifest = '' } = {}) {
-            if (this.$refs.form?.form?.type != 'environment') {
+            if (this.$refs.form?.form?.type != 'tradition') {
                 this.manifest = rootManifest;
             }
             this.json = this.$refs.form?.json || {};
@@ -577,7 +577,7 @@ export default {
             this.dependsIndex = -1;
         },
         applyRemovedChildrenResult({ existingFiles = [], rootManifest = '', identifies = [] } = {}) {
-            if (this.$refs.form?.form?.type != 'environment') {
+            if (this.$refs.form?.form?.type != 'tradition') {
                 this.manifest = rootManifest;
             }
             this.json = this.$refs.form?.json || {};

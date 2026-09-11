@@ -41,8 +41,8 @@
                                         <div class="df ai-c">
                                             前端包上传
                                             <a-tooltip position="tl"
-                                                :content="form.type == 'environment'
-                                                    ? '压缩包根目录就是前端构建产物目录，请进入构建产物目录后压缩，不要把外层目录一起压入。例如：cd dist && zip -r frontend.zip .。环境应用的菜单配置可以不设置。'
+                                                :content="form.type == 'tradition'
+                                                    ? '压缩包根目录就是前端构建产物目录，请进入构建产物目录后压缩，不要把外层目录一起压入。例如：cd dist && zip -r frontend.zip .。传统应用的菜单配置可以不设置。'
                                                     : '压缩包根目录就是前端构建产物目录，请进入构建产物目录后压缩，不要把外层目录一起压入。例如：cd dist && zip -r frontend.zip .'">
                                                 <ArcoIcon name="icon-41" :size="16" />
                                             </a-tooltip>
@@ -240,7 +240,7 @@
                                             <div class="registry-alert-item mt-6">变量传递的请求参数只支持query方式，会将GET参数固定拼接到地址后。</div>
                                         </a-alert>
                                         <a-form-item label="地址类型" style="margin-bottom:20px;">
-                                            <a-radio-group v-model="r.type" @change="changeBackendType(r)" :disabled="form.type === 'tradition'">
+                                            <a-radio-group v-model="r.type" @change="changeBackendType(r)" :disabled="form.type === 'app-plugin'">
                                                 <a-radio value="internal">应用地址</a-radio>
                                                 <a-radio value="external">远程地址</a-radio>
                                             </a-radio-group>
@@ -429,13 +429,13 @@
                                                 <ArcoIcon name="icon-41" :size="16" />
                                             </a-tooltip></div>
                                         <a-form-item label="地址类型" style="margin-bottom:20px;">
-                                            <a-radio-group :disabled="form.type === 'tradition'" v-model="r.type" @change="changeBackendType(r)">
+                                            <a-radio-group :disabled="form.type === 'app-plugin'" v-model="r.type" @change="changeBackendType(r)">
                                                 <a-radio value="internal">应用地址</a-radio>
                                                 <a-radio value="external">远程地址</a-radio>
                                             </a-radio-group>
                                         </a-form-item>
                                         <a-form-item label="接口地址" style="margin-bottom:20px;">
-                                            <div class="backend-url-form-field" v-if="r.type == 'internal' && form.type === 'tradition'">
+                                            <div class="backend-url-form-field" v-if="r.type == 'internal' && form.type === 'app-plugin'">
                                                 <div class="backend-url-config df ai-c">
                                                     <span class="backend-url-fixed">https://</span>
                                                     <span class="backend-url-fixed backend-url-placeholder">{{
@@ -475,7 +475,7 @@
                                                     <a-option label="https://" value="https://"></a-option>
                                                 </a-select>
                                                 <a-input v-model="r.root_url" @change="getMenu" placeholder="请输入地址"
-                                                    :disabled="form.type === 'tradition'"
+                                                    :disabled="form.type === 'app-plugin'"
                                                     class="backend-url-control backend-url-input" />
                                             </div>
                                         </a-form-item>
@@ -1476,7 +1476,7 @@ export default {
             return value === '0' ? '' : value;
         },
         usesDomainBackendAddress(role) {
-            return role?.type == 'internal' && (role.load_mode == 'iframe' || this.form.type == 'tradition');
+            return role?.type == 'internal' && (role.load_mode == 'iframe' || this.form.type == 'app-plugin');
         },
         changeBackendUrl(role) {
             role.backend_port = this.getDefaultBackendPort(role.backend_url);
@@ -1507,7 +1507,7 @@ export default {
                 }
                 this.syncIframeBackendDefaults(role);
             } else {
-                if (this.form.type != 'tradition' && role.type == 'internal' && role.backend_url == this.getIframeDomainPlaceholder()) {
+                if (this.form.type != 'app-plugin' && role.type == 'internal' && role.backend_url == this.getIframeDomainPlaceholder()) {
                     role.backend_url = this.getDefaultBackendIdentifie();
                     role.backend_port = this.getDefaultBackendPort(role.backend_url);
                 }
@@ -1841,12 +1841,12 @@ export default {
                     location: 'left',
                     menu: [],
 
-                    type: this.form.type === 'tradition' ? 'external' : 'internal',
+                    type: this.form.type === 'app-plugin' ? 'external' : 'internal',
                     backend_url: backend_url,
                     backend_port: this.getDefaultBackendPort(backend_url),
                     backend_path: '',
                     root_protocol: 'http://',
-                    root_url: this.form.type === 'tradition' ? this.getIframeDomainPlaceholder() : '',
+                    root_url: this.form.type === 'app-plugin' ? this.getIframeDomainPlaceholder() : '',
 
                     proxy_request_header: [],
                     proxy_request_query: [],
@@ -1981,7 +1981,7 @@ export default {
                 itemObj.menu = menu;
                 this.normalizeBuiltMenuDefault(itemObj.menu, this.hasIncompleteDefaultMenu(r.menu));
 
-                if (itemObj.menu.length > 0 || r.load_mode == 'iframe' || this.form.type == 'environment') {
+                if (itemObj.menu.length > 0 || r.load_mode == 'iframe' || this.form.type == 'tradition') {
                     role.push(itemObj);
                 }
             });
@@ -2035,12 +2035,12 @@ export default {
                     is_default_register: 1,
                     location: 'left',
                     menu: [],
-                    type: this.form.type === 'tradition' ? 'external' : 'internal',
+                    type: this.form.type === 'app-plugin' ? 'external' : 'internal',
                     backend_url: backend_url,
                     backend_port: this.getDefaultBackendPort(backend_url),
                     backend_path: '',
                     root_protocol: 'http://',
-                    root_url: this.form.type === 'tradition' ? this.getIframeDomainPlaceholder() : '',
+                    root_url: this.form.type === 'app-plugin' ? this.getIframeDomainPlaceholder() : '',
                     proxy_request_header: [],
                     proxy_request_query: [],
                     frontend_props: [],
@@ -2137,7 +2137,7 @@ export default {
                 if (item.load_mode == 'iframe') {
                     let iframeBackend = this.parseIframeBackendUrl(item?.backend_config?.backend_url || '');
                     item.type = iframeBackend.type;
-                    if (this.form.type === 'tradition') {
+                    if (this.form.type === 'app-plugin') {
                         item.type = 'external';
                     }
                     item.backend_url = iframeBackend.backend_url;
@@ -2147,7 +2147,7 @@ export default {
                     item.backend_port = '';
                 } else {
                     item.type = item?.backend_config?.type || 'internal';
-                    if (this.form.type === 'tradition') {
+                    if (this.form.type === 'app-plugin') {
                         item.type = 'external';
                     }
                     item.backend_path = '';
@@ -2163,7 +2163,7 @@ export default {
                         item.backend_url = item?.backend_config?.backend_url;
                         item.backend_url = item.backend_url || this.getDefaultBackendIdentifie();
                         item.backend_port = this.normalizeBackendPortValue(item?.backend_config?.backend_port);
-                        if (this.form.type == 'tradition') {
+                        if (this.form.type == 'app-plugin') {
                             let iframeBackend = this.parseIframeBackendUrl(item?.backend_config?.backend_url || '');
                             item.backend_url = iframeBackend.backend_url;
                             item.backend_path = iframeBackend.type == 'internal' ? iframeBackend.backend_path : '';

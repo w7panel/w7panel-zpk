@@ -129,7 +129,7 @@ func importRemoteFormulaManifest(
 	}
 
 	helmURL := remoteInfo.HelmURLs[identifie]
-	needsHelmAsset := remoteManifest.Application.Type == commonlogic.Help_App ||
+	needsHelmAsset := remoteManifest.Application.Type == commonlogic.HelmApp ||
 		remoteManifest.Platform.Helm.ChartName != "" ||
 		remoteManifest.Platform.Helm.Repository != "" ||
 		len(remoteManifest.Platform.Helm.DependYamls) > 0

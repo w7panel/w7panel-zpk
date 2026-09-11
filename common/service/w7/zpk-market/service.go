@@ -58,19 +58,18 @@ func (s ZpkMarketService) CheckToken(token, formulaIdentify string) error {
 	}, nil)
 }
 
-func (s ZpkMarketService) UseOrder(consoleUid int32, orderSn, formulaVersion, formulaType string, formulaIsPlugin, isUpgrade, reinstall bool, panelDeviceSN, panelURL, appIdentify, domain string) error {
+func (s ZpkMarketService) UseOrder(consoleUid int32, orderSn, formulaVersion, formulaType string, isUpgrade, reinstall bool, panelDeviceSN, panelURL, appIdentify, domain string) error {
 	return postSigned[any](s, "/zpk-market/order/use-order", map[string]interface{}{
-		"order_sn":          orderSn,
-		"formula_version":   formulaVersion,
-		"formula_type":      formulaType,
-		"formula_is_plugin": formulaIsPlugin,
-		"is_upgrade":        isUpgrade,
-		"reinstall":         reinstall,
-		"console_uid":       consoleUid,
-		"panel_device_sn":   panelDeviceSN,
-		"panel_url":         panelURL,
-		"app_identify":      appIdentify,
-		"domain":            domain,
+		"order_sn":        orderSn,
+		"formula_version": formulaVersion,
+		"formula_type":    formulaType,
+		"is_upgrade":      isUpgrade,
+		"reinstall":       reinstall,
+		"console_uid":     consoleUid,
+		"panel_device_sn": panelDeviceSN,
+		"panel_url":       panelURL,
+		"app_identify":    appIdentify,
+		"domain":          domain,
 	}, nil)
 }
 

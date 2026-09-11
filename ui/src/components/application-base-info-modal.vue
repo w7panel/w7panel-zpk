@@ -192,13 +192,14 @@ export default {
             return this.applicationType == 'gateway-plugin';
         },
         isInstallNeverOnceType() {
-            return ['environment', 'system-image'].includes(this.applicationType);
+            return ['tradition', 'system-image'].includes(this.applicationType);
         },
         isRegisterSiteDisabled() {
             return this.applicationType == 'gateway-plugin';
         },
         requiredTagName() {
-            if (this.applicationType == 'environment') { return '运行环境' }
+            if (this.applicationType == 'app-plugin') { return '应用插件' }
+            if (this.applicationType == 'tradition') { return '传统应用' }
             if (this.applicationType == 'system-image') { return '系统镜像' }
             if (this.applicationType == 'gateway-plugin') { return '网关插件' }
             return '';

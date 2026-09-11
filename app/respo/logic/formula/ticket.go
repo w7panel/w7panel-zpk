@@ -9,16 +9,15 @@ import (
 )
 
 type TicketInfo struct {
-	FormulaId       int32  `json:"formula_id"`
-	ConsoleUid      int32  `json:"console_uid"`
-	FormulaVersion  string `json:"formula_version"`
-	FormulaType     string `json:"formula_type"`
-	FormulaIsPlugin bool   `json:"formula_is_plugin"`
-	OrderSn         string `json:"order_sn"`
-	IsUpgrade       bool   `json:"is_upgrade"`
-	Reinstall       bool   `json:"reinstall"`
-	Domain          string `json:"domain"`
-	AppIdentify     string `json:"app_identify"`
+	FormulaId      int32  `json:"formula_id"`
+	ConsoleUid     int32  `json:"console_uid"`
+	FormulaVersion string `json:"formula_version"`
+	FormulaType    string `json:"formula_type"`
+	OrderSn        string `json:"order_sn"`
+	IsUpgrade      bool   `json:"is_upgrade"`
+	Reinstall      bool   `json:"reinstall"`
+	Domain         string `json:"domain"`
+	AppIdentify    string `json:"app_identify"`
 }
 
 func CreateTicket(ticketInfo TicketInfo) (string, error) {

@@ -274,7 +274,7 @@ func updateManifestByAttachment(manifest *commonlogic.Manifest, attachment Attac
 		manifest.Source.Url = "file://" + attachment.Path
 		manifest.Source.Type = "zip"
 	case AttachTypeHelm:
-		manifest.Application.Type = commonlogic.Help_App
+		manifest.Application.Type = commonlogic.HelmApp
 		manifest.Platform.Helm.ChartName = "file://" + attachment.Path
 		manifest.Platform.Helm.Repository = ""
 		manifest.Platform.Helm.Version = ""

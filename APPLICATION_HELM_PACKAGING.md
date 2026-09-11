@@ -1,18 +1,18 @@
 # ZPK 五类应用及 Helm Sidecar 的打包、依赖与存储说明
 
-> 本文基于仓库当前工作树实现整理，覆盖原生应用、传统应用、运行环境、Helm/K8sYaml 应用和系统镜像。文中“当前实现”指当前 Go/Vue 文件表达的运行路径，不把 `DEPENDENCY_EXPORTS_DESIGN.md` 中尚未落地的建议当成现有能力。
+> 本文基于仓库当前工作树实现整理，覆盖原生应用、应用插件、传统应用、Helm/K8sYaml 应用和系统镜像。文中“当前实现”指当前 Go/Vue 文件表达的运行路径，不把 `DEPENDENCY_EXPORTS_DESIGN.md` 中尚未落地的建议当成现有能力。
 >
-> 最后核对日期：2026-09-09。
+> 最后核对日期：2026-09-11。
 
 ## 1. 结论摘要
 
-五类应用最终都由 `PackManifestToHelm` 生成一个 Helm Chart，但内部只有三种主要打包路径：
+五类应用最终都由 `PackManifestToHelm` 生成一个 Helm Chart，但内部有四种主要打包路径：
 
 | 应用类型 | manifest 值 | 打包路径 | 主要运行资源 | 运行时存储 |
 | --- | --- | --- | --- | --- |
 | 原生应用 | `docker` | 通用工作负载生成器 | Deployment/StatefulSet/DaemonSet、Service、Ingress、Job | 外部 PVC、StatefulSet claim template、emptyDir 或 hostPath |
-| 传统应用 | `tradition` | 传统应用专用 Job 打包器 | Helm hook Job，可选 MicroApp/Site；没有自己的常驻 Workload | 复用所选运行环境的 `site-storage` PVC |
-| 运行环境 | `environment` | 通用工作负载生成器 + 环境增强 | Workload、Service、Ingress、代码/NGINX Job、可选 NGINX 子 Chart | 安装方传入的 `PVC_NAME`，主要挂载为 `site-storage` |
+| 应用插件 | `app-plugin` | 应用插件专用 Job 打包器 | Helm hook Job，可选 MicroApp/Site；没有自己的常驻 Workload | 复用所选传统应用的 `site-storage` PVC |
+| 传统应用 | `tradition` | 通用工作负载生成器 + 传统应用增强 | Workload、Service、Ingress、代码/NGINX Job、可选 NGINX 子 Chart | 安装方传入的 `PVC_NAME`，主要挂载为 `site-storage` |
 | Helm/K8sYaml 应用 | `helm` | 解包并改写用户 Chart，或把 YAML 写入 templates | 完全由用户 Chart/YAML 决定，ZPK 可追加子 Chart、MicroApp、Site、sidecar | 完全由用户 Chart/YAML 决定 |
 | 系统镜像 | `system-image` | 通用工作负载生成器 | Sysbox Deployment、Service、Job | 安装方传入的 `PVC_NAME`，挂载到 `/system-rootfs` |
 
@@ -20,8 +20,8 @@
 
 - `platform.depends` 描述安装依赖关系，但真正被内嵌进 `charts/` 的普通子应用来自同一制品下保存的 `*/manifest.yaml`，不是仅凭一条 `depends` 记录即时下载。
 - `type: out` 是单独安装的外部依赖；`type: in` 是随当前包保存/打包的子应用关系。
-- 原生应用、运行环境和系统镜像都可以声明 PVC volume，但通用打包器不会为 Deployment 自动创建 PVC。空 `claimName` 在渲染时取 `.Values.PVC_NAME`。
-- 只有 StatefulSet 的 `platform.volumeClaimTemplates` 会随 Workload 生成 PVC；传统应用不拥有 PVC；Helm 应用是否创建 PVC 取决于用户 Chart。
+- 原生应用、传统应用和系统镜像都可以声明 PVC volume，但通用打包器不会为 Deployment 自动创建 PVC。空 `claimName` 在渲染时取 `.Values.PVC_NAME`。
+- 只有 StatefulSet 的 `platform.volumeClaimTemplates` 会随 Workload 生成 PVC；应用插件不拥有 PVC；Helm 应用是否创建 PVC 取决于用户 Chart。
 - 前端 zip 不会塞进最终 Helm tgz。Helm 里生成的是 `MicroApp` CR，前端文件仍由 ZPK 的附件下载接口提供。
 
 ## 2. 总体数据与打包流程
@@ -37,12 +37,12 @@ flowchart TD
     Storage --> Load
     Load --> Pack[PackManifestToHelm]
     Pack --> Native[通用 Workload\n原生/系统镜像]
-    Pack --> Tradition[传统应用 Job]
-    Pack --> Environment[环境增强 Workload]
+    Pack --> Plugin[应用插件 Job]
+    Pack --> Tradition[传统应用增强 Workload]
     Pack --> UserHelm[用户 Helm/YAML 解包改写]
     Native --> TGZ[最终聚合 Helm tgz]
+    Plugin --> TGZ
     Tradition --> TGZ
-    Environment --> TGZ
     UserHelm --> TGZ
     TGZ -->|一次性 token URL| Installer[面板安装端]
 ```
@@ -97,9 +97,9 @@ OCI repository 名为：
 | 字段 | 内容 | 谁使用 |
 | --- | --- | --- |
 | `application` | 名称、标识、作者、类型、版本、注解、是否只装一次、是否需要集群权限、是否注册站点 | UI、打包分流、Chart 标签、Site/sidecar、商品逻辑 |
-| `platform` | 容器、Workload、存储、网络、启动参数、依赖、Shell、Helm/传统应用专属配置 | Helm 打包器和安装端 |
+| `platform` | 容器、Workload、存储、网络、启动参数、依赖、Shell、Helm/应用插件专属配置 | Helm 打包器和安装端 |
 | `bindings` | 菜单、角色、加载方式、后端路由、请求代理、前端 props | `MicroApp` CR 和动态市场菜单 |
-| `source` | 后端源码或传统/环境代码包，通常是 zip | Kaniko 构建 Job 或代码安装 Job |
+| `source` | 后端源码或应用插件/传统应用代码包，通常是 zip | Kaniko 构建 Job 或代码安装 Job |
 | `web` | 前端构建产物 zip | 是否生成 MicroApp，以及 info 接口的 `webzip_url` |
 | `v` / `version` | manifest 协议版本 | 对外 info 返回时设置为 3 |
 
@@ -109,10 +109,10 @@ OCI repository 名为：
 
 - `name`、`identifie`、`description`、`author`、`version`。
 - `type`：五类应用的分流字段。
-- `once`：是否只允许安装一次。运行环境和系统镜像的 UI 强制为 `false`。
+- `once`：是否只允许安装一次。传统应用和系统镜像的 UI 强制为 `false`。
 - `clusterPrivileges`：为生成型应用追加 ServiceAccount、ClusterRole、ClusterRoleBinding 和 service-account-token Secret。
 - `registerSite`：根 Chart 追加 `Site` CR，同时自动引入 `w7panel-cloudnoauth` sidecar Chart。
-- `annotation`：直接参与 Pod 注解；运行环境和系统镜像也在这里保存类型专属元数据。
+- `annotation`：直接参与 Pod 注解；传统应用和系统镜像也在这里保存类型专属元数据。
 
 ### 3.3 `platform`
 
@@ -129,9 +129,9 @@ OCI repository 名为：
 | `shells` | install/upgrade/uninstall/custom 等生命周期 Shell |
 | `runtimeClassName` / `hostUsers` | Sysbox、GPU 等运行时设置 |
 | `helm` | Helm/K8sYaml 应用的 Chart 来源、版本、values 覆盖和附加 YAML |
-| `tradition` | 传统应用选择的环境、环境版本、镜像模板和 site/extension 类型 |
+| `plugin` | 应用插件选择的传统应用、版本、语言和镜像模板 |
 
-旧 `platform.container` 会由 `GetManifestV2` 转成 `container-v2`、`volumes`、`startParams` 和默认 Deployment；传统与 Helm 应用不会执行这个容器转换。
+旧 `platform.container` 会由 `GetManifestV2` 转成 `container-v2`、`volumes`、`startParams` 和默认 Deployment；应用插件与 Helm 应用不会执行这个容器转换。
 
 ## 4. 公共 Helm 打包器
 
@@ -141,9 +141,11 @@ OCI repository 名为：
 
 1. `gateway-plugin` 专用分支。
 2. 只要 `platform.helm.chartName`、`repository` 或 `depend_yamls` 任一个非空，就走用户 Helm 包分支。
-3. `tradition` 走传统应用分支。
-4. `environment` 走环境应用分支。
+3. `app-plugin` 走应用插件分支。
+4. `tradition` 走传统应用分支。
 5. 其余类型，包括 `docker` 和 `system-image`，走通用 Workload 分支。
+
+读取旧 manifest 时，`environment` 会迁移为 `tradition`。
 
 因此类型和数据应保持一致。例如非 Helm 类型意外残留 `platform.helm` 时，也会优先按用户 Helm 包处理。当前 UI 在切换类型时会清理这类残留字段。
 
@@ -292,35 +294,36 @@ Job 默认 `backoffLimit: 2`、完成 60 秒后清理。安装前/删除后的 J
 - StatefulSet 的 `volumeClaimTemplates` 会创建逐 Pod PVC，accessModes、storageClassName、storage size 被替换为全局安装 values。
 - `subPath` 为 `%RANDOM_DIR%` 或 `RANDOM_DIR` 时，转换成基于 release/chart/container/volume/mountPath 的稳定 12 位哈希；升级时通过 Helm `lookup` 优先保留现有 Workload 的 subPath。
 
-## 6. 传统应用（`tradition`）
+## 6. 应用插件（`app-plugin`）
 
 ### 6.1 本质
 
-传统应用不是一个独立运行容器。最终 Chart 不生成自己的 Deployment、Service 或 Ingress，主要生成 Helm hook Job，把代码和生命周期 Shell 放到选定运行环境所使用的 PVC 路径中执行。
+应用插件不是一个独立运行容器。最终 Chart 不生成自己的 Deployment、Service 或 Ingress，主要生成 Helm hook Job，把代码和生命周期 Shell 放到选定传统应用所使用的 PVC 路径中执行。
 
 ### 6.2 必需信息
 
 打包器会强校验：
 
-- `platform.tradition.environmentName`：运行环境制品标识；
-- `platform.tradition.environmentVersion`：选定环境版本；
-- `source.url`：传统应用代码 zip。
+- `platform.plugin.traditionName`：传统应用制品标识；
+- `platform.plugin.traditionVersion`：选定传统应用版本；
+- `source.url`：应用插件代码 zip。
 
 另外常用字段：
 
-- `environmentImageTemplate`：环境镜像模板，例如 `php:{version}-fpm`，用于执行用户自定义 Shell；
-- `installType`：`site` 或 `extension`。当前 Helm 模板不因该字段改变代码安装路径；`extension` 主要被商品/ticket 逻辑判定为插件；
+- `traditionImageTemplate`：传统应用镜像模板，例如 `php:{version}-fpm`，用于执行用户自定义 Shell；
 - `platform.shells`：应用自定义安装、升级、卸载和 custom Shell；
 - bindings：如果 manifest 直接带前端或菜单，仍可生成 MicroApp。
 
-### 6.3 环境依赖协议
+应用插件不再区分旧的“整站”和“插件”设置，也不再保存 `installType` 或 `formula_is_plugin`；应用类型 `app-plugin` 本身就是唯一判断依据。
 
-编辑器会为选定环境建立：
+### 6.3 传统应用依赖协议
+
+编辑器会为选定传统应用建立：
 
 ```yaml
 platform:
   depends:
-    - identifie: <environment>
+    - identifie: <tradition-app>
       type: out
       required: true
       multipleInstances: true
@@ -329,15 +332,15 @@ platform:
   startParams:
     - name: DOMAIN_URL
       values_text: "%DOMAIN_URL%"
-      module_name: <environment>
+      module_name: <tradition-app>
       hidden: true
     - name: PVC_NAME
       values_text: "%PVC_NAME%"
-      module_name: <environment>
+      module_name: <tradition-app>
       hidden: true
 ```
 
-info 接口会再解析/生成 `<ENVIRONMENT>_RELEASE_NAME`。已有订单绑定优先使用真实 app identify；未绑定的多实例环境生成 `<identify>-<12位随机串>`。传统应用 Job 的 affinity 使用这个具体 release name，同时再匹配环境应用标识。
+info 接口会再解析/生成 `<TRADITION_APP>_RELEASE_NAME`。已有订单绑定优先使用真实 app identify；未绑定的多实例传统应用生成 `<identify>-<12位随机串>`。应用插件 Job 的 affinity 使用这个具体 release name，同时再匹配传统应用标识。
 
 ### 6.4 安装和卸载
 
@@ -351,24 +354,24 @@ info 接口会再解析/生成 `<ENVIRONMENT>_RELEASE_NAME`。已有订单绑定
 ### 6.5 存储
 
 - volume 名固定为 `site-storage`。
-- PVC 名取环境依赖导出的 `.Values.PVC_NAME`。
+- PVC 名取传统应用依赖导出的 `.Values.PVC_NAME`。
 - Job mountPath 为 `/www/wwwroot/<domain>`。
 - PVC subPath 为 `nginx-web-dir/<domain>`。
-- 传统应用不创建、不拥有也不删除该 PVC。
-- 因为默认按 RWO 处理，Job 用环境 release 的 pod affinity 调度到环境所在节点。
+- 应用插件不创建、不拥有也不删除该 PVC。
+- 因为默认按 RWO 处理，Job 用传统应用 release 的 pod affinity 调度到传统应用所在节点。
 
-## 7. 运行环境（`environment`）
+## 7. 传统应用（`tradition`）
 
 ### 7.1 必要信息
 
-- 环境语言：`application.annotation["w7.cc/image_language"]`。
+- 应用语言：`application.annotation["w7.cc/image_language"]`。
 - 镜像模板：annotation 中保存 `w7.cc/image_template`，主容器 image 也保存同一模板；必须包含 `{version}`。
 - 支持版本：`w7.cc/image_version`，同时生成必填 `IMAGE_VERSION` select 参数。
 - 域名：必填 `DOMAIN_URL` 参数。
 - 至少一个非 init container；UI 缺失时会补默认容器和 Deployment。
 - 固定共享 volume `site-storage` 和主容器 `/www/wwwroot` mount。
 
-打包时所有环境容器 image 中的 `{version}` 都替换为 `{{ .Values.IMAGE_VERSION }}`。
+打包时所有传统应用容器 image 中的 `{version}` 都替换为 `{{ .Values.IMAGE_VERSION }}`。
 
 ### 7.2 代码包
 
@@ -377,11 +380,11 @@ info 接口会再解析/生成 `<ENVIRONMENT>_RELEASE_NAME`。已有订单绑定
 - 安装/升级前 Job：下载 zip 到临时文件，解压到 `/www/wwwroot/$DOMAIN_URL`；
 - 卸载后 Job：删除该域名目录，但保留 PVC。
 
-因此运行环境既可以只是一个语言/runtime 服务，也可以自带初始站点代码。
+因此传统应用既可以只是一个语言/runtime 服务，也可以自带初始站点代码。
 
 ### 7.3 系统重启还原与 Sysbox
 
-`w7.cc/system-reboot-restore` 控制环境容器是否在重启后还原系统层：
+`w7.cc/system-reboot-restore` 控制传统应用容器是否在重启后还原系统层：
 
 - 开启还原：移除 `sysbox-runc`、`hostUsers=false` 和 `sysbox/rootfs-rw-layer` 注解。
 - 关闭还原：使用 `runtimeClassName: sysbox-runc`、`hostUsers: false`，写入 rootfs 持久化注解，并自动增加外部 `w7panel-sysbox` 必选依赖。
@@ -396,22 +399,22 @@ info 接口会再解析/生成 `<ENVIRONMENT>_RELEASE_NAME`。已有订单绑定
 2. 下载该制品根/子应用的完整 manifest、后端 zip、前端 zip和每个需要的 Helm tgz到本地 `/Storage`。
 3. 保存 `w7-sitemanagernginx/manifest.yaml` 及其子应用 manifest。
 4. 在根 manifest 中保存 `type: in`、`from: https://zpk.w7.cc` 依赖。
-5. 把 NGINX 子应用的 `PVC_NAME.module_name` 指向当前环境主应用。
-6. 把环境 Ingress 后端改为 NGINX 子应用及其实际端口。
+5. 把 NGINX 子应用的 `PVC_NAME.module_name` 指向当前传统应用。
+6. 把传统应用 Ingress 后端改为 NGINX 子应用及其实际端口。
 
-打包时 NGINX 已经是普通本地子 Chart，并非每次仅根据 `depends.from` 临时下载。环境打包器还会：
+打包时 NGINX 已经是普通本地子 Chart，并非每次仅根据 `depends.from` 临时下载。传统应用打包器还会：
 
-- 给 `w7-sitemanagernginx` 子 Workload 写 `w7.cc/nginx-restart-revision={{ .Release.Revision }}`，使环境升级时 NGINX 滚动；
+- 给 `w7-sitemanagernginx` 子 Workload 写 `w7.cc/nginx-restart-revision={{ .Release.Revision }}`，使传统应用升级时 NGINX 滚动；
 - 若配置了 `w7.cc/nginx_vhost_template`，生成安装/升级 vhost 和卸载 vhost 的 Job；
 - 从 NGINX 子 manifest 找出 `site-storage`/`nginx-dir` mounts，给 vhost Job 使用；
 - 支持 `{SERVER_NAME}`、`{LOG_DIR}`、`{ROOT_DIR}`、`{K8S_DOMAIN}`、`{UPSTREAM_APP_NAME}` 模板变量。
 
 ### 7.5 存储
 
-- 环境主容器的 `site-storage` claimName 默认为空，渲染时取 `.Values.PVC_NAME`。
+- 传统应用主容器的 `site-storage` claimName 默认为空，渲染时取 `.Values.PVC_NAME`。
 - 主容器挂载 `/www/wwwroot`，subPath 为 `nginx-web-dir`；每个域名的代码再存于该目录下的 `<domain>/`。
-- NGINX 子 Chart、环境代码 Job 和 vhost Job 应通过安装端传值复用同一 PVC。
-- 当前环境 Chart 不创建 PVC，安装方必须准备 PVC 并传 `PVC_NAME`。
+- NGINX 子 Chart、传统应用代码 Job 和 vhost Job 应通过安装端传值复用同一 PVC。
+- 当前传统应用 Chart 不创建 PVC，安装方必须准备 PVC 并传 `PVC_NAME`。
 - 未开启系统层还原时，还会通过注解把容器系统层映射到该持久卷中的 `www/server/<container>/system` 逻辑路径。
 
 ## 8. Helm/K8sYaml 应用（`helm`）
@@ -555,7 +558,7 @@ application.registerSite=true
 
 也就是说，manifest 目前没有一个可供用户任意填写的 sidecar 列表；`requiredSidecarInfoURLs` 根据应用能力返回代码内固定的 sidecar 来源。来源会按 `Chart` 名称去重。普通应用在 `registerSite=false` 时，`w7panelSidecars` 默认为空，也不会远程下载 sidecar。
 
-sidecar 准备发生在应用类型分流之前，因此原生、传统、环境、Helm 和系统镜像五类 Chart 都共用这一步；是否真正进入某个 Pod，还取决于该分支模板有没有调用对应 helper。
+sidecar 准备发生在应用类型分流之前，因此原生、应用插件、传统应用、Helm 和系统镜像五类 Chart 都共用这一步；是否真正进入某个 Pod，还取决于该分支模板有没有调用对应 helper。
 
 #### 10.4.2 下载和打包流程
 
@@ -671,8 +674,8 @@ Shell Job 的处理需要特别注意：
 | 应用类型 | Workload sidecar | Shell Job sidecar | 备注 |
 | --- | --- | --- | --- |
 | 原生应用 | 通用 Workload 已接入 | 公共 Shell Job 已接入 | Deployment/StatefulSet/DaemonSet 都走同一模板 |
-| 传统应用 | 无常驻 Workload | 公共 Shell Job 已接入 | sidecar 只能作用于安装/升级/卸载等 Job；不能凭空产生常驻业务 Pod |
-| 运行环境 | 环境 Workload 已接入 | 公共 Shell Job 已接入 | 环境代码/生命周期 Job 是否使用，取决于是否走公共 Shell Job 模板 |
+| 应用插件 | 无常驻 Workload | 公共 Shell Job 已接入 | sidecar 只能作用于安装/升级/卸载等 Job；不能凭空产生常驻业务 Pod |
+| 传统应用 | 传统应用 Workload 已接入 | 公共 Shell Job 已接入 | 代码/生命周期 Job 是否使用，取决于是否走公共 Shell Job 模板 |
 | Helm/K8sYaml 应用 | 不自动改写用户 Workload | 不自动改写用户 Job | 只注入 helper 和资源模板；用户模板必须主动调用插槽 |
 | 系统镜像 | 通用 Workload 已接入 | 公共 Shell Job 已接入 | Job annotation 会剔除系统镜像的 rootfs 持久化注解 |
 
@@ -692,7 +695,7 @@ Shell Job 的处理需要特别注意：
 sidecar 框架本身不创建、分配或回收固定存储，也没有独立的 PVC 生命周期。存储完全由 sidecar 导出的内容决定：
 
 - `sidecar-volumes-template` 可以输出 `emptyDir`、Secret、ConfigMap、PVC 等任意合法 Pod volume；对应 container template 需要自行输出匹配的 `volumeMounts`。
-- 引用 PVC 时，PVC 必须由安装方、宿主 Chart 或 `sidecar-resources-template` 预先创建；框架不会像环境应用那样自动解释 `PVC_NAME`。
+- 引用 PVC 时，PVC 必须由安装方、宿主 Chart 或 `sidecar-resources-template` 预先创建；框架不会像传统应用打包器那样自动解释 `PVC_NAME`。
 - Job 只有在该 sidecar 声明了 job container template 时才会带上其 volumes，且 Job 中的挂载也必须由 init/job container 模板自行声明。
 - `sidecar-resources-template` 可以输出 PVC、ConfigMap、Service、RBAC 等独立对象，但其命名、升级、删除和 hook 语义完全由 sidecar 自己负责。
 
@@ -708,8 +711,8 @@ sidecar 框架本身不创建、分配或回收固定存储，也没有独立的
 | --- | --- | --- | --- | --- |
 | 原生 Deployment/DaemonSet PVC volume | 安装方/外部系统 | `PVC_NAME` 或 manifest 固定 claimName | manifest 自定义 | 应用 Chart 不创建时也不拥有 |
 | 原生 StatefulSet claim template | StatefulSet Controller | Helm 全局 values | manifest 自定义 | 随 StatefulSet/PVC policy 处理 |
-| 传统应用 | 运行环境/安装方 | 从环境依赖注入 `PVC_NAME` | `nginx-web-dir/<domain>` | 只清目录，不删 PVC |
-| 运行环境 | 安装方 | `PVC_NAME` | `nginx-web-dir`，域名为子目录 | 卸载代码 Job 只删当前域名目录 |
+| 应用插件 | 传统应用/安装方 | 从传统应用依赖注入 `PVC_NAME` | `nginx-web-dir/<domain>` | 只清目录，不删 PVC |
+| 传统应用 | 安装方 | `PVC_NAME` | `nginx-web-dir`，域名为子目录 | 卸载代码 Job 只删当前域名目录 |
 | Helm 应用 | 用户 Chart | 用户 values | 用户定义 | 用户 Chart 定义 |
 | 系统镜像 | 安装方 | `PVC_NAME` | `/system-rootfs` 和 `<container>/system` | Chart 不创建 PVC |
 
@@ -736,7 +739,7 @@ Registry 自己使用另一块 PVC，默认文件系统根为 `/var/lib/registry
 
 ## 12. 当前实现的约束和风险
 
-1. **应用 PVC 大多是外部前置条件**：环境和系统镜像文案容易让人误以为 Chart 会创建 PVC，实际必须传 `PVC_NAME`。
+1. **应用 PVC 大多是外部前置条件**：传统应用和系统镜像文案容易让人误以为 Chart 会创建 PVC，实际必须传 `PVC_NAME`。
 2. **依赖记录不是打包输入的唯一事实来源**：普通子 Chart 依赖真实子 manifest 文件，需保证导入/删除操作同时维护文件和根 `depends`。
 3. **资源限制不随生成型 Workload 下发**：`container-v2.resources` 在 Workload values 中被清空。
 4. **用户 Helm Chart 的 helper 契约是隐式的**：MicroApp bindings 依赖 `common.fullname`，sidecar 依赖 `w7panel.*` include；打包器不做完整静态校验。
@@ -764,20 +767,10 @@ helm template <release> <generated-chart-dir> -f <install-values.yaml>
 | 类型 | 必验内容 |
 | --- | --- |
 | 原生 | 直接镜像与源码构建、三种 Workload、Service/Ingress、外部 PVC、StatefulSet claim template、子应用共享 PVC |
-| 传统 | 环境缺失时报错、具体环境 release affinity、域名路径校验、安装/升级覆盖、卸载不删 PVC |
-| 环境 | `{version}` 替换、`PVC_NAME`、有/无代码包、Sysbox 两种模式、开启/关闭 NGINX、vhost 模板和子 Chart 端口 |
+| 应用插件 | 传统应用缺失时报错、具体传统应用 release affinity、域名路径校验、安装/升级覆盖、卸载不删 PVC |
+| 传统应用 | `{version}` 替换、`PVC_NAME`、有/无代码包、Sysbox 两种模式、开启/关闭 NGINX、vhost 模板和子 Chart 端口 |
 | Helm | repository、HTTP tgz、本地 tgz、纯 YAML、kv 深层数组覆盖、原 dependency 合并、带 MicroApp/sidecar 的宿主 helper |
 | 系统镜像 | Sysbox/hostUsers、版本替换、rootfs annotation、外部 PVC、无 PVC 对象、无 Web/Ingress |
-
-2026-09-09 在当前工作树执行 `go test ./app/respo/logic`，测试包未通过编译，现有错误为：
-
-```text
-environment_reboot_restore_test.go: undefined: withEnvironmentAppSysbox
-environment_reboot_restore_test.go: undefined: environmentSysboxRootfsAnnotation
-helm_pack_environment_standalone_test.go: undefined: withEnvironmentAppStorage
-```
-
-这些是文档新增前已经存在的工作树代码/测试不同步问题，不是本 Markdown 变更引入。合并或清理相关环境应用改动后，应重新执行上面的完整验收矩阵。
 
 ## 14. 主要代码索引
 
@@ -785,8 +778,8 @@ helm_pack_environment_standalone_test.go: undefined: withEnvironmentAppStorage
 | --- | --- |
 | manifest 模型与旧版兼容 | `common/logic/manifest.go` |
 | 总打包入口和通用模板 values | `app/respo/logic/helm/helm_pack.go` |
+| 应用插件打包 | `app/respo/logic/helm/helm_pluginapp.go` |
 | 传统应用打包 | `app/respo/logic/helm/helm_traditionapp.go` |
-| 运行环境打包 | `app/respo/logic/helm/helm_environmentapp.go` |
 | MicroApp 生成/动态替换 | `app/respo/logic/helm/helm_microapp.go`、`app/respo/logic/helm/helm_dynamic_pack.go` |
 | sidecar 下载、契约与 Job 接入 | `app/respo/logic/helm/helm_sidecar.go`、`app/respo/logic/helm/helm_templates/_w7panel-sidecars.tpl`、`app/respo/logic/helm/helm_templates/shell-job.yaml.tpl`、`HELM_SIDECAR.md` |
 | ZPK 自身部署 Chart 的 sidecar 接入 | `charts/templates/_w7panel-sidecars.tpl`、`charts/templates/w7panel-sidecar-resources.yaml`、`charts/templates/deployment.yaml` |
@@ -797,7 +790,7 @@ helm_pack_environment_standalone_test.go: undefined: withEnvironmentAppStorage
 | ZPK Market 订单授权 | `app/respo/logic/zpkmarket/order.go` |
 | 制品安装票据 | `app/respo/logic/formula/ticket.go` |
 | 远程子应用导入 | `app/respo/logic/formula/formula_child_app_import.go`、`ui/src/utils/child-app-import.js` |
-| 环境/传统 manifest 整形 | `ui/src/utils/environment-app.js`、`ui/src/utils/tradition-app.js` |
+| 应用插件/传统应用 manifest 整形 | `ui/src/utils/plugin-app.js`、`ui/src/utils/tradition-app.js` |
 | 五类应用编辑器 | `ui/src/components/files-manifest.vue` |
 | 制品本地/OCI 存储 | `app/respo/logic/formula/depot.go`、`app/respo/logic/formula/formula_share_file.go`、`common/logic/oci_pack.go` |
 | 附件存储、永久下载 Token 与 ZIP 缓存 | `app/respo/logic/attach/attach.go`、`app/respo/logic/attach/storage.go` |

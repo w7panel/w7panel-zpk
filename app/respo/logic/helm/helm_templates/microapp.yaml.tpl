@@ -48,7 +48,7 @@ spec:
           {{- if eq .load_mode "iframe" }}
           serverUrl: {{ tpl .backend_url $ | quote }}
           {{- else if eq .type "internal" }}
-          {{- if eq $applicationType "tradition" }}
+          {{- if eq $applicationType "app-plugin" }}
           serverUrl: {{ tpl .backend_url $ | quote }}
           {{- else }}
           {{- $backendFullName := $fullName -}}

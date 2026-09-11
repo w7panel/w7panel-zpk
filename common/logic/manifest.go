@@ -10,11 +10,11 @@ import (
 )
 
 const (
-	Tradition_App    = "tradition"
+	PluginApp        = "app-plugin"
 	Docker_App       = "docker"
-	Help_App         = "helm"
+	HelmApp          = "helm"
 	GatewayPluginApp = "gateway-plugin"
-	EnvironmentApp   = "environment"
+	TraditionApp     = "tradition"
 	SystemImageApp   = "system-image"
 	SidecarApp       = "sidecar"
 
@@ -99,7 +99,7 @@ type Platform struct {
 	VolumeClaimTemplates []v1.PersistentVolumeClaim `yaml:"volumeClaimTemplates" json:"volumeClaimTemplates"`
 	Workload             Workload                   `yaml:"workload" json:"workload"`
 	Helm                 Helm                       `yaml:"helm" json:"helm"`
-	Tradition            Tradition                  `yaml:"tradition" json:"tradition"`
+	Plugin               *Plugin                    `yaml:"plugin,omitempty" json:"plugin,omitempty"`
 	Ingress              []Ingress                  `yaml:"ingress" json:"ingress"`
 	Depends              []Depend                   `yaml:"depends" json:"depends"`
 	StartParams          []StartParams              `yaml:"startParams" json:"startParams"`
@@ -141,14 +141,12 @@ type ContainerV2 struct {
 	Build  Build   `yaml:"build" json:"build"`
 }
 
-type Tradition struct {
-	EnvironmentName          string `yaml:"environmentName" json:"environmentName"`
-	EnvironmentVersion       string `yaml:"environmentVersion" json:"environmentVersion"`
-	EnvironmentLanguage      string `yaml:"environmentLanguage" json:"environmentLanguage"`
-	EnvironmentImageTemplate string `yaml:"environmentImageTemplate,omitempty" json:"environmentImageTemplate,omitempty"`
-	InstallType              string `yaml:"installType,omitempty" json:"installType,omitempty"`
-	InstallRelativePath      string `yaml:"installRelativePath,omitempty" json:"installRelativePath,omitempty"`
-	CodeAttachUrl            string `yaml:"-" json:"-"`
+type Plugin struct {
+	TraditionName          string `yaml:"traditionName" json:"traditionName"`
+	TraditionVersion       string `yaml:"traditionVersion" json:"traditionVersion"`
+	TraditionLanguage      string `yaml:"traditionLanguage" json:"traditionLanguage"`
+	TraditionImageTemplate string `yaml:"traditionImageTemplate,omitempty" json:"traditionImageTemplate,omitempty"`
+	CodeAttachUrl          string `yaml:"-" json:"-"`
 }
 
 type HelmDependYaml struct {
@@ -388,7 +386,9 @@ func ProcessManifestIdentify(manifestRow Manifest) Manifest {
 
 		manifestRow.Bindings[index] = item
 	}
-	manifestRow.Platform.Tradition.EnvironmentName = strings.ReplaceAll(manifestRow.Platform.Tradition.EnvironmentName, "_", "-")
+	if manifestRow.Platform.Plugin != nil {
+		manifestRow.Platform.Plugin.TraditionName = strings.ReplaceAll(manifestRow.Platform.Plugin.TraditionName, "_", "-")
+	}
 
 	return manifestRow
 }
@@ -401,6 +401,13 @@ func normalizeBackendIdentifie(identifie string) string {
 }
 
 func GetManifestV2(manifest Manifest) Manifest {
+	// Upgrade the former environment application type value.
+	if manifest.Application.Type == "environment" {
+		manifest.Application.Type = TraditionApp
+	}
+	if manifest.Platform.Plugin != nil {
+		manifest.Platform.Plugin.TraditionName = strings.ReplaceAll(manifest.Platform.Plugin.TraditionName, "_", "-")
+	}
 	manifest = normalizeLegacyManifestPlaceholders(manifest)
 
 	if len(manifest.Platform.StartParams) == 0 {
@@ -420,7 +427,7 @@ func GetManifestV2(manifest Manifest) Manifest {
 	if manifest.Platform.Container.Image == "" && manifest.Source.Url == "" {
 		return manifest
 	}
-	if manifest.Application.Type == "tradition" || manifest.Application.Type == "helm" {
+	if manifest.Application.Type == PluginApp || manifest.Application.Type == HelmApp {
 		return manifest
 	}
 

@@ -156,12 +156,12 @@ func (hc *HelmPack) PackToHelm() error {
 		if err := hc.configureHelmSidecarHost(helmDir); err != nil {
 			return err
 		}
-	} else if hc.Manifest.Application.Type == logic2.Tradition_App {
-		if err := hc.packTraditionApp(helmDir, templatesDir); err != nil {
+	} else if hc.Manifest.Application.Type == logic2.PluginApp {
+		if err := hc.packPluginApp(helmDir, templatesDir); err != nil {
 			return err
 		}
-	} else if hc.Manifest.Application.Type == logic2.EnvironmentApp {
-		if err := hc.packEnvironmentApp(helmDir, templatesDir); err != nil {
+	} else if hc.Manifest.Application.Type == logic2.TraditionApp {
+		if err := hc.packTraditionApp(helmDir, templatesDir); err != nil {
 			return err
 		}
 	} else {

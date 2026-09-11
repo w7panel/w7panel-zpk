@@ -10,14 +10,14 @@ import (
 )
 
 const (
-	traditionStorageVolumeName              = "site-storage"
-	managedCodeInstallShellImage            = "busybox:stable-uclibc"
-	traditionImageLanguageAnnotation        = "w7.cc/image_language"
-	traditionNginxVhostAnnotation           = "w7.cc/nginx_vhost_template"
-	traditionNginxRestartRevisionAnnotation = "w7.cc/nginx-restart-revision"
-	traditionCodeUninstallJobTitle          = "卸载传统应用代码"
-	traditionNginxVhostJobTitle             = "安装传统应用 NGINX 配置"
-	traditionNginxVhostUninstallJobTitle    = "卸载传统应用 NGINX 配置"
+	traditionStorageVolumeName             = "site-storage"
+	managedCodeInstallShellImage           = "busybox:stable-uclibc"
+	traditionImageLanguageAnnotation       = "w7.cc/image_language"
+	traditionNginxVhostAnnotation          = "w7.cc/nginx_vhost_template"
+	traditionToolRestartRevisionAnnotation = "w7.cc/tradition-tool-restart-revision"
+	traditionCodeUninstallJobTitle         = "卸载传统应用代码"
+	traditionNginxVhostJobTitle            = "安装传统应用 NGINX 配置"
+	traditionNginxVhostUninstallJobTitle   = "卸载传统应用 NGINX 配置"
 )
 
 // traditionCodeInstallShell is added to the generated chart as an internal
@@ -49,7 +49,7 @@ code_install_path="/www/wwwroot/$domain_url"
 rm -rf -- "$code_install_path"`
 
 // traditionNginxVhostShell writes the rendered site-manager vhost into the
-// nginx-dir subtree mounted from the embedded w7-sitemanagernginx application.
+// nginx-dir subtree mounted from the embedded w7-traditiontool application.
 const traditionNginxVhostShell = `{{- $rawDomain := toString .Values.DOMAIN_URL -}}
 {{- $domain := replace "https://" "" $rawDomain -}}
 {{- $domain = replace "http://" "" $domain -}}
@@ -116,12 +116,27 @@ func (hc *HelmPack) addTraditionAppValues(values map[string]interface{}) error {
 			"nginxVhostTemplate": nginxVhostTemplate,
 		},
 	}
-	hc.applyTraditionNginxJobVolumeMounts(values)
+	if traditionGatewayEnabled(hc.Manifest) {
+		hc.applyTraditionToolJobVolumeMounts(values)
+	}
 	return nil
 }
 
-func (hc *HelmPack) applyTraditionNginxJobVolumeMounts(values map[string]interface{}) {
-	volumeMounts := hc.traditionNginxVolumeMounts()
+func traditionGatewayEnabled(manifest logic2.Manifest) bool {
+	if manifest.Application.Annotation == nil {
+		return false
+	}
+	return strings.EqualFold(strings.TrimSpace(traditionAnnotationString(
+		manifest.Application.Annotation["w7.cc/nginx-gateway"],
+	)), "true")
+}
+
+// applyTraditionToolJobVolumeMounts copies w7-traditiontool's shared-storage
+// mounts to the traditional application's NGINX install/uninstall jobs. Those
+// jobs run in the parent chart but must read and write the same nginx-dir on
+// the shared PVC that is mounted by w7-traditiontool.
+func (hc *HelmPack) applyTraditionToolJobVolumeMounts(values map[string]interface{}) {
+	volumeMounts := hc.traditionToolVolumeMounts()
 	if len(volumeMounts) == 0 {
 		return
 	}
@@ -133,18 +148,16 @@ func (hc *HelmPack) applyTraditionNginxJobVolumeMounts(values map[string]interfa
 		if job["title"] != traditionNginxVhostJobTitle && job["title"] != traditionNginxVhostUninstallJobTitle {
 			continue
 		}
-		container, ok := job["container"].(map[string]interface{})
-		if !ok {
-			continue
+		if container, ok := job["container"].(map[string]interface{}); ok {
+			container["volumeMounts"] = append([]v1.VolumeMount(nil), volumeMounts...)
 		}
-		container["volumeMounts"] = append([]v1.VolumeMount(nil), volumeMounts...)
 	}
 }
 
-func (hc *HelmPack) traditionNginxVolumeMounts() []v1.VolumeMount {
+func (hc *HelmPack) traditionToolVolumeMounts() []v1.VolumeMount {
 	for _, child := range hc.SubManifest {
 		identify := strings.ToLower(strings.ReplaceAll(strings.TrimSpace(child.Application.Identifie), "_", "-"))
-		if identify != "w7-sitemanagernginx" {
+		if identify != "w7-traditiontool" {
 			continue
 		}
 		for _, container := range child.Platform.ContainerV2s {
@@ -224,33 +237,25 @@ func (hc *HelmPack) packTraditionApp(rootDir, templatesDir string) error {
 	)
 }
 
-// prepareTraditionAppSubManifests applies traditional-application metadata before
-// the generic sub-chart packer runs. This keeps NGINX knowledge out of the
-// shared generateSubCharts loop while still making the imported child roll on
-// every Helm upgrade of a traditional application.
 func (hc *HelmPack) prepareTraditionAppSubManifests() {
 	for identify, child := range hc.SubManifest {
-		hc.SubManifest[identify] = withTraditionNginxRestartAnnotation(hc.Manifest, child)
+		hc.SubManifest[identify] = withTraditionToolRestartAnnotation(hc.Manifest, child)
 	}
 }
 
-// withTraditionNginxRestartAnnotation adds an upgrade marker only to the
-// imported w7-sitemanagernginx child application. The child chart renders application
-// annotations into its Pod template, so changing the Helm release revision
-// causes that workload to roll by default.
-func withTraditionNginxRestartAnnotation(parent, child logic2.Manifest) logic2.Manifest {
+func withTraditionToolRestartAnnotation(parent, child logic2.Manifest) logic2.Manifest {
 	if parent.Application.Type != logic2.TraditionApp {
 		return child
 	}
 	identify := strings.ToLower(strings.ReplaceAll(strings.TrimSpace(child.Application.Identifie), "_", "-"))
-	if identify != "w7-sitemanagernginx" {
+	if identify != "w7-traditiontool" {
 		return child
 	}
 	annotations := make(map[string]interface{}, len(child.Application.Annotation)+1)
 	for key, value := range child.Application.Annotation {
 		annotations[key] = value
 	}
-	annotations[traditionNginxRestartRevisionAnnotation] = "{{ .Release.Revision }}"
+	annotations[traditionToolRestartRevisionAnnotation] = "{{ .Release.Revision }}"
 	child.Application.Annotation = annotations
 	return child
 }

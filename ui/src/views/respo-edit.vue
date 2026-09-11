@@ -100,13 +100,11 @@ import {
     importChildApplication,
     importedChildFilePath,
     isChildImportVersionNewer,
-    getImportedChildIdentifies,
     saveImportedChildren,
-    removeImportedChildren,
 } from '@/utils/child-app-import';
 import {
-    traditionNginxDependency,
-    withTraditionNginxPvcModuleName,
+    traditionToolDependency,
+    withTraditionToolConfig,
 } from '@/utils/tradition-app';
 import {
     IconArrowLeft,
@@ -328,7 +326,7 @@ export default {
                 version: this.version_id,
             });
         },
-        prepareTraditionNginxEntry(entry) {
+        prepareTraditionToolEntry(entry, gatewayEnabled = false) {
             if (!entry) { return { manifest: {}, changed: false }; }
             let source = entry.data || entry.manifest || {};
             if (typeof source == 'string') {
@@ -339,9 +337,10 @@ export default {
                 }
             }
             const before = JSON.stringify(source);
-            const manifest = withTraditionNginxPvcModuleName(
+            const manifest = withTraditionToolConfig(
                 source,
                 this.getManifestIdentifie(this.$refs.form?.json, this.identifie),
+                gatewayEnabled,
             );
             entry.data = manifest;
             entry.manifest = jsyaml.dump(manifest);
@@ -349,6 +348,73 @@ export default {
                 manifest,
                 changed: JSON.stringify(manifest) != before,
             };
+        },
+        async ensureTraditionToolDependency(gatewayEnabled = false) {
+            const rootRef = this.$refs.form;
+            if (rootRef?.form?.type != 'tradition' || !rootRef?.json) {
+                return;
+            }
+            rootRef.syncTraditionDependency?.();
+            rootRef.syncImportedDependenciesToManifest?.();
+            const file = importedChildFilePath(traditionToolDependency.identifie);
+            const dependencyExists = (rootRef.json?.platform?.depends || []).some(item =>
+                item?.identifie == traditionToolDependency.identifie
+                && String(item?.from || '').trim());
+            const existingContent = this.list?.[file];
+            if (dependencyExists && existingContent !== undefined) {
+                const entry = {
+                    identifie: traditionToolDependency.identifie,
+                    manifest: existingContent,
+                    data: existingContent,
+                };
+                const prepared = this.prepareTraditionToolEntry(entry, gatewayEnabled);
+                if (prepared.changed) {
+                    await myAxios.post('/respo/manifest/file', {
+                        identifie: this.identifie,
+                        filename: file,
+                        content: entry.manifest,
+                        version: this.version_id,
+                    });
+                    this.list[file] = entry.manifest;
+                    const dependency = this.depends.find(item =>
+                        item?.identifie == traditionToolDependency.identifie);
+                    if (dependency) {
+                        dependency.manifest = entry.manifest;
+                    }
+                }
+                return;
+            }
+
+            const dependency = {
+                identifie: traditionToolDependency.identifie,
+                name: traditionToolDependency.name,
+                subidentifie: '',
+                subname: '',
+                required: true,
+                type: 'in',
+                from: traditionToolDependency.source,
+            };
+            const entries = await importChildApplication(myAxios, { dependency });
+            const toolEntry = entries.find(entry =>
+                entry?.identifie == traditionToolDependency.identifie);
+            if (!toolEntry) {
+                throw new Error('导入结果中缺少传统应用工具子应用 manifest');
+            }
+            this.prepareTraditionToolEntry(toolEntry, gatewayEnabled);
+            const replaceExisting = (this.depends || []).some(item =>
+                item?.identifie == traditionToolDependency.identifie)
+                || existingContent !== undefined;
+            const result = await saveImportedChildren(myAxios, {
+                rootRef,
+                rootIdentifie: this.identifie,
+                versionId: this.version_id,
+                entries,
+                sourceDependency: dependency,
+                existingDependencies: this.depends,
+                existingManifests: this.list,
+                replaceExisting,
+            });
+            this.applyImportedChildrenResult(result);
         },
         openImportDepend() {
             this.importPicker.show = true;
@@ -359,69 +425,15 @@ export default {
         async handleTraditionNginxGatewayChange({ enabled, finish } = {}) {
             const done = typeof finish == 'function' ? finish : () => { };
             try {
-                if (enabled) {
-                    const rootDependencies = this.$refs.form?.json?.platform?.depends || [];
-                    const hasDependency = rootDependencies.some(item =>
-                        item?.identifie == traditionNginxDependency.identifie
-                        && String(item?.from || '').trim())
-                        && Object.prototype.hasOwnProperty.call(
-                            this.list || {},
-                            importedChildFilePath(traditionNginxDependency.identifie),
-                        );
-                    if (!hasDependency) {
-                        const dependency = {
-                            identifie: traditionNginxDependency.identifie,
-                            name: traditionNginxDependency.name,
-                            subidentifie: '',
-                            subname: '',
-                            required: true,
-                            type: 'in',
-                            from: traditionNginxDependency.source,
-                        };
-                        const entries = await importChildApplication(myAxios, { dependency });
-                        const nginxEntry = entries.find(entry =>
-                            entry?.identifie == traditionNginxDependency.identifie);
-                        if (!nginxEntry) {
-                            throw new Error('导入结果中缺少 NGINX 子应用 manifest');
-                        }
-                        this.prepareTraditionNginxEntry(nginxEntry);
-                        const result = await saveImportedChildren(myAxios, {
-                            rootRef: this.$refs.form,
-                            rootIdentifie: this.identifie,
-                            versionId: this.version_id,
-                            entries,
-                            sourceDependency: dependency,
-                            existingDependencies: this.depends,
-                        });
-                        this.applyImportedChildrenResult(result);
-                    }
-                    done(true);
-                    await this.persistTraditionManifest();
-                    messageSuccess('NGINX 网关及其子应用导入成功');
-                    return;
-                }
-
-                const identifies = getImportedChildIdentifies(
-                    traditionNginxDependency.identifie,
-                    this.list,
-                    this.depends,
-                );
-                const result = await removeImportedChildren(myAxios, {
-                    rootRef: this.$refs.form,
-                    rootIdentifie: this.identifie,
-                    versionId: this.version_id,
-                    list: this.list,
-                    identifies,
-                });
-                this.applyRemovedChildrenResult(result);
+                await this.ensureTraditionToolDependency(enabled);
                 done(true);
                 await this.persistTraditionManifest();
-                messageSuccess('NGINX 网关及其子应用已删除');
+                messageSuccess(enabled ? 'NGINX 网关已开启' : 'NGINX 网关已关闭');
             } catch (error) {
                 done(false);
                 messageError(error?.response?.data?.error || error?.message || (enabled
-                    ? '导入 NGINX 网关失败'
-                    : '删除 NGINX 网关失败'));
+                    ? '开启 NGINX 网关失败'
+                    : '关闭 NGINX 网关失败'));
             }
         },
         async importChild(record, tab = 'local') {
@@ -523,8 +535,11 @@ export default {
                 if (!rootEntry) {
                     throw new Error(`导入结果中缺少 ${item.identifie} 子应用 manifest`);
                 }
-                if (item.identifie == traditionNginxDependency.identifie) {
-                    this.prepareTraditionNginxEntry(rootEntry);
+                if (item.identifie == traditionToolDependency.identifie) {
+                    this.prepareTraditionToolEntry(
+                        rootEntry,
+                        Boolean(this.$refs.form?.form?.traditionNginxGateway),
+                    );
                 }
                 const result = await saveImportedChildren(myAxios, {
                     rootRef: this.$refs.form,
@@ -537,7 +552,7 @@ export default {
                     replaceExisting: true,
                 });
                 this.applyImportedChildrenResult(result);
-                if (item.identifie == traditionNginxDependency.identifie) {
+                if (item.identifie == traditionToolDependency.identifie) {
                     await this.persistTraditionManifest();
                 }
                 await this.checkImportedChildUpdates();
@@ -701,13 +716,21 @@ export default {
         },
 
         complete(json, yaml, otherData, callback) {
-            myAxios.post('/respo/manifest/file', {
+            const prepare = json?.application?.type == 'tradition'
+                ? this.ensureTraditionToolDependency(
+                    Boolean(this.$refs.form?.form?.traditionNginxGateway),
+                ).then(() => {
+                    json = this.$refs.form?.json || json;
+                    yaml = jsyaml.dump(json);
+                })
+                : Promise.resolve();
+            prepare.then(() => myAxios.post('/respo/manifest/file', {
                 identifie: this.identifie,
                 filename: 'manifest.yaml',
                 content: yaml,
                 version: this.version_id,
 
-            }).then((res) => {
+            })).then((res) => {
                 if (otherData?.editfile) {
                     (typeof callback == 'function') && callback();
                     if (/\.yaml$/.test(otherData.editfile)) {
@@ -729,9 +752,7 @@ export default {
             }).then(res => {
 
             }).catch((error) => {
-                if (error?.response?.data?.error) {
-                    messageError(error.response.data.error);
-                }
+                messageError(error?.response?.data?.error || error?.message || '制品配置保存失败');
             });
         },
         publish(noback) {

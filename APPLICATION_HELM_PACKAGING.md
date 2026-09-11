@@ -393,20 +393,21 @@ info 接口会再解析/生成 `<TRADITION_APP>_RELEASE_NAME`。已有订单绑�
 
 ### 7.4 可选 NGINX 网关
 
-开启后编辑器会：
+传统应用保存时，无论是否开启 NGINX 网关，编辑器都会：
 
-1. 从 `https://zpk.w7.cc` 请求 `w7-sitemanagernginx` 的完整 info。
+1. 从 `https://zpk.w7.cc` 请求 `w7-traditiontool` 的完整 info。
 2. 下载该制品根/子应用的完整 manifest、后端 zip、前端 zip和每个需要的 Helm tgz到本地 `/Storage`。
-3. 保存 `w7-sitemanagernginx/manifest.yaml` 及其子应用 manifest。
+3. 保存 `w7-traditiontool/manifest.yaml` 及其子应用 manifest。
 4. 在根 manifest 中保存 `type: in`、`from: https://zpk.w7.cc` 依赖。
-5. 把 NGINX 子应用的 `PVC_NAME.module_name` 指向当前传统应用。
-6. 把传统应用 Ingress 后端改为 NGINX 子应用及其实际端口。
+5. 把工具子应用的 `PVC_NAME.module_name` 指向当前传统应用。
 
-打包时 NGINX 已经是普通本地子 Chart，并非每次仅根据 `depends.from` 临时下载。传统应用打包器还会：
+开启 NGINX 网关时，编辑器给 `w7-traditiontool` 设置隐藏启动参数 `gatewayEnabled=true`，并把传统应用 Ingress 后端改为工具子应用及其实际端口。关闭网关时显式设置 `gatewayEnabled=false`，不删除工具依赖。
 
-- 给 `w7-sitemanagernginx` 子 Workload 写 `w7.cc/nginx-restart-revision={{ .Release.Revision }}`，使传统应用升级时 NGINX 滚动；
+打包时工具已经是普通本地子 Chart，并非每次仅根据 `depends.from` 临时下载。传统应用打包器还会：
+
+- 给 `w7-traditiontool` 子 Workload 写 `w7.cc/tradition-tool-restart-revision={{ .Release.Revision }}`，使传统应用升级时工具同步滚动；
 - 若配置了 `w7.cc/nginx_vhost_template`，生成安装/升级 vhost 和卸载 vhost 的 Job；
-- 从 NGINX 子 manifest 找出 `site-storage`/`nginx-dir` mounts，给 vhost Job 使用；
+- 从工具子 manifest 找出 `site-storage`/`nginx-dir` mounts，给 vhost Job 使用；
 - 支持 `{SERVER_NAME}`、`{LOG_DIR}`、`{ROOT_DIR}`、`{K8S_DOMAIN}`、`{UPSTREAM_APP_NAME}` 模板变量。
 
 ### 7.5 存储

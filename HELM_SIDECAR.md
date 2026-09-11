@@ -40,12 +40,12 @@ manifest 当前没有允许用户任意填写 sidecar 列表的字段。`registe
 
 ```yaml
 depends:
-  - identifie: w7-sitemanagernginx
+  - identifie: w7-traditiontool
     type: in
     from: https://zpk.w7.cc
 ```
 
-传统应用需要确保 `w7-sitemanagernginx` 已经作为子 manifest 导入；打包器随后才会对这个子应用补充传统应用专属配置并生成子 Chart。
+传统应用会默认导入 `w7-traditiontool` 及其子 manifest；打包器随后对这个子应用补充传统应用专属配置并生成子 Chart。
 
 ## 3. Sidecar 下载和打包流程
 

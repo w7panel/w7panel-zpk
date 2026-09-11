@@ -773,6 +773,7 @@ import ManifestConfigTableColumn from '@/components/manifest-config-table-column
 import dependPicker from '@/components/depend-picker.vue';
 import myAxios from '../utils/index';
 import {
+    traditionToolDependency,
     traditionSysboxRootfsAnnotation,
     traditionSystemRebootRestoreAnnotation,
     isTraditionAppDependency,
@@ -1467,8 +1468,8 @@ export default {
             }
             const enabled = Boolean(value);
             const previous = !enabled;
-            // Keep the visible state unchanged until the confirmation and the
-            // parent-side import/removal have completed successfully.
+            // Keep the visible state unchanged until the parent-side
+            // dependency update has completed successfully.
             this.form.traditionNginxGateway = previous;
             const finish = (success) => {
                 this.traditionNginxGatewayChanging = false;
@@ -1488,12 +1489,14 @@ export default {
                     finish,
                 });
             };
+            if (enabled) {
+                request();
+                return;
+            }
             confirm({
-                title: enabled ? '开启 NGINX 网关' : '关闭 NGINX 网关',
-                content: enabled
-                    ? '将从 https://zpk.w7.cc/zpk/respo/info/w7-sitemanagernginx 自动导入 NGINX 及其子应用，是否继续？'
-                    : '关闭后会自动删除 NGINX 及其已导入的子应用，是否继续？',
-                confirmButtonText: enabled ? '导入并开启' : '删除并关闭',
+                title: '关闭 NGINX 网关',
+                content: '关闭后将停止使用 NGINX 网关，是否继续？',
+                confirmButtonText: '关闭',
                 cancelButtonText: '取消',
                 onOk: request,
                 onCancel: () => {
@@ -1655,6 +1658,7 @@ export default {
                 this.json.platform,
                 this.json.application?.annotation || {},
                 Boolean(this.form.traditionSystemRebootRestore),
+                this.json.application?.identifie || this.form.identifie,
             );
             this.json.platform = result.platform;
             this.json.application = this.json.application || {};
@@ -2007,16 +2011,23 @@ export default {
             if (this.traditionNginxGatewayChanging) {
                 return;
             }
-            if (this.form.traditionNginxGateway) {
-                return;
-            }
-            // Nginx is optional for traditional applications. When the switch
-            // is off, remove only the managed dependency and leave any other
-            // user-selected dependencies untouched.
+            const existing = [...(this.form.dependsIn || []), ...(this.form.depends || [])]
+                .find(item => isTraditionAppDependency(item));
+            const dependency = {
+                ...(existing || {}),
+                identifie: traditionToolDependency.identifie,
+                name: traditionToolDependency.name,
+                subidentifie: '',
+                subname: '',
+                required: true,
+                type: 'in',
+                from: traditionToolDependency.source,
+            };
             this.form.depends = (this.form.depends || [])
                 .filter(item => !isTraditionAppDependency(item));
             this.form.dependsIn = (this.form.dependsIn || [])
                 .filter(item => !isTraditionAppDependency(item));
+            this.form.dependsIn.push(dependency);
         },
         requiresSysboxDependency() {
             if (this.form.type == 'system-image') { return true }
@@ -3050,13 +3061,6 @@ platform:
                     }
                     this.getSubDepends(index);
                 })
-
-                if (this.form.type == 'tradition' && !this.traditionNginxGatewayAnnotationPresent) {
-                    const hasLegacyNginx = [...this.form.dependsIn, ...this.form.depends]
-                        .some(item => isTraditionAppDependency(item));
-                    this.form.traditionNginxGateway = hasLegacyNginx
-                        || Boolean(String(this.form.traditionNginxVhostTemplate || '').trim());
-                }
 
                 let depend_yamls = j.platform?.helm?.depend_yamls || [];
                 depend_yamls = depend_yamls.map(i => {

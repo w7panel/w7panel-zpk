@@ -1,7 +1,7 @@
 const traditionApp = Object.freeze({
     toolDependencyIdentifie: 'w7-traditiontool',
     toolDependencyName: 'w7-traditiontool',
-    toolDependencySource: 'https://zpk.w7.cc',
+    toolDependencySource: 'https://zpk.fan.b2.sz.w7.com',
     storageName: 'site-storage',
 });
 

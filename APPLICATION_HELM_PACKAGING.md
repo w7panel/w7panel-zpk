@@ -395,7 +395,7 @@ info 接口会再解析/生成 `<TRADITION_APP>_RELEASE_NAME`。已有订单绑�
 
 传统应用保存时，无论是否开启 NGINX 网关，编辑器都会：
 
-1. 从 `https://zpk.w7.cc` 请求 `w7-traditiontool` 的完整 info。
+1. 从 `https://zpk.fan.b2.sz.w7.com` 请求 `w7-traditiontool` 的完整 info。
 2. 下载该制品根/子应用的完整 manifest、后端 zip、前端 zip和每个需要的 Helm tgz到本地 `/Storage`。
 3. 保存 `w7-traditiontool/manifest.yaml` 及其子应用 manifest。
 4. 在根 manifest 中保存 `type: in`、`from: https://zpk.w7.cc` 依赖。

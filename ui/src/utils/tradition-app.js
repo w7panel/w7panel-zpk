@@ -171,6 +171,10 @@ export function withTraditionAppStorage(platform = {}) {
             name: traditionStorageVolumeName,
             mountPath: '/www/wwwroot',
             subPath: 'nginx-web-dir',
+        }, {
+            name: traditionStorageVolumeName,
+            mountPath: '/www/server',
+            subPath: 'server-dir',
         });
     }
     nextPlatform['container-v2'] = containers;

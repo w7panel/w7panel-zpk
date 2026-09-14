@@ -370,7 +370,7 @@ info 接口会再解析/生成 `<TRADITION_APP>_RELEASE_NAME`。已有订单绑�
 - 支持版本：`w7.cc/image_version`，同时生成必填 `IMAGE_VERSION` select 参数。
 - 域名：必填 `DOMAIN_URL` 参数。
 - 至少一个非 init container；UI 缺失时会补默认容器和 Deployment。
-- 固定共享 volume `site-storage` 和主容器 `/www/wwwroot` mount。
+- 固定共享 volume `site-storage`，主容器挂载 `/www/wwwroot` (`nginx-web-dir`) 和 `/www/server` (`server-dir`)。
 
 打包时所有传统应用容器 image 中的 `{version}` 都替换为 `{{ .Values.IMAGE_VERSION }}`。
 
@@ -414,7 +414,7 @@ info 接口会再解析/生成 `<TRADITION_APP>_RELEASE_NAME`。已有订单绑�
 ### 7.5 存储
 
 - 传统应用主容器的 `site-storage` claimName 默认为空，渲染时取 `.Values.PVC_NAME`。
-- 主容器挂载 `/www/wwwroot`，subPath 为 `nginx-web-dir`；每个域名的代码再存于该目录下的 `<domain>/`。
+- 主容器挂载 `/www/wwwroot` (`nginx-web-dir`) 和 `/www/server` (`server-dir`)；每个域名的代码存于 `nginx-web-dir/<domain>/`。
 - NGINX 子 Chart、传统应用代码 Job 和 vhost Job 应通过安装端传值复用同一 PVC。
 - 当前传统应用 Chart 不创建 PVC，安装方必须准备 PVC 并传 `PVC_NAME`。
 - 未开启系统层还原时，还会通过注解把容器系统层映射到该持久卷中的 `www/server/<container>/system` 逻辑路径。

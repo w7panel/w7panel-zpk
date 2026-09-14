@@ -23,11 +23,11 @@ spec:
       {{- include "registry.selectorLabels" . | nindent 6 }}
   template:
     metadata:
+      {{- $podAnnotations := deepCopy (.Values.podAnnotations | default dict) }}
+      {{- $_ := set $podAnnotations "w7.cc/inject-root-ca" "false" }}
+      {{- $_ := set $podAnnotations "zpk.w7.cc/registry-jwt-rotate-nonce" (default "" .Values.global.registryJwt.rotateNonce) }}
       annotations:
-        zpk.w7.cc/registry-jwt-rotate-nonce: {{ default "" .Values.global.registryJwt.rotateNonce | quote }}
-        {{- with .Values.podAnnotations }}
-        {{- toYaml . | nindent 8 }}
-        {{- end }}
+        {{- toYaml $podAnnotations | nindent 8 }}
       labels:
         {{- include "registry.selectorLabels" . | nindent 8 }}
     spec:

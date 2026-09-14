@@ -410,7 +410,7 @@
                                     </files-upload>
                                     <div class="c-blue cursor ml-20" @click="deleteUpload">删除</div>
                                     <a-tooltip v-if="form.type == 'app-plugin'"
-                                        content="请进入应用插件代码根目录后打包，压缩包根目录应直接包含安装内容，不要包含外层目录。例如：cd 应用插件目录 && zip -r app.zip .。安装时会解压到 /www/wwwroot/&lt;站点域名&gt;，并随当前版本发布。"
+                                        content="请在应用插件的外层目录打包，并保留插件安装所需的完整目录结构。例如微擎插件需要将 addons 目录一起打包，使压缩包根目录直接包含 addons 目录。安装时会解压到 /www/wwwroot/&lt;站点域名&gt;，并随当前版本发布。"
                                         position="top">
                                         <icon-exclamation-circle-fill class="fs-16 c-99 ml-4" />
                                     </a-tooltip>

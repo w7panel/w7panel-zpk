@@ -117,7 +117,7 @@ func (hc *HelmPack) addTraditionAppValues(values map[string]interface{}) error {
 		},
 	}
 	if traditionGatewayEnabled(hc.Manifest) {
-		hc.applyTraditionToolJobVolumeMounts(values)
+		applyTraditionToolJobVolumeMounts(values)
 	}
 	return nil
 }
@@ -131,15 +131,10 @@ func traditionGatewayEnabled(manifest logic2.Manifest) bool {
 	)), "true")
 }
 
-// applyTraditionToolJobVolumeMounts copies w7-traditiontool's shared-storage
-// mounts to the traditional application's NGINX install/uninstall jobs. Those
-// jobs run in the parent chart but must read and write the same nginx-dir on
-// the shared PVC that is mounted by w7-traditiontool.
-func (hc *HelmPack) applyTraditionToolJobVolumeMounts(values map[string]interface{}) {
-	volumeMounts := hc.traditionToolVolumeMounts()
-	if len(volumeMounts) == 0 {
-		return
-	}
+// applyTraditionToolJobVolumeMounts mounts the site-manager PVC location used
+// by w7-traditiontool for NGINX configuration. The path matches
+// w7panel-sitemanager/charts: /www/server/nginx backed by nginx-dir.
+func applyTraditionToolJobVolumeMounts(values map[string]interface{}) {
 	jobs, ok := values["jobs"].([]map[string]interface{})
 	if !ok {
 		return
@@ -149,29 +144,13 @@ func (hc *HelmPack) applyTraditionToolJobVolumeMounts(values map[string]interfac
 			continue
 		}
 		if container, ok := job["container"].(map[string]interface{}); ok {
-			container["volumeMounts"] = append([]v1.VolumeMount(nil), volumeMounts...)
+			container["volumeMounts"] = []v1.VolumeMount{{
+				Name:      traditionStorageVolumeName,
+				MountPath: "/www/server/nginx",
+				SubPath:   "nginx-dir",
+			}}
 		}
 	}
-}
-
-func (hc *HelmPack) traditionToolVolumeMounts() []v1.VolumeMount {
-	for _, child := range hc.SubManifest {
-		identify := strings.ToLower(strings.ReplaceAll(strings.TrimSpace(child.Application.Identifie), "_", "-"))
-		if identify != "w7-traditiontool" {
-			continue
-		}
-		for _, container := range child.Platform.ContainerV2s {
-			if container.IsInitContainer {
-				continue
-			}
-			for _, mount := range container.VolumeMounts {
-				if mount.Name == traditionStorageVolumeName && mount.SubPath == "nginx-dir" {
-					return container.VolumeMounts
-				}
-			}
-		}
-	}
-	return nil
 }
 
 func (hc *HelmPack) traditionAppHelmValuesOptions() helmValuesOptions {

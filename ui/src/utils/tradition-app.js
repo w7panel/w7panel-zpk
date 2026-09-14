@@ -95,12 +95,9 @@ export function traditionAppRootfsAnnotation(
     const identifie = String(applicationIdentifie || '').trim()
         .replace(/[^A-Za-z0-9._-]+/g, '-')
         .replace(/^-+|-+$/g, '');
-    // IMAGE_VERSION is a selectable startup parameter. Keep it as a Helm
-    // value expression so each installation gets a version-specific rootfs.
-    const rawVersion = '{{ .Values.IMAGE_VERSION }}';
-    const version = rawVersion.includes('{{')
-        ? rawVersion
-        : rawVersion.replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '');
+    // Keep the manifest independent of Helm syntax. The packer turns this
+    // platform placeholder into .Values.IMAGE_VERSION when generating a chart.
+    const version = '${IMAGE_VERSION}';
     const name = `${identifie}-${version}`;
     if (!name) return '';
     return JSON.stringify([{

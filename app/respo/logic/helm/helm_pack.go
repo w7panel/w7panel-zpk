@@ -790,7 +790,7 @@ func (hc *HelmPack) generateValuesYaml(rootDir string, options helmValuesOptions
 			"title":    appName,
 			"identify": hc.Manifest.Application.Identifie,
 		},
-		"annotations":          hc.Manifest.Application.Annotation,
+		"annotations":          renderHelmValuesPlaceholdersInAnnotations(hc.Manifest.Application.Annotation),
 		"global":               hc.getGlobalValues(),
 		"replicas":             1,
 		"workload":             hc.getWorkloadValues(platform),
@@ -1108,6 +1108,24 @@ func renderHelmValuesPlaceholdersMap(values map[string]string) map[string]string
 	rendered := make(map[string]string, len(values))
 	for key, value := range values {
 		rendered[key] = renderHelmValuesPlaceholders(value)
+	}
+	return rendered
+}
+
+// renderHelmValuesPlaceholdersInAnnotations converts platform placeholders at
+// the chart generation boundary. Manifests can therefore store ${PARAM}
+// without embedding executable Helm template syntax in persisted content.
+func renderHelmValuesPlaceholdersInAnnotations(values map[string]interface{}) map[string]interface{} {
+	if len(values) == 0 {
+		return values
+	}
+	rendered := make(map[string]interface{}, len(values))
+	for key, value := range values {
+		if stringValue, ok := value.(string); ok {
+			rendered[key] = renderHelmValuesPlaceholders(stringValue)
+			continue
+		}
+		rendered[key] = value
 	}
 	return rendered
 }

@@ -822,7 +822,6 @@ const isDerivedDependencyReleaseStartParam = item => Boolean(
 const pvcNameStartParamName = 'PVC_NAME';
 
 const gatewayPluginAnnotationPrefix = 'w7.cc/plugin-';
-const gatewayPluginAnnotationKeys = ['w7.cc/official-app'];
 
 const gatewayPluginCategoryOptions = [
     { label: '路由', value: 'route' },
@@ -1848,8 +1847,7 @@ export default {
             }
             Object.keys(filtered)
                 .filter(key => type != 'gateway-plugin'
-                    && (key.startsWith(gatewayPluginAnnotationPrefix)
-                        || gatewayPluginAnnotationKeys.includes(key)))
+                    && key.startsWith(gatewayPluginAnnotationPrefix))
                 .forEach(key => delete filtered[key]);
             if (type == 'tradition') {
                 Object.assign(filtered, this.getTraditionAnnotations());
@@ -1947,9 +1945,7 @@ export default {
             }
         },
         shouldSaveFormulaTypeSetting() {
-            if (['tradition', 'gateway-plugin', 'system-image'].includes(this.form.type)) { return true }
-            return ['tradition', 'gateway-plugin', 'system-image'].includes(this.initialApplicationType)
-                && this.form.type != this.initialApplicationType;
+            return Boolean(this.identifie);
         },
         async saveFormulaTypeSetting() {
             if (this.option?.pureManifest || !this.shouldSaveFormulaTypeSetting()) { return }
@@ -1959,7 +1955,9 @@ export default {
             }
             let nextBaseInfo = {
                 ...baseInfo,
-                annotation: this.filterAnnotationsForType(baseInfo.annotation || {}),
+                annotation: this.filterAnnotationsForType(
+                    this.json.application?.annotation || baseInfo.annotation || {},
+                ),
                 once: this.form.type == 'gateway-plugin'
                     ? true
                     : (['tradition', 'system-image'].includes(this.form.type) ? false : Boolean(baseInfo.once)),

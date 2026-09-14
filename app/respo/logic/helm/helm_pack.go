@@ -288,7 +288,7 @@ func (hc *HelmPack) processHelmPkg(rootDir string) error {
 		}
 	}
 
-	return nil
+	return hc.applyHelmPackageAffinity(rootDir)
 }
 
 func (hc *HelmPack) applyHelmConfigOverrides(rootDir string) error {
@@ -303,7 +303,20 @@ func (hc *HelmPack) applyHelmConfigOverrides(rootDir string) error {
 	if len(overrides) == 0 {
 		return nil
 	}
+	return mergeHelmValuesFile(rootDir, overrides)
+}
 
+func (hc *HelmPack) applyHelmPackageAffinity(rootDir string) error {
+	affinity := hc.getSharedStorageWorkloadAffinityValues()
+	if len(affinity) == 0 {
+		return nil
+	}
+	return mergeHelmValuesFile(rootDir, map[string]interface{}{
+		"affinity": affinity,
+	})
+}
+
+func mergeHelmValuesFile(rootDir string, overrides map[string]interface{}) error {
 	valuesPath := filepath.Join(rootDir, "values.yaml")
 	values := make(map[string]interface{})
 	if function.FileExists(valuesPath) {
@@ -792,9 +805,11 @@ func (hc *HelmPack) generateValuesYaml(rootDir string, options helmValuesOptions
 		"runtimeClass":         hc.getRuntimeClassValues(platform),
 		"hostUsers":            platform.HostUsers,
 		"affinity":             options.workloadAffinity,
-		"jobAffinity":          options.jobAffinity,
-		"jobPreferredAffinity": options.jobPreferredAffinity,
-		"w7panelSidecars":      sidecarChartReferences(hc.Sidecars),
+		"job": map[string]interface{}{
+			"affinity":          options.jobAffinity,
+			"preferredAffinity": options.jobPreferredAffinity,
+		},
+		"w7panelSidecars": sidecarChartReferences(hc.Sidecars),
 	}
 	values["jobs"] = hc.buildJobValues(platform, options.shellJobContainerValues)
 	if options.addValues != nil {

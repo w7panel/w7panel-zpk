@@ -44,9 +44,10 @@ spec:
         {{- $jobSidecarHostAliases | nindent 8 }}
       {{- end }}
       serviceAccountName: {{ include "common.serviceAccountName" $root }}
-      {{- $jobAffinity := $root.Values.jobAffinity }}
+      {{- $jobSettings := $root.Values.job | default dict }}
+      {{- $jobAffinity := $jobSettings.affinity }}
       {{- if or (contains "pre-install" $job.type) (eq $job.type "post-delete") }}
-        {{- $jobAffinity = $root.Values.jobPreferredAffinity }}
+        {{- $jobAffinity = $jobSettings.preferredAffinity }}
       {{- end }}
       {{- with $jobAffinity }}
       affinity:

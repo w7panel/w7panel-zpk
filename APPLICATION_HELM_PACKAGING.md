@@ -190,7 +190,7 @@ OCI repository 名为：
 - `workload`、`replicas`、`containers`、`volumes`、`volumeClaimTemplates`。
 - `service`、`node_service`、`ingress`。
 - `startParams`、`runtimeClass`、`hostUsers`。
-- `jobs`、`affinity`、`jobAffinity`、`jobPreferredAffinity`。
+- `jobs`、`affinity`、`job.affinity`、`job.preferredAffinity`。
 - `w7panelSidecars`。
 
 当前实现有几个需要知道的固定行为：
@@ -236,6 +236,7 @@ Job 默认 `backoffLimit: 2`、完成 60 秒后清理。安装前/删除后的 J
 - `NewHelmPack` 按应用标识建立子 manifest map；`generateSubCharts` 递归为每个子应用生成 `charts/<identify>/`。
 - 根 `Chart.yaml` 扫描 `charts/` 下每个目录的 `Chart.yaml`，登记成 `file://./charts/<dir>` dependency，并合并用户原有 dependencies。
 - 如果父、子 manifest 都声明了任意 PVC volume，子 Workload 会加 required pod affinity，按同一 Helm release 的 `w7.cc/group-name` 和父应用 `w7.cc/identifie` 调度到同一节点。这是对 RWO 场景的保守处理，并不会查询真实 PVC access mode。
+- 如果该子应用是用户 Helm 包，打包器只把相同规则合并到子 Chart `values.yaml` 的顶层 `affinity`；其中包含基于 `.Release.Name` 的模板值，因此子 Chart 的 Workload 模板需要使用 `tpl (toYaml .Values.affinity) $` 渲染。子 Chart 内部的 Job 应自行复用或派生其 Workload 亲和性。
 - StatefulSet 的 `volumeClaimTemplates` 不会挂进 Shell Job；Job 只保留能在 `.Values.volumes` 找到的 mount。
 
 ### 4.7 MicroApp、前端包和 Site

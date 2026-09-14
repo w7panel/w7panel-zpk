@@ -790,6 +790,13 @@ import {
     withPluginTraditionStartParams,
 } from '@/utils/plugin-app';
 import {
+    isSystemImageFixedStartParamName,
+    systemImageAnnotationKeys,
+    systemImageRootfsVolumeName,
+    withSystemImageRuntime,
+    withSystemImageStartParams,
+} from '@/utils/system-image';
+import {
     IconCheckCircleFill,
     IconClose,
     IconExclamationCircleFill,
@@ -807,12 +814,6 @@ const traditionAnnotationKeys = {
     nginxVhostTemplate: 'w7.cc/nginx_vhost_template',
     nginxGateway: 'w7.cc/nginx-gateway',
     systemRebootRestore: traditionSystemRebootRestoreAnnotation,
-};
-
-const systemImageAnnotationKeys = {
-    category: 'w7.cc/system_image_category',
-    versions: traditionAnnotationKeys.imageVersion,
-    rootfs: 'sysbox/rootfs-rw-layer',
 };
 
 const isDerivedDependencyReleaseStartParam = item => Boolean(
@@ -1562,20 +1563,7 @@ export default {
         },
         systemImageStartParams() {
             let versions = this.normalizeApplicationVersions(this.form.systemImageVersions);
-            let fixedNames = new Set([
-                'IMAGE_VERSION',
-                'global.cluster.storageRWmode',
-                'global.cluster.storageSize',
-                'global.cluster.storageClassName',
-            ]);
-            let customParams = (this.form.startParams || []).filter(item => !fixedNames.has(item?.name));
-            return [
-                { mark: 'system-image', name: 'IMAGE_VERSION', title: '镜像版本', required: true, values_text: versions.join('|'), module_name: '', description: '选择要安装的镜像版本', type: 'select' },
-                { mark: 'storage', name: 'global.cluster.storageRWmode', title: '读写模式', required: true, values_text: '%STORAGE_RW_MODE%', module_name: '', description: '', type: 'text' },
-                { mark: 'storage', name: 'global.cluster.storageSize', title: '存储大小', required: true, values_text: '%STORAGE_SIZE%', module_name: '', description: '', type: 'text' },
-                { mark: 'storage', name: 'global.cluster.storageClassName', title: '存储类', required: true, values_text: '%STORAGE_CLASS_NAME%', module_name: '', description: '', type: 'text' },
-                ...customParams,
-            ];
+            return withSystemImageStartParams(this.form.startParams, versions);
         },
         traditionStartParams() {
             let versions = this.normalizeApplicationVersions(this.form.traditionImageVersion);
@@ -1692,62 +1680,25 @@ export default {
             this.ensureSystemImageContainer();
             this.changeForm();
         },
-        getSystemImageRootfsAnnotation() {
-            let containerName = this.json?.platform?.['container-v2']?.[0]?.name
-                || ((this.form.author && this.form.identifie)
-                    ? `${this.form.author}-${this.form.identifie}`
-                    : 'system-image');
-            containerName = String(containerName).replaceAll('_', '-');
-            return JSON.stringify([{
-                name: containerName,
-                volumeName: 'system-rootfs',
-                path: `${containerName}/system`,
-                persistentSpecialMounts: true,
-            }]);
-        },
         ensureSystemImageContainer() {
             if (this.form.type != 'system-image') { return; }
-            this.json.platform = this.json.platform || {};
             delete this.json.source;
             delete this.json.web;
-            delete this.json.platform.container;
-            let containers = this.json.platform['container-v2'] || [];
-            if (!containers.length) {
-                containers.push({
-                    name: (this.form.author && this.form.identifie)
-                        ? `${this.form.author}-${this.form.identifie}` : 'system-image',
-                    image: String(this.form.systemImageTemplate || '').trim(),
-                    imagePullPolicy: 'IfNotPresent',
-                });
-            }
-            containers[0].image = String(this.form.systemImageTemplate || '').trim();
-            let command = (this.form.cmd || [])
-                .map(item => String(item || '').trim())
-                .filter(Boolean);
-            if (command.length) {
-                containers[0].command = command;
-            } else {
-                delete containers[0].command;
-            }
-            this.json.platform['container-v2'] = containers;
-            this.form.containers = containers;
-            this.json.platform.workload = { ...(this.json.platform.workload || {}), type: 'Deployment' };
+            const applicationIdentifie = (this.form.author && this.form.identifie)
+                ? `${this.form.author}-${this.form.identifie}`
+                : 'system-image';
+            const result = withSystemImageRuntime(
+                this.json.platform,
+                this.json.application?.annotation || {},
+                applicationIdentifie,
+                this.form.systemImageTemplate,
+                this.form.cmd,
+            );
+            this.json.platform = result.platform;
+            this.form.containers = this.json.platform['container-v2'];
             this.containerPluginData.kind = 'Deployment';
-            this.json.platform.runtimeClassName = 'sysbox-runc';
-            this.json.platform.hostUsers = false;
-            this.json.platform.volumes = [{
-                name: 'system-rootfs',
-                persistentVolumeClaim: { claimName: '' },
-            }];
-            containers[0].volumeMounts = [{
-                name: 'system-rootfs',
-                mountPath: '/system-rootfs',
-            }];
             this.json.application = this.json.application || {};
-            this.json.application.annotation = {
-                ...(this.json.application.annotation || {}),
-                [systemImageAnnotationKeys.rootfs]: this.getSystemImageRootfsAnnotation(),
-            };
+            this.json.application.annotation = result.annotations;
         },
         loadFormulaSetting() {
             if (this.option?.pureManifest || !this.identifie) {
@@ -1862,7 +1813,6 @@ export default {
                 Object.assign(filtered, {
                     [systemImageAnnotationKeys.category]: this.form.systemImageCategory || 'operating-system',
                     [systemImageAnnotationKeys.versions]: versions.join(','),
-                    [systemImageAnnotationKeys.rootfs]: this.getSystemImageRootfsAnnotation(),
                 });
             }
             return filtered;
@@ -1876,27 +1826,21 @@ export default {
             );
 
             if (previousType == 'system-image' && nextType != 'system-image') {
-                const fixedNames = new Set([
-                    'IMAGE_VERSION',
-                    'global.cluster.storageRWmode',
-                    'global.cluster.storageSize',
-                    'global.cluster.storageClassName',
-                ]);
                 this.form.startParams = (this.form.startParams || [])
-                    .filter(item => !fixedNames.has(item?.name));
+                    .filter(item => !isSystemImageFixedStartParamName(item?.name));
                 this.json.platform.startParams = this.serializeStartParams();
                 delete this.json.platform.hostUsers;
                 if (this.json.platform.runtimeClassName == 'sysbox-runc') {
                     delete this.json.platform.runtimeClassName;
                 }
                 this.json.platform.volumes = (this.json.platform.volumes || [])
-                    .filter(item => item?.name != 'system-rootfs');
+                    .filter(item => item?.name != systemImageRootfsVolumeName);
                 if (!this.json.platform.volumes.length) {
                     delete this.json.platform.volumes;
                 }
                 (this.json.platform['container-v2'] || []).forEach(container => {
                     container.volumeMounts = (container.volumeMounts || [])
-                        .filter(item => item?.name != 'system-rootfs');
+                        .filter(item => item?.name != systemImageRootfsVolumeName);
                     if (!container.volumeMounts.length) {
                         delete container.volumeMounts;
                     }
@@ -2147,12 +2091,8 @@ export default {
                 || (item?.name === 'DOMAIN_URL' && ['%DOMAIN_URL%', '%DOMAIN_SSL_URL%'].includes(item?.values_text));
         },
         isSystemImageFixedStartParam(item) {
-            return this.form.type == 'system-image' && [
-                'IMAGE_VERSION',
-                'global.cluster.storageRWmode',
-                'global.cluster.storageSize',
-                'global.cluster.storageClassName',
-            ].includes(item?.name);
+            return this.form.type == 'system-image'
+                && isSystemImageFixedStartParamName(item?.name);
         },
         isTraditionFixedStartParam(item) {
             return this.form.type == 'tradition' && [
@@ -2162,6 +2102,22 @@ export default {
                 'global.cluster.storageSize',
                 'global.cluster.storageClassName',
             ].includes(item?.name);
+        },
+        validateSysboxContainerName() {
+            if (this.form.type == 'system-image') {
+                const containerName = this.json?.platform?.['container-v2']?.[0]?.name;
+                return String(containerName || '').trim()
+                    ? ''
+                    : '系统镜像主容器名称不能为空';
+            }
+            if (this.form.type == 'tradition' && !this.form.traditionSystemRebootRestore) {
+                const containerName = this.json?.platform?.['container-v2']
+                    ?.find(item => !item?.isInitContainer)?.name;
+                return String(containerName || '').trim()
+                    ? ''
+                    : '传统应用主容器名称不能为空';
+            }
+            return '';
         },
         isPVCNameStartParam(item) {
             return String(item?.name || '').trim().toUpperCase() === pvcNameStartParamName;
@@ -3138,6 +3094,12 @@ platform:
                     messageWarning(this.form.type == 'tradition'
                         ? '请检查传统应用配置中的错误项'
                         : '必填项不能为空');
+                    return;
+                }
+
+                const sysboxContainerNameError = this.validateSysboxContainerName();
+                if (sysboxContainerNameError) {
+                    messageWarning(sysboxContainerNameError);
                     return;
                 }
 

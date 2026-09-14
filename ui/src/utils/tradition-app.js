@@ -47,7 +47,7 @@ export function withTraditionToolConfig(
     const platform = nextManifest.platform;
     let startParams = Array.isArray(platform.startParams)
         ? platform.startParams
-        : (Array.isArray(platform.container?.startParams) ? platform.container.startParams : []);
+        : [];
     startParams = startParams
         .filter(item => String(item?.name || '').trim() !== traditionToolGatewayStartParam)
         .map(item => ({ ...item }));
@@ -72,9 +72,6 @@ export function withTraditionToolConfig(
         hidden: true,
     });
     platform.startParams = startParams;
-    if (platform.container && typeof platform.container === 'object') {
-        platform.container.startParams = startParams.map(item => ({ ...item }));
-    }
     return nextManifest;
 }
 
@@ -91,19 +88,20 @@ export function removeTraditionAppCodeStorage(json) {
 
 export function traditionAppRootfsAnnotation(
     applicationIdentifie = '',
+    containerName = '',
 ) {
     const identifie = String(applicationIdentifie || '').trim()
         .replace(/[^A-Za-z0-9._-]+/g, '-')
         .replace(/^-+|-+$/g, '');
+    const name = String(containerName || '').trim().replaceAll('_', '-');
+    if (!identifie || !name) return '';
     // Keep the manifest independent of Helm syntax. The packer turns this
     // platform placeholder into .Values.IMAGE_VERSION when generating a chart.
     const version = '${IMAGE_VERSION}';
-    const name = `${identifie}-${version}`;
-    if (!name) return '';
     return JSON.stringify([{
         name,
         volumeName: traditionStorageVolumeName,
-        path: `www/server/${name}/system`,
+        path: `www/server/${identifie}-${version}/system`,
         persistentSpecialMounts: true,
     }]);
 }
@@ -140,7 +138,7 @@ export function withTraditionAppSysbox(
     nextPlatform.hostUsers = false;
     const containers = nextPlatform['container-v2'] || [];
     const container = containers.find(item => !item?.isInitContainer);
-    const rootfs = traditionAppRootfsAnnotation(applicationIdentifie);
+    const rootfs = traditionAppRootfsAnnotation(applicationIdentifie, container?.name);
     if (rootfs) {
         annotations[traditionSysboxRootfsAnnotation] = rootfs;
     }

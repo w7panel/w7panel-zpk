@@ -221,53 +221,15 @@ export function traditionAppDefaultContainerPort(source = {}, fallback = 80) {
     return legacyPort || fallback;
 }
 
-function matchesApplication(source, identifie) {
-    if (!source || !identifie) return false;
-    const names = [source.identifie, source.identifier, source.id, source.name]
-        .filter(Boolean)
-        .map(value => String(value));
-    return names.some(value => value === identifie || value.endsWith(`-${identifie}`));
-}
-
-/**
- * Resolve the Nginx dependency's service port from imported child manifests or
- * app_ports. A fallback is only used while the dependency is not imported yet
- * (for example during the first render of the gateway switch).
- */
-export function traditionNginxPort(sources = [], fallback = 80) {
-    const values = Array.isArray(sources) ? sources : [sources];
-    for (const source of values) {
-        const data = source?.data || source;
-        const manifest = data?.platform ? data : source?.manifest;
-        if (manifest?.platform && matchesApplication(manifest?.application || {}, traditionToolIdentifie)) {
-            const ingressPort = firstPort((manifest.platform.ingress || [])
-                .flatMap(item => (item?.routes || []).map(route => route?.backend)));
-            if (ingressPort) return ingressPort;
-            const port = traditionAppDefaultContainerPort(manifest, 0);
-            if (port) return port;
-        }
-        if (matchesApplication(source, traditionToolIdentifie)) {
-            const port = firstPort(source.port)
-                || firstPort(source.ports)
-                || traditionAppDefaultContainerPort(manifest || data, 0)
-                || traditionAppDefaultContainerPort(source, 0);
-            if (port) return port;
-        }
-    }
-    return Number(fallback) > 0 ? Number(fallback) : 80;
-}
-
 export function withTraditionAppIngress(
     platform = {},
     applicationIdentifie = '',
     nginxGateway = false,
-    nginxPortSource = [],
 ) {
     const nextPlatform = { ...(platform || {}) };
     const containerPort = traditionAppDefaultContainerPort(nextPlatform);
-    const nginxPort = traditionNginxPort(nginxPortSource, containerPort);
     const defaultBackend = nginxGateway
-        ? { name: traditionToolIdentifie, port: nginxPort, match: 'Prefix' }
+        ? { name: traditionToolIdentifie, port: 80, match: 'Prefix' }
         : { name: applicationIdentifie, port: containerPort, match: 'Prefix' };
     nextPlatform.ingress = (platform?.ingress || []).map(item => ({
         ...item,
@@ -289,7 +251,7 @@ export function withTraditionAppIngress(
             const backend = route.backend;
             if (nginxGateway) {
                 backend.name = traditionToolIdentifie;
-                backend.port = nginxPort;
+                backend.port = 80;
                 backend.match = backend.match || 'Prefix';
                 return;
             }

@@ -1427,11 +1427,8 @@ export default {
                 this.changeForm();
             }
         },
-        'option.app_ports'(v) {
+        'option.app_ports'() {
             this.computedAppPort();
-            if (this.form.type == 'tradition' && this.form.traditionNginxGateway) {
-                this.syncTraditionIngress(v);
-            }
         }
     },
     beforeUnmount() {
@@ -1651,7 +1648,7 @@ export default {
             this.json.application = this.json.application || {};
             this.json.application.annotation = result.annotations;
         },
-        syncTraditionIngress(portSource = this.option?.app_ports || []) {
+        syncTraditionIngress() {
             if (this.form.type != 'tradition' || !this.json?.platform) {
                 return this.json?.platform?.ingress || [];
             }
@@ -1663,7 +1660,6 @@ export default {
                 this.json.platform,
                 applicationIdentifie,
                 Boolean(this.form.traditionNginxGateway),
-                portSource,
             );
             const ingress = JSON.parse(JSON.stringify(this.json.platform.ingress || []));
             if (JSON.stringify(this.form.ingress || []) != JSON.stringify(ingress)) {

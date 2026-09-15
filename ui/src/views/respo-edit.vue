@@ -314,10 +314,7 @@ export default {
             if (rootRef?.form?.type != 'tradition' || !rootRef?.json) {
                 return;
             }
-            // app_ports is rebuilt from the imported child manifests, so the
-            // gateway backend can use the dependency's declared service port.
-            this.updateAppPorts();
-            rootRef.syncTraditionIngress?.(this.app_ports);
+            rootRef.syncTraditionIngress?.();
             const content = jsyaml.dump(rootRef.json);
             await myAxios.post('/respo/manifest/file', {
                 identifie: this.identifie,

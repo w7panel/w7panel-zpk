@@ -248,26 +248,25 @@ func (self *Depot) GetFormula(name string, version string, user *entity.Registry
 	}
 	//load all manifest
 	list, _ := self.GetManifestFileList(result)
+	rootManifest, err := self.parseFormulaManifestFile(list["manifest.yaml"])
+	if err != nil {
+		return nil, err
+	}
+	rootManifest.Application.Version = result.Version
+	result.ApplyBaseInfo(rootManifest)
+	result.Manifest = rootManifest
+	result.AllManifest = append(result.AllManifest, rootManifest)
+
 	for key, value := range list {
-		if strings.Contains(key, "manifest.yaml") {
-			manifestRow := &logic.Manifest{}
-			err := yaml.Unmarshal([]byte(value), manifestRow)
-			if err != nil {
-				return nil, err
-			}
-
-			//处理转换旧数据格式
-			manifestRow.Application.Version = result.Version
-			tmpManifest := logic.ProcessManifestIdentify(*manifestRow)
-			tmpManifest = logic.GetManifestV2(tmpManifest)
-			manifestRow = &tmpManifest
-			if key == "manifest.yaml" {
-				result.ApplyBaseInfo(manifestRow)
-				result.Manifest = manifestRow
-			}
-
-			result.AllManifest = append(result.AllManifest, manifestRow)
+		if key == "manifest.yaml" {
+			continue
 		}
+		manifestRow, err := self.parseFormulaManifestFile(value)
+		if err != nil {
+			return nil, err
+		}
+		self.applyChildManifestVersion(rootManifest, manifestRow, result.Version)
+		result.AllManifest = append(result.AllManifest, manifestRow)
 	}
 
 	if strings.HasPrefix(result.Manifest.Source.Url, "file://") {
@@ -297,6 +296,28 @@ func (self *Depot) GetFormula(name string, version string, user *entity.Registry
 	}()
 
 	return result, nil
+}
+
+func (self *Depot) parseFormulaManifestFile(content string) (*logic.Manifest, error) {
+	manifest := &logic.Manifest{}
+	if err := yaml.Unmarshal([]byte(content), manifest); err != nil {
+		return nil, err
+	}
+	result := logic.ProcessManifestIdentify(*manifest)
+	result = logic.GetManifestV2(result)
+	return &result, nil
+}
+
+func (self *Depot) applyChildManifestVersion(root, child *logic.Manifest, formulaVersion string) {
+	if root == nil || child == nil {
+		return
+	}
+	for _, dependency := range root.Platform.Depends {
+		if dependency.Identifie == child.Application.Identifie && strings.TrimSpace(dependency.From) != "" {
+			return
+		}
+	}
+	child.Application.Version = formulaVersion
 }
 
 func (self *Depot) GetFormulaBackendZipDownloadUrl(formula *Formula, isTemporary bool) string {

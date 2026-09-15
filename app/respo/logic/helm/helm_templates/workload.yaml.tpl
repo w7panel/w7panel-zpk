@@ -1,3 +1,8 @@
+{{- $rootCtx := dict "Values" (deepCopy .Values) "Chart" .Chart "Release" .Release "Capabilities" .Capabilities "Template" .Template "Files" .Files "Subcharts" .Subcharts -}}
+{{- $runtimeImageVersion := include "common.resolveRuntimeImageVersion" . | trim -}}
+{{- if and (.Values.preserveRuntimeImageVersion | default false) $runtimeImageVersion -}}
+  {{- $_ := set $rootCtx.Values "IMAGE_VERSION" $runtimeImageVersion -}}
+{{- end -}}
 apiVersion: apps/v1
 kind: {{ .Values.workload.kind }}
 metadata:
@@ -29,7 +34,7 @@ spec:
       {{- include "common.selectorLabels" . | nindent 6 }}
   template:
     metadata:
-      {{- $podAnnotations := include "w7panel.podAnnotations" . }}
+      {{- $podAnnotations := include "w7panel.podAnnotations" $rootCtx }}
       {{- if $podAnnotations }}
       annotations:
         {{- $podAnnotations | nindent 8 }}
@@ -39,8 +44,7 @@ spec:
         w7.cc/identifie: {{ .Values.app.identify | quote }}
         w7.cc/group-name: {{ .Release.Name }}
     spec:
-      {{- $root := . }}
-      {{- $rootCtx := $ }}
+      {{- $root := $rootCtx }}
       {{- if ne .Values.hostUsers nil }}
       hostUsers: {{ .Values.hostUsers }}
       {{- end }}
@@ -74,7 +78,7 @@ spec:
       {{- if or $podVolumes $sidecarVolumes }}
       volumes:
         {{- if $podVolumes }}
-        {{- include "common.volumesToYaml" (dict "root" . "volumes" $podVolumes) | nindent 8 }}
+        {{- include "common.volumesToYaml" (dict "root" $rootCtx "volumes" $podVolumes) | nindent 8 }}
         {{- end }}
         {{- $sidecarVolumes | nindent 8 }}
       {{- end }}
@@ -108,8 +112,8 @@ spec:
             {{- with .env }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
-            {{- if $root.Values.startParams }}
-            {{- range $qkey, $qvalue := $root.Values.startParams }}
+            {{- if $rootCtx.Values.startParams }}
+            {{- range $qkey, $qvalue := $rootCtx.Values.startParams }}
             - name: {{ $qkey }}
               value: {{ tpl $qvalue $rootCtx | quote }}
             {{- end }}
@@ -160,8 +164,8 @@ spec:
             {{- with .env }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
-            {{- if $root.Values.startParams }}
-            {{- range $qkey, $qvalue := $root.Values.startParams }}
+            {{- if $rootCtx.Values.startParams }}
+            {{- range $qkey, $qvalue := $rootCtx.Values.startParams }}
             - name: {{ $qkey }}
               value: {{ tpl $qvalue $rootCtx | quote }}
           {{- end }}

@@ -120,6 +120,37 @@ source of truth; new installations use the original deterministic fallback.
 {{- end }}
 
 {{/*
+Keep the externally switched image version when upgrading traditional
+applications and system images. Charts for those application types enable
+this helper through preserveRuntimeImageVersion. A new installation, an
+offline render, or a workload without IMAGE_VERSION falls back to the value
+passed to Helm.
+*/}}
+{{- define "common.resolveRuntimeImageVersion" -}}
+{{- $root := . -}}
+{{- $fallback := toString (get $root.Values "IMAGE_VERSION") -}}
+{{- $runtimeVersion := "" -}}
+{{- if ($root.Values.preserveRuntimeImageVersion | default false) -}}
+  {{- $workloadName := include "common.fullname" $root -}}
+  {{- $workloadKind := $root.Values.workload.kind | default "Deployment" -}}
+  {{- $existing := lookup "apps/v1" $workloadKind $root.Release.Namespace $workloadName -}}
+  {{- if $existing -}}
+    {{- $spec := default (dict) (index $existing "spec") -}}
+    {{- $template := default (dict) (index $spec "template") -}}
+    {{- $podSpec := default (dict) (index $template "spec") -}}
+    {{- range $container := (default (list) (index $podSpec "containers")) -}}
+      {{- range $env := (default (list) $container.env) -}}
+        {{- if and (eq $runtimeVersion "") (eq (default "" $env.name) "IMAGE_VERSION") (ne (default "" $env.value) "") -}}
+          {{- $runtimeVersion = toString $env.value -}}
+        {{- end -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- default $fallback $runtimeVersion -}}
+{{- end }}
+
+{{/*
 Create pull secrets
 */}}
 {{- define "common.pullSecrets" -}}

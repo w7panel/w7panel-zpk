@@ -811,6 +811,9 @@ func (hc *HelmPack) generateValuesYaml(rootDir string, options helmValuesOptions
 		},
 		"w7panelSidecars": sidecarChartReferences(hc.Sidecars),
 	}
+	if hc.Manifest.Application.Type == logic2.TraditionApp || hc.Manifest.Application.Type == logic2.SystemImageApp {
+		values["preserveRuntimeImageVersion"] = true
+	}
 	values["jobs"] = hc.buildJobValues(platform, options.shellJobContainerValues)
 	if options.addValues != nil {
 		if err := options.addValues(values); err != nil {

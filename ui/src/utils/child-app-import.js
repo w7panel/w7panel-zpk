@@ -231,6 +231,17 @@ export async function saveImportedChildren(client, {
     } else {
         rootRef.addImportedDependencies(dependencies);
     }
+    rootRef.json.application = rootRef.json.application || {};
+    rootRef.json.application.order = 0;
+    const childOrders = new Map((rootRef.json?.platform?.depends || [])
+        .filter(item => item?.identifie && item?.type !== 'out')
+        .map((item, index) => [item.identifie, index + 1]));
+    imported.forEach((entry, index) => {
+        entry.data = entry.data || {};
+        entry.data.application = entry.data.application || {};
+        entry.data.application.order = childOrders.get(entry.identifie) || (index + 1);
+        entry.manifest = jsyaml.dump(entry.data);
+    });
     const rootManifest = jsyaml.dump(rootRef.json);
     try {
         const childWrites = await Promise.allSettled(imported.map(entry =>

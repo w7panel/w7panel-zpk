@@ -15,6 +15,7 @@ type microAppTemplateConfig struct {
 	Identifie string `json:"identifie"`
 	Type      string `json:"type"`
 	Version   string `json:"version"`
+	Order     int    `json:"order"`
 }
 
 func newMicroAppTemplateConfig(application logic2.Application) microAppTemplateConfig {
@@ -23,32 +24,7 @@ func newMicroAppTemplateConfig(application logic2.Application) microAppTemplateC
 		Identifie: application.Identifie,
 		Type:      application.Type,
 		Version:   application.Version,
-	}
-}
-
-func WithMicroAppBindings(application logic2.Application, names []string, bindings []logic2.Bindings) DynamicHelmPackageOption {
-	replacementNames := append([]string(nil), names...)
-	replacements := append([]logic2.Bindings(nil), bindings...)
-	templateConfig := newMicroAppTemplateConfig(application)
-	cacheValue := struct {
-		TemplateConfig microAppTemplateConfig `json:"template_config"`
-		Names          []string               `json:"names"`
-		Bindings       []logic2.Bindings      `json:"bindings"`
-	}{
-		TemplateConfig: templateConfig,
-		Names:          replacementNames,
-		Bindings:       replacements,
-	}
-	return func(options *dynamicHelmPackageOptions) error {
-		return options.addTransform(cacheValue, func(chartDir string) error {
-			if err := replaceHelmChartMicroAppBindings(chartDir, replacementNames, replacements); err != nil {
-				return err
-			}
-			if len(replacements) == 0 {
-				return nil
-			}
-			return writeMicroAppTemplate(filepath.Join(chartDir, "templates"), application, false)
-		})
+		Order:     application.Order,
 	}
 }
 
@@ -136,66 +112,6 @@ func buildMicroAppValues(bindings []logic2.Bindings) ([]map[string]interface{}, 
 		})
 	}
 	return menuConfigs, backendConfigs
-}
-
-func replaceHelmChartMicroAppBindings(chartDir string, names []string, replacements []logic2.Bindings) error {
-	valuesPath := filepath.Join(chartDir, "values.yaml")
-	valuesContent, err := os.ReadFile(valuesPath)
-	if err != nil {
-		return fmt.Errorf("读取 Helm values.yaml 失败: %w", err)
-	}
-
-	values := make(map[string]interface{})
-	if err = yaml.Unmarshal(valuesContent, &values); err != nil {
-		return fmt.Errorf("解析 Helm values.yaml 失败: %w", err)
-	}
-
-	nameSet := make(map[string]struct{}, len(names))
-	for _, name := range names {
-		if name = strings.TrimSpace(name); name != "" {
-			nameSet[name] = struct{}{}
-		}
-	}
-	menuValues := removeMicroAppValues(values["bindings"], "name", nameSet)
-	backendValues := removeMicroAppValues(values["backend_config"], "role", nameSet)
-	replacementMenus, replacementBackends := buildMicroAppValues(replacements)
-	for _, replacement := range replacementMenus {
-		menuValues = append(menuValues, replacement)
-	}
-	for _, replacement := range replacementBackends {
-		backendValues = append(backendValues, replacement)
-	}
-	values["bindings"] = menuValues
-	values["backend_config"] = backendValues
-
-	valuesContent, err = yaml.Marshal(values)
-	if err != nil {
-		return fmt.Errorf("序列化 Helm values.yaml 失败: %w", err)
-	}
-	if err = os.WriteFile(valuesPath, valuesContent, 0644); err != nil {
-		return fmt.Errorf("写入 Helm values.yaml 失败: %w", err)
-	}
-	return nil
-}
-
-func removeMicroAppValues(value interface{}, key string, names map[string]struct{}) []interface{} {
-	result := make([]interface{}, 0)
-	items, ok := value.([]interface{})
-	if !ok {
-		return result
-	}
-	for _, item := range items {
-		itemMap, isMap := item.(map[string]interface{})
-		if isMap {
-			if name, isString := itemMap[key].(string); isString {
-				if _, exists := names[name]; exists {
-					continue
-				}
-			}
-		}
-		result = append(result, item)
-	}
-	return result
 }
 
 func readHelmChartName(chartDir string) (string, error) {

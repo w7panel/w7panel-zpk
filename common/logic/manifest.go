@@ -80,6 +80,7 @@ func (plugin GatewayPlugin) Normalize() GatewayPlugin {
 type Application struct {
 	Name              string                 `yaml:"name" json:"name"`
 	Identifie         string                 `yaml:"identifie" json:"identifie"`
+	Order             int                    `yaml:"order" json:"order"`
 	Description       string                 `yaml:"description" json:"description"`
 	Author            string                 `yaml:"author" json:"author"`
 	InstallOnlyOnce   bool                   `yaml:"once" json:"once"`

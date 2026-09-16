@@ -23,6 +23,7 @@
 - 原生应用、传统应用和系统镜像都可以声明 PVC volume，但通用打包器不会为 Deployment 自动创建 PVC。空 `claimName` 在渲染时取 `.Values.PVC_NAME`。
 - 只有 StatefulSet 的 `platform.volumeClaimTemplates` 会随 Workload 生成 PVC；应用插件不拥有 PVC；Helm 应用是否创建 PVC 取决于用户 Chart。
 - 前端 zip 不会塞进最终 Helm tgz。Helm 里生成的是 `MicroApp` CR，前端文件仍由 ZPK 的附件下载接口提供。
+- manifest 的 `application.order` 用于声明同组 MicroApp 顺序，生成时原样写入 `metadata.labels["w7.cc/order"]`。主应用为 `0`，子应用在新建、导入或删除后按当前列表重新编号为 `1...n`，ZPK Market 动态 MicroApp 固定为 `9999`；打包过程不使用 `platform.depends` 重新推导顺序。
 
 ## 2. 总体数据与打包流程
 

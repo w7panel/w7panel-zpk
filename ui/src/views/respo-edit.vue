@@ -115,6 +115,7 @@ import {
 const defaultManifest = `application:
     name: ''
     identifie: ''
+    order: 0
     description: ''
     author: ''
 platform:
@@ -276,29 +277,29 @@ export default {
             if (this.deleteLoading) { return }
             if (this.isManagedDependency(this.depends[index])) { return }
             let file = this.tree.find(i => i.label == (this.depends[index]?.identifie) + '/manifest.yaml');
-            if (file) {
-                myAxios.post('/respo/manifest/file', {
+            const deleteFile = file
+                ? myAxios.post('/respo/manifest/file', {
                     identifie: this.identifie,
                     filename: file.label,
                     content: '',
                     version: this.version_id,
-
-                }).then(res => {
-                    this.getInfo(this.identifie, () => {
-                        this.publish(1);
-                        setTimeout(() => {
-                            this.getFile();
-                        }, 300)
-                    })
-                });
-            }
+                })
+                : Promise.resolve();
             this.deleteLoading = true;
             this.$refs.form?.delDepend(index);
             this.$nextTick(() => {
                 this.$refs.form.submit({ stop: true }, () => {
-                    this.getManifest().finally(() => {
-                        this.deleteLoading = false;
-                    });
+                    deleteFile
+                        .then(() => this.getFile())
+                        .then(() => this.getManifest())
+                        .then(() => this.persistChildOrders())
+                        .then(() => this.publish(1))
+                        .catch(error => {
+                            messageError(error?.response?.data?.error || error?.message || '删除子应用失败');
+                        })
+                        .finally(() => {
+                            this.deleteLoading = false;
+                        });
                 });
             })
         },
@@ -412,6 +413,7 @@ export default {
                 replaceExisting,
             });
             this.applyImportedChildrenResult(result);
+            await this.persistChildOrders();
         },
         openImportDepend() {
             this.importPicker.show = true;
@@ -460,6 +462,7 @@ export default {
                     existingDependencies: this.depends,
                 });
                 this.applyImportedChildrenResult(result);
+                await this.persistChildOrders();
                 this.importPicker.show = false;
                 messageSuccess('子应用导入成功');
             } catch (error) {
@@ -549,6 +552,7 @@ export default {
                     replaceExisting: true,
                 });
                 this.applyImportedChildrenResult(result);
+                await this.persistChildOrders();
                 if (item.identifie == traditionToolDependency.identifie) {
                     await this.persistTraditionManifest();
                 }
@@ -601,6 +605,33 @@ export default {
             this.depends = this.depends.filter(item => !removed.has(item?.identifie));
             this.dependsIndex = -1;
         },
+        async persistChildOrders() {
+            const writes = [];
+            this.depends.forEach((item, index) => {
+                let manifest;
+                try {
+                    manifest = typeof item.manifest == 'string'
+                        ? (jsyaml.load(item.manifest) || {})
+                        : (item.manifest || {});
+                } catch {
+                    return;
+                }
+                if (!manifest.application) { return; }
+                const order = index + 1;
+                manifest.application.order = order;
+                const content = jsyaml.dump(manifest);
+                const filename = item.title || importedChildFilePath(item.identifie);
+                item.manifest = content;
+                this.list[filename] = content;
+                writes.push(myAxios.post('/respo/manifest/file', {
+                    identifie: this.identifie,
+                    filename,
+                    content,
+                    version: this.version_id,
+                }));
+            });
+            await Promise.all(writes);
+        },
         addfileInside(json, yaml, data) {
             this.deleteLoading = true;
             myAxios.post('/respo/manifest/file', {
@@ -612,6 +643,7 @@ export default {
                 if (this.tree.find(i => i.label == data.file)) {
                     await this.getFile();
                     await this.getManifest();
+                    await this.persistChildOrders();
                     this.dependsIndex = this.depends.length - 1;
                     return
                 }
@@ -625,6 +657,7 @@ export default {
                     this.deleteLoading = false;
                     await this.getFile();
                     await this.getManifest();
+                    await this.persistChildOrders();
                     this.dependsIndex = this.depends.length - 1;
                 }).catch(() => {
                     this.deleteLoading = false;

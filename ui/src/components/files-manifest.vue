@@ -2605,9 +2605,11 @@ export default {
                 this.dependForm.show = false;
 
                 let file = o.identifie + '/manifest.yaml';
+                const childOrder = this.form.dependsIn.findIndex(item => item.identifie == o.identifie) + 1;
                 let cont = `application:
     name: ${o.name}
     identifie: ${o.identifie}
+    order: ${childOrder}
     description: ''
     author: ''
 platform:

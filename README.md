@@ -6,6 +6,8 @@ openssl req -new -x509 -key registry-key.pem -out registry-cert.pem -days 365 -s
 
 制品存在商品订单菜单时，仓库 `info` 接口会基于当前 Helm 包状态和 Bindings 内容生成缓存键，覆盖包内 MicroApp 的 `name: market` 菜单及独立的外部 iframe `backend_config`。没有市场 Binding 时直接返回原 Helm 包地址，不解包或重打；相同基础包和 Bindings 复用已有动态包，内容变化时才重新生成。动态包与 `PackFormulaToHelmAndPack` 产物位于同一目录，文件名格式为 `{原文件名去扩展名}-{hash}.tgz`，空闲 24 小时后清理。
 
+manifest 使用 `application.order` 声明 MicroApp 顺序。生成的 MicroApp 会将该值原样写入 `metadata.labels["w7.cc/order"]`：主应用为 `0`，子应用在新建、导入或删除后按当前列表顺序重新编号为 `1...n`。ZPK Market 动态 MicroApp 固定使用 `9999`。打包过程不再根据 `platform.depends` 推导或改写顺序。
+
 `market` 菜单默认只对 `founder` 显示，使用现有 MicroApp 字段，不新增 `external_services`、`roles`、`icon` 或 `key` 协议字段。
 
 市场域名只写入 `backend_config[role=zpk-market].backend_url`，菜单 `do` 仅写入 `#/user-orders?...` 路由；应用详情页通过 Binding 名称选择同名运行配置。

@@ -1243,6 +1243,7 @@ func writeMicroAppTemplate(rootDir string, application logic2.Application, isSub
 		"__APPLICATION_VERSION__":    application.Version,
 		"__MANIFEST_TYPE__":          manifestType,
 		"__APP_TITLE__":              strconv.Quote(appName),
+		"__MICROAPP_ORDER__":         strconv.Itoa(application.Order),
 		"__MICROAPP_RESOURCE_NAME__": microAppResourceName,
 	})
 

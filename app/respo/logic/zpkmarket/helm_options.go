@@ -9,6 +9,7 @@ import (
 )
 
 const microAppChartName = "zpk-market"
+const microAppOrder = 9999
 
 func BuildHelmOptions(application commonlogic.Application, marketURL string, goodsID int32, orderSN string) []helm.DynamicHelmPackageOption {
 	bindings := buildBindings(marketURL, goodsID, orderSN)
@@ -25,6 +26,7 @@ func BuildHelmOptions(application commonlogic.Application, marketURL string, goo
 	if strings.TrimSpace(application.Name) == "" {
 		application.Name = "Cloud Service"
 	}
+	application.Order = microAppOrder
 
 	return []helm.DynamicHelmPackageOption{
 		helm.WithMicroAppSubchart(microAppChartName, application, bindings),

@@ -10,6 +10,7 @@ export const traditionToolIdentifie = traditionApp.toolDependencyIdentifie;
 export const traditionToolGatewayStartParam = 'gatewayEnabled';
 export const traditionSystemRebootRestoreAnnotation = 'w7.cc/system-reboot-restore';
 export const traditionSysboxRootfsAnnotation = 'sysbox/rootfs-rw-layer';
+export const traditionSysboxRuntimeClassName = 'sysbox-runc-lite';
 
 export const traditionToolDependency = Object.freeze({
     identifie: traditionApp.toolDependencyIdentifie,
@@ -126,16 +127,15 @@ export function withTraditionAppSysbox(
     }
 
     delete annotations[traditionSysboxRootfsAnnotation];
+    delete nextPlatform.hostUsers;
     if (restore) {
-        delete nextPlatform.hostUsers;
-        if (nextPlatform.runtimeClassName === 'sysbox-runc') {
+        if (nextPlatform.runtimeClassName === traditionSysboxRuntimeClassName) {
             delete nextPlatform.runtimeClassName;
         }
         return { platform: nextPlatform, annotations };
     }
 
-    nextPlatform.runtimeClassName = 'sysbox-runc';
-    nextPlatform.hostUsers = false;
+    nextPlatform.runtimeClassName = traditionSysboxRuntimeClassName;
     const containers = nextPlatform['container-v2'] || [];
     const container = containers.find(item => !item?.isInitContainer);
     const rootfs = traditionAppRootfsAnnotation(applicationIdentifie, container?.name);

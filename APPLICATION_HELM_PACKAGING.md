@@ -387,8 +387,8 @@ info 接口会再解析/生成 `<TRADITION_APP>_RELEASE_NAME`。已有订单绑�
 
 `w7.cc/system-reboot-restore` 控制传统应用容器是否在重启后还原系统层：
 
-- 开启还原：移除 `sysbox-runc`、`hostUsers=false` 和 `sysbox/rootfs-rw-layer` 注解。
-- 关闭还原：使用 `runtimeClassName: sysbox-runc`、`hostUsers: false`，写入 rootfs 持久化注解；注解中的 `name` 与主容器名一致，持久化路径按 `<应用标识>-${IMAGE_VERSION}` 隔离，并自动增加外部 `w7panel-sysbox` 必选依赖。
+- 开启还原：移除传统应用使用的 Sysbox RuntimeClass、`hostUsers` 和 `sysbox/rootfs-rw-layer` 注解。
+- 关闭还原：使用 `runtimeClassName: sysbox-runc-lite`，不设置 `hostUsers`，写入 rootfs 持久化注解；注解中的 `name` 与主容器名一致，持久化路径按 `<应用标识>-${IMAGE_VERSION}` 隔离，并自动增加外部 `w7panel-sysbox` 必选依赖。
 
 界面默认值为开启；语言切换时 PHP 默认关闭，其他语言默认开启，最终以保存值为准。
 

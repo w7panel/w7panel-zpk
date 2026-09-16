@@ -775,6 +775,7 @@ import myAxios from '../utils/index';
 import {
     traditionToolDependency,
     traditionSysboxRootfsAnnotation,
+    traditionSysboxRuntimeClassName,
     traditionSystemRebootRestoreAnnotation,
     isTraditionAppDependency,
     removeTraditionAppCodeStorage,
@@ -3313,7 +3314,7 @@ platform:
                 this.syncTraditionIngress();
             } else {
                 delete j.platform.hostUsers;
-                if (j.platform.runtimeClassName == 'sysbox-runc') {
+                if (j.platform.runtimeClassName == traditionSysboxRuntimeClassName) {
                     delete j.platform.runtimeClassName;
                 }
             }

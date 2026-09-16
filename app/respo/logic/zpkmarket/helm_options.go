@@ -38,7 +38,7 @@ func buildBindings(marketURL string, goodsID int32, orderSN string) []commonlogi
 	}
 
 	return []commonlogic.Bindings{{
-		Name:     "other",
+		Name:     "founder",
 		Title:    "云服务",
 		Support:  "thirdparty_cd",
 		Menu:     menus,

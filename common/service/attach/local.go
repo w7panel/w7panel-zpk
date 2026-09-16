@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -25,13 +26,12 @@ func newLocalClient(input *StorageInput) *localClient {
 		secretId:  input.SecretId,
 		secretKey: input.SecretKey,
 	}
-	myLocalClient.uploadIdMapping = make(map[string]*uploadIdNode)
 	return myLocalClient
 }
 
 type localClient struct {
 	basePath        string
-	uploadIdMapping map[string]*uploadIdNode
+	uploadIdMapping sync.Map
 	endpoint        string
 	secretId        string
 	secretKey       string
@@ -91,11 +91,12 @@ func (self *localClient) PresignUrl(remoteName string) (*PresignUrl, error) {
 }
 
 func (self *localClient) PresignUrlMultipart(remoteName string, uploadId string, partNumber int32) (*PresignUrl, error) {
-	if _, ok := self.uploadIdMapping[uploadId]; !ok {
+	upload, ok := self.loadUpload(uploadId)
+	if !ok {
 		return nil, errors.New("The upload id not found or expired. Please create it first.")
 	}
 
-	path := fmt.Sprintf("%s/%s.%d.part", *self.uploadIdMapping[uploadId].uploadId, uploadId, partNumber)
+	path := fmt.Sprintf("%s/%s.%d.part", *upload.uploadId, uploadId, partNumber)
 	os.MkdirAll(filepath.Dir(path), service.FileMode)
 
 	return &PresignUrl{
@@ -106,32 +107,37 @@ func (self *localClient) PresignUrlMultipart(remoteName string, uploadId string,
 
 func (self *localClient) MultipartCreateUploadId(remoteName string) (string, error) {
 	key := uuid.New().String()
-	if _, ok := self.uploadIdMapping[key]; !ok {
-		tempDir, _ := os.MkdirTemp("", "storage_part")
-		self.uploadIdMapping[key] = &uploadIdNode{
-			uploadId:  ptr.String(tempDir),
-			key:       ptr.String(remoteName),
-			abortDate: aws.Time(time.Now().Add(time.Hour)),
-		}
+	tempDir, err := os.MkdirTemp("", "storage_part")
+	if err != nil {
+		return "", err
 	}
+	self.uploadIdMapping.Store(key, &uploadIdNode{
+		uploadId:  ptr.String(tempDir),
+		key:       ptr.String(remoteName),
+		abortDate: aws.Time(time.Now().Add(time.Hour)),
+	})
 	return key, nil
 }
 
 func (self *localClient) MultipartComplete(uploadId string) (string, error) {
-	if uploadId == "" || self.uploadIdMapping[uploadId] == nil {
+	value, ok := self.uploadIdMapping.LoadAndDelete(uploadId)
+	if !ok {
 		return "nil", errors.New("The upload id not found or expired. Please create it first.")
 	}
-	targetFile, err := self.getFileHandler(*self.uploadIdMapping[uploadId].key)
+	upload, ok := value.(*uploadIdNode)
+	if !ok || upload == nil {
+		return "nil", errors.New("The upload id not found or expired. Please create it first.")
+	}
+	targetFile, err := self.getFileHandler(*upload.key)
 	if err != nil {
 		return "", err
 	}
 	defer targetFile.Close()
-	defer os.RemoveAll(*self.uploadIdMapping[uploadId].uploadId)
-	defer delete(self.uploadIdMapping, uploadId)
+	defer os.RemoveAll(*upload.uploadId)
 
-	log.Printf("clear: %s", *self.uploadIdMapping[uploadId].uploadId)
+	log.Printf("clear: %s", *upload.uploadId)
 	for i := 1; i <= 10000; i++ {
-		chunk := fmt.Sprintf("%s/%s.%d.part", *self.uploadIdMapping[uploadId].uploadId, uploadId, i)
+		chunk := fmt.Sprintf("%s/%s.%d.part", *upload.uploadId, uploadId, i)
 		content, err := os.ReadFile(chunk)
 		if err != nil {
 			if os.IsNotExist(err) {
@@ -142,6 +148,18 @@ func (self *localClient) MultipartComplete(uploadId string) (string, error) {
 		targetFile.Write(content)
 	}
 	return targetFile.Name(), nil
+}
+
+func (self *localClient) loadUpload(uploadId string) (*uploadIdNode, bool) {
+	if uploadId == "" {
+		return nil, false
+	}
+	value, ok := self.uploadIdMapping.Load(uploadId)
+	if !ok {
+		return nil, false
+	}
+	upload, ok := value.(*uploadIdNode)
+	return upload, ok && upload != nil
 }
 
 func (self *localClient) GetString(remoteName string) (string, error) {

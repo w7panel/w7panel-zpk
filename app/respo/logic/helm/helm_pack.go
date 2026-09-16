@@ -114,21 +114,36 @@ func PackManifestToHelm(manifest logic2.Manifest, subManifest []*logic2.Manifest
 }
 
 func PackFormulaToHelmAndPack(formula formulalogic.Formula, rePack bool) (string, error) {
-	depot, _ := formulalogic.NewDepot()
-	helmDir := filepath.Join(filepath.Join(depot.GetBasePath(), "Helm", "Formula"))
-	helmZipPath := filepath.Join(filepath.Dir(helmDir), strings.ReplaceAll(formula.Manifest.Application.Identifie, "-", "_")+"-"+strconv.Itoa(int(formula.VersionId))+".tgz")
+	depot, err := formulalogic.NewDepot()
+	if err != nil {
+		return "", fmt.Errorf("获取制品仓库失败: %w", err)
+	}
+
+	helmRootDir := filepath.Join(depot.GetBasePath(), "Helm")
+	helmZipPath := filepath.Join(helmRootDir, strings.ReplaceAll(formula.Manifest.Application.Identifie, "-", "_")+"-"+strconv.Itoa(int(formula.VersionId))+".tgz")
 	if !rePack && function.FileExists(helmZipPath) {
 		return helmZipPath, nil
 	}
-	err := PackManifestToHelm(*formula.Manifest, formula.AllManifest, helmDir, false, "")
+
+	if err := os.MkdirAll(helmRootDir, 0o755); err != nil {
+		return "", fmt.Errorf("创建 Helm 目录失败: %w", err)
+	}
+
+	buildDir, err := os.MkdirTemp(helmRootDir, ".formula-build-")
 	if err != nil {
+		return "", fmt.Errorf("创建 Helm 构建目录失败: %w", err)
+	}
+	defer os.RemoveAll(buildDir)
+
+	if err := PackManifestToHelm(*formula.Manifest, formula.AllManifest, buildDir, false, ""); err != nil {
 		return "", err
 	}
-	defer os.RemoveAll(helmDir)
 
-	formulaHelmDir := filepath.Join(helmDir, formula.Manifest.Application.Identifie)
-	err = function.ZipHelmChart(formulaHelmDir, helmZipPath)
-	return helmZipPath, err
+	formulaHelmDir := filepath.Join(buildDir, formula.Manifest.Application.Identifie)
+	if err := function.ZipHelmChart(formulaHelmDir, helmZipPath); err != nil {
+		return "", err
+	}
+	return helmZipPath, nil
 }
 
 func (hc *HelmPack) PackToHelm() error {
@@ -570,11 +585,11 @@ func (hc *HelmPack) generateSubCharts(rootDir string) error {
 	}
 	mainChartName := hc.Manifest.Application.Identifie
 	for _, subManifest := range hc.SubManifest {
-		sharedStorageTargetApp := ""
-		if hasSharedPersistentStorage(hc.Manifest.Platform.Volumes, subManifest.Platform.Volumes) {
-			sharedStorageTargetApp = mainChartName
-		}
-		err := PackManifestToHelm(subManifest, nil, rootDir, true, sharedStorageTargetApp)
+		//sharedStorageTargetApp := ""
+		//if hasSharedPersistentStorage(hc.Manifest.Platform.Volumes, subManifest.Platform.Volumes) {
+		//	sharedStorageTargetApp = mainChartName
+		//}
+		err := PackManifestToHelm(subManifest, nil, rootDir, true, mainChartName)
 		if err != nil {
 			return err
 		}

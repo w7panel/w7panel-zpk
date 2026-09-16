@@ -279,12 +279,10 @@
 
                             <a-alert v-if="form.type == 'tradition'" type="info" show-icon
                                 class="zpk-primary-alert mt-16 mb-20" title="说明" :closable="false">
-                                <div class="registry-alert-item">1. 传统应用会作为独立应用安装，同时保存为站点可选的传统应用模板；运行方式固定为 Deployment。</div>
-                                <div class="registry-alert-item mt-6">2. 新建或升级站点并选择此传统应用时，系统会根据模板创建站点所需的传统应用实例。这里的修改只会用于之后创建的实例，已创建的实例不会自动更新。</div>
-                                <div class="registry-alert-item mt-6">3. 独立安装时通过“传统应用版本”启动参数替换运行容器镜像中的 {version}；为站点创建实例时也会使用同一模板。</div>
-                                <div class="registry-alert-item mt-6">4. 传统应用容器的启动命令可在页面下方“启动命令”中配置。</div>
-                                <div class="registry-alert-item mt-6">5. 页面下方“脚本配置”中的安装、升级脚本只在安装或升级此制品时执行，站点管理创建传统应用实例时不会再次执行。</div>
-                                <div class="registry-alert-item mt-6">6. 传统应用准备完成后，系统会使用 NGINX 模板配置站点并完成绑定。</div>
+                                <div class="registry-alert-item">1. 传统应用会作为独立应用安装，运行方式固定为 Deployment。</div>
+                                <div class="registry-alert-item mt-6">2. 安装时通过“传统应用版本”启动参数替换运行容器镜像中的 {version}。</div>
+                                <div class="registry-alert-item mt-6">3. 传统应用容器的启动命令可在页面下方“应用配置”中配置。</div>
+                                <div class="registry-alert-item mt-6">4. 页面下方“脚本配置”中的安装、升级脚本只在安装或升级此制品时执行。</div>
                             </a-alert>
 
                             <a-form-item v-if="form.type == 'tradition'" label="传统应用配置"
@@ -352,7 +350,7 @@
                                                         查看完整示例
                                                     </a-button>
                                                 </div>
-                                                <span class="c-99 mt-6">用于为使用此传统应用的站点生成访问配置。</span>
+                                                <span class="c-99 mt-6">用于生成此传统应用的 NGINX 访问配置。</span>
                                             </div>
                                         </a-form-item>
                                     </div>

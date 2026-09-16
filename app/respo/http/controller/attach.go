@@ -9,6 +9,7 @@ import (
 	path2 "path"
 	"path/filepath"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -19,7 +20,7 @@ import (
 	"github.com/we7coreteam/w7-rangine-go/v2/src/core/err_handler"
 )
 
-var uploadTempDir = map[string]string{}
+var uploadTempDir sync.Map
 
 type Attach struct {
 	Abstract
@@ -58,12 +59,31 @@ func (c Attach) Upload(ctx *gin.Context) {
 
 		// 此处应该按正常流程，先获取UploadId再上传
 		// 为了兼容现有程序，如果没有传 UploadId 时，按 remoteName 给生成一个
-		if params.UploadId == "" && uploadTempDir[params.Filename] == "" {
-			uploadTempDir[params.Filename], _ = storageLocalClient.MultipartCreateUploadId(saveFileName)
+		uploadID := params.UploadId
+		if uploadID == "" {
+			if value, ok := uploadTempDir.Load(params.Filename); ok {
+				uploadID, _ = value.(string)
+			}
+		}
+		if uploadID == "" {
+			createdUploadID, err := storageLocalClient.MultipartCreateUploadId(saveFileName)
+			if err != nil {
+				c.JsonResponseWithServerError(ctx, err)
+				return
+			}
+			value, _ := uploadTempDir.LoadOrStore(params.Filename, createdUploadID)
+			uploadID, _ = value.(string)
 		}
 
-		uploadPartSavePath, _ := storageLocalClient.PresignUrlMultipart(params.Filename, uploadTempDir[params.Filename], params.ChunkNumber)
-		ctx.SaveUploadedFile(fileHeader, uploadPartSavePath.Url)
+		uploadPartSavePath, err := storageLocalClient.PresignUrlMultipart(params.Filename, uploadID, params.ChunkNumber)
+		if err != nil {
+			c.JsonResponseWithServerError(ctx, err)
+			return
+		}
+		if err := ctx.SaveUploadedFile(fileHeader, uploadPartSavePath.Url); err != nil {
+			c.JsonResponseWithServerError(ctx, err)
+			return
+		}
 		c.JsonSuccessResponse(ctx)
 		return
 	} else {
@@ -83,8 +103,14 @@ func (c Attach) Upload(ctx *gin.Context) {
 			})
 			return
 		} else {
-			_, err := storageLocalClient.MultipartComplete(uploadTempDir[params.Filename])
-			defer delete(uploadTempDir, params.Filename)
+			uploadID := params.UploadId
+			if uploadID == "" {
+				if value, ok := uploadTempDir.Load(params.Filename); ok {
+					uploadID, _ = value.(string)
+				}
+			}
+			_, err := storageLocalClient.MultipartComplete(uploadID)
+			uploadTempDir.CompareAndDelete(params.Filename, uploadID)
 			if err_handler.Found(err) {
 				c.JsonResponseWithServerError(ctx, err)
 				return

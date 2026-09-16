@@ -104,8 +104,12 @@ func UnzipHelmPackage(archivePath, targetDir string) error {
 // ZipHelmChart - 将 Chart 目录打包成 Helm Chart (.tgz)
 func ZipHelmChart(sourceDir, outputFilePath string) error {
 	// 验证源目录是否存在
-	if _, err := os.Stat(sourceDir); os.IsNotExist(err) {
-		return fmt.Errorf("源目录不存在: %w", err)
+	sourceInfo, err := os.Stat(sourceDir)
+	if err != nil {
+		return fmt.Errorf("读取源目录失败: %w", err)
+	}
+	if !sourceInfo.IsDir() {
+		return fmt.Errorf("Helm Chart 源路径不是目录: %s", sourceDir)
 	}
 
 	// 确保输出文件路径以 .tgz 结尾
@@ -116,25 +120,31 @@ func ZipHelmChart(sourceDir, outputFilePath string) error {
 	// 获取目录名作为顶层目录名（用于 tar 包内路径）
 	chartName := filepath.Base(sourceDir)
 
-	// 创建输出文件
-	outFile, err := os.Create(outputFilePath)
-	if err != nil {
-		return fmt.Errorf("创建输出文件失败: %w", err)
+	// 先在目标目录内生成临时文件，完整写入后再通过 Rename 原子发布。
+	// 下载请求因此只会看到旧的完整包或新的完整包，不会读到半成品。
+	if err := os.MkdirAll(filepath.Dir(outputFilePath), 0o755); err != nil {
+		return fmt.Errorf("创建输出目录失败: %w", err)
 	}
-	defer outFile.Close()
+	outFile, err := os.CreateTemp(filepath.Dir(outputFilePath), "."+filepath.Base(outputFilePath)+".tmp-")
+	if err != nil {
+		return fmt.Errorf("创建临时输出文件失败: %w", err)
+	}
+	temporaryOutputPath := outFile.Name()
+	defer os.Remove(temporaryOutputPath)
 
 	// 创建 gzip 写入器
 	gzw := gzip.NewWriter(outFile)
-	defer gzw.Close()
 
 	// 创建 tar 写入器
 	tw := tar.NewWriter(gzw)
-	defer tw.Close()
 
 	// 遍历源目录并添加文件到 tar 包
 	err = filepath.Walk(sourceDir, func(filePath string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
+		}
+		if !info.IsDir() && !info.Mode().IsRegular() {
+			return fmt.Errorf("Helm Chart 不允许包含特殊文件: %s", filePath)
 		}
 
 		// 创建 tar 头信息
@@ -167,15 +177,18 @@ func ZipHelmChart(sourceDir, outputFilePath string) error {
 		}
 
 		// 如果是普通文件，写入文件内容
-		if !info.IsDir() {
+		if info.Mode().IsRegular() {
 			file, err := os.Open(filePath)
 			if err != nil {
 				return fmt.Errorf("打开文件失败: %w", err)
 			}
-			defer file.Close()
-
-			if _, err := io.Copy(tw, file); err != nil {
-				return fmt.Errorf("复制文件内容失败: %w", err)
+			_, copyErr := io.Copy(tw, file)
+			closeErr := file.Close()
+			if copyErr != nil {
+				return fmt.Errorf("复制文件内容失败: %w", copyErr)
+			}
+			if closeErr != nil {
+				return fmt.Errorf("关闭源文件失败: %w", closeErr)
 			}
 		}
 
@@ -183,7 +196,32 @@ func ZipHelmChart(sourceDir, outputFilePath string) error {
 	})
 
 	if err != nil {
+		_ = tw.Close()
+		_ = gzw.Close()
+		_ = outFile.Close()
 		return fmt.Errorf("遍历目录失败: %w", err)
+	}
+	if err := tw.Close(); err != nil {
+		_ = gzw.Close()
+		_ = outFile.Close()
+		return fmt.Errorf("完成 tar 写入失败: %w", err)
+	}
+	if err := gzw.Close(); err != nil {
+		_ = outFile.Close()
+		return fmt.Errorf("完成 gzip 写入失败: %w", err)
+	}
+	if err := outFile.Sync(); err != nil {
+		_ = outFile.Close()
+		return fmt.Errorf("同步 Helm 包失败: %w", err)
+	}
+	if err := outFile.Close(); err != nil {
+		return fmt.Errorf("关闭 Helm 包失败: %w", err)
+	}
+	if err := os.Chmod(temporaryOutputPath, 0o644); err != nil {
+		return fmt.Errorf("设置 Helm 包权限失败: %w", err)
+	}
+	if err := os.Rename(temporaryOutputPath, outputFilePath); err != nil {
+		return fmt.Errorf("发布 Helm 包失败: %w", err)
 	}
 
 	return nil

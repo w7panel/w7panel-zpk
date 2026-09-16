@@ -270,7 +270,6 @@ func (c Formula) Info(ctx *gin.Context) {
 			return
 		}
 	}
-
 	schemaHttp := "https://"
 	_ = depotLogin.GetFormulaBackendZipDownloadUrl(formula, false)
 	zipUrl := depotLogin.GetFormulaBackendZipDownloadUrl(formula, true)
@@ -284,30 +283,38 @@ func (c Formula) Info(ctx *gin.Context) {
 			webzipUrl[k] = dUrl
 		}
 	}
-	responseManifest := *formula.Manifest
+	responseManifestIndex := 0
+	responseManifest := *formula.AllManifest[responseManifestIndex]
 	if params.CName != "" {
-		for _, item := range formula.AllManifest {
+		for index, item := range formula.AllManifest {
 			if item.Application.Identifie == params.CName {
+				responseManifestIndex = index
 				responseManifest = *item
 				break
 			}
 		}
 	}
-	dependencyOrderBindings, err := zpkmarket.GetFormulaInfoDependencyOrderBindings(
-		consoleUid,
-		params.OrderSn,
-		responseManifest,
-		formula.AllManifest,
-		params.CName == "",
-	)
-	if err != nil {
-		c.JsonResponseWithError(ctx, err, http.StatusInternalServerError)
-		return
+	if responseManifestIndex == 0 {
+		dependencyOrderBindings, dependencyErr := zpkmarket.GetFormulaInfoDependencyOrderBindings(
+			consoleUid,
+			params.OrderSn,
+			responseManifest,
+			formula.AllManifest,
+			false,
+		)
+		if dependencyErr != nil {
+			c.JsonResponseWithError(ctx, dependencyErr, http.StatusInternalServerError)
+			return
+		}
+		if err = formulalogic.ConfigureManifestExternalDependencies(&responseManifest, dependencyOrderBindings); err != nil {
+			c.JsonResponseWithError(ctx, err, http.StatusInternalServerError)
+			return
+		}
 	}
-	if err = formulalogic.ConfigureManifestExternalDependencies(&responseManifest, dependencyOrderBindings); err != nil {
-		c.JsonResponseWithError(ctx, err, http.StatusInternalServerError)
-		return
-	}
+	formula.AllManifest[responseManifestIndex] = &responseManifest
+	formulalogic.ResolveStartParamAppReferences(formula.AllManifest)
+	formula.Manifest = formula.AllManifest[0]
+
 	type FormulaInstallInfo struct {
 		Name        string               `json:"name"`
 		Title       string               `json:"title"`
@@ -317,52 +324,31 @@ func (c Formula) Info(ctx *gin.Context) {
 	}
 	installFormulas := make([]FormulaInstallInfo, 0)
 	if params.CName == "" {
-		if responseManifest.Platform.StartParams == nil {
-			responseManifest.Platform.StartParams = make([]logic2.StartParams, 0)
-		}
-		if formula.Manifest.Platform.Volumes == nil {
-			formula.Manifest.Platform.Volumes = make([]v1.Volume, 0)
-		}
-		responseManifest.Platform.StartParams = ensurePVCNameStartParam(
-			responseManifest.Platform.StartParams,
-			formula.Manifest.Platform.Volumes,
-		)
-		installFormulas = append(installFormulas, FormulaInstallInfo{
-			Name:        responseManifest.Application.Identifie,
-			Title:       responseManifest.Application.Name,
-			Required:    true,
-			StartParams: responseManifest.Platform.StartParams,
-			Volumes:     formula.Manifest.Platform.Volumes,
-		})
 		formulaRequiredMap := make(map[string]bool)
 		for _, item := range formula.Manifest.Platform.Depends {
 			formulaRequiredMap[item.Identifie] = item.Required
 		}
-		for _, item := range formula.AllManifest {
-			if item.Application.Identifie != formula.Manifest.Application.Identifie {
-				itemManifest := *item
-				if err = formulalogic.ConfigureManifestExternalDependencies(&itemManifest, dependencyOrderBindings); err != nil {
-					c.JsonResponseWithError(ctx, err, http.StatusInternalServerError)
-					return
-				}
-				if itemManifest.Platform.StartParams == nil {
-					itemManifest.Platform.StartParams = make([]logic2.StartParams, 0)
-				}
-				if itemManifest.Platform.Volumes == nil {
-					itemManifest.Platform.Volumes = make([]v1.Volume, 0)
-				}
-				itemManifest.Platform.StartParams = ensurePVCNameStartParam(
-					itemManifest.Platform.StartParams,
-					itemManifest.Platform.Volumes,
-				)
-				installFormulas = append(installFormulas, FormulaInstallInfo{
-					Name:        itemManifest.Application.Identifie,
-					Title:       itemManifest.Application.Name,
-					Required:    formulaRequiredMap[itemManifest.Application.Identifie],
-					StartParams: itemManifest.Platform.StartParams,
-					Volumes:     itemManifest.Platform.Volumes,
-				})
+		for index, item := range formula.AllManifest {
+			if item == nil {
+				continue
 			}
+			if item.Platform.StartParams == nil {
+				item.Platform.StartParams = make([]logic2.StartParams, 0)
+			}
+			if item.Platform.Volumes == nil {
+				item.Platform.Volumes = make([]v1.Volume, 0)
+			}
+			item.Platform.StartParams = ensurePVCNameStartParam(
+				item.Platform.StartParams,
+				item.Platform.Volumes,
+			)
+			installFormulas = append(installFormulas, FormulaInstallInfo{
+				Name:        item.Application.Identifie,
+				Title:       item.Application.Name,
+				Required:    index == 0 || formulaRequiredMap[item.Application.Identifie],
+				StartParams: item.Platform.StartParams,
+				Volumes:     item.Platform.Volumes,
+			})
 		}
 	}
 

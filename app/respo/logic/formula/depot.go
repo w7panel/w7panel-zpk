@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -268,6 +269,7 @@ func (self *Depot) GetFormula(name string, version string, user *entity.Registry
 		self.applyChildManifestVersion(rootManifest, manifestRow, result.Version)
 		result.AllManifest = append(result.AllManifest, manifestRow)
 	}
+	sortManifestsByApplicationOrder(result.AllManifest)
 
 	if strings.HasPrefix(result.Manifest.Source.Url, "file://") {
 		result.ZipPath = strings.Split(result.Manifest.Source.Url, "file://")[1]
@@ -911,4 +913,16 @@ func (self *Depot) GetFormulaOciTag(formula *Formula) string {
 	}
 
 	return versionModel.Name
+}
+
+func sortManifestsByApplicationOrder(manifests []*logic.Manifest) {
+	sort.SliceStable(manifests, func(i, j int) bool {
+		if manifests[i] == nil {
+			return false
+		}
+		if manifests[j] == nil {
+			return true
+		}
+		return manifests[i].Application.Order < manifests[j].Application.Order
+	})
 }

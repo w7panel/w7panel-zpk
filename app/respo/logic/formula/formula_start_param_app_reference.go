@@ -7,24 +7,25 @@ import (
 	commonlogic "github.com/w7panel/w7panel-zpk/common/logic"
 )
 
-// ResolveStartParamAppReferences resolves app[index] references against an
-// all-manifest list that was ordered during formula initialization. References
-// with an optional field suffix, such as app[0].DB_NAME, keep that suffix.
-func ResolveStartParamAppReferences(manifests []*commonlogic.Manifest) {
+// ResolveStartParamAppReferencesCopy returns resolved start parameters without
+// changing the persisted manifest representation used by editing APIs.
+func ResolveStartParamAppReferencesCopy(
+	params []commonlogic.StartParams,
+	manifests []*commonlogic.Manifest,
+) []commonlogic.StartParams {
+	resolved := append([]commonlogic.StartParams(nil), params...)
+	resolveStartParamModuleNames(resolved, startParamAppIdentifies(manifests))
+	return resolved
+}
+
+func startParamAppIdentifies(manifests []*commonlogic.Manifest) []string {
 	identifies := make([]string, len(manifests))
 	for index, manifest := range manifests {
 		if manifest != nil {
 			identifies[index] = manifest.Application.Identifie
 		}
 	}
-
-	for _, manifest := range manifests {
-		if manifest == nil {
-			continue
-		}
-		resolveStartParamModuleNames(manifest.Platform.StartParams, identifies)
-		resolveStartParamModuleNames(manifest.Platform.Container.StartParams, identifies)
-	}
+	return identifies
 }
 
 func resolveStartParamModuleNames(params []commonlogic.StartParams, identifies []string) {

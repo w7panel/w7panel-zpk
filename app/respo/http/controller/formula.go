@@ -312,7 +312,6 @@ func (c Formula) Info(ctx *gin.Context) {
 		}
 	}
 	formula.AllManifest[responseManifestIndex] = &responseManifest
-	formulalogic.ResolveStartParamAppReferences(formula.AllManifest)
 	formula.Manifest = formula.AllManifest[0]
 
 	type FormulaInstallInfo struct {
@@ -332,22 +331,24 @@ func (c Formula) Info(ctx *gin.Context) {
 			if item == nil {
 				continue
 			}
-			if item.Platform.StartParams == nil {
-				item.Platform.StartParams = make([]logic2.StartParams, 0)
-			}
-			if item.Platform.Volumes == nil {
-				item.Platform.Volumes = make([]v1.Volume, 0)
-			}
-			item.Platform.StartParams = ensurePVCNameStartParam(
+			startParams := formulalogic.ResolveStartParamAppReferencesCopy(
 				item.Platform.StartParams,
-				item.Platform.Volumes,
+				formula.AllManifest,
 			)
+			startParams = ensurePVCNameStartParam(startParams, item.Platform.Volumes)
+			if startParams == nil {
+				startParams = make([]logic2.StartParams, 0)
+			}
+			volumes := item.Platform.Volumes
+			if volumes == nil {
+				volumes = make([]v1.Volume, 0)
+			}
 			installFormulas = append(installFormulas, FormulaInstallInfo{
 				Name:        item.Application.Identifie,
 				Title:       item.Application.Name,
 				Required:    index == 0 || formulaRequiredMap[item.Application.Identifie],
-				StartParams: item.Platform.StartParams,
-				Volumes:     item.Platform.Volumes,
+				StartParams: startParams,
+				Volumes:     volumes,
 			})
 		}
 	}

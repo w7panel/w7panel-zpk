@@ -4,21 +4,27 @@
             <div>
                 <a-form ref="formref" :model="form" :rules="rules" label-align="left"
                     :label-col-props="{ span: 5, flex: '0 0 120px' }"
-                    :wrapper-col-props="{ span: 19, flex: '1' }" class="form manifest-form">
-                    <div class="bg-white com-line df">
+                    :wrapper-col-props="{ span: 19, flex: '1' }" class="form manifest-form"
+                    :class="{ 'manifest-start-params-only': option?.startParamsOnly }">
+                    <div class="bg-white com-line df manifest-base-section">
                         <div class="fc">
                             <div class="c-00-6 df ai-c">基础配置</div>
-                            <a-form-item class="mt-16" label="名称" :field="option?.pureManifest ? 'name' : ''">
+                            <a-form-item class="mt-16 manifest-start-params-readonly" label="名称"
+                                :field="option?.pureManifest ? 'name' : ''"
+                                :inert="Boolean(option?.startParamsOnly)">
                                 <a-input v-model="form.name" size="large" style="width:500px;" @change="changeForm"
                                     placeholder="请输入"></a-input>
                             </a-form-item>
-                            <a-form-item label="标识" :field="option?.pureManifest ? 'identifie' : ''">
+                            <a-form-item class="manifest-start-params-readonly" label="标识"
+                                :field="option?.pureManifest ? 'identifie' : ''"
+                                :inert="Boolean(option?.startParamsOnly)">
                                 <div class="df jc-b" style="width:500px;">
                                     <w7-identifie v-model:author="form.author" v-model:identifie="form.identifie"
                                         @change="changeForm" disabled />
                                 </div>
                             </a-form-item>
-                            <a-form-item label="描述" field="description">
+                            <a-form-item class="manifest-start-params-readonly" label="描述" field="description"
+                                :inert="Boolean(option?.startParamsOnly)">
                                 <div class="df df-c">
                                     <a-input v-model="form.description" size="large" style="width:500px;"
                                         placeholder="请输入应用描述" @change="changeForm"></a-input>
@@ -30,7 +36,7 @@
                             </a-form-item>
                         </div>
                     </div>
-                    <div class="bg-white mt-20 pb-24">
+                    <div class="bg-white mt-20 pb-24" :inert="Boolean(option?.startParamsOnly)">
                         <div class="c-00-6 df ai-c">
                             <span class="">代码配置</span>
                         </div>
@@ -512,8 +518,8 @@
                         </div>
                     </div>
 
-                    <div class="bg-white com-line mt-20">
-                        <a-form-item v-if="form.type != 'gateway-plugin'" class="mt-16" label="启动参数" field="startParams">
+                    <div class="bg-white com-line mt-20 manifest-start-params-section">
+                        <a-form-item v-if="form.type != 'gateway-plugin'" class="mt-16 manifest-start-param-editor" label="启动参数" field="startParams">
                             <div class="manifest-field-stack">
                                 <div v-if="form.type != 'system-image'" class="start-param-head">
                                     <div class="start-param-services">
@@ -574,7 +580,7 @@
                             </div>
                         </a-form-item>
 
-                        <a-form-item class="mt-20" label="安装依赖">
+                        <a-form-item class="mt-20" label="安装依赖" :inert="Boolean(option?.startParamsOnly)">
                             <manifest-config-table :rows="form.depends" table-class="install-depend-table"
                                 :add-text="form.type == 'tradition' ? '' : '添加安装依赖'"
                                 @add="openDependPicker()">
@@ -629,7 +635,7 @@
                         </a-form-item>
                     </div>
 
-                    <div class="bg-white pb-24 mt-20 df ai-c">
+                    <div class="bg-white pb-24 mt-20 df ai-c manifest-submit-section">
                         <a-button v-if="option.pureManifest" :loading="submiting" type="primary" @click="submit(otherData)">确定提交</a-button>
                         <a-button v-else :loading="submiting" :disabled="traditionNginxGatewayChanging" type="primary" @click="submit()">确定提交</a-button>
                     </div>
@@ -679,7 +685,7 @@
                 :wrapper-col-props="{ span: 19, flex: '1' }" class="manifest-dialog-form">
                 <a-form-item label="标识" field="identifie">
                     <w7-identifie v-model:author="dependForm.identifie_before"
-                        v-model:identifie="dependForm.identifie_last" @change="onChange" :author-disabled="true" />
+                        v-model:identifie="dependForm.identifie_last" :author-disabled="true" />
                 </a-form-item>
                 <a-form-item label="名称" field="name">
                     <a-input placeholder="请输入名称" v-model="dependForm.name" size="large"
@@ -762,39 +768,12 @@
 
 <script>
 import jsyaml from "js-yaml";
-import hljs from 'highlight.js';
 import filesUpload from './files-upload.vue';
 import formIngress from '@/components/form-ingress.vue';
 import w7Identifie from "@/components/w7-identifie.vue";
 import ManifestConfigTable from '@/components/manifest-config-table.vue';
 import ManifestConfigTableColumn from '@/components/manifest-config-table-column.vue';
 import dependPicker from '@/components/depend-picker.vue';
-import myAxios from '../utils/index';
-import {
-    traditionToolDependency,
-    traditionSysboxRootfsAnnotation,
-    traditionSysboxRuntimeClassName,
-    traditionSystemRebootRestoreAnnotation,
-    isTraditionAppDependency,
-    removeTraditionAppCodeStorage,
-    withTraditionAppIngress,
-    withTraditionAppStorage,
-    withTraditionAppSysbox,
-} from '@/utils/tradition-app';
-import {
-    applyPluginTraditionDependencyStartParams,
-    createPluginTraditionDependency,
-    removePluginAppStorage,
-    withPluginAppStorage,
-    withPluginTraditionStartParams,
-} from '@/utils/plugin-app';
-import {
-    isSystemImageFixedStartParamName,
-    systemImageAnnotationKeys,
-    systemImageRootfsVolumeName,
-    withSystemImageRuntime,
-    withSystemImageStartParams,
-} from '@/utils/system-image';
 import {
     IconCheckCircleFill,
     IconClose,
@@ -803,117 +782,79 @@ import {
     IconPlus,
     IconUpload,
 } from '@arco-design/web-vue/es/icon';
-import { confirm, messageError, messageSuccess, messageWarning } from '@/utils/ui-feedback';
-import emitWujieEvent from '@/utils/wujie-event';
-
-const traditionAnnotationKeys = {
-    imageLanguage: 'w7.cc/image_language',
-    imageTemplate: 'w7.cc/image_template',
-    imageVersion: 'w7.cc/image_version',
-    nginxVhostTemplate: 'w7.cc/nginx_vhost_template',
-    nginxGateway: 'w7.cc/nginx-gateway',
-    systemRebootRestore: traditionSystemRebootRestoreAnnotation,
-};
-
-const isDerivedDependencyReleaseStartParam = item => Boolean(
-    item?.hidden && /_RELEASE_NAME$/.test(item?.name || '')
-);
-
-const pvcNameStartParamName = 'PVC_NAME';
-
-const gatewayPluginAnnotationPrefix = 'w7.cc/plugin-';
-
-const gatewayPluginCategoryOptions = [
-    { label: '路由', value: 'route' },
-    { label: 'AI', value: 'ai' },
-    { label: '认证', value: 'auth' },
-    { label: '安全', value: 'security' },
-    { label: '流量', value: 'traffic' },
-    { label: '转换', value: 'transform' },
-    { label: '可观测性', value: 'o11y' },
-    { label: '自定义', value: 'custom' },
-];
-
-const traditionLanguagePresets = [
-    { label: 'PHP', value: 'php' },
-    { label: 'Java', value: 'java' },
-    { label: 'Node.js', value: 'nodejs' },
-    { label: 'Python', value: 'python' },
-    { label: 'Go', value: 'go' },
-    { label: '.NET', value: 'dotnet' },
-    { label: 'Ruby', value: 'ruby' },
-    { label: 'Rust', value: 'rust' },
-];
-
-const nginxTemplatePlaceholders = [
-    '{SERVER_NAME}',
-    '{LOG_DIR}',
-    '{ROOT_DIR}',
-    '{K8S_DOMAIN}',
-    '{UPSTREAM_APP_NAME}',
-];
-
-const nginxTemplateExample = String.raw`server {
-    listen 80;
-    server_name {SERVER_NAME};
-
-    root {ROOT_DIR};
-    index index.php index.html index.htm;
-
-    access_log /dev/stdout;
-    error_log /dev/stderr;
-
-    # 静态文件处理
-    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2)$ {
-        expires 1y;
-        add_header Cache-Control "public, immutable";
-        try_files $uri =404;
-    }
-
-    # 隐藏文件保护
-    location ~ /\. {
-        deny all;
-        access_log off;
-        log_not_found off;
-    }
-
-    # PHP 代理配置
-    location ~ ^/(.+\.php)(/.*)?$ {
-        # 使用 FastCGI 连接到 PHP-FPM
-        fastcgi_pass {K8S_DOMAIN}:9000;
-
-        set $real_scheme $http_x_forwarded_proto;
-        if ($real_scheme = "") {
-            set $real_scheme $scheme;
-        }
-
-        # 关键 FastCGI 参数
-        include fastcgi_params;
-        fastcgi_split_path_info ^(.+\.php)(/.+)$;
-        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
-        fastcgi_param SCRIPT_NAME $fastcgi_script_name;
-        fastcgi_param PATH_INFO $fastcgi_path_info;
-        fastcgi_param PATH_TRANSLATED $document_root$fastcgi_path_info;
-        fastcgi_index index.php;
-
-        # 必要的请求头
-        fastcgi_param HTTP_X_REAL_IP $remote_addr;
-        fastcgi_param HTTP_X_FORWARDED_FOR $proxy_add_x_forwarded_for;
-        fastcgi_param HTTP_X_FORWARDED_PROTO $real_scheme;
-        fastcgi_param REQUEST_SCHEME $real_scheme;
-        fastcgi_param HTTPS $real_scheme;
-
-        # FastCGI 超时设置
-        fastcgi_connect_timeout 30s;
-        fastcgi_send_timeout 60s;
-        fastcgi_read_timeout 60s;
-    }
-
-    # 主路由配置（支持前端控制器）
-    location / {
-        try_files $uri $uri/ /index.php?$query_string;
-    }
-}`;
+import { confirm, messageError, messageWarning } from '@/utils/ui-feedback';
+import {
+    traditionFormDefaults,
+    traditionManifestComputed,
+    traditionManifestMethods,
+    traditionManifestState,
+    traditionValidationRules,
+} from '@/components/manifest/tradition-manifest';
+import {
+    systemImageFormDefaults,
+    systemImageManifestMethods,
+    systemImageValidationRules,
+} from '@/components/manifest/system-image-manifest';
+import {
+    appPluginFormDefaults,
+    appPluginManifestMethods,
+    appPluginManifestState,
+} from '@/components/manifest/plugin-app-manifest';
+import {
+    gatewayPluginFormDefaults,
+    gatewayPluginManifestMethods,
+    gatewayPluginManifestState,
+    gatewayPluginValidationRules,
+} from '@/components/manifest/gateway-plugin-manifest';
+import {
+    dockerManifestMethods,
+    normalizeDockerApplicationType,
+} from '@/components/manifest/docker-manifest';
+import {
+    helmFormDefaults,
+    helmManifestComputed,
+    helmManifestMethods,
+    helmManifestState,
+} from '@/components/manifest/helm-manifest';
+import {
+    startParamsFormDefaults,
+    startParamsManifestMethods,
+    startParamsManifestState,
+    startParamsManifestWatch,
+} from '@/components/manifest/start-params-manifest';
+import {
+    shellFormDefaults,
+    shellManifestComputed,
+    shellManifestMethods,
+    shellManifestState,
+    shellManifestWatch,
+} from '@/components/manifest/shell-manifest';
+import {
+    dependencyFormDefaults,
+    dependencyManifestMethods,
+    dependencyManifestState,
+    dependencyManifestWatch,
+} from '@/components/manifest/dependency-manifest';
+import {
+    applicationConfigFormDefaults,
+    applicationConfigManifestMethods,
+    applicationConfigManifestState,
+    applicationConfigManifestWatch,
+} from '@/components/manifest/application-config-manifest';
+import {
+    manifestMetadataFormDefaults,
+    manifestMetadataMethods,
+    manifestMetadataState,
+    manifestMetadataValidationRules,
+} from '@/components/manifest/manifest-metadata';
+import {
+    manifestSourceMethods,
+    manifestSourceState,
+} from '@/components/manifest/manifest-source';
+import {
+    manifestYamlMethods,
+    manifestYamlState,
+} from '@/components/manifest/manifest-yaml';
 
 export default {
     emits: ['writefile', 'tradition-nginx-gateway-change'],
@@ -940,877 +881,135 @@ export default {
     },
     data() {
         return {
-            field_arr: [
-                "metadata.name",
-                "metadata.namespace",
-                "spec.serviceAccountName",
-                "status.hostIP",
-                "status.podIP",
-                "status.podIPs",
-                "spec.nodeName",
-            ],
-            vtitle: '',
-            showYaml: false,
-
-            zip: {
-                codetype: 'zip',
-                name: '',
-                url: '',
-                hasDockerfile: true,
-            },
-
-            web: {
-                type: 'zip',
-                name: '',
-                url: '',
-            },
-
             json: {},
             yaml: '',
-            git: { url: '' },
             form: {
                 type: 'docker',
-                name: "",
-                author: "",
-                description: "",
-                identifie: "",
-                gatewayPluginCategory: 'custom',
-                gatewayPluginDriver: 'higress-wasm/v1',
-                gatewayPluginUrl: '',
-                gatewayPluginPhase: 'UNSPECIFIED_PHASE',
-                gatewayPluginPriority: 0,
-                gatewayPluginSupportGlobal: true,
-                gatewayPluginSupportRule: false,
-                gatewayPluginDefaultEnabled: true,
-                gatewayPluginDefaultConfig: '{}',
-                traditionImageLanguage: '',
-                traditionImageTemplate: '',
-                traditionImageVersion: [],
-                traditionSystemRebootRestore: true,
-                traditionNginxGateway: false,
-                traditionNginxVhostTemplate: '',
-                systemImageCategory: 'operating-system',
-                systemImageTemplate: '',
-                systemImageVersions: [],
-                startParams: [],
-                dependsIn: [],
-                depends: [],
+                ...manifestMetadataFormDefaults(),
+                ...gatewayPluginFormDefaults(),
+                ...traditionFormDefaults(),
+                ...systemImageFormDefaults(),
+                ...appPluginFormDefaults(),
+                ...startParamsFormDefaults(),
+                ...dependencyFormDefaults(),
+                ...shellFormDefaults(),
+                ...applicationConfigFormDefaults(),
+                helm: helmFormDefaults(),
 
-                mysql8: false,
-                redis: false,
-
-                image: "",
-
-                taginput: "",
-                tags: [],
-
-
-
-
-                build_context: '',
-
-
-                shell: [],
-                containers: [],
-                language: '',
-                helm: {
-                    helmtype: '1',
-                    repository: '',
-                    chartName: 'default',
-                    chartName2: '',
-                    version: '',
-                    kv: [],
-                },
-                entry: 'public',
-                traditionName: '',
-                traditionVersion: '',
-                cmd: [''],
-
-            },
-
-            shellConfig: {
-                show: false,
-                editIndex: -1,
-                item: null,
-            },
-
-            domainConfig: {
-                show: false,
-                ingress: [],
-            },
-
-            app_ports: [],
-            app_names: [],
-
-            volumeRules: {
-                mountPath: [{ required: true, message: '内容不能为空', trigger: 'blur' }],
-                subPath: [{ required: true, message: '内容不能为空', trigger: 'blur' }],
-                type: [{ required: true, message: '内容不能为空', trigger: 'blur' }],
-                hostPath: [{ required: true, message: '内容不能为空', trigger: 'blur' }],
             },
 
             rules: {
-                name: [
-                    { required: true, message: '内容不能为空', trigger: 'blur' },
-                ],
-                identifie: [
-                    { required: true, message: '内容不能为空', trigger: 'blur' },
-                    {
-                        required: true, trigger: 'blur', validator: (value, callback) => {
-                            if (this.form.author) { callback() }
-                            else { callback("请输入完整") }
-                        }
-                    },
-                    {
-                        required: true, trigger: 'blur', validator: (value, callback) => {
-                            if (/^[a-zA-Z0-9]+$/.test(value)) { callback() }
-                            else { callback("标识格式有误") }
-                        }
-                    },
-                    {
-                        required: true, trigger: 'blur', validator: (value, callback) => {
-                            if (/^[a-zA-Z0-9]+$/.test(this.form.author)) { callback() }
-                            else { callback("标识格式有误") }
-                        }
-                    },
-                ],
-                port: [
-                    { required: true, message: '内容不能为空', trigger: 'blur' },
-                    {
-                        required: true, trigger: 'blur', validator: (value, callback) => {
-                            if (value?.filter?.(i => i.name && i.protocol && i.port)?.length) {
-                                callback()
-                            } else {
-                                callback("必填项不能为空")
-                            }
-                        }
-                    },
-                ],
-                gatewayPluginUrl: [
-                    { required: true, message: '请输入插件镜像地址', trigger: 'blur' },
-                ],
-                gatewayPluginCategory: [
-                    { required: true, message: '请选择插件分类', trigger: 'change' },
-                ],
-                gatewayPluginDriver: [
-                    { required: true, message: '请选择运行时驱动', trigger: 'change' },
-                ],
-                gatewayPluginPhase: [
-                    { required: true, message: '请选择执行阶段', trigger: 'change' },
-                ],
-                gatewayPluginPriority: [
-                    { required: true, message: '请输入优先级', trigger: 'change' },
-                ],
-                traditionImageLanguage: [
-                    {
-                        required: true,
-                        message: '请选择应用语言',
-                        trigger: 'change',
-                    },
-                ],
-                traditionImageTemplate: [
-                    {
-                        required: true,
-                        message: '请输入镜像地址',
-                        trigger: 'blur',
-                        validator: (value, callback) => this.validateTraditionImageTemplate(value, callback),
-                    },
-                ],
-                traditionImageVersion: [
-                    {
-                        required: true,
-                        message: '请输入传统应用版本',
-                        trigger: 'change',
-                        validator: (value, callback) => this.validateTraditionImageVersions(value, callback),
-                    },
-                ],
-                traditionNginxVhostTemplate: [
-                    {
-                        required: false,
-                        message: '请输入 NGINX 模板',
-                        trigger: 'blur',
-                        validator: (value, callback) => {
-                            if (!this.form.traditionNginxGateway || String(value || '').trim()) {
-                                callback();
-                            } else {
-                                callback('请输入 NGINX 模板');
-                            }
-                        },
-                    },
-                ],
-                systemImageCategory: [
-                    { required: true, message: '请选择系统镜像分类', trigger: 'change' },
-                ],
-                systemImageTemplate: [
-                    {
-                        required: true,
-                        trigger: 'blur',
-                        validator: (value, callback) => this.validateSystemImageTemplate(value, callback),
-                    },
-                ],
-                systemImageVersions: [
-                    {
-                        required: true,
-                        trigger: 'change',
-                        validator: (value, callback) => this.validateSystemImageVersions(value, callback),
-                    },
-                ],
+                ...manifestMetadataValidationRules(this),
+                ...gatewayPluginValidationRules(),
+                ...traditionValidationRules(this),
+                ...systemImageValidationRules(this),
             },
-            addRules: {
-                identifie: [
-                    { required: true, message: '内容不能为空', trigger: 'blur' },
-
-                    {
-                        required: true, trigger: 'blur', validator: (value, callback) => {
-                            if (/^[a-zA-Z0-9]+-[a-zA-Z0-9]+$/.test(value)) { callback() }
-                            else { callback("标识格式有误") }
-                        }
-                    },
-                ],
-                name: [{ required: true, message: '内容不能为空', trigger: 'blur' }],
-            },
-            yamlDom: "",
-            downloadUrl: "",
-
-            dialogVisible: false,
-            icons: [],
-            activeItem: null,
-
-
-            frameVisible: false,
-            downloadFrame: null,
-            beforeDownload: false,
-
-
             otherData: {},
-            logoimg: '',
-            logofile: null,
 
-            baseurl: '',
+            ...manifestMetadataState(),
+            ...manifestSourceState(),
+            ...manifestYamlState(),
+            ...traditionManifestState(),
+            ...appPluginManifestState(),
+            ...gatewayPluginManifestState(),
+            ...startParamsManifestState(),
+            ...dependencyManifestState(),
+            ...shellManifestState(),
+            ...applicationConfigManifestState(),
+            ...helmManifestState(),
 
-            depend: {
-                input: '',
-                item: null,
-            },
-
-            dependForm: {
-                show: false,
-                editIndex: -1,
-                identifie: '',
-                identifie_before: '',
-                identifie_last: '',
-                name: '',
-                required: true,
-                from: '',
-            },
-
-            languageList: [],
-
-            spEdit: {
-                show: false,
-                values: '',
-            },
-            spDesc: {
-                show: false,
-                item: null,
-                value: '',
-            },
-
-            dependsList: {},
-            subDependsList: {},
-
-            dependPicker: {
-                show: false,
-                editIndex: -1,
-            },
-
-            buildImageLogData: null,
-            buildImageInterval: null,
-
-
-            helmCharts: [],
-            helmChartVersions: [],
-            helmChartKeyword: '',
-            helmChartVersionKeyword: '',
-
-            getChartInfoLoading: false,
-
-            containerPluginData: {},
-
-            traditionList: [],
-            versionList: [],
-            commandList: [],
-
-            disabledDomainStartParams: false,
-            formulaSettingLoading: false,
-            formulaSettingLoaded: false,
-            formulaBaseInfo: null,
-            traditionNginxGatewayChanging: false,
-            traditionNginxGatewayAnnotationPresent: false,
-            sysboxDependencyManaged: false,
             initialApplicationType: '',
             currentApplicationType: '',
-            gatewayPluginCategoryOptions,
-            nginxTemplatePlaceholders,
-            nginxTemplateExample,
-            nginxTemplateExampleVisible: false,
+            savedEditorState: '',
+            savedManifestJSON: null,
         }
     },
     created() {
         this.getDependsList();
         this.getTraditionList();
-        this.baseurl = window?.$wujie?.props?.url || '';
-        hljs.configure({ ignoreUnescapedHTML: true });
+        this.initManifestYaml();
         this.init(this.data);
+        const initializationRequests = [];
         if (!this.option?.pureManifest) {
-            this.getTag();
-            if (['tradition', 'gateway-plugin'].includes(this.form.type)) {
-                this.loadFormulaSetting().catch(() => { });
+            if (['tradition', 'gateway-plugin', 'system-image'].includes(this.form.type)) {
+                initializationRequests.push(this.loadFormulaSetting());
             }
         } else {
             this.otherData.required = Boolean(this.option?.required);
         }
-
-        this.languageList = [
-            {
-                "name": "php8.1",
-                "identifie": "tradition_php81",
-            },
-            {
-                "name": "php8.0",
-                "identifie": "tradition_php80",
-            },
-            {
-                "name": "php7.4",
-                "identifie": "tradition_php74",
-            },
-            {
-                "name": "php7.3",
-                "identifie": "tradition_php73",
-            },
-            {
-                "name": "PHP7.2",
-                "identifie": "tradition_php72",
-            }
-        ]
+        this.markManifestSavedAfter(initializationRequests);
 
     },
 
     computed: {
-        traditionLanguageOptions() {
-            let currentLanguage = String(this.form.traditionImageLanguage || '').trim();
-            if (currentLanguage && !traditionLanguagePresets.some(option => option.value == currentLanguage)) {
-                return [
-                    { label: `${currentLanguage}（已有值）`, value: currentLanguage },
-                    ...traditionLanguagePresets,
-                ];
-            }
-            return traditionLanguagePresets;
-        },
-        helmChartOptions() {
-            return this.filterAutocompleteOptions(this.helmCharts, this.helmChartKeyword);
-        },
-        helmChartVersionOptions() {
-            return this.filterAutocompleteOptions(this.helmChartVersions, this.helmChartVersionKeyword);
-        },
-        selectedTradition() {
-            return this.traditionList?.find?.(i => i.identifie == this.form.traditionName) || null;
-        },
-        shellTypeOptions() {
-            return [
-                { label: '安装前执行', value: 'requireinstall' },
-                { label: '安装后执行', value: 'install' },
-                { label: '升级前执行', value: 'pre-upgrade' },
-                { label: '升级后执行', value: 'upgrade' },
-                { label: '卸载后执行', value: 'uninstall' },
-                { label: '手动触发', value: 'custom' },
-            ];
-        },
-        shellContainerOptions() {
-            let containers = this.form.containers?.length
-                ? this.form.containers
-                : (this.json?.platform?.['container-v2'] || []);
-            return (containers || [])
-                .filter(item => item && !item.isInitContainer && item.name)
-                .map(item => ({
-                    label: item.name,
-                    value: item.name,
-                }));
-        },
-        hasShellContainerOptions() {
-            return this.form.type != 'app-plugin' && this.shellContainerOptions.length > 0;
-        },
-        defaultShellContainer() {
-            return this.hasShellContainerOptions ? this.shellContainerOptions[0].value : '';
-        },
-        traditionIcon() {
-            return icon => {
-                if (!icon) return '';
-                return /^https?:\/\//i.test(icon) ? icon : `https://img.w7.cc${icon.startsWith('/') ? '' : '/'}${icon}`;
-            };
-        },
+        ...traditionManifestComputed,
+        ...helmManifestComputed,
+        ...shellManifestComputed,
     },
     watch: {
-        'dependForm.identifie_before'() {
-            this.dependForm.identifie = this.dependForm.identifie_before + '-' + this.dependForm.identifie_last;
-        },
-        'dependForm.identifie_last'() {
-            this.dependForm.identifie = this.dependForm.identifie_before + '-' + this.dependForm.identifie_last;
-        },
-
+        ...startParamsManifestWatch,
+        ...dependencyManifestWatch,
+        ...shellManifestWatch,
+        ...applicationConfigManifestWatch,
         data() {
             this.init(this.data);
+            const initializationRequests = [];
             if (!this.option?.pureManifest && ['tradition', 'gateway-plugin', 'system-image'].includes(this.form.type)) {
-                this.loadFormulaSetting().catch(() => { });
+                initializationRequests.push(this.loadFormulaSetting());
             }
+            this.markManifestSavedAfter(initializationRequests);
         },
-        'form.storage'(v) {
-            const params = this.form.type == 'tradition'
-                ? []
-                : [
-                    { mark: 'storage', name: 'global.cluster.storageRWmode', title: '读写模式', required: true, values_text: '%STORAGE_RW_MODE%', module_name: '' },
-                    { mark: 'storage', name: 'global.cluster.storageSize', title: '存储大小', required: true, values_text: '%STORAGE_SIZE%', module_name: '' },
-                    { mark: 'storage', name: 'global.cluster.storageClassName', title: '存储类', required: true, values_text: '%STORAGE_CLASS_NAME%', module_name: '' },
-                ];
-            this.checkStartParams(v, 'storage', params)
-        },
-        'form.mysql8'(v) {
-            if (v && this.form.mysql5) { this.form.mysql5 = false; }
-            this.checkStartParams(v, 'mysql8', [
-                { mark: 'mysql8', name: 'MYSQL_DATABASE', title: 'mysql数据库', required: true, values_text: 'dbname_%RANDOM%', module_name: 'w7_mysql.DB_NAME' },
-                { mark: 'mysql8', name: 'MYSQL_PASSWORD', title: 'mysql密码', required: true, values_text: '%MYSQL_ROOT_PASSWORD%', module_name: 'w7_mysql' },
-                { mark: 'mysql8', name: 'MYSQL_USERNAME', title: 'mysql用户名', required: true, values_text: '%MYSQL_ROOT_USERNAME%', module_name: 'w7_mysql' },
-                { mark: 'mysql8', name: 'MYSQL_PORT', title: 'mysql端口', required: true, values_text: '%PORT%', module_name: 'w7_mysql' },
-                { mark: 'mysql8', name: 'MYSQL_HOST', title: 'mysql地址', required: true, values_text: '%HOST%', module_name: 'w7_mysql' },
-            ])
-        },
-        'form.mysql5'(v) {
-            if (v && this.form.mysql8) { this.form.mysql8 = false; }
-            this.checkStartParams(v, 'mysql5', [
-                { mark: 'mysql5', name: 'MYSQL_DATABASE', title: 'mysql数据库', required: true, values_text: 'dbname_%RANDOM%', module_name: 'w7_mysql.DB_NAME' },
-                { mark: 'mysql5', name: 'MYSQL_PASSWORD', title: 'mysql密码', required: true, values_text: '%MYSQL_ROOT_PASSWORD%', module_name: 'w7_mysql5' },
-                { mark: 'mysql5', name: 'MYSQL_USERNAME', title: 'mysql用户名', required: true, values_text: '%MYSQL_ROOT_USERNAME%', module_name: 'w7_mysql5' },
-                { mark: 'mysql5', name: 'MYSQL_PORT', title: 'mysql端口', required: true, values_text: '%PORT%', module_name: 'w7_mysql5' },
-                { mark: 'mysql5', name: 'MYSQL_HOST', title: 'mysql地址', required: true, values_text: '%HOST%', module_name: 'w7_mysql5' },
-            ])
-        },
-        'form.redis'(v) {
-            this.checkStartParams(v, 'redis', [
-                { mark: 'redis', name: 'REDIS_PASSWORD', title: 'redis密码', required: true, values_text: '%REDIS_PASSWORD%', module_name: 'w7_redis' },
-                { mark: 'redis', name: 'REDIS_PORT', title: 'redis端口', required: true, values_text: '%PORT%', module_name: 'w7_redis' },
-                { mark: 'redis', name: 'REDIS_HOST', title: 'redis地址', required: true, values_text: '%HOST%', module_name: 'w7_redis' },
-            ]);
-        },
-        'form.mongodb6'(v) {
-            this.checkStartParams(v, 'mongodb6', [
-                { mark: 'mongodb6', name: 'MONGO_PORT', title: '端口', required: true, values_text: '%PORT%', module_name: 'w7_mongodb' },
-                { mark: 'mongodb6', name: 'MONGO_HOST', title: '内网域名', required: true, values_text: '%HOST%', module_name: 'w7_mongodb' },
-                { mark: 'mongodb6', name: 'MONGO_INITDB_ROOT_PASSWORD', title: '密码', required: true, values_text: '%MONGO_INITDB_ROOT_PASSWORD%', module_name: 'w7_mongodb' },
-                { mark: 'mongodb6', name: 'MONGO_INITDB_ROOT_USERNAME', title: '用户名', required: true, values_text: '%MONGO_INITDB_ROOT_USERNAME%', module_name: 'w7_mongodb' },
-            ]);
-        },
-        'form.domain'(v) {
-            this.checkStartParams(v, 'domain', [
-                { mark: 'domain', name: 'DOMAIN_URL', title: '域名', required: true, values_text: '%DOMAIN_URL%', module_name: '' },
-            ]);
-        },
-        'form.ingress': {
-            deep: true,
-            handler() {
-                this.changeForm();
-            }
-        },
-        'form.shell': {
-            deep: true,
-            handler() {
-                this.changeForm();
-            }
-        },
-        'option.app_ports'() {
-            this.computedAppPort();
-        }
     },
     beforeUnmount() {
-        try {
-            clearInterval(this.buildImageInterval)
-        } catch { }
+        this.cleanupManifestYaml();
     },
     methods: {
-        useNginxTemplateExample() {
-            const applyExample = () => {
-                this.form.traditionNginxVhostTemplate = this.nginxTemplateExample;
-                this.nginxTemplateExampleVisible = false;
-                messageSuccess('已填入 NGINX 模板示例');
-            };
-            const currentTemplate = String(this.form.traditionNginxVhostTemplate || '').trim();
-
-            if (!currentTemplate || currentTemplate == this.nginxTemplateExample.trim()) {
-                applyExample();
-                return;
-            }
-
-            confirm({
-                title: '使用 NGINX 模板示例',
-                content: '当前模板内容将被示例覆盖，是否继续？',
-                confirmButtonText: '覆盖并使用',
-                cancelButtonText: '取消',
-                onOk: applyExample,
+        ...traditionManifestMethods,
+        ...systemImageManifestMethods,
+        ...appPluginManifestMethods,
+        ...gatewayPluginManifestMethods,
+        ...dockerManifestMethods,
+        ...helmManifestMethods,
+        ...startParamsManifestMethods,
+        ...dependencyManifestMethods,
+        ...shellManifestMethods,
+        ...applicationConfigManifestMethods,
+        ...manifestMetadataMethods,
+        ...manifestSourceMethods,
+        ...manifestYamlMethods,
+        getEditorStateSnapshot() {
+            return JSON.stringify({
+                form: this.form,
+                json: this.json,
+                zip: this.zip,
+                web: this.web,
             });
         },
-        toggleTraditionNginxGateway(value) {
-            if (this.form.type != 'tradition' || this.option?.pureManifest
-                || this.traditionNginxGatewayChanging) {
-                return;
-            }
-            const enabled = Boolean(value);
-            const previous = !enabled;
-            // Keep the visible state unchanged until the parent-side
-            // dependency update has completed successfully.
-            this.form.traditionNginxGateway = previous;
-            const finish = (success) => {
-                this.traditionNginxGatewayChanging = false;
-                if (!success) {
-                    this.form.traditionNginxGateway = previous;
-                } else {
-                    this.form.traditionNginxGateway = enabled;
-                    // Rebuild only the managed ingress backend after the
-                    // parent has imported/removed the dependency.
-                    this.syncTraditionIngress();
-                }
-            };
-            const request = () => {
-                this.traditionNginxGatewayChanging = true;
-                this.$emit('tradition-nginx-gateway-change', {
-                    enabled,
-                    finish,
+        markManifestSaved() {
+            this.savedEditorState = this.getEditorStateSnapshot();
+            this.savedManifestJSON = JSON.parse(JSON.stringify(this.json || {}));
+        },
+        markManifestSavedAfter(requests = []) {
+            const token = (this._savedEditorStateToken || 0) + 1;
+            this._savedEditorStateToken = token;
+            Promise.allSettled(requests.filter(Boolean)).then(() => {
+                this.$nextTick(() => {
+                    if (this._savedEditorStateToken == token) this.markManifestSaved();
                 });
-            };
-            if (enabled) {
-                request();
-                return;
-            }
-            confirm({
-                title: '关闭 NGINX 网关',
-                content: '关闭后将停止使用 NGINX 网关，是否继续？',
-                confirmButtonText: '关闭',
-                cancelButtonText: '取消',
-                onOk: request,
-                onCancel: () => {
-                    this.form.traditionNginxGateway = previous;
-                },
             });
         },
-        validateTraditionImageTemplate(value, callback) {
-            let template = String(value || '').trim();
-            if (!template) {
-                callback('请输入镜像地址');
-                return;
-            }
-            if (/\s/.test(template)) {
-                callback('镜像地址不能包含空格或换行');
-                return;
-            }
-            if (!template.includes('{version}')) {
-                callback('镜像地址必须包含 {version} 占位符');
-                return;
-            }
-            let unsupportedPlaceholders = [...new Set(template.match(/\{[^{}]+\}/g) || [])]
-                .filter(placeholder => placeholder != '{version}');
-            if (unsupportedPlaceholders.length) {
-                callback('镜像地址包含不支持的占位符：' + unsupportedPlaceholders.join('、'));
-                return;
-            }
-            callback();
+        hasUnsavedChanges() {
+            return !this.savedEditorState
+                || this.savedEditorState !== this.getEditorStateSnapshot();
         },
-        validateTraditionImageVersions(value, callback) {
-            let versions = this.normalizeApplicationVersions(value);
-            if (!versions.length) {
-                callback('请输入至少一个传统应用版本');
-                return;
-            }
-            let invalidVersions = [...new Set(versions.filter(version => !/^[A-Za-z0-9_][A-Za-z0-9._-]{0,127}$/.test(version)))];
-            if (invalidVersions.length) {
-                let invalidText = invalidVersions.slice(0, 3).join('、');
-                if (invalidVersions.length > 3) { invalidText += ' 等' }
-                callback('以下语言版本格式不正确：' + invalidText);
-                return;
-            }
-            callback();
-        },
-        validateSystemImageTemplate(value, callback) {
-            let template = String(value || '').trim();
-            if (!template) { callback('请输入镜像地址'); return; }
-            if (/\s/.test(template)) { callback('镜像地址不能包含空格或换行'); return; }
-            if (!template.includes('{version}')) { callback('镜像地址必须包含 {version} 占位符'); return; }
-            let unsupported = [...new Set(template.match(/\{[^{}]+\}/g) || [])]
-                .filter(item => item != '{version}');
-            if (unsupported.length) {
-                callback('镜像地址包含不支持的占位符：' + unsupported.join('、'));
-                return;
-            }
-            callback();
-        },
-        validateSystemImageVersions(value, callback) {
-            let versions = this.normalizeApplicationVersions(value);
-            if (!versions.length) { callback('请输入至少一个系统版本'); return; }
-            let invalid = versions.filter(version => !/^[A-Za-z0-9_][A-Za-z0-9._-]{0,127}$/.test(version));
-            if (invalid.length) { callback('系统版本格式不正确：' + invalid.slice(0, 3).join('、')); return; }
-            callback();
-        },
-        systemImageStartParams() {
-            let versions = this.normalizeApplicationVersions(this.form.systemImageVersions);
-            return withSystemImageStartParams(this.form.startParams, versions);
-        },
-        traditionStartParams() {
-            let versions = this.normalizeApplicationVersions(this.form.traditionImageVersion);
-            let fixedNames = new Set([
-                'IMAGE_VERSION',
-                'DOMAIN_URL',
-                'global.cluster.storageRWmode',
-                'global.cluster.storageSize',
-                'global.cluster.storageClassName',
-            ]);
-            let customParams = (this.form.startParams || []).filter(item => !fixedNames.has(item?.name));
-            let params = [
-                { mark: 'tradition', name: 'IMAGE_VERSION', title: '传统应用版本', required: true, values_text: versions.join('|'), module_name: '', description: '选择要安装的传统应用版本', type: 'select' },
-                { mark: 'environment-site', name: 'DOMAIN_URL', title: '站点域名', required: true, values_text: '%DOMAIN_URL%', module_name: '', description: '用于站点访问', type: 'text' },
-            ];
-            return [...params, ...customParams];
-        },
-        hasTraditionCodePackage() {
-            return this.form.type == 'tradition'
-                && Boolean(String(this.zip?.url || this.json?.source?.url || '').trim());
-        },
-        syncTraditionVersionConfig() {
-            if (this.form.type != 'tradition') { return; }
-            this.form.traditionImageVersion = this.normalizeApplicationVersions(this.form.traditionImageVersion);
-            this.form.startParams = this.traditionStartParams();
-            this.changeForm();
-        },
-        ensureTraditionContainerDefaults(forceImage = false) {
-            if (this.form.type != 'tradition') { return; }
-            this.json.platform = this.json.platform || {};
-            delete this.json.platform.container;
-            let containers = Array.isArray(this.json.platform['container-v2'])
-                ? this.json.platform['container-v2']
-                : [];
-            let mainContainer = containers.find(item => !item?.isInitContainer);
-            if (!mainContainer) {
-                mainContainer = {
-                    name: (this.form.author && this.form.identifie)
-                        ? `${this.form.author}-${this.form.identifie}`
-                        : (this.json?.application?.identifie || 'tradition'),
-                    image: '',
-                    imagePullPolicy: 'IfNotPresent',
-                };
-                containers.unshift(mainContainer);
-            }
-            let imageTemplate = String(this.form.traditionImageTemplate || '').trim();
-            if (forceImage || !String(mainContainer.image || '').trim()) {
-                mainContainer.image = imageTemplate;
-            }
-            if (!mainContainer.imagePullPolicy) {
-                mainContainer.imagePullPolicy = 'IfNotPresent';
-            }
-            this.json.platform['container-v2'] = containers;
-            this.form.containers = containers;
-            this.json.platform.workload = this.json.platform.workload || {};
-            if (!this.json.platform.workload.type) {
-                this.json.platform.workload.type = 'Deployment';
-            }
-            if (!this.containerPluginData.kind) {
-                this.containerPluginData.kind = 'Deployment';
-            }
-            this.fillDefaultShellContainer();
-            this.json.platform = withTraditionAppStorage(this.json.platform);
-        },
-        getTraditionMainContainer() {
-            return this.json?.platform?.['container-v2']
-                ?.find(item => !item?.isInitContainer);
-        },
-        syncTraditionRuntimeConfig() {
-            if (this.form.type != 'tradition') { return; }
-            this.ensureTraditionContainerDefaults(true);
-            this.applyTraditionRebootRestoreConfig();
-            this.syncSysboxDependency();
-            this.changeForm();
-        },
-        applyTraditionRebootRestoreConfig() {
-            if (this.form.type != 'tradition' || !this.json?.platform) { return; }
-            const result = withTraditionAppSysbox(
-                this.json.platform,
-                this.json.application?.annotation || {},
-                Boolean(this.form.traditionSystemRebootRestore),
-                this.json.application?.identifie || this.form.identifie,
-            );
-            this.json.platform = result.platform;
-            this.json.application = this.json.application || {};
-            this.json.application.annotation = result.annotations;
-        },
-        syncTraditionIngress() {
-            if (this.form.type != 'tradition' || !this.json?.platform) {
-                return this.json?.platform?.ingress || [];
-            }
-            const applicationIdentifie = this.json?.application?.identifie
-                || ((this.form.author && this.form.identifie)
-                    ? `${this.form.author}-${this.form.identifie}`
-                    : this.identifie || '');
-            this.json.platform = withTraditionAppIngress(
-                this.json.platform,
-                applicationIdentifie,
-                Boolean(this.form.traditionNginxGateway),
-            );
-            const ingress = JSON.parse(JSON.stringify(this.json.platform.ingress || []));
-            if (JSON.stringify(this.form.ingress || []) != JSON.stringify(ingress)) {
-                this.form.ingress = ingress;
-            }
-            return ingress;
-        },
-        syncSystemImageConfig() {
-            if (this.form.type != 'system-image') { return; }
-            this.form.systemImageVersions = this.normalizeApplicationVersions(this.form.systemImageVersions);
-            this.form.startParams = this.systemImageStartParams();
-            this.form.storage = true;
-            this.json.platform = this.json.platform || {};
-            this.ensureSystemImageContainer();
-            this.changeForm();
-        },
-        ensureSystemImageContainer() {
-            if (this.form.type != 'system-image') { return; }
-            delete this.json.source;
-            delete this.json.web;
-            const applicationIdentifie = (this.form.author && this.form.identifie)
-                ? `${this.form.author}-${this.form.identifie}`
-                : 'system-image';
-            const result = withSystemImageRuntime(
-                this.json.platform,
-                this.json.application?.annotation || {},
-                applicationIdentifie,
-                this.form.systemImageTemplate,
-                this.form.cmd,
-            );
-            this.json.platform = result.platform;
-            this.form.containers = this.json.platform['container-v2'];
-            this.containerPluginData.kind = 'Deployment';
-            this.json.application = this.json.application || {};
-            this.json.application.annotation = result.annotations;
-        },
-        loadFormulaSetting() {
-            if (this.option?.pureManifest || !this.identifie) {
-                return Promise.resolve(null);
-            }
-            if (this.formulaSettingLoaded) {
-                return Promise.resolve(this.formulaBaseInfo);
-            }
-            if (this._formulaSettingPromise) {
-                return this._formulaSettingPromise;
-            }
-
-            this.formulaSettingLoading = true;
-            this._formulaSettingPromise = myAxios.post('/respo/setting/get', {
-                identifie: this.identifie,
-            }).then(res => {
-                let baseInfo = res?.data?.data?.base_info;
-                if (!baseInfo) {
-                    throw new Error('制品基础信息为空');
-                }
-                this.formulaBaseInfo = JSON.parse(JSON.stringify(baseInfo));
-                this.applyTraditionAnnotationForm(baseInfo.annotation || {});
-                this.applySystemImageAnnotationForm(baseInfo.annotation || {});
-                if (this.form.type == 'gateway-plugin') {
-                    this.form.once = true;
-                }
-                this.formulaSettingLoaded = true;
-                return this.formulaBaseInfo;
-            }).finally(() => {
-                this.formulaSettingLoading = false;
-                this._formulaSettingPromise = null;
-            });
-            return this._formulaSettingPromise;
-        },
-        applyTraditionAnnotationForm(annotation = {}) {
-            this.traditionNginxGatewayAnnotationPresent = Object.prototype.hasOwnProperty.call(
-                annotation || {},
-                traditionAnnotationKeys.nginxGateway,
-            );
-            if (this.traditionNginxGatewayAnnotationPresent) {
-                const value = annotation[traditionAnnotationKeys.nginxGateway];
-                this.form.traditionNginxGateway = value === true
-                    || String(value).toLowerCase() == 'true';
-            }
-            this.form.traditionImageLanguage = String(annotation[traditionAnnotationKeys.imageLanguage] || '');
-            this.form.traditionImageTemplate = String(annotation[traditionAnnotationKeys.imageTemplate] || '');
-            this.form.traditionImageVersion = this.normalizeApplicationVersions(annotation[traditionAnnotationKeys.imageVersion]);
-            this.form.traditionNginxVhostTemplate = String(annotation[traditionAnnotationKeys.nginxVhostTemplate] || '');
-            const restoreValue = annotation[traditionAnnotationKeys.systemRebootRestore];
-            this.form.traditionSystemRebootRestore = restoreValue === undefined || restoreValue === null || restoreValue === ''
-                ? String(this.form.traditionImageLanguage || '').toLowerCase() != 'php'
-                : String(restoreValue).toLowerCase() == 'true';
-            if (this.form.type == 'tradition') {
-                this.ensureTraditionContainerDefaults();
-                this.form.startParams = this.traditionStartParams();
-                this.applyTraditionRebootRestoreConfig();
-            }
-        },
-        applySystemImageAnnotationForm(annotation = {}) {
-            this.form.systemImageCategory = String(annotation[systemImageAnnotationKeys.category] || 'operating-system');
-            this.form.systemImageVersions = this.normalizeApplicationVersions(annotation[systemImageAnnotationKeys.versions]);
-        },
-        normalizeApplicationVersions(value) {
-            let values = Array.isArray(value) ? value : String(value || '').split(/[,，\n]/);
-            return [...new Set(values
-                .map(item => String(item || ''))
-                .flatMap(item => item.split(/[,，\n]/))
-                .map(item => item.trim())
-                .filter(Boolean))];
-        },
-        changeTraditionLanguage(value) {
-            this.form.traditionSystemRebootRestore = String(value || '').toLowerCase() != 'php';
-        },
-        getTraditionAnnotations() {
-            let versions = this.normalizeApplicationVersions(this.form.traditionImageVersion);
-            this.form.traditionImageVersion = versions;
-            const annotations = {
-                [traditionAnnotationKeys.imageLanguage]: String(this.form.traditionImageLanguage || '').trim(),
-                [traditionAnnotationKeys.imageTemplate]: String(this.form.traditionImageTemplate || '').trim(),
-                [traditionAnnotationKeys.imageVersion]: versions.join(','),
-                [traditionAnnotationKeys.nginxVhostTemplate]: this.form.traditionNginxGateway
-                    ? String(this.form.traditionNginxVhostTemplate || '')
-                    : '',
-                [traditionAnnotationKeys.nginxGateway]: String(Boolean(this.form.traditionNginxGateway)),
-                [traditionAnnotationKeys.systemRebootRestore]: String(Boolean(this.form.traditionSystemRebootRestore)),
-            };
-            return annotations;
+        getSavedManifest() {
+            const manifest = this.savedManifestJSON || this.json || {};
+            return JSON.parse(JSON.stringify(manifest));
         },
         filterAnnotationsForType(annotation = {}, type = this.form.type) {
-            let filtered = { ...(annotation || {}) };
-            if (type != 'tradition' && type != 'system-image') {
-                Object.values(traditionAnnotationKeys).forEach(key => delete filtered[key]);
-            } else if (type == 'system-image') {
-                Object.values(traditionAnnotationKeys)
-                    .filter(key => key != traditionAnnotationKeys.imageVersion)
-                    .forEach(key => delete filtered[key]);
-            }
-            Object.keys(filtered)
-                .filter(key => type != 'gateway-plugin'
-                    && key.startsWith(gatewayPluginAnnotationPrefix))
-                .forEach(key => delete filtered[key]);
-            if (type == 'tradition') {
-                Object.assign(filtered, this.getTraditionAnnotations());
-            }
-            if (type != 'system-image') {
-                Object.values(systemImageAnnotationKeys)
-                    .filter(key => type != 'tradition'
-                        || ![systemImageAnnotationKeys.versions, systemImageAnnotationKeys.rootfs].includes(key))
-                    .forEach(key => delete filtered[key]);
-            } else {
-                let versions = this.normalizeApplicationVersions(this.form.systemImageVersions);
-                Object.assign(filtered, {
-                    [systemImageAnnotationKeys.category]: this.form.systemImageCategory || 'operating-system',
-                    [systemImageAnnotationKeys.versions]: versions.join(','),
-                });
-            }
-            return filtered;
+            let filtered = this.filterTraditionAnnotations(annotation, type);
+            filtered = this.filterSystemImageAnnotations(filtered, type);
+            return this.filterGatewayPluginAnnotations(filtered, type);
         },
         cleanupTypeSpecificManifest(previousType, nextType) {
             this.json.application = this.json.application || {};
@@ -1820,1035 +1019,24 @@ export default {
                 nextType,
             );
 
-            if (previousType == 'system-image' && nextType != 'system-image') {
-                this.form.startParams = (this.form.startParams || [])
-                    .filter(item => !isSystemImageFixedStartParamName(item?.name));
-                this.json.platform.startParams = this.serializeStartParams();
-                delete this.json.platform.hostUsers;
-                if (this.json.platform.runtimeClassName == 'sysbox-runc') {
-                    delete this.json.platform.runtimeClassName;
-                }
-                this.json.platform.volumes = (this.json.platform.volumes || [])
-                    .filter(item => item?.name != systemImageRootfsVolumeName);
-                if (!this.json.platform.volumes.length) {
-                    delete this.json.platform.volumes;
-                }
-                (this.json.platform['container-v2'] || []).forEach(container => {
-                    container.volumeMounts = (container.volumeMounts || [])
-                        .filter(item => item?.name != systemImageRootfsVolumeName);
-                    if (!container.volumeMounts.length) {
-                        delete container.volumeMounts;
-                    }
-                });
-                delete this.json.platform['container-v2'];
-                this.form.containers = [];
-                this.form.cmd = [''];
-            }
-            if (previousType == 'tradition' && !['tradition', 'system-image'].includes(nextType)) {
-                this.form.startParams = (this.form.startParams || [])
-                    .filter(item => ![
-                        'IMAGE_VERSION',
-                        'DOMAIN_URL',
-                        'global.cluster.storageRWmode',
-                        'global.cluster.storageSize',
-                        'global.cluster.storageClassName',
-                    ].includes(item?.name));
-                this.json.platform.startParams = this.serializeStartParams();
-                removeTraditionAppCodeStorage(this.json);
-                this.form.dependsIn = (this.form.dependsIn || [])
-                    .filter(item => !isTraditionAppDependency(item));
-                this.form.depends = (this.form.depends || [])
-                    .filter(item => !isTraditionAppDependency(item));
-            }
-            if (previousType != 'system-image' && nextType == 'system-image') {
-                delete this.json.source;
-                delete this.json.web;
-                delete this.json.platform.ingress;
-                delete this.json.platform.volumeClaimTemplates;
-                delete this.json.platform.container;
-                this.json.platform['container-v2'] = [];
-                this.form.containers = [];
-                this.form.cmd = [''];
-                this.form.ingress = [];
-                this.form.domain = false;
-            }
-            if (previousType == 'app-plugin' && nextType != 'app-plugin') {
-                delete this.json.platform.plugin;
-                this.json.platform = removePluginAppStorage(this.json.platform);
-            }
-            if (previousType == 'helm' && nextType != 'helm') {
-                delete this.json.platform.helm;
-            }
-            if (previousType == 'gateway-plugin' && nextType != 'gateway-plugin') {
-                delete this.json.platform.gatewayPlugin;
-            }
-        },
-        shouldSaveFormulaTypeSetting() {
-            return Boolean(this.identifie);
-        },
-        async saveFormulaTypeSetting() {
-            if (this.option?.pureManifest || !this.shouldSaveFormulaTypeSetting()) { return }
-            let baseInfo = await this.loadFormulaSetting();
-            if (!baseInfo) {
-                throw new Error('制品基础信息加载失败');
-            }
-            let nextBaseInfo = {
-                ...baseInfo,
-                annotation: this.filterAnnotationsForType(
-                    this.json.application?.annotation || baseInfo.annotation || {},
-                ),
-                once: this.form.type == 'gateway-plugin'
-                    ? true
-                    : (['tradition', 'system-image'].includes(this.form.type) ? false : Boolean(baseInfo.once)),
-            };
-            await myAxios.post('/respo/setting/set', {
-                identifie: this.identifie,
-                base_info: nextBaseInfo,
-            });
-            if (this.form.type == 'gateway-plugin') {
-                this.form.once = true;
-            } else if (['tradition', 'system-image'].includes(this.form.type)) {
-                this.form.once = false;
-            }
-            this.formulaBaseInfo = JSON.parse(JSON.stringify(nextBaseInfo));
-        },
-        getDefaultTypeTagName(type = this.form.type) {
-            if (type == 'app-plugin') { return '应用插件' }
-            if (type == 'tradition') { return '传统应用' }
-            if (type == 'system-image') { return '系统镜像' }
-            if (type == 'gateway-plugin') { return '网关插件' }
-            return '';
-        },
-        async ensureDefaultTypeTags() {
-            if (this.option?.pureManifest || !this.identifie) { return }
-            let names = [...new Set([
-                this.getDefaultTypeTagName(this.initialApplicationType),
-                this.getDefaultTypeTagName(this.form.type),
-            ].filter(Boolean))];
-            await Promise.all(names.map(name => myAxios.post('/respo/tag/add', {
-                identifie: this.identifie,
-                name,
-            })));
-        },
-        isTraditionFixedDependency(record) {
-            return (this.form.type == 'tradition' && isTraditionAppDependency(record))
-                || (this.requiresSysboxDependency() && record?.identifie == 'w7panel-sysbox')
-                || this.isPluginTraditionDependency(record);
-        },
-        isPluginTraditionDependency(record) {
-            if (this.form.type != 'app-plugin') { return false }
-            const dependencyIdentify = String(record?.identifie || '').replaceAll('_', '-');
-            const traditionIdentify = String(this.form.traditionName || '').replaceAll('_', '-');
-            return Boolean(traditionIdentify) && dependencyIdentify == traditionIdentify;
-        },
-        syncTraditionDependency() {
-            if (this.form.type != 'tradition') {
-                return;
-            }
-            if (this.traditionNginxGatewayChanging) {
-                return;
-            }
-            const existing = [...(this.form.dependsIn || []), ...(this.form.depends || [])]
-                .find(item => isTraditionAppDependency(item));
-            const dependency = {
-                ...(existing || {}),
-                identifie: traditionToolDependency.identifie,
-                name: traditionToolDependency.name,
-                subidentifie: '',
-                subname: '',
-                required: true,
-                type: 'in',
-                from: traditionToolDependency.source,
-            };
-            this.form.depends = (this.form.depends || [])
-                .filter(item => !isTraditionAppDependency(item));
-            this.form.dependsIn = (this.form.dependsIn || [])
-                .filter(item => !isTraditionAppDependency(item));
-            this.form.dependsIn.push(dependency);
-        },
-        requiresSysboxDependency() {
-            if (this.form.type == 'system-image') { return true }
-            if (this.form.type != 'tradition') { return false }
-            return Boolean(this.json.application?.annotation?.[traditionSysboxRootfsAnnotation]);
-        },
-        syncSysboxDependency() {
-            let depends = Array.isArray(this.form.depends) ? this.form.depends : [];
-            if (!this.requiresSysboxDependency()) {
-                if (this.sysboxDependencyManaged) {
-                    this.form.depends = depends.filter(item => item?.identifie != 'w7panel-sysbox');
-                    this.sysboxDependencyManaged = false;
-                }
-                return;
-            }
-
-            this.sysboxDependencyManaged = true;
-            let dependency = {
-                identifie: 'w7panel-sysbox',
-                name: '微擎sysbox',
-                subidentifie: '',
-                subname: '',
-                required: true,
-                type: 'out',
-                from: 'https://zpk.w7.cc',
-            };
-            let inserted = false;
-            this.form.depends = depends.reduce((result, item) => {
-                if (item?.identifie != dependency.identifie) {
-                    result.push(item);
-                } else if (!inserted) {
-                    result.push({ ...item, ...dependency });
-                    inserted = true;
-                }
-                return result;
-            }, []);
-            if (!inserted) {
-                this.form.depends.unshift(dependency);
-            }
-        },
-        filterAutocompleteOptions(list = [], keyword = '') {
-            let normalizedKeyword = String(keyword || '').toLowerCase();
-            let source = normalizedKeyword
-                ? list.filter(item => String(item || '').toLowerCase().includes(normalizedKeyword))
-                : list;
-            return source.map(item => ({ label: item, value: item }));
-        },
-        addShellTask() {
-            this.form.shell.push({ title: '', type: '', container: this.defaultShellContainer, shell: '' });
-            this.changeForm();
-        },
-        openShellConfig(record, index) {
-            if (!record) { return }
-            const item = { ...record };
-            if (item.container === undefined) { item.container = ''; }
-            if (this.form.type != 'app-plugin' && !item.container && this.defaultShellContainer) {
-                item.container = this.defaultShellContainer;
-            }
-            if (item.shell === undefined) { item.shell = ''; }
-            this.shellConfig = {
-                show: true,
-                editIndex: index,
-                item,
-            };
-        },
-        getShellTaskStatus(record) {
-            if (!record?.shell) { return '未配置' }
-            if (this.form.type == 'app-plugin') { return '所选传统应用容器' }
-            return record.container || this.defaultShellContainer || '默认执行容器';
-        },
-        fillDefaultShellContainer() {
-            if (this.form.type == 'app-plugin' || !this.defaultShellContainer) { return }
-            (this.form.shell || []).forEach(item => {
-                if (item && !item.container) {
-                    item.container = this.defaultShellContainer;
-                }
-            });
-        },
-        resetShellConfig() {
-            this.shellConfig = {
-                show: false,
-                editIndex: -1,
-                item: null,
-            };
-        },
-        saveShellConfig() {
-            if (this.shellConfig.editIndex >= 0 && this.shellConfig.item) {
-                this.form.shell[this.shellConfig.editIndex] = {
-                    ...(this.form.shell[this.shellConfig.editIndex] || {}),
-                    ...this.shellConfig.item,
-                };
-            }
-            this.resetShellConfig();
-            this.changeForm();
-        },
-        openDomainConfig() {
-            let ingress = JSON.parse(JSON.stringify(this.form.ingress || []));
-            this.domainConfig = {
-                show: true,
-                ingress,
-            };
-        },
-        resetDomainConfig() {
-            this.domainConfig = {
-                show: false,
-                ingress: [],
-            };
-        },
-        saveDomainConfig() {
-            let ingress = JSON.parse(JSON.stringify(this.domainConfig.ingress || []));
-            this.form.ingress = ingress;
-            this.checkDomainStartParams(Boolean(ingress.length));
-            this.changeForm();
-            this.domainConfig.show = false;
-        },
-        onChange() { },
-        isDomainStartParam(item) {
-            return item?.mark === 'domain'
-                || (item?.name === 'DOMAIN_URL' && ['%DOMAIN_URL%', '%DOMAIN_SSL_URL%'].includes(item?.values_text));
-        },
-        isSystemImageFixedStartParam(item) {
-            return this.form.type == 'system-image'
-                && isSystemImageFixedStartParamName(item?.name);
-        },
-        isTraditionFixedStartParam(item) {
-            return this.form.type == 'tradition' && [
-                'IMAGE_VERSION',
-                'DOMAIN_URL',
-                'global.cluster.storageRWmode',
-                'global.cluster.storageSize',
-                'global.cluster.storageClassName',
-            ].includes(item?.name);
-        },
-        validateSysboxContainerName() {
-            if (this.form.type == 'system-image') {
-                const containerName = this.json?.platform?.['container-v2']?.[0]?.name;
-                return String(containerName || '').trim()
-                    ? ''
-                    : '系统镜像主容器名称不能为空';
-            }
-            if (this.form.type == 'tradition' && !this.form.traditionSystemRebootRestore) {
-                const containerName = this.json?.platform?.['container-v2']
-                    ?.find(item => !item?.isInitContainer)?.name;
-                return String(containerName || '').trim()
-                    ? ''
-                    : '传统应用主容器名称不能为空';
-            }
-            return '';
-        },
-        isPVCNameStartParam(item) {
-            return String(item?.name || '').trim().toUpperCase() === pvcNameStartParamName;
-        },
-        isFixedStartParam(item) {
-            return this.isSystemImageFixedStartParam(item)
-                || this.isTraditionFixedStartParam(item)
-                || this.isPVCNameStartParam(item);
-        },
-        computedSpDisabled(item) {
-            return this.isFixedStartParam(item)
-                || ((this.disabledDomainStartParams || this.form.type == 'app-plugin') && this.isDomainStartParam(item))
-                || (this.json?.platform?.['volumeClaimTemplates']?.length && item.mark === 'storage')
-        },
-        ensurePVCNameStartParam(volumes = this.json?.platform?.volumes) {
-            if (this.form.type == 'app-plugin') {
-                this.form.startParams = (this.form.startParams || [])
-                    .filter(item => !this.isPVCNameStartParam(item));
-                return;
-            }
-            const hasPVC = (volumes || []).some(item => Boolean(item?.persistentVolumeClaim));
-            if (!hasPVC) { return; }
-
-            this.form.startParams = this.form.startParams || [];
-            if (this.form.startParams.some(item => this.isPVCNameStartParam(item))) {
-                return;
-            }
-
-            this.form.startParams.push({
-                name: pvcNameStartParamName,
-                title: '存储',
-                required: true,
-                values_text: '%PVC_NAME%',
-                module_name: '',
-                description: '安装时选择的 PVC 名称',
-                type: 'text',
-            });
-        },
-        serializeStartParams() {
-            // PVC_NAME is installation input rather than an author-maintained
-            // value. Add it here as well as from the volume editor so old
-            // manifests are upgraded when they are saved. Plugins resolve the
-            // traditional application's PVC at Helm render time and skip it.
-            this.ensurePVCNameStartParam();
-            let start = [];
-            let params = this.form.type == 'tradition'
-                ? this.traditionStartParams()
-                : this.form.startParams;
-            params = (params || []).filter(item => item?.mark !== 'environment-release'
-                && !isDerivedDependencyReleaseStartParam(item));
-            for (let i in params) {
-                let o = params[i];
-                if (o.name) {
-                    start.push({
-                        type: 'text',
-                        name: o.name,
-                        title: o.title,
-                        required: o.required,
-                        values_text: o.values_text,
-                        module_name: o.module_name,
-                        description: o.description || '',
-                        hidden: Boolean(o.hidden),
-                    });
-                }
-            }
-            if (this.form.type == 'app-plugin') {
-                return withPluginTraditionStartParams(start, this.form.traditionName);
-            }
-            return start;
-        },
-        formatIngressRoutes(routes = []) {
-            return routes.filter(r => r.path && r.backend?.port).map(r => ({
-                ...r,
-                backend: {
-                    ...r.backend,
-                    port: Number(r.backend.port),
-                },
-            }));
-        },
-        openAppset() {
-            let volumes = this.json?.platform?.volumes;
-            let volumeClaimTemplates = this.json?.platform?.volumeClaimTemplates;
-            let containers = this.json?.platform?.['container-v2']?.filter(i => !i.isInitContainer);
-            let initContainers = this.json?.platform?.['container-v2']?.filter(i => i.isInitContainer);
-
-            emitWujieEvent("containerPlugin", {
-                volumes,
-                volumeClaimTemplates,
-                containers,
-                initContainers,
-                isTemplate: true,
-                pluginData: this.containerPluginData
-            }, (data) => {
-                let initContainers = data?.initContainers || [];
-                initContainers.map(i => i.isInitContainer = true);
-                let containers = data?.containers || [];
-                let allConatiners = containers.concat(initContainers);
-                this.form.containers = allConatiners;
-                this.json.platform['container-v2'] = allConatiners;
-                this.json.platform['volumes'] = data.volumes;
-                this.json.platform['volumeClaimTemplates'] = data.volumeClaimTemplates;
-                this.fillDefaultShellContainer();
-
-                this.form.storage = Boolean(data?.volumeClaimTemplates?.length);
-
-
-                this.json.platform.runtimeClassName = this.form.type == 'system-image'
-                    ? 'sysbox-runc'
-                    : (data?.pluginData?.gpu ? 'nvidia' : '');
-
-                this.json.platform.workload = this.json?.platform?.workload || {};
-                this.json.platform.workload.type = data?.pluginData?.kind || 'deployments';
-
-                this.applyPlatformShells();
-
-                if (this.form.type == 'tradition') {
-                    this.syncTraditionIngress();
-                } else {
-                    this.json.platform.ingress = (this.form.ingress || []).map(i => ({
-                        name: i.name,
-                        routes: this.formatIngressRoutes(i.routes),
-                    }));
-                }
-
-                this.ensurePVCNameStartParam(data?.volumes);
-                this.json.platform.startParams = this.serializeStartParams();
-                this.yaml = jsyaml.dump(this.json);
-
-                this.computedAppPort(this.json.platform?.['container-v2']);
-            })
-        },
-        checkDomainStartParams(v) {
-            this.form.domain = v;
-            this.disabledDomainStartParams = !!v;
-        },
-        async changeEnv(item) {
-            if (!item.identifie || item.identifie == this.form.traditionName) { return }
-
-            this.form.depends = this.form.depends?.filter?.(i => !i.temporary) || []
-            let findIndex = this.form.depends?.findIndex(i => i.identifie == item.identifie && i.name == item.name)
-            if (findIndex != -1) {
-                this.form.depends[findIndex] = {
-                    ...this.form.depends[findIndex],
-                    ...createPluginTraditionDependency(item),
-                };
-            } else {
-                this.form.depends.push(createPluginTraditionDependency(item))
-            }
-
-            this.form.traditionName = item.identifie;
-            this.form.traditionImageTemplate = String(
-                item.image_template || item.image || item.extra?.image || ''
-            ).trim();
-            this.form.traditionVersion = '';
-
-            if (item.versions?.length) {
-                this.form.traditionVersion = item.versions[0];
-            }
-            this.getStart();
-            this.changeForm();
-        },
-        getTraditionList() {
-            // 传统应用列表由制品市场提供，支持版本使用接口返回的 support_version 字段。
-            // 该接口与市场前端（zm.w7.com）使用同一 API，避免继续依赖旧的 zpk.w7.cc 数据源。
-            const listUrl = 'https://api.zm.w7.com/zpk-market/formula/list';
-            myAxios.post(listUrl, {
-                status: [2, 99],
-                page: 1,
-                limit: 99,
-                tag: '传统应用',
-            }, { dontalert: true }).then(res => {
-                const traditionList = res.data?.data?.list || [];
-                this.traditionList = traditionList.map(item => {
-                    const identifie = item.identifie || item.identify || item.identifier
-                        || item.formula_identifie || item.formula_identify || '';
-                    const traditionLanguage = String(item.environment_language || '').trim();
-                    const imageTemplate = String(
-                        item.image_template || item.image || item.extra?.image || ''
-                    ).trim();
-                    const versions = String(item.support_version || '')
-                        .split(',')
-                        .map(version => version.trim())
-                        .filter(Boolean);
-                    return {
-                        ...item,
-                        identifie,
-                        name: item.name || item.formula_name || item.title || identifie,
-                        environment_language: traditionLanguage,
-                        image_template: imageTemplate,
-                        versions,
-                    };
-                }).filter(item => item.identifie);
-                this.form.depends?.map?.((item, index) => {
-                    if (this.form.type == 'app-plugin' && this.traditionList?.length) {
-                        let now = this.traditionList.find(i => i.identifie == this.form.traditionName);
-                        if (now) {
-                            if (item.name == now.name && item.identifie == now.identifie) {
-                                item.goodsId = Number(now.goods_id || now.goodsId || now.id || 0);
-                                item.temporary = true;
-                            }
-                        }
-                    }
-                })
-            }).catch(() => {
-                this.traditionList = [];
-            });
-        },
-        getChartInfo() {
-            this.getChartInfoLoading = true;
-            return myAxios.post('/helm/chart/list', {
-                repository_url: this.form.helm.repository
-            }, {
-                dontalert: true,
-            }).then(res => {
-                let charts = res?.data?.data?.charts || [];
-                this.helmCharts = charts;
-                this.helmChartVersions = [];
-                this.getChartInfoLoading = false;
-            }).catch(() => {
-                this.helmCharts = [];
-                this.helmChartVersions = [];
-                this.getChartInfoLoading = false;
-            })
-        },
-        getChartVersion() {
-            return myAxios.post('/helm/chart/version/list', {
-                repository_url: this.form.helm.repository,
-                chart: this.form.helm.chartName
-            }, { dontalert: true }).then(res => {
-                let versions = res?.data?.data?.versions || [];
-                this.helmChartVersions = versions;
-            }).catch(() => {
-                this.helmChartVersions = [];
-            })
-        },
-        helmyamlsUpload(e, index) {
-            let file = e
-            if (!file) { return }
-            if (!(/\.yaml$/.test(file.name) || /\.yml$/.test(file.name))) {
-                messageError('请上传yaml文件');
-                return;
-            }
-            this.form.helm.depend_yamls[index].name = file.name;
-            this.form.helm.depend_yamls[index].nameInput = file.name.replace(/\.yaml$/, '');
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                this.form.helm.depend_yamls[index].yaml = event.target.result;
-                this.changeForm();
-            };
-            reader.readAsText(file, 'UTF-8');
-        },
-        getDependName(record) {
-            if (!record) { return '' }
-            return record.name || this.dependsList?.[record.identifie] || record.identifie || '';
-        },
-        getSubDependsOptions(index) {
-            return this.subDependsList?.[index] || { "": "无" };
-        },
-        getSubDependName(index, identifie) {
-            return this.getSubDependsOptions(index)?.[identifie] || '';
-        },
-        normalizeDependList(list = []) {
-            return (list || []).filter(i => i?.install_only_once).map(i => ({
-                ...i,
-                name: i.name || i.identifie,
-            }));
-        },
-        mergeDependsList(list = []) {
-            let obj = { ...this.dependsList };
-            list.forEach(i => {
-                if (i?.identifie) {
-                    obj[i.identifie] = i.name || i.identifie;
-                }
-            });
-            this.dependsList = obj;
-        },
-        openDependPicker(index = -1) {
-            if (this.form.type == 'tradition') { return }
-            this.dependPicker.show = true;
-            this.dependPicker.editIndex = index;
-        },
-        closeDependPicker() {
-            this.dependPicker.editIndex = -1;
-        },
-        selectDependFromPicker(record, tab = 'local') {
-            if (!record?.identifie) { return }
-            let data = {
-                identifie: record.identifie,
-                goodsId: Number(record.goods_id || record.goodsId || record.id || 0),
-                name: record.name || record.identifie,
-                subidentifie: '',
-                subname: '',
-                required: false,
-                type: 'out',
-                from: tab == 'official' ? 'https://zpk.w7.cc' : '',
-            };
-            let index = this.dependPicker.editIndex;
-            if (index >= 0 && this.form.depends[index]) {
-                data.required = Boolean(this.form.depends[index].required);
-                this.form.depends.splice(index, 1, data);
-            } else {
-                this.form.depends.push(data);
-                index = this.form.depends.length - 1;
-            }
-            this.dependPicker.show = false;
-            this.getSubDepends(index, tab);
-            this.changeForm();
-        },
-        getSubDepends(index, source = '') {
-            this.subDependsList[index] = { "": "无" };
-            let identifie = this.form.depends?.[index]?.identifie;
-            if (!identifie) { return Promise.resolve() }
-            let localUrl = '/respo/v2/info/' + identifie + '/1.0.0';
-            let officialUrl = 'https://zpk.w7.cc/zpk/respo/v2/info/' + identifie + '/1.0.0';
-            let urls = source == 'official' ? [officialUrl, localUrl] : [localUrl, officialUrl];
-            let load = (urlIndex = 0) => {
-                let url = urls[urlIndex];
-                if (!url) { return Promise.resolve() }
-                return myAxios.get(url, {
-                    headers: { cancelerror: true },
-                    dontalert: true,
-                }).then(res => {
-                    this.setSubDepends(index, res);
-                }).catch(() => load(urlIndex + 1));
-            };
-            return load();
-        },
-        setSubDepends(index, res) {
-            try {
-                let json = jsyaml.load(res?.data?.data?.manifest);
-                if (json?.platform?.depends?.length) {
-                    let d = json?.platform?.depends;
-                    d.map(i => {
-                        this.subDependsList[index][i.identifie] = i.name;
-                    })
-                }
-            } catch { }
-        },
-        getDependsList() {
-            myAxios.get('/respo/list?limit=999').then(res => {
-                let list = res.data?.data?.list || []
-                this.mergeDependsList(this.normalizeDependList(list));
-            })
-        },
-
-        async computedAppPort(containers = this.form.containers) {
-            const normalizePorts = (ports) => {
-                if (!Array.isArray(ports)) { ports = ports ? [ports] : [] }
-                return [...new Set(ports.map(i => {
-                    if (typeof i === 'object' && i !== null) {
-                        return i.port ?? i.containerPort ?? '';
-                    }
-                    return i;
-                }).filter(i => i !== '' && i !== undefined && i !== null).map(i => String(i)))]
-            };
-            let ports = {};
-            let arr = [];
-            if (containers) {
-                containers?.map?.(i => {
-                    arr = arr.concat(normalizePorts(i?.ports || []));
-                    if (i?.port || i?.containerPort) {
-                        arr = arr.concat(normalizePorts([i.port ?? i.containerPort]));
-                    }
-                })
-            }
-            let legacyContainer = this.json?.platform?.container;
-            if (legacyContainer) {
-                arr = arr.concat(normalizePorts(legacyContainer?.ports || []));
-                if (legacyContainer?.port || legacyContainer?.containerPort) {
-                    arr = arr.concat(normalizePorts([legacyContainer.port ?? legacyContainer.containerPort]));
-                }
-            }
-            arr = arr.concat(normalizePorts(this.json?.platform?.port || []));
-            arr = [...new Set(arr)];
-            ports[this.identifie] = arr;
-
-            if (this.option?.app_ports?.length) {
-                this.option.app_ports.map(i => {
-                    if (i.name == this.identifie) { return; }
-                    ports[i.name] = normalizePorts(i.port || i.ports || []);
-                })
-            }
-            this.app_ports = ports;
-
-            let names = [{
-                id: this.identifie,
-                name: this.identifie,
-                title: this.form.name || this.identifie,
-            }];
-
-            if (this.option?.app_ports?.length) {
-                names = names.concat(this.option.app_ports.filter(i => i.name != this.identifie).map(i => {
-                    return {
-                        id: i.name,
-                        name: i.name,
-                        title: i.title || i.name,
-                    }
-                }));
-            }
-            this.app_names = names;
-
-        },
-
-        openSpEdit() {
-            this.spEdit.show = true;
-            let values = this.form.startParams.map(i => `${i.name || ''}=${i.values_text || ''} #${i.title || ' '}:${i.description || ' '}:${i.required ? 1 : 0}:${i.module_name || ''}`);
-            this.spEdit.values = values.join('\n');
-        },
-
-        submitSpEdit() {
-            let values = this.spEdit.values.split('\n');
-            let arr = [];
-            values.map(i => {
-                let match = i.match(/^([^\s=#]+)\s*=\s*([^\s=#]+)\s*(#([^:：\s]*)\s*[:：]\s*([^:：\s]*)\s*[:：]\s*([^:：\s]*)\s*[:：]\s*([^:：\s]*))?$/);
-                if (!match) { return }
-                arr.push({
-                    name: match[1],
-                    values_text: match[2],
-                    title: match[4] || '',
-                    description: match[5] || '',
-                    required: match[6] == '1',
-                    module_name: match[7] || '',
-                    type: 'text',
-                });
-            });
-            this.form.startParams = arr;
-
-            this.form.startParams.forEach((i, index) => {
-                if (i.module_name == 'w7_mysql' || i.module_name == 'w7_mysql5') {
-                    i.mark = i.module_name == 'w7_mysql' ? 'mysql8' : 'mysql5';
-                    this.form[i.module_name == 'w7_mysql' ? 'mysql8' : 'mysql5'] = true;
-
-                    let next = this.form.startParams[index + 1];
-                    if (next && next.name == 'MYSQL_DATABASE' && !next.module_name) {
-                        next.mark = i.mark;
-                    }
-                }
-                if (i.module_name == 'w7_redis') { i.mark = 'redis'; this.form.redis = true; }
-                if (i.module_name == 'w7_mongodb') { i.mark = 'mongodb6'; this.form.mongodb6 = true; }
-            });
-            this.spEdit.show = false;
-            this.getStart();
-        },
-        delDepend(index) {
-            if (this.form.dependsIn.length - 1 < index) {
-                this.form.depends.splice(index - (this.form.dependsIn.length || 0), 1);
-            } else {
-                this.form.dependsIn.splice(index, 1);
-            }
-            this.changeForm();
-        },
-
-        openSpDesc(item) {
-            this.spDesc.show = true;
-            this.spDesc.item = item;
-            this.spDesc.value = item.description || '';
-        },
-        submitSpDesc() {
-            if (this.spDesc.item) {
-                this.spDesc.item.description = this.spDesc.value || '';
-                this.getStart();
-            }
-            this.spDesc.show = false;
-        },
-        openAddDepend() {
-            this.dependForm.show = true;
-            let identifie = this.json?.platform?.baseInfo?.identifie || this.json?.application?.identifie;
-            this.dependForm.identifie_before = identifie.match(/^([^-]+)-(.+)$/)?.[1] || '';
-        },
-        addDepend() {
-            this.$refs.depend.validate((errors) => {
-                if (errors) { return }
-                if (!this.dependForm.identifie_before || !this.dependForm.identifie_last) {
-                    messageWarning('标识请填写完整');
-                    return;
-                }
-                let o = {
-                    identifie: this.dependForm.identifie,
-                    required: this.dependForm.required,
-                    name: this.dependForm.name,
-                };
-
-                if (this.dependForm.editIndex >= 0) {
-                    this.form.dependsIn.splice(this.dependForm.editIndex, 1, o);
-                } else {
-                    this.form.dependsIn.push(o);
-                }
-                this.changeForm();
-
-                this.dependForm.show = false;
-
-                let file = o.identifie + '/manifest.yaml';
-                const childOrder = this.form.dependsIn.findIndex(item => item.identifie == o.identifie) + 1;
-                let cont = `application:
-    name: ${o.name}
-    identifie: ${o.identifie}
-    order: ${childOrder}
-    description: ''
-    author: ''
-platform:
-    container:
-        containerPort: 80
-`
-                this.$refs.formref.validate(async (errors) => {
-                    if (errors) { messageWarning('必填项不能为空'); return }
-
-                    if (this.form.type == 'helm') {
-                        try {
-                            delete this.json.platform['container-v2']
-                            delete this.json.platform['volumes']
-                            delete this.json.platform['volumeClaimTemplates']
-                            delete this.json.platform.ingress
-                            delete this.json.platform.runtimeClassName
-                        } catch { }
-                    } else if (this.form.type == 'app-plugin') {
-                        try {
-                            delete this.json.platform['volumeClaimTemplates']
-                            delete this.json.platform.ingress
-                            delete this.json.platform.runtimeClassName
-                        } catch { }
-                        this.applyPlatformShells();
-                    } else if (this.form.type == 'docker') {
-
-                        this.applyPlatformShells();
-
-                        this.json.platform.ingress = (this.form.ingress || []).map(i => ({
-                            name: i.name,
-                            routes: this.formatIngressRoutes(i.routes),
-                        }));
-                    }
-
-                    this.yaml = jsyaml.dump(this.json);
-
-                    this.$emit('addfile', this.json, this.yaml, {
-                        file: file,
-                        cont: cont,
-                    });
-                });
-            });
-        },
-        changeDepend(index, data) {
-            if (!this.form.dependsIn?.[index]) { return }
-            this.form.dependsIn[index] = data;
-            this.changeForm();
-            this.submit({ stop: true });
-        },
-        addImportedDependencies(dependencies = []) {
-            const imported = Array.isArray(dependencies) ? dependencies : [];
-            const importedIdentifies = new Set(imported.map(item => item?.identifie).filter(Boolean));
-            if (!importedIdentifies.size) { return; }
-            this.form.depends = (this.form.depends || [])
-                .filter(item => !importedIdentifies.has(item?.identifie));
-            const existing = new Set((this.form.dependsIn || []).map(item => item?.identifie).filter(Boolean));
-            imported.forEach(item => {
-                if (!item?.identifie || existing.has(item.identifie)) { return; }
-                this.form.dependsIn.push(item);
-                existing.add(item.identifie);
-            });
-            this.syncImportedDependenciesToManifest();
-        },
-        replaceImportedDependencies(dependencies = []) {
-            const replacements = new Map((dependencies || [])
-                .filter(item => item?.identifie)
-                .map(item => [item.identifie, item]));
-            if (!replacements.size) { return; }
-            const replaced = new Set();
-            const replace = items => (items || []).map(item => {
-                const replacement = replacements.get(item?.identifie);
-                if (!replacement) { return item; }
-                replaced.add(item.identifie);
-                return { ...item, ...replacement };
-            });
-            this.form.dependsIn = replace(this.form.dependsIn);
-            this.form.depends = replace(this.form.depends);
-            replacements.forEach((item, identifie) => {
-                if (!replaced.has(identifie)) {
-                    this.form.dependsIn.push(item);
-                }
-            });
-            this.syncImportedDependenciesToManifest();
-        },
-        removeImportedDependencies(identifies = []) {
-            const importedIdentifies = new Set((identifies || []).filter(Boolean));
-            if (!importedIdentifies.size) { return; }
-            this.form.dependsIn = (this.form.dependsIn || [])
-                .filter(item => !importedIdentifies.has(item?.identifie));
-            this.form.depends = (this.form.depends || [])
-                .filter(item => !importedIdentifies.has(item?.identifie));
-            this.syncImportedDependenciesToManifest();
-        },
-        syncImportedDependenciesToManifest() {
-            this.json.platform = this.json.platform || {};
-            this.json.platform.depends = (this.form.dependsIn || [])
-                .concat(this.form.depends || []);
-            this.setYaml();
-        },
-
-
-        checkStartParams(check, mark, arr) {
-            if (check) {
-                let hasmark = false;
-                this.form.startParams.forEach(i => { if (i.mark == mark) { hasmark = true } });
-                if (!hasmark) {
-                    arr.forEach(i => {
-                        this.form.startParams.unshift(i);
-                    });
-                }
-            } else {
-                for (let i = this.form.startParams.length - 1; i >= 0; i--) {
-                    if (this.form.startParams[i].mark == mark) {
-                        this.form.startParams.splice(i, 1);
-                    }
-                }
-            }
-            this.getStart();
-        },
-
-        uplogo(event) {
-            this.logofile = event.target.files[0];
-            if (!this.logofile) { return }
-            let formdata = new FormData();
-            formdata.append('identifie', this.form.author + '-' + this.form.identifie);
-            formdata.append('file', this.logofile);
-            myAxios.post('/respo/icon', formdata).then(res => {
-                messageSuccess('添加成功');
-                this.logoimg = res.data?.data?.url;
-                if (!/^https?:\/\//.test(this.logoimg)) {
-                    this.logoimg = this.baseurl + this.logoimg;
-                }
-                this.logoimg = this.logoimg + '?time=' + Date.now();
-            });
-        },
-
-        deleteTag(index) {
-            myAxios.post('/respo/tag/delete', {
-                tagId: this.form.tags[index].id,
-            }).then(res => {
-                messageSuccess('删除成功');
-                this.form.tags.splice(index, 1);
-            })
-        },
-
-        addTag() {
-            if (!this.form.taginput) { return }
-            let tag = this.form.taginput;
-            myAxios.post('/respo/tag/add', {
-                identifie: this.form.author + '-' + this.form.identifie,
-                name: tag,
-            }).then(res => {
-                messageSuccess('添加成功');
-                this.form.tags.push({ name: tag, id: res.data.id });
-                this.form.taginput = '';
-                this.getTag();
-            });
-        },
-
-        getTag() {
-            myAxios.get('/respo/list?status=1&status=2&status=99&limit=1000').then(res => {
-                let list = res.data?.data?.list || [];
-                let find = list.find(i => i.identifie == (this.form.author + '-' + this.form.identifie))
-                if (find?.icon) {
-                    this.logoimg = find.icon;
-                    if (this.logoimg && !/^https?:\/\//.test(this.logoimg)) {
-                        this.logoimg = this.baseurl + this.logoimg;
-                    }
-                }
-                if (find?.tag) {
-                    this.form.tags = find.tag;
-                }
-            })
-        },
-
-        uploadSuccess(data, filename) {
-            if (data?.data?.url) {
-                let url = data?.data?.url;
-                this.zip.name = url.match(/[^\/]+$/)[0];
-                if (!this.json.source) { this.json.source = {}; }
-                this.json.source.type = 'zip';
-                this.json.source.url = url;
-                this.zip.url = url;
-                if (this.form.type == 'tradition') {
-                    this.form.startParams = this.traditionStartParams();
-                    this.ensureTraditionContainerDefaults();
-                    this.json.platform.startParams = this.serializeStartParams();
-                }
-                this.setYaml();
-            }
-        },
-
-        helmUploadSuccess(data, filename) {
-            let url = data?.data?.url;
-            this.form.helm.chartName2 = url;
-            this.changeForm();
-        },
-        deleteUpload() {
-            confirm({
-                title: '提示',
-                content: '确定要删除吗',
-                confirmButtonText: '确定',
-                cancelButtonText: '取消',
-                onOk: () => {
-                    this.zip.name = '';
-                    this.zip.url = '';
-                    delete this.json.source;
-                    if (this.form.type == 'tradition') {
-                        this.form.startParams = this.traditionStartParams();
-                        this.ensureTraditionContainerDefaults();
-                        this.json.platform.startParams = this.serializeStartParams();
-                    }
-                    this.setYaml();
-                },
-            });
-        },
-        uploadHelmChart(data) {
-            if (data?.url || data?.data?.url) {
-                let url = data?.url || data?.data?.url;
-                this.form.helm.chartName2 = url;
-                this.changeForm();
-            }
+            this.cleanupSystemImageType(previousType, nextType);
+            this.cleanupTraditionType(previousType, nextType);
+            this.cleanupAppPluginType(previousType, nextType);
+            this.cleanupHelmType(previousType, nextType);
+            this.cleanupGatewayPluginType(previousType, nextType);
         },
         init(data) {
             if (!data) { return }
             this.json = jsyaml.load(data);
+            this.beginStartParamsInitialization(this.json);
 
             this.json.platform = this.json?.platform || {}
 
-
-            if (!this.option?.pureManifest) {
-                this.json.platform.baseInfo = this.json.platform.baseInfo || {};
-                this.json.platform.baseInfo.identifie = this.json.platform.baseInfo.identifie || this.json.application?.identifie || '';
-                this.json.platform.baseInfo.name = this.json.platform.baseInfo.name || this.json?.application?.name || '';
-                this.json.platform.baseInfo.description = this.json.platform.baseInfo.description || this.json?.application?.description || '';
-            }
-            this.vtitle = this.json?.application?.name;
+            this.ensureManifestBaseInfo(this.json);
             this.initJSON();
-            this.changeForm();
+            if (!this.finishStartParamsInitialization()) {
+                this.changeForm();
+            }
             this.computedAppPort();
         },
 
@@ -2856,12 +1044,7 @@ platform:
             this._initializing = true;
             let j = this.json;
             if (j.application) {
-                if (/^[^-]+-.+$/.test(j.application?.identifie)) {
-                    let i = j.application.identifie;
-                    j.application.author = i.match(/^([^-]+)-(.+)$/)[1];
-                }
-                this.form.once = j.application?.once || false;
-                const applicationType = j.application.type === 'front' ? 'docker' : (j.application.type || 'docker');
+                const applicationType = normalizeDockerApplicationType(j.application.type);
                 if (applicationType === 'environment') {
                     this.form.type = 'tradition';
                 } else {
@@ -2877,214 +1060,28 @@ platform:
                 }
             }
 
-            this.form.name = j?.application?.name;
-            if (j.application?.identifie && /^[^-]+-.+$/.test(j.application.identifie)) {
-                this.form.identifie = j.application.identifie.match(/^([^-]+)-(.+)$/)[2];
-            } else {
-                this.form.identifie = j?.application?.identifie;
-            }
-            this.form.author = j?.application?.author;
-            if (!this.form.identifie && !this.form.author && this.identifie) {
-                let arr = this.identifie.match(/^([^-]+)-(.+)$/);
-                if (arr?.length) {
-                    this.form.identifie = arr[2];
-                    this.form.author = arr[1];
-                }
-            }
-
-            this.form.description = j?.application?.description;
-            const gatewayPlugin = j?.platform?.gatewayPlugin || {};
-            const gatewayPluginRuntime = gatewayPlugin.runtime || {};
-            const gatewayPluginRuntimeConfig = gatewayPluginRuntime.config || {};
-            const gatewayPluginSupports = gatewayPlugin.supports || {};
-            this.form.gatewayPluginCategory = gatewayPlugin.category || 'custom';
-            this.form.gatewayPluginDriver = gatewayPluginRuntime.driver || 'higress-wasm/v1';
-            this.form.gatewayPluginUrl = gatewayPluginRuntimeConfig.url || '';
-            this.form.gatewayPluginPhase = gatewayPluginRuntimeConfig.phase || 'UNSPECIFIED_PHASE';
-            this.form.gatewayPluginPriority = Number(gatewayPluginRuntimeConfig.priority || 0);
-            this.form.gatewayPluginSupportGlobal = gatewayPluginSupports.global !== false;
-            this.form.gatewayPluginSupportRule = gatewayPluginSupports.rule === true;
-            this.form.gatewayPluginDefaultEnabled = gatewayPlugin.defaultEnabled !== false;
-            this.form.gatewayPluginDefaultConfig = JSON.stringify(gatewayPlugin.defaultConfig || {}, null, 2);
+            this.initManifestMetadata(j);
+            this.initGatewayPluginManifest(j?.platform || {});
             this.applyTraditionAnnotationForm(j?.application?.annotation || {});
             this.applySystemImageAnnotationForm(j?.application?.annotation || {});
-            this.form.systemImageTemplate = j?.platform?.['container-v2']?.[0]?.image || '';
+            this.initSystemImageManifest(j?.platform || {});
 
-            if (!this.option?.pureManifest && this.form.type != 'gateway-plugin') {
-                this.form.name = j?.platform?.baseInfo?.name || '';
-                let identifie = j?.platform?.baseInfo?.identifie || '';
-                this.form.identifie = identifie.match(/^([^-]+)-(.+)$/)?.[2] || '';
-                this.form.author = identifie.match(/^([^-]+)-(.+)$/)?.[1] || '';
-                this.form.description = j?.platform?.baseInfo?.description || '';
-            }
-
-            if (j?.source?.type == 'zip') {
-                this.zip.codetype = 'zip';
-                this.zip.url = j.source.url;
-                this.zip.name = j.source.url.replace(/.*\//, '');
-            }
-            if (j?.web?.type == 'zip') {
-                this.web.url = j.web.url;
-                this.web.name = j.web.url.replace(/.*\//, '');
-            }
+            this.initManifestSource(j);
 
             if (j.platform) {
-
-                this.form.traditionName = j.platform?.plugin?.traditionName || '';
-                this.form.traditionVersion = j.platform?.plugin?.traditionVersion || '';
-                this.form.traditionImageTemplate = j.platform?.plugin?.traditionImageTemplate || '';
-                if (this.form.type == 'system-image') {
-                    let command = j.platform?.['container-v2']?.[0]?.command;
-                    this.form.cmd = Array.isArray(command) && command.length
-                        ? command.map(item => String(item))
-                        : [''];
-                } else {
-                    this.form.cmd = [''];
-                }
-
-                this.form.ingress = JSON.parse(JSON.stringify(j.platform?.ingress || []));
-                this.form.shell = JSON.parse(JSON.stringify(j.platform?.shells || j.platform?.['container-v2']?.[0]?.shells || []));
-                this.form.build_context = j.platform?.['container-v2']?.[0]?.build?.context || '';
-                this.form.containers = j.platform?.['container-v2'] || [];
-                this.fillDefaultShellContainer();
-
-                this.containerPluginData = {
-                    ...this.containerPluginData,
-                    runtimeClassName: j.platform?.runtimeClassName || '',
-                    kind: j?.platform?.workload?.type || '',
-                };
-
-                let startParams = j?.platform?.startParams;
-                this.form.startParams = JSON.parse(JSON.stringify(startParams?.length ? startParams : []))
-                    .filter(item => item?.mark !== 'environment-release'
-                        && !isDerivedDependencyReleaseStartParam(item));
-
-                if (this.form.type == 'system-image') {
-                    this.form.startParams = this.systemImageStartParams();
-                    this.form.storage = true;
-                    this.ensureSystemImageContainer();
-                } else if (this.form.type == 'tradition') {
-                    this.ensureTraditionContainerDefaults();
-                    this.form.startParams = this.traditionStartParams();
-                }
-
-                this.ensurePVCNameStartParam(j?.platform?.volumes);
-
-                if (this.form.startParams?.length) {
-                    this.form.startParams.forEach((i, index) => {
-                        if (i.module_name == 'w7_mysql' || i.module_name == 'w7_mysql5') {
-                            i.mark = i.module_name == 'w7_mysql' ? 'mysql8' : 'mysql5';
-                            this.form[i.module_name == 'w7_mysql' ? 'mysql8' : 'mysql5'] = true;
-
-                            let next = this.form.startParams[index + 1];
-                            if (next && next.name == 'MYSQL_DATABASE' && !next.module_name) {
-                                next.mark = i.mark;
-                            }
-                        }
-
-                        if (i.name == 'DOMAIN_URL') { i.mark = 'domain'; this.form.domain = true; }
-                        if (i.module_name == 'w7_redis') { i.mark = 'redis'; this.form.redis = true; }
-                        if (i.module_name == 'w7_mongodb') { i.mark = 'mongodb6'; this.form.mongodb6 = true; }
-                        if (['global.cluster.storageRWmode', 'global.cluster.storageSize', 'global.cluster.storageClassName'].includes(i.name)) {
-                            i.mark = 'storage';
-                            this.form.storage = true;
-                        }
-                    })
-                }
-
-                this.form.dependsIn = j.platform?.depends?.filter(i => i.type != 'out' && !String(i.from || '').trim()) || [];
-                this.form.dependsIn.map(i => i.type = 'in');
-                this.form.depends = j.platform?.depends?.filter(i => i.type == 'out' || String(i.from || '').trim()) || [];
-
-                this.form.depends.map((item, index) => {
-                    if (this.isPluginTraditionDependency(item)) {
-                        item.temporary = true;
-                        item.required = true;
-                        item.multipleInstances = true;
-                    }
-                    if (this.form.type == 'app-plugin' && this.traditionList?.length) {
-                        let now = this.traditionList.find(i => i.identifie == this.form.traditionName);
-                        if (now) {
-                            if (item.identifie == now.identifie && item.name == now.name) {
-                                item.temporary = true;
-                            }
-                        }
-                    }
-                    this.getSubDepends(index);
-                })
-
-                let depend_yamls = j.platform?.helm?.depend_yamls || [];
-                depend_yamls = depend_yamls.map(i => {
-                    return {
-                        name: i?.name,
-                        nameInput: i?.name?.replace?.(/\.yaml$/, ''),
-                        yaml: i.yaml,
-                    }
-                })
-
-                this.form.helm = {
-                    helmtype: j.platform?.helm?.repository ? '1' : '2',
-                    repository: j.platform?.helm?.repository || '',
-                    chartName: j.platform?.helm?.chartName || '',
-                    chartName2: '',
-                    version: j.platform?.helm?.version || '',
-                    kv: j.platform?.helm?.kv || [],
-
-                    depend_yamls: depend_yamls,
-                    useHelm: Boolean(j.platform?.helm?.chartName),
-                };
-                if (!j.platform?.helm?.repository) {
-                    this.form.helm.chartName2 = j?.platform?.helm?.chartName || '';
-                    this.form.helm.chartName = '';
-                } else {
-                    this.getChartInfo();
-                }
-            }
-            if (this.form.type != 'helm' && this.form.type != 'app-plugin' && this.form.ingress?.length) {
-                this.form.domain = true;
-                this.disabledDomainStartParams = true;
+                this.initAppPluginManifest(j.platform);
+                this.initApplicationConfig(j.platform);
+                this.initShellManifest(j.platform);
+                this.initStartParams(j.platform);
+                this.initDependencies(j.platform);
+                this.applyHelmManifestForm(j.platform);
             }
             this.syncTraditionDependency();
             this.syncSysboxDependency();
             this._initializing = false;
         },
-        getPanelData() {
-            return new Promise((resolve, reject) => {
-                emitWujieEvent('submit' + this.wujieId, (data) => {
-                    resolve(data)
-                })
-            })
-        },
-        getValidShells() {
-            return (this.form.shell || []).filter(i => i.type && i.shell);
-        },
-        applyPlatformShells() {
-            this.json.platform = this.json.platform || {};
-            const shells = this.getValidShells();
-            if (!shells.length) {
-                delete this.json.platform.shells;
-                return;
-            }
-            this.json.platform.shells = shells;
-            if (this.json.platform?.['container-v2']?.[0]) {
-                delete this.json.platform['container-v2'][0].shells;
-            }
-        },
-        parseGatewayPluginDefaultConfig(showMessage = false) {
-            try {
-                const config = JSON.parse(this.form.gatewayPluginDefaultConfig || '{}');
-                if (config === null || typeof config !== 'object' || Array.isArray(config)) {
-                    throw new Error('默认配置必须是 JSON 对象');
-                }
-                return config;
-            } catch (error) {
-                if (showMessage) {
-                    messageWarning(error?.message || '默认配置 JSON 格式错误');
-                }
-                return null;
-            }
-        },
         submit(otherData, callback) {
+            if (this.submitStartParamsOnly(otherData, callback)) return;
 
             this.$refs.formref.validate(async (errors) => {
                 if (errors) {
@@ -3127,33 +1124,19 @@ platform:
                 }
 
                 if (this.form.type == 'helm') {
-                    try {
-                        delete this.json.platform['container-v2']
-                        delete this.json.platform['volumes']
-                        delete this.json.platform['volumeClaimTemplates']
-                        delete this.json.platform.ingress
-                        delete this.json.platform.runtimeClassName
-                    } catch { }
+                    this.cleanupHelmPlatformForSubmit();
                 } else if (this.form.type == 'app-plugin') {
-                    try {
-                        delete this.json.platform['volumeClaimTemplates']
-                        delete this.json.platform.ingress
-                        delete this.json.platform.runtimeClassName
-                    } catch { }
+                    delete this.json.platform.volumeClaimTemplates;
+                    delete this.json.platform.ingress;
+                    delete this.json.platform.runtimeClassName;
                     this.applyPlatformShells();
                 } else if (this.form.type == 'tradition') {
                     this.form.startParams = this.traditionStartParams();
                     this.ensureTraditionContainerDefaults();
                     this.applyPlatformShells();
                     this.syncTraditionIngress();
-            } else if (this.form.type == 'docker') {
-
-                    this.applyPlatformShells();
-
-                    this.json.platform.ingress = (this.form.ingress || []).map(i => ({
-                        name: i.name,
-                        routes: this.formatIngressRoutes(i.routes),
-                    }));
+                } else if (this.form.type == 'docker') {
+                    this.applyDockerPlatform();
                 }
 
                 if (this.form.type != 'gateway-plugin') {
@@ -3190,6 +1173,7 @@ platform:
         applyFormTypeChange(previousType, nextType) {
             this.form.type = nextType;
             this.cleanupTypeSpecificManifest(previousType, nextType);
+            this.syncApplicationBuiltInStartParams();
             this.json.application = this.json.application || {};
             this.json.application.annotation = this.filterAnnotationsForType(
                 this.json.application.annotation || {},
@@ -3202,25 +1186,9 @@ platform:
             if (['tradition', 'gateway-plugin', 'system-image'].includes(this.form.type)) {
                 this.loadFormulaSetting().catch(() => { });
             }
-            if (!['light', 'system-image'].includes(this.form.type) && this.zip.url) {
-                if (!this.json.source) { this.json.source = {}; }
-                this.json.source.type = 'zip';
-                this.json.source.url = this.zip.url;
-            }
-            if (!['app-plugin', 'system-image'].includes(this.form.type) && this.web.url) {
-                if (!this.json.web) { this.json.web = {}; }
-                this.json.web.type = 'zip';
-                this.json.web.url = this.web.url;
-            }
-
-            if (this.form.type == 'light') {
-
-                if (this.json.source) { delete this.json.source; }
-            }
+            this.syncManifestSourceForType();
             if (this.form.type == 'app-plugin') {
                 this.getStart();
-
-                if (this.json.web) { delete this.json.web; }
             }
             if (this.form.type == 'system-image') {
                 this.syncSystemImageConfig();
@@ -3245,227 +1213,55 @@ platform:
             if (this._initializing) return;
 
             let j = this.json;
-            if (j.application) {
-                if (this.option?.pureManifest) {
-                    j.application.name = this.form.name;
-                    j.application.identifie = this.form.author + '-' + this.form.identifie;
-                    j.application.description = this.form.description;
-                }
-
-                j.application.author = this.form.author;
-                j.application.theme = this.form.theme;
-                j.application.type = this.form.type;
-                if (this.form.type == 'gateway-plugin') {
-                    this.form.once = true;
-                } else if (['tradition', 'system-image'].includes(this.form.type)) {
-                    this.form.once = false;
-                }
-                j.application.once = ['tradition', 'system-image'].includes(this.form.type)
-                    ? false
-                    : Boolean(this.form.once);
-                if (this.form.type != 'app-plugin') {
-                    this.form.language = '';
-                }
-            }
-            if (this.form.type == 'gateway-plugin') {
-                const defaultConfig = this.parseGatewayPluginDefaultConfig(false);
-                const currentDefaultConfig = j.platform?.gatewayPlugin?.defaultConfig
-                    || {};
-                const currentConfigSchema = j.platform?.gatewayPlugin?.configSchema
-                    || {};
-                j.platform = {
-                    gatewayPlugin: {
-                        category: this.form.gatewayPluginCategory || 'custom',
-                        defaultEnabled: Boolean(this.form.gatewayPluginDefaultEnabled),
-                        supports: {
-                            global: Boolean(this.form.gatewayPluginSupportGlobal),
-                            rule: Boolean(this.form.gatewayPluginSupportRule),
-                        },
-                        defaultConfig: defaultConfig === null
-                            ? currentDefaultConfig
-                            : defaultConfig,
-                        ...(Object.keys(currentConfigSchema).length ? { configSchema: currentConfigSchema } : {}),
-                        runtime: {
-                            driver: this.form.gatewayPluginDriver || 'higress-wasm/v1',
-                            config: {
-                                url: this.form.gatewayPluginUrl,
-                                phase: this.form.gatewayPluginPhase || 'UNSPECIFIED_PHASE',
-                                priority: Number(this.form.gatewayPluginPriority || 0),
-                            },
-                        },
-                    },
-                    depends: this.form.dependsIn.concat(this.form.depends),
-                };
-                delete j.source;
-            } else {
-                if (j.platform) { delete j.platform.gatewayPlugin; }
-            }
+            this.applyApplicationMetadata(j.application);
+            this.applyGatewayPluginManifest();
             j.platform = j.platform || {};
 
             if (this.form.type == 'system-image') {
-                this.form.systemImageVersions = this.normalizeApplicationVersions(this.form.systemImageVersions);
-                this.form.startParams = this.systemImageStartParams();
-                this.ensureSystemImageContainer();
+                this.applySystemImageManifest();
             } else if (this.form.type == 'tradition') {
-                this.form.traditionImageVersion = this.normalizeApplicationVersions(this.form.traditionImageVersion);
-                this.form.startParams = this.traditionStartParams();
-                this.ensureTraditionContainerDefaults();
-                this.applyTraditionRebootRestoreConfig();
-                this.syncTraditionIngress();
+                this.applyTraditionManifest();
             } else {
-                delete j.platform.hostUsers;
-                if (j.platform.runtimeClassName == traditionSysboxRuntimeClassName) {
-                    delete j.platform.runtimeClassName;
-                }
+                this.cleanupInactiveSysboxRuntime(j.platform);
             }
             this.syncSysboxDependency();
 
-            if (this.form.type == 'app-plugin') {
-                j.platform = withPluginAppStorage(j.platform);
-                let traditionLanguage = j.platform?.plugin?.traditionLanguage || '';
-                try {
-                    const selectedTradition = this.traditionList
-                        ?.find?.(i => i.identifie == this.form.traditionName);
-                    traditionLanguage = selectedTradition?.environment_language || traditionLanguage;
-                } catch { }
-                j.platform.plugin = {
-                    traditionName: this.form.traditionName,
-                    traditionVersion: this.form.traditionVersion,
-                    traditionLanguage,
-                    traditionImageTemplate: this.form.traditionImageTemplate,
-                }
-            }
+            j.platform = this.applyAppPluginManifest(j.platform);
 
             if (j.platform && this.form.type != 'gateway-plugin') {
-                if (this.form.type !== 'helm' || true) {
-
-                    if (!this.option?.pureManifest) {
-                        j.platform.baseInfo = j.platform.baseInfo || {};
-                        j.platform.baseInfo.name = this.form.name;
-                        j.platform.baseInfo.identifie = (this.form.author && this.form.identifie) ? (this.form.author + '-' + this.form.identifie) : '';
-                        j.platform.baseInfo.description = this.form.description;
-                    }
-                }
-
-
-                let dependencies = this.form.dependsIn.concat(this.form.depends);
-                if (this.form.type == 'app-plugin') {
-                    dependencies = applyPluginTraditionDependencyStartParams(
-                        dependencies,
-                        this.form.traditionName,
-                        this.form.traditionVersion,
-                    );
-                }
-                j.platform.depends = dependencies;
+                this.applyPlatformBaseInfo(j.platform);
+                this.applyManifestDependencies(j.platform);
                 j.platform.startParams = this.serializeStartParams();
 
-                if (this.form.type == 'helm') {
-
-                    delete j.source
-                    try {
-                        delete j.platform?.['container-v2']?.image;
-                    } catch { }
-
-                    let depend_yamls = [];
-                    if (this.form.helm?.depend_yamls?.length) {
-                        depend_yamls = this.form.helm?.depend_yamls?.filter(i => i.nameInput && i.yaml).map(i => {
-                            return {
-                                name: i.nameInput + '.yaml',
-                                yaml: i.yaml,
-                            }
-                        })
-                    }
-
-                    let kv = this.form?.helm?.kv?.filter(i => i.name && i.value).map(i => ({ name: i.name, value: i.value })) || [];
-                    if (this.form.helm.helmtype == '1') {
-                        j.platform.helm = {
-                            repository: this.form.helm.repository,
-                            chartName: this.form.helm.chartName,
-                            version: this.form.helm.version,
-                            depend_yamls: depend_yamls,
-                            kv: kv,
-                        }
-                    } else {
-                        j.platform.helm = {
-                            chartName: this.form.helm.chartName2,
-                            kv: kv,
-                            depend_yamls: depend_yamls,
-                        }
-                    }
-                } else {
-                    delete j.platform.helm;
-                }
-                if (this.form.type == 'helm') {
-                    delete j.platform.shells;
-                } else {
+                this.applyHelmPlatform();
+                if (this.form.type != 'helm') {
                     this.applyPlatformShells();
                 }
                 if (this.form.type == 'docker') {
-
-                    this.json.platform.ingress = (this.form.ingress || []).map(i => ({
-                        name: i.name,
-                        routes: this.formatIngressRoutes(i.routes),
-                    }));
+                    this.applyDockerPlatform();
                 }
             }
             this.setYaml();
-        },
-        setYaml() {
-            this.yaml = jsyaml.dump(this.json, {
-                indent: 2,
-                sortKeys: (a, b) => {
-                    if (b == 'menu') { return -1; }
-                    return a > b ? 1 : -1;
-                },
-            });
-            this.yamlDom = `<pre class='pre'><code class='language-yaml'>${this.escapeHtml(this.yaml)}</code></pre>`;
-            this.$nextTick(() => {
-                window.hljs.highlightAll();
-                this.download();
-            });
-        },
-        escapeHtml(text) {
-            return String(text || '')
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;')
-                .replace(/"/g, '&quot;')
-                .replace(/'/g, '&#39;');
-        },
-        openYamlPreview() {
-            this.showYaml = true;
-            this.$nextTick(() => {
-                this.setYaml();
-            });
-        },
-        getStart() {
-            this.json.platform.startParams = this.serializeStartParams();
-            this.setYaml();
-        },
-        download() {
-            let file = new File([this.yaml], 'manifest.yaml', { type: 'text/plain' });
-            this.downloadUrl = URL.createObjectURL(file);
-        },
-        onekeyCopy(text) {
-            if (0 && navigator.clipboard) {
-                navigator.clipboard.writeText(text);
-            } else {
-                var textarea = document.createElement('textarea');
-                document.body.appendChild(textarea);
-                textarea.style.position = 'fixed';
-                textarea.style.clip = 'rect(0 0 0 0)';
-                textarea.style.top = '10px';
-                textarea.value = text;
-                textarea.select();
-                document.execCommand('copy', true);
-                document.body.removeChild(textarea);
-            }
-            messageSuccess("复制成功")
         },
     },
 }
 </script>
 <style scoped>
+.manifest-start-params-only > .bg-white:not(.manifest-base-section):not(.manifest-start-params-section):not(.manifest-submit-section) {
+    pointer-events: none;
+    opacity: 0.6;
+}
+
+.manifest-start-params-only .manifest-start-params-readonly {
+    pointer-events: none;
+    opacity: 0.6;
+}
+
+.manifest-start-params-only .manifest-start-params-section > :deep(.arco-form-item):not(.manifest-start-param-editor) {
+    pointer-events: none;
+    opacity: 0.6;
+}
+
 .tradition-config-spin {
     display: block;
     width: 100%;

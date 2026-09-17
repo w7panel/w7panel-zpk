@@ -20,39 +20,53 @@
             <div v-if="manifest && (!noPlatform || isCreate)">
                 <div class="zpk-page-toolbar edit-package-toolbar">
                     <div class="zpk-toolbar-left">
-                        <a-button @click="dependsIndex = -1;"
-                            :type="dependsIndex == -1 ? 'primary' : 'secondary'">主应用</a-button>
+                        <div class="application-tab-item">
+                            <a-button @click="dependsIndex = -1;"
+                                :type="dependsIndex == -1 ? 'primary' : 'secondary'">
+                                主应用
+                                <span class="application-index-label">app[{{ getManifestOrder(manifest) ?? 0 }}]</span>
+                            </a-button>
+                        </div>
                         <div v-for="(item, index) in depends" :key="item.identifie" class="depend-item">
                             <div class="depend-tab">
                                 <a-button :type="dependsIndex == index ? 'primary' : 'secondary'"
-                                    @click="dependsIndex = index; edit({ stop: true })">{{ item.identifie }}</a-button>
-                                <span v-if="!isManagedDependency(item)" @click="delDepend(index)"
-                                    class="depend-close c-red fs-20 cursor"
-                                    :class="{ 'depend-close-with-update': childUpdates[item.identifie]?.available }">×</span>
-                                <a-popover v-if="childUpdates[item.identifie]?.available" position="bottom"
-                                    trigger="click" :content-style="{ padding: '6px 10px 16px' }">
-                                    <div class="child-update-trigger" @click.stop>
-                                        <icon-exclamation-circle-fill />
-                                        <span>新版本</span>
-                                    </div>
-                                    <template #content>
-                                        <div class="child-update-popover">
-                                            <div class="child-update-title">
-                                                <icon-exclamation-circle-fill />
-                                                <span>新版本</span>
-                                            </div>
-                                            <div class="child-update-description">
-                                                当前子应用有新版发布，可更新至
-                                                {{ childUpdates[item.identifie].latestVersion }}
-                                            </div>
-                                            <div class="child-update-actions">
-                                                <a-button size="small" type="primary"
-                                                    :loading="childUpdateLoading == item.identifie"
-                                                    @click="updateImportedChild(item)">立即更新</a-button>
-                                            </div>
+                                    @click="selectChildApplication(index)">
+                                    {{ item.identifie }}
+                                    <span v-if="getManifestOrder(item.manifest) !== null" class="application-index-label">
+                                        app[{{ getManifestOrder(item.manifest) }}]
+                                    </span>
+                                </a-button>
+                                <div v-if="!isManagedDependency(item) || isImportedDependency(item)
+                                    || childUpdates[item.identifie]?.available" class="application-tab-corner">
+                                    <span v-if="isImportedDependency(item)"
+                                        class="application-tab-badge application-imported-badge">导入</span>
+                                    <a-popover v-if="childUpdates[item.identifie]?.available" position="bottom"
+                                        trigger="click" :content-style="{ padding: '6px 10px 16px' }">
+                                        <div class="child-update-trigger" @click.stop>
+                                            <icon-exclamation-circle-fill />
+                                            <span>新版本</span>
                                         </div>
-                                    </template>
-                                </a-popover>
+                                        <template #content>
+                                            <div class="child-update-popover">
+                                                <div class="child-update-title">
+                                                    <icon-exclamation-circle-fill />
+                                                    <span>新版本</span>
+                                                </div>
+                                                <div class="child-update-description">
+                                                    当前子应用有新版发布，可更新至
+                                                    {{ childUpdates[item.identifie].latestVersion }}
+                                                </div>
+                                                <div class="child-update-actions">
+                                                    <a-button size="small" type="primary"
+                                                        :loading="childUpdateLoading == item.identifie"
+                                                        @click="updateImportedChild(item)">立即更新</a-button>
+                                                </div>
+                                            </div>
+                                        </template>
+                                    </a-popover>
+                                    <span v-if="!isManagedDependency(item)" class="depend-close cursor"
+                                        title="删除子应用" @click.stop="delDepend(index)">×</span>
+                                </div>
                             </div>
                         </div>
                         <a-button @click="openAddDepend">
@@ -72,7 +86,7 @@
                     @structure="structure"></files-manifest>
                 <files-manifest v-for="(item, index) in depends" :key="item.identifie" :ref="'depends' + index"
                     v-show="dependsIndex == index" :data="depends[index].manifest"
-                    :option="{ pureManifest: true, imginstall: true, required: item.required, app_ports: this.app_ports }"
+                    :option="{ pureManifest: true, imginstall: true, required: item.required, app_ports: this.app_ports, startParamsOnly: isImportedDependency(item) }"
                     :identifie="item.identifie" @complete="dependsComplete" @structure="structure"></files-manifest>
             </div>
             <div v-else>
@@ -93,19 +107,20 @@ import myAxios from '@/utils';
 import filesManifest from '@/components/files-manifest.vue';
 import dependPicker from '@/components/depend-picker.vue';
 import jsyaml from "js-yaml";
-import { confirm, messageError, messageSuccess } from '@/utils/ui-feedback';
+import { confirm, messageError, messageSuccess, messageWarning } from '@/utils/ui-feedback';
 import {
     childImportRepositoryBaseURL,
     fetchChildImportListFromSource,
     importChildApplication,
+    getImportedChildIdentifies,
     importedChildFilePath,
     isChildImportVersionNewer,
+    removeImportedChildren,
     saveImportedChildren,
 } from '@/utils/child-app-import';
 import {
     traditionToolDependency,
-    withTraditionToolConfig,
-} from '@/utils/tradition-app';
+} from '@/components/manifest/tradition-manifest';
 import {
     IconArrowLeft,
     IconDownload,
@@ -178,6 +193,18 @@ export default {
         this.childUpdateCheckToken++;
         window.removeEventListener('message', this.winMessage);
     },
+    computed: {
+        importedChildIdentifySet() {
+            const identifies = new Set();
+            this.depends
+                .filter(item => String(item?.from || '').trim())
+                .forEach(item => {
+                    getImportedChildIdentifies(item.identifie, this.list, this.depends)
+                        .forEach(identifie => identifies.add(identifie));
+                });
+            return identifies;
+        },
+    },
     watch: {
         manifest() {
             this.updateAppPorts();
@@ -190,6 +217,39 @@ export default {
         },
     },
     methods: {
+        getManifestOrder(manifest) {
+            try {
+                const json = typeof manifest == 'string'
+                    ? (jsyaml.load(manifest) || {})
+                    : (manifest || {});
+                const order = json?.application?.order;
+                return order === undefined || order === null || order === ''
+                    ? null
+                    : order;
+            } catch {
+                return null;
+            }
+        },
+        sortChildApplications(dependencies = []) {
+            return dependencies
+                .map((dependency, index) => ({
+                    dependency,
+                    index,
+                    order: this.getManifestOrder(dependency?.manifest),
+                }))
+                .sort((first, second) => {
+                    const firstOrder = Number(first.order);
+                    const secondOrder = Number(second.order);
+                    const firstHasOrder = first.order !== null && Number.isFinite(firstOrder);
+                    const secondHasOrder = second.order !== null && Number.isFinite(secondOrder);
+                    if (firstHasOrder && secondHasOrder && firstOrder !== secondOrder) {
+                        return firstOrder - secondOrder;
+                    }
+                    if (firstHasOrder !== secondHasOrder) return firstHasOrder ? -1 : 1;
+                    return first.index - second.index;
+                })
+                .map(item => item.dependency);
+        },
         getManifestIdentifie(json, fallback) {
             let identifie = json?.platform?.baseInfo?.identifie || json?.application?.identifie || fallback || '';
             let author = json?.application?.author || '';
@@ -273,42 +333,70 @@ export default {
         openYamlPreview() {
             this.getActiveManifestRef()?.openYamlPreview?.();
         },
+        ensureMainManifestSaved() {
+            if (!this.$refs.form?.hasUnsavedChanges?.()) return true;
+            this.dependsIndex = -1;
+            messageWarning('请先保存主应用配置');
+            return false;
+        },
+        selectChildApplication(index) {
+            if (this.dependsIndex == -1 && !this.ensureMainManifestSaved()) return;
+            this.dependsIndex = index;
+        },
         delDepend(index) {
-            if (this.deleteLoading) { return }
-            if (this.isManagedDependency(this.depends[index])) { return }
-            let file = this.tree.find(i => i.label == (this.depends[index]?.identifie) + '/manifest.yaml');
-            const deleteFile = file
-                ? myAxios.post('/respo/manifest/file', {
-                    identifie: this.identifie,
-                    filename: file.label,
-                    content: '',
-                    version: this.version_id,
-                })
-                : Promise.resolve();
+            if (this.deleteLoading || !this.ensureMainManifestSaved()) { return }
+            const dependency = this.depends[index];
+            if (!dependency || this.isManagedDependency(dependency)) { return }
+            confirm({
+                title: '删除子应用',
+                content: `确定要删除“${dependency.name || dependency.identifie}”吗？`,
+                confirmButtonText: '确定删除',
+                cancelButtonText: '取消',
+                onOk: () => this.removeChildDependency(dependency),
+            });
+        },
+        async removeChildDependency(dependency) {
+            if (this.deleteLoading || !dependency?.identifie
+                || !this.ensureMainManifestSaved()) return;
+            const rootRef = this.$refs.form;
+            if (!rootRef?.json) {
+                messageError('主应用 manifest 尚未加载完成');
+                return;
+            }
             this.deleteLoading = true;
-            this.$refs.form?.delDepend(index);
-            this.$nextTick(() => {
-                this.$refs.form.submit({ stop: true }, () => {
-                    deleteFile
-                        .then(() => this.getFile())
-                        .then(() => this.getManifest())
-                        .then(() => this.persistChildOrders())
-                        .then(() => this.publish(1))
-                        .catch(error => {
-                            messageError(error?.response?.data?.error || error?.message || '删除子应用失败');
-                        })
-                        .finally(() => {
-                            this.deleteLoading = false;
-                        });
+            try {
+                const result = await removeImportedChildren(myAxios, {
+                    rootRef,
+                    rootIdentifie: this.identifie,
+                    versionId: this.version_id,
+                    list: this.list,
+                    identifies: [dependency.identifie],
+                    orderedIdentifies: this.depends.map(item => item.identifie),
                 });
-            })
+                this.applyRemovedChildrenResult(result);
+                await this.getFile();
+                await this.getManifest();
+                await this.$nextTick();
+                this.$refs.form?.markManifestSaved?.();
+                await this.publish(1);
+                messageSuccess('子应用已删除');
+            } catch (error) {
+                messageError(error?.response?.data?.error || error?.message || '删除子应用失败');
+            } finally {
+                this.deleteLoading = false;
+            }
         },
         openAddDepend() {
+            if (!this.ensureMainManifestSaved()) return;
             this.dependsIndex = -1;
             this.$refs.form?.openAddDepend();
         },
         isManagedDependency(item) {
             return this.$refs.form?.isTraditionFixedDependency?.(item) || false;
+        },
+        isImportedDependency(item) {
+            return Boolean(item?.identifie)
+                && this.importedChildIdentifySet.has(item.identifie);
         },
         async persistTraditionManifest() {
             const rootRef = this.$refs.form;
@@ -323,31 +411,10 @@ export default {
                 content,
                 version: this.version_id,
             });
+            this.manifest = content;
+            rootRef.markManifestSaved?.();
         },
-        prepareTraditionToolEntry(entry, gatewayEnabled = false) {
-            if (!entry) { return { manifest: {}, changed: false }; }
-            let source = entry.data || entry.manifest || {};
-            if (typeof source == 'string') {
-                try {
-                    source = jsyaml.load(source) || {};
-                } catch {
-                    source = {};
-                }
-            }
-            const before = JSON.stringify(source);
-            const manifest = withTraditionToolConfig(
-                source,
-                this.getManifestIdentifie(this.$refs.form?.json, this.identifie),
-                gatewayEnabled,
-            );
-            entry.data = manifest;
-            entry.manifest = jsyaml.dump(manifest);
-            return {
-                manifest,
-                changed: JSON.stringify(manifest) != before,
-            };
-        },
-        async ensureTraditionToolDependency(gatewayEnabled = false) {
+        async ensureTraditionToolDependency() {
             const rootRef = this.$refs.form;
             if (rootRef?.form?.type != 'tradition' || !rootRef?.json) {
                 return;
@@ -360,26 +427,6 @@ export default {
                 && String(item?.from || '').trim());
             const existingContent = this.list?.[file];
             if (dependencyExists && existingContent !== undefined) {
-                const entry = {
-                    identifie: traditionToolDependency.identifie,
-                    manifest: existingContent,
-                    data: existingContent,
-                };
-                const prepared = this.prepareTraditionToolEntry(entry, gatewayEnabled);
-                if (prepared.changed) {
-                    await myAxios.post('/respo/manifest/file', {
-                        identifie: this.identifie,
-                        filename: file,
-                        content: entry.manifest,
-                        version: this.version_id,
-                    });
-                    this.list[file] = entry.manifest;
-                    const dependency = this.depends.find(item =>
-                        item?.identifie == traditionToolDependency.identifie);
-                    if (dependency) {
-                        dependency.manifest = entry.manifest;
-                    }
-                }
                 return;
             }
 
@@ -398,7 +445,6 @@ export default {
             if (!toolEntry) {
                 throw new Error('导入结果中缺少传统应用工具子应用 manifest');
             }
-            this.prepareTraditionToolEntry(toolEntry, gatewayEnabled);
             const replaceExisting = (this.depends || []).some(item =>
                 item?.identifie == traditionToolDependency.identifie)
                 || existingContent !== undefined;
@@ -416,6 +462,7 @@ export default {
             await this.persistChildOrders();
         },
         openImportDepend() {
+            if (!this.ensureMainManifestSaved()) return;
             this.importPicker.show = true;
         },
         closeImportDepend() {
@@ -423,9 +470,14 @@ export default {
         },
         async handleTraditionNginxGatewayChange({ enabled, finish } = {}) {
             const done = typeof finish == 'function' ? finish : () => { };
+            if (!this.ensureMainManifestSaved()) {
+                done(false);
+                return;
+            }
             try {
-                await this.ensureTraditionToolDependency(enabled);
+                await this.ensureTraditionToolDependency();
                 done(true);
+                await this.$refs.form?.saveFormulaTypeSetting?.();
                 await this.persistTraditionManifest();
                 messageSuccess(enabled ? 'NGINX 网关已开启' : 'NGINX 网关已关闭');
             } catch (error) {
@@ -436,7 +488,8 @@ export default {
             }
         },
         async importChild(record, tab = 'local') {
-            if (!record?.identifie || this.importPicker.importing) { return; }
+            if (!record?.identifie || this.importPicker.importing
+                || !this.ensureMainManifestSaved()) { return; }
             const dependency = {
                 identifie: record.identifie,
                 goodsId: Number(record.goods_id || record.goodsId || record.id || 0),
@@ -463,6 +516,7 @@ export default {
                 });
                 this.applyImportedChildrenResult(result);
                 await this.persistChildOrders();
+                this.$refs.form?.markManifestSaved?.();
                 this.importPicker.show = false;
                 messageSuccess('子应用导入成功');
             } catch (error) {
@@ -517,7 +571,8 @@ export default {
         },
         async updateImportedChild(item) {
             const update = this.childUpdates[item?.identifie];
-            if (!item?.from || !update?.available || this.childUpdateLoading) { return; }
+            if (!item?.from || !update?.available || this.childUpdateLoading
+                || !this.ensureMainManifestSaved()) { return; }
             const dependency = {
                 identifie: item.identifie,
                 name: item.name || item.identifie,
@@ -535,12 +590,6 @@ export default {
                 if (!rootEntry) {
                     throw new Error(`导入结果中缺少 ${item.identifie} 子应用 manifest`);
                 }
-                if (item.identifie == traditionToolDependency.identifie) {
-                    this.prepareTraditionToolEntry(
-                        rootEntry,
-                        Boolean(this.$refs.form?.form?.traditionNginxGateway),
-                    );
-                }
                 const result = await saveImportedChildren(myAxios, {
                     rootRef: this.$refs.form,
                     rootIdentifie: this.identifie,
@@ -556,6 +605,7 @@ export default {
                 if (item.identifie == traditionToolDependency.identifie) {
                     await this.persistTraditionManifest();
                 }
+                this.$refs.form?.markManifestSaved?.();
                 await this.checkImportedChildUpdates();
                 messageSuccess(`子应用已更新到 ${update.latestVersion}`);
             } catch (error) {
@@ -592,7 +642,12 @@ export default {
             // manifests; the user can switch to a child explicitly.
             this.dependsIndex = -1;
         },
-        applyRemovedChildrenResult({ existingFiles = [], rootManifest = '', identifies = [] } = {}) {
+        applyRemovedChildrenResult({
+            existingFiles = [],
+            orderedFiles = {},
+            rootManifest = '',
+            identifies = [],
+        } = {}) {
             if (this.$refs.form?.form?.type != 'tradition') {
                 this.manifest = rootManifest;
             }
@@ -600,6 +655,11 @@ export default {
             existingFiles.forEach(file => {
                 delete this.list[file];
                 this.tree = this.tree.filter(item => item.label != file);
+            });
+            Object.entries(orderedFiles).forEach(([file, content]) => {
+                this.list[file] = content;
+                const dependency = this.depends.find(item => item?.title == file);
+                if (dependency) dependency.manifest = content;
             });
             const removed = new Set(identifies);
             this.depends = this.depends.filter(item => !removed.has(item?.identifie));
@@ -632,42 +692,50 @@ export default {
             });
             await Promise.all(writes);
         },
-        addfileInside(json, yaml, data) {
+        async addfileInside(json, yaml, data) {
+            if (!this.ensureMainManifestSaved()) return;
             this.deleteLoading = true;
-            myAxios.post('/respo/manifest/file', {
-                identifie: this.identifie,
-                filename: 'manifest.yaml',
-                content: yaml,
-                version: this.version_id,
-            }).then(async (res) => {
-                if (this.tree.find(i => i.label == data.file)) {
-                    await this.getFile();
-                    await this.getManifest();
-                    await this.persistChildOrders();
-                    this.dependsIndex = this.depends.length - 1;
-                    return
+            const childExists = this.tree.some(item => item.label == data.file);
+            let childCreated = false;
+            try {
+                if (!childExists) {
+                    await myAxios.post('/respo/manifest/file', {
+                        identifie: this.identifie,
+                        filename: data.file,
+                        content: data.cont,
+                        version: this.version_id,
+                    });
+                    childCreated = true;
                 }
-                myAxios.post('/respo/manifest/file', {
-                    identifie: this.identifie,
-                    filename: data.file,
-                    content: data.cont,
-                    version: this.version_id,
-
-                }).then(async () => {
-                    this.deleteLoading = false;
-                    await this.getFile();
-                    await this.getManifest();
-                    await this.persistChildOrders();
-                    this.dependsIndex = this.depends.length - 1;
-                }).catch(() => {
-                    this.deleteLoading = false;
-                });
-            }).catch((error) => {
+                try {
+                    await myAxios.post('/respo/manifest/file', {
+                        identifie: this.identifie,
+                        filename: 'manifest.yaml',
+                        content: yaml,
+                        version: this.version_id,
+                    });
+                } catch (error) {
+                    if (childCreated) {
+                        await myAxios.post('/respo/manifest/file', {
+                            identifie: this.identifie,
+                            filename: data.file,
+                            content: '',
+                            version: this.version_id,
+                        }).catch(() => undefined);
+                    }
+                    throw error;
+                }
+                await this.getFile();
+                await this.getManifest();
+                await this.persistChildOrders();
+                await this.$nextTick();
+                this.$refs.form?.markManifestSaved?.();
+                this.dependsIndex = this.depends.length - 1;
+            } catch (error) {
+                messageError(error?.response?.data?.error || error?.message || '新增子应用失败');
+            } finally {
                 this.deleteLoading = false;
-                if (error?.response?.data?.error) {
-                    messageError(error.response.data.error);
-                }
-            });
+            }
         },
         getManifest() {
             this.deleteLoading = true;
@@ -704,7 +772,7 @@ export default {
                         i.title = i.identifie + '/manifest.yaml';
                         return i;
                     });
-                    this.depends = depends;
+                    this.depends = this.sortChildApplications(depends);
                 }
                 this.updateAppPorts();
                 this.checkImportedChildUpdates();
@@ -713,43 +781,88 @@ export default {
             });
         },
 
-        dependsComplete(json, yaml, otherData) {
+        async dependsComplete(json, yaml, otherData) {
+            const dependency = this.depends[this.dependsIndex];
+            if (!dependency) {
+                messageError('未找到当前子应用');
+                return;
+            }
+            const imported = this.isImportedDependency(dependency);
+            const required = otherData?.required ?? dependency.required;
+            if (required != dependency.required && !this.ensureMainManifestSaved()) return;
+            let savedJSON = json;
+            let savedYAML = yaml;
+            let rootManifestYAML = '';
+            if (imported) {
+                try {
+                    const original = jsyaml.load(dependency?.manifest || '') || {};
+                    original.platform = original.platform || {};
+                    original.platform.startParams = JSON.parse(JSON.stringify(
+                        json?.platform?.startParams || [],
+                    ));
+                    savedJSON = original;
+                    savedYAML = jsyaml.dump(original);
+                } catch (error) {
+                    messageError(error?.message || '导入子应用配置解析失败');
+                    return;
+                }
+            }
 
-            myAxios.post('/respo/manifest/file', {
-                identifie: this.identifie,
-                filename: this.depends[this.dependsIndex].title,
-                content: yaml,
-                version: this.version_id,
-            }).then(() => {
-                this.depends.forEach((item, index) => {
-                    if (item.identifie == json.application.identifie) {
-                        item.name = json.application.name || '';
-                        let v = otherData?.required ?? item.required;
-                        if (v != item.required) {
-                            let o = {
-                                type: 'in',
-                                identifie: item.identifie,
-                                name: item.name,
-                                required: v,
-                            }
-                            this.$refs.form.changeDepend(index, o)
-                        }
+            try {
+                await myAxios.post('/respo/manifest/file', {
+                    identifie: this.identifie,
+                    filename: dependency.title,
+                    content: savedYAML,
+                    version: this.version_id,
+                });
+                dependency.manifest = savedYAML;
+                if (!imported) {
+                    dependency.name = savedJSON.application.name || '';
+                }
+                if (required != dependency.required) {
+                    const rootDependencies = this.$refs.form?.form?.dependsIn || [];
+                    const rootIndex = rootDependencies.findIndex(item =>
+                        item?.identifie == dependency.identifie);
+                    if (rootIndex >= 0) {
+                        rootDependencies.splice(rootIndex, 1, {
+                            ...rootDependencies[rootIndex],
+                            name: dependency.name,
+                            required,
+                        });
+                        this.$refs.form.syncImportedDependenciesToManifest?.();
+                        const rootManifest = this.$refs.form?.getSavedManifest?.()
+                            || jsyaml.load(this.manifest || '') || {};
+                        rootManifest.platform = rootManifest.platform || {};
+                        rootManifest.platform.depends = JSON.parse(JSON.stringify(
+                            this.$refs.form.json?.platform?.depends || [],
+                        ));
+                        rootManifestYAML = jsyaml.dump(rootManifest);
+                        dependency.required = required;
                     }
-                })
-
+                }
+                if (rootManifestYAML) {
+                    await myAxios.post('/respo/manifest/file', {
+                        identifie: this.identifie,
+                        filename: 'manifest.yaml',
+                        content: rootManifestYAML,
+                        version: this.version_id,
+                    });
+                }
+                await this.getFile();
+                await this.getManifest();
+                await this.$nextTick();
+                this.$refs.form?.markManifestSaved?.();
                 this.getInfo(this.identifie, () => {
                     messageSuccess('操作成功');
                 });
-                this.getFile();
-                this.getManifest();
-            });
+            } catch (error) {
+                messageError(error?.response?.data?.error || error?.message || '子应用配置保存失败');
+            }
         },
 
         complete(json, yaml, otherData, callback) {
             const prepare = json?.application?.type == 'tradition'
-                ? this.ensureTraditionToolDependency(
-                    Boolean(this.$refs.form?.form?.traditionNginxGateway),
-                ).then(() => {
+                ? this.ensureTraditionToolDependency().then(() => {
                     json = this.$refs.form?.json || json;
                     yaml = jsyaml.dump(json);
                 })
@@ -760,7 +873,9 @@ export default {
                 content: yaml,
                 version: this.version_id,
 
-            })).then((res) => {
+            })).then(() => {
+                this.manifest = yaml;
+                this.$refs.form?.markManifestSaved?.();
                 if (otherData?.editfile) {
                     (typeof callback == 'function') && callback();
                     if (/\.yaml$/.test(otherData.editfile)) {
@@ -779,8 +894,6 @@ export default {
                         this.$router.push('/zpk-version?id=' + this.identifie + '&title=' + (json?.application?.name) || '')
                     });
                 });
-            }).then(res => {
-
             }).catch((error) => {
                 messageError(error?.response?.data?.error || error?.message || '制品配置保存失败');
             });
@@ -799,7 +912,7 @@ export default {
         },
         getInfo(id, callback, n) {
             n = n || 0;
-            myAxios.get('/respo/v2/info/' + id + '/' + this.version_id).then(res => {
+            myAxios.get('/respo/v2/info/' + id + '/' + this.version_id).then(() => {
                 callback && callback();
             }).catch(() => {
                 if (n > 10) { return }
@@ -824,9 +937,6 @@ export default {
                 this.deleteLoading = false;
             })
         },
-        edit(data) {
-            this.$refs.form.submit(data);
-        },
         del(row) {
             confirm({
                 title: '提示',
@@ -839,7 +949,7 @@ export default {
                     content: '',
                     version: this.version_id,
 
-                }).then(res => {
+                }).then(() => {
                     messageSuccess('删除成功');
                     this.getInfo(this.identifie, () => {
                         this.publish(1);
@@ -880,11 +990,68 @@ export default {
     padding: 20px 20px 0;
 }
 
-.depend-item,
+.edit-package-toolbar .zpk-toolbar-left {
+    align-items: center;
+}
+
+.application-tab-item,
+.depend-item {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+}
+
 .depend-tab {
     position: relative;
     display: inline-flex;
     align-items: center;
+}
+
+.application-tab-corner {
+    position: absolute;
+    top: -14px;
+    right: -6px;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.application-tab-badge {
+    display: inline-flex;
+    align-items: center;
+    height: 16px;
+    box-sizing: border-box;
+    padding: 0 5px;
+    font-size: 10px;
+    font-weight: 500;
+    line-height: 16px;
+    white-space: nowrap;
+    border-radius: 4px;
+    box-shadow: 0 0 0 2px #fff;
+}
+
+.application-index-label {
+    display: inline-flex;
+    align-items: center;
+    height: 16px;
+    box-sizing: border-box;
+    margin-left: 6px;
+    padding: 0 4px;
+    color: #fff;
+    font-family: SFMono-Regular, Consolas, "Liberation Mono", monospace;
+    font-size: 10px;
+    font-weight: 500;
+    line-height: 16px;
+    white-space: nowrap;
+    background: rgb(var(--red-6));
+    border-radius: 4px;
+}
+
+.application-imported-badge {
+    color: rgb(var(--red-6));
+    background: #fff;
+    border: 1px solid rgb(var(--red-2));
 }
 
 .child-update-trigger,
@@ -895,18 +1062,22 @@ export default {
 }
 
 .child-update-trigger {
-    position: absolute;
-    top: -12px;
-    right: -18px;
-    z-index: 2;
     gap: 2px;
-    padding: 0 3px;
-    font-size: 12px;
-    line-height: 18px;
+    height: 16px;
+    box-sizing: border-box;
+    padding: 0 5px;
+    font-size: 10px;
+    font-weight: 500;
+    line-height: 16px;
     white-space: nowrap;
-    background: #fff;
-    border-radius: 9px;
+    background: rgb(var(--red-1));
+    border-radius: 4px;
+    box-shadow: 0 0 0 2px #fff;
     cursor: pointer;
+}
+
+.child-update-trigger svg {
+    font-size: 11px;
 }
 
 .child-update-title {
@@ -928,22 +1099,28 @@ export default {
 }
 
 .depend-close {
-    position: absolute;
-    top: -10px;
-    right: -10px;
+    position: relative;
+    top: 1px;
+    left: 2px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 18px;
-    height: 18px;
+    width: 16px;
+    height: 16px;
+    box-sizing: border-box;
+    padding-bottom: 1px;
+    color: rgb(var(--red-6));
+    font-size: 15px;
     line-height: 1;
     background: #fff;
+    border: 1px solid rgb(var(--red-2));
     border-radius: 50%;
+    box-shadow: 0 0 0 2px #fff;
 }
 
-.depend-close-with-update {
-    right: auto;
-    left: -10px;
+.depend-close:hover {
+    color: #fff;
+    background: rgb(var(--red-6));
 }
 
 .manifest-empty {

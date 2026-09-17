@@ -174,17 +174,37 @@ export function importedChildFilePath(identifie) {
     return `${identifie}/manifest.yaml`;
 }
 
-export function getImportedChildIdentifies(rootIdentifie, list = {}, dependencies = []) {
-    const identifies = new Set([rootIdentifie].filter(Boolean));
-    const rootFile = importedChildFilePath(rootIdentifie);
-    const rootDependency = (dependencies || []).find(item => item?.identifie == rootIdentifie);
-    const rootRaw = list?.[rootFile] || rootDependency?.manifest || '';
+function clonePersistedRootManifest(rootRef) {
     try {
-        const root = typeof rootRaw == 'string' ? (jsyaml.load(rootRaw) || {}) : rootRaw;
-        (root?.platform?.depends || []).forEach(item => {
-            if (item?.identifie) { identifies.add(item.identifie); }
-        });
-    } catch { }
+        if (rootRef?.getSavedManifest) return rootRef.getSavedManifest();
+        if (typeof rootRef?.data == 'string') return jsyaml.load(rootRef.data) || {};
+        if (rootRef?.data) return JSON.parse(JSON.stringify(rootRef.data));
+    } catch {
+        // Fall back to the editor state when the original manifest cannot be parsed.
+    }
+    return JSON.parse(JSON.stringify(rootRef?.json || {}));
+}
+
+export function getImportedChildIdentifies(rootIdentifie, list = {}, dependencies = []) {
+    const identifies = new Set();
+    const dependenciesByIdentifie = new Map((dependencies || [])
+        .filter(item => item?.identifie)
+        .map(item => [item.identifie, item]));
+    const visit = (identifie) => {
+        if (!identifie || identifies.has(identifie)) { return; }
+        identifies.add(identifie);
+        const file = importedChildFilePath(identifie);
+        const raw = list?.[file] || dependenciesByIdentifie.get(identifie)?.manifest || '';
+        try {
+            const manifest = typeof raw == 'string' ? (jsyaml.load(raw) || {}) : raw;
+            (manifest?.platform?.depends || [])
+                .filter(item => item?.type !== 'out')
+                .forEach(item => visit(item?.identifie));
+        } catch {
+            // Ignore malformed child manifests while resolving the imported tree.
+        }
+    };
+    visit(rootIdentifie);
     return [...identifies];
 }
 
@@ -225,15 +245,16 @@ export async function saveImportedChildren(client, {
         } : {});
     });
 
-    const previousJSON = JSON.parse(JSON.stringify(rootRef.json));
+    const previousJSON = clonePersistedRootManifest(rootRef);
     if (replaceExisting) {
         rootRef.replaceImportedDependencies(dependencies);
     } else {
         rootRef.addImportedDependencies(dependencies);
     }
-    rootRef.json.application = rootRef.json.application || {};
-    rootRef.json.application.order = 0;
-    const childOrders = new Map((rootRef.json?.platform?.depends || [])
+    const rootJSON = JSON.parse(JSON.stringify(previousJSON));
+    rootJSON.platform = rootJSON.platform || {};
+    rootJSON.platform.depends = JSON.parse(JSON.stringify(rootRef.json?.platform?.depends || []));
+    const childOrders = new Map((rootJSON.platform.depends || [])
         .filter(item => item?.identifie && item?.type !== 'out')
         .map((item, index) => [item.identifie, index + 1]));
     imported.forEach((entry, index) => {
@@ -242,7 +263,7 @@ export async function saveImportedChildren(client, {
         entry.data.application.order = childOrders.get(entry.identifie) || (index + 1);
         entry.manifest = jsyaml.dump(entry.data);
     });
-    const rootManifest = jsyaml.dump(rootRef.json);
+    const rootManifest = jsyaml.dump(rootJSON);
     try {
         const childWrites = await Promise.allSettled(imported.map(entry =>
             client.post('/respo/manifest/file', {
@@ -290,37 +311,117 @@ export async function removeImportedChildren(client, {
     versionId,
     list = {},
     identifies = [],
+    orderedIdentifies = [],
 }) {
     if (!rootRef?.json) {
         throw new Error('主应用 manifest 尚未加载完成');
     }
     const importedIdentifies = new Set((identifies || []).filter(Boolean));
-    if (!importedIdentifies.size) { return { existingFiles: [], rootManifest: jsyaml.dump(rootRef.json) }; }
+    if (!importedIdentifies.size) {
+        return { existingFiles: [], orderedFiles: {}, rootManifest: jsyaml.dump(clonePersistedRootManifest(rootRef)) };
+    }
     const existingFiles = [...importedIdentifies]
         .map(identifie => importedChildFilePath(identifie))
         .filter(file => Object.prototype.hasOwnProperty.call(list || {}, file));
-    const previousJSON = JSON.parse(JSON.stringify(rootRef.json));
+    const previousJSON = clonePersistedRootManifest(rootRef);
 
-    rootRef.removeImportedDependencies([...importedIdentifies]);
-    const rootManifest = jsyaml.dump(rootRef.json);
+    if (rootRef.removeChildDependencies) {
+        rootRef.removeChildDependencies([...importedIdentifies]);
+    } else {
+        rootRef.removeImportedDependencies([...importedIdentifies]);
+    }
+    const childOrder = new Map((orderedIdentifies || [])
+        .filter(identifie => identifie && !importedIdentifies.has(identifie))
+        .map((identifie, index) => [identifie, index]));
+    const dependencies = rootRef.json?.platform?.depends || [];
+    const childDependencies = dependencies
+        .map((dependency, index) => ({ dependency, index }))
+        .filter(item => item.dependency?.type !== 'out')
+        .sort((first, second) => {
+            const firstOrder = childOrder.get(first.dependency?.identifie);
+            const secondOrder = childOrder.get(second.dependency?.identifie);
+            if (firstOrder !== undefined && secondOrder !== undefined) return firstOrder - secondOrder;
+            if (firstOrder !== undefined || secondOrder !== undefined) return firstOrder !== undefined ? -1 : 1;
+            return first.index - second.index;
+        })
+        .map(item => item.dependency);
+    const orderedDependencies = childDependencies.concat(
+        dependencies.filter(item => item?.type === 'out'),
+    );
+    rootRef.json.platform.depends = orderedDependencies;
+    const rootJSON = JSON.parse(JSON.stringify(previousJSON));
+    rootJSON.platform = rootJSON.platform || {};
+    rootJSON.platform.depends = JSON.parse(JSON.stringify(orderedDependencies));
+
+    const orderedFiles = {};
+    (rootJSON.platform.depends || [])
+        .filter(item => item?.identifie && item?.type !== 'out')
+        .forEach((item, index) => {
+            const filename = importedChildFilePath(item.identifie);
+            const raw = list?.[filename];
+            if (raw === undefined) return;
+            try {
+                const manifest = typeof raw == 'string'
+                    ? (jsyaml.load(raw) || {})
+                    : JSON.parse(JSON.stringify(raw));
+                if (!manifest.application) return;
+                manifest.application.order = index + 1;
+                orderedFiles[filename] = jsyaml.dump(manifest);
+            } catch {
+                // Keep deletion available even when an unrelated child manifest is malformed.
+            }
+        });
+
+    const rootManifest = jsyaml.dump(rootJSON);
+    const previousFiles = Object.fromEntries(
+        [...new Set(existingFiles.concat(Object.keys(orderedFiles)))]
+            .map(filename => [filename, list?.[filename] ?? '']),
+    );
     try {
-        await Promise.all([
+        await client.post('/respo/manifest/file', {
+            identifie: rootIdentifie,
+            filename: 'manifest.yaml',
+            content: rootManifest,
+            version: versionId,
+        });
+        const fileWrites = await Promise.allSettled([
+            ...Object.entries(orderedFiles).map(([filename, content]) => client.post('/respo/manifest/file', {
+                identifie: rootIdentifie,
+                filename,
+                content,
+                version: versionId,
+            })),
             ...existingFiles.map(filename => client.post('/respo/manifest/file', {
                 identifie: rootIdentifie,
                 filename,
                 content: '',
                 version: versionId,
             })),
+        ]);
+        const failedWrite = fileWrites.find(result => result.status === 'rejected');
+        if (failedWrite) throw failedWrite.reason;
+    } catch (error) {
+        await Promise.allSettled([
             client.post('/respo/manifest/file', {
                 identifie: rootIdentifie,
                 filename: 'manifest.yaml',
-                content: rootManifest,
+                content: jsyaml.dump(previousJSON),
                 version: versionId,
             }),
+            ...Object.entries(previousFiles).map(([filename, content]) => client.post('/respo/manifest/file', {
+                identifie: rootIdentifie,
+                filename,
+                content,
+                version: versionId,
+            })),
         ]);
-    } catch (error) {
         rootRef.replaceZpk(previousJSON);
         throw error;
     }
-    return { existingFiles, rootManifest, identifies: [...importedIdentifies] };
+    return {
+        existingFiles,
+        orderedFiles,
+        rootManifest,
+        identifies: [...importedIdentifies],
+    };
 }

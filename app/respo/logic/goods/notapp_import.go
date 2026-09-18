@@ -377,10 +377,10 @@ func unpackNotAppVersionToFormula(notAppInfo devcenterapi.NotApp, notAppVersion 
 func unpackNotAppVersionBackendPkg(formula *formulalogic.Formula, zipPath string, remoteNotAppName string) (string, error) {
 	depot, _ := formulalogic.NewDepot()
 	backendDir := filepath.Dir(zipPath)
-	slog.Info("执行命令", "cmd", "unzip", zipPath)
+	slog.Info("执行命令", "cmd", []string{"unzip", zipPath})
 	cmd := exec.Command("unzip", zipPath, "-d", backendDir)
 	message, err := cmd.CombinedOutput()
-	slog.Info("执行命令完成", "cmd", "unzip", zipPath, "dir", backendDir, "message", string(message), "err", err)
+	slog.Info("执行命令完成", "cmd", []string{"unzip", zipPath}, "dir", backendDir, "message", string(message), "err", err)
 	if err != nil {
 		return "", err
 	}
@@ -428,11 +428,11 @@ func unpackNotAppVersionBackendPkg(formula *formulalogic.Formula, zipPath string
 		return "", err
 	}
 
-	slog.Info("执行命令", "cmd", "zip -r", formula.Name+"_backend.zip", "dir", backendDir)
+	slog.Info("执行命令", "cmd", []string{"zip", "-r", formula.Name + "_backend.zip", "./"}, "dir", backendDir)
 	cmd = exec.Command("zip", "-r", formula.Name+"_backend.zip", "./")
 	cmd.Dir = backendDir
 	message, err = cmd.CombinedOutput()
-	slog.Info("执行命令完成", "cmd", "zip -r", formula.Name+"_backend.zip", "dir", filepath.Dir(backendDir), "message", string(message), "err", err)
+	slog.Info("执行命令完成", "cmd", []string{"zip", "-r", formula.Name + "_backend.zip", "./"}, "dir", filepath.Dir(backendDir), "message", string(message), "err", err)
 	if err != nil {
 		return "", err
 	}
@@ -446,10 +446,10 @@ func unpackNotAppVersionBackendPkg(formula *formulalogic.Formula, zipPath string
 
 func unpackNotAppVersionFrontendPkg(formula *formulalogic.Formula, zipPath string, remoteNotAppName string) (string, error) {
 	frontendDir := filepath.Dir(zipPath)
-	slog.Info("执行命令", "cmd", "unzip", zipPath)
+	slog.Info("执行命令", "cmd", []string{"unzip", zipPath})
 	cmd := exec.Command("unzip", zipPath, "-d", frontendDir)
 	message, err := cmd.CombinedOutput()
-	slog.Info("执行命令完成", "cmd", "unzip", zipPath, "dir", frontendDir, "message", string(message), "err", err)
+	slog.Info("执行命令完成", "cmd", []string{"unzip", zipPath}, "dir", frontendDir, "message", string(message), "err", err)
 	if err != nil {
 		return "", err
 	}
@@ -458,11 +458,11 @@ func unpackNotAppVersionFrontendPkg(formula *formulalogic.Formula, zipPath strin
 	formulaFrontendSavePath := fmt.Sprintf("/Storage/%s/%s%s", time.Now().Format("200601"), function.GetMd5(pathInfo.Filename+formula.Name+formula.Version), pathInfo.Extension)
 	frontendDir = filepath.Join(frontendDir, remoteNotAppName)
 
-	slog.Info("执行命令", "cmd", "zip -r", formula.Name+"_backend.zip", "dir", frontendDir)
+	slog.Info("执行命令", "cmd", []string{"zip", "-r", formula.Name + "_frontend.zip", "./"}, "dir", frontendDir)
 	cmd = exec.Command("zip", "-r", formula.Name+"_frontend.zip", "./")
 	cmd.Dir = frontendDir
 	message, err = cmd.CombinedOutput()
-	slog.Info("执行命令完成", "cmd", "zip -r", formula.Name+"_frontend.zip", "dir", filepath.Dir(frontendDir), "message", string(message), "err", err)
+	slog.Info("执行命令完成", "cmd", []string{"zip", "-r", formula.Name + "_frontend.zip", "./"}, "dir", filepath.Dir(frontendDir), "message", string(message), "err", err)
 	if err != nil {
 		return "", err
 	}

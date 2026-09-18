@@ -1018,7 +1018,7 @@ func (hc *HelmPack) generateContainerV2Values(container logic2.ContainerV2, appl
 		"volumeMounts":    container.VolumeMounts,
 		"livenessProbe":   container.LivenessProbe,
 		"startupProbe":    container.StartupProbe,
-		"readinessProb":   container.ReadinessProb,
+		"readinessProbe":  container.ReadinessProb,
 		"lifecycle":       container.Lifecycle,
 		"securityContext": hc.getSecurityContext(container),
 		"isInitContainer": container.IsInitContainer,

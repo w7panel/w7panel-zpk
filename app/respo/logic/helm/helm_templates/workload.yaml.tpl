@@ -130,6 +130,9 @@ spec:
           {{- with .startupProbe }}
           startupProbe: {{- toYaml . | nindent 12 }}
           {{- end }}
+          {{- with .readinessProbe }}
+          readinessProbe: {{- toYaml . | nindent 12 }}
+          {{- end }}
           {{- with .lifecycle }}
           lifecycle: {{- toYaml . | nindent 12 }}
           {{- end }}

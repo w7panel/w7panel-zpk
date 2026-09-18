@@ -71,8 +71,9 @@ beta:
 dev: clean
 	go run ${SOURCE_FILES} server:start
 
-test: clean
-	go test -v ./tests/...
+test:
+	go test . ./app/... ./common/...
+	cd cli && go test ./...
 
 clean:
 	go clean

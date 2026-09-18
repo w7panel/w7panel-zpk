@@ -227,18 +227,29 @@ func (c Attach) GetBackendZipFileContent(ctx *gin.Context) {
 
 func (c Attach) GetFrontendZipFileContent(ctx *gin.Context) {
 	type ParamsValidate struct {
-		Identifie string `uri:"identifie" binding:"required"`
-		Version   string `uri:"version" binding:"required"`
-		Path      string `uri:"path" binding:"required"`
-		Ticket    string `form:"ticket"`
+		Identifie       string `uri:"identifie" binding:"required"`
+		Version         string `uri:"version" binding:"required"`
+		Path            string `uri:"path" binding:"required"`
+		Ticket          string `form:"ticket"`
+		ParentIdentifie string `form:"parent_identifie"`
+		ParentVersion   string `form:"parent_version"`
 	}
 	params := ParamsValidate{}
 	if !c.Validate(ctx, &params) {
 		return
 	}
 
+	parentIdentifie := params.ParentIdentifie
+	if parentIdentifie == "" {
+		parentIdentifie = params.Identifie
+	}
+	parentVersion := params.ParentVersion
+	if parentVersion == "" {
+		parentVersion = params.Version
+	}
+
 	depot := c.getDepot()
-	formula, err := depot.GetFormula(params.Identifie, params.Version, nil)
+	formula, err := depot.GetFormula(parentIdentifie, parentVersion, nil)
 	if err != nil {
 		c.JsonResponseWithServerError(ctx, err)
 		return
@@ -257,7 +268,7 @@ func (c Attach) GetFrontendZipFileContent(ctx *gin.Context) {
 		}
 	}
 
-	content, err := depot.GetFrontendZipFileContent(formula, params.Path)
+	content, err := depot.GetFrontendZipFileContent(formula, params.Identifie, params.Path)
 	if err != nil {
 		c.JsonResponseWithServerError(ctx, err)
 		return

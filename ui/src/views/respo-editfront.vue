@@ -112,6 +112,39 @@ export default {
         },
     },
     methods: {
+        getManifestOrder(manifest) {
+            try {
+                const json = typeof manifest == 'string'
+                    ? (jsyaml.load(manifest) || {})
+                    : (manifest || {});
+                const order = json?.application?.order;
+                return order === undefined || order === null || order === ''
+                    ? null
+                    : order;
+            } catch {
+                return null;
+            }
+        },
+        sortChildApplications(dependencies = []) {
+            return dependencies
+                .map((dependency, index) => ({
+                    dependency,
+                    index,
+                    order: this.getManifestOrder(dependency?.manifest),
+                }))
+                .sort((first, second) => {
+                    const firstOrder = Number(first.order);
+                    const secondOrder = Number(second.order);
+                    const firstHasOrder = first.order !== null && Number.isFinite(firstOrder);
+                    const secondHasOrder = second.order !== null && Number.isFinite(secondOrder);
+                    if (firstHasOrder && secondHasOrder && firstOrder !== secondOrder) {
+                        return firstOrder - secondOrder;
+                    }
+                    if (firstHasOrder !== secondHasOrder) return firstHasOrder ? -1 : 1;
+                    return first.index - second.index;
+                })
+                .map(item => item.dependency);
+        },
         getManifestAppPorts(manifest) {
             let json = typeof manifest == 'string' ? (jsyaml.load(manifest) || {}) : (manifest || {});
             let ports = [];
@@ -245,7 +278,9 @@ export default {
                         i.manifest = this.list[i.identifie + '/manifest.yaml'] || defaultManifest;
                         i.title = i.identifie + '/manifest.yaml';
                     });
-                    this.depends = JSON.parse(JSON.stringify(depends))
+                    this.depends = this.sortChildApplications(
+                        JSON.parse(JSON.stringify(depends)),
+                    );
                 }
             });
         },
@@ -336,7 +371,9 @@ export default {
                     i.manifest = (this.list[i.identifie + '/manifest.yaml'] || defaultManifest)?.replace(/backend_port: 0/g, 'backend_port:');
                     i.title = i.identifie + '/manifest.yaml';
                 });
-                this.depends = JSON.parse(JSON.stringify(this.depends));
+                this.depends = this.sortChildApplications(
+                    JSON.parse(JSON.stringify(this.depends)),
+                );
             })
         },
         edit(data) {

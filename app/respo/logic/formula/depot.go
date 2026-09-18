@@ -45,6 +45,10 @@ const (
 	SETTING_TYPE_ICON    = 3
 )
 
+var (
+	ErrFrontendPackageNotFound = errors.New("前端包不存在")
+)
+
 func RegisterDepot() error {
 	err := facade.GetContainer().NamedSingleton("depot", func() *Depot {
 		depot := &Depot{}
@@ -545,12 +549,14 @@ func (self *Depot) GetBackendZipFileContent(formula *Formula, path string) ([]by
 	return io.ReadAll(file)
 }
 
-func (self *Depot) GetFrontendZipFileContent(formula *Formula, path string) ([]byte, error) {
-	if _, exists := formula.WebZipPaths[formula.Name]; !exists {
-		return nil, nil
+func (self *Depot) GetFrontendZipFileContent(formula *Formula, identifie, path string) ([]byte, error) {
+	frontendIdentifie := strings.ReplaceAll(identifie, "_", "-")
+	webZipPath, exists := formula.WebZipPaths[frontendIdentifie]
+	if !exists {
+		return nil, fmt.Errorf("%w: %s", ErrFrontendPackageNotFound, identifie)
 	}
 
-	zipPath := filepath.Join(self.basePath, formula.WebZipPaths[formula.Name])
+	zipPath := filepath.Join(self.basePath, webZipPath)
 	cacheRoot := filepath.Join(os.TempDir(), "w7panel-zpk", "zip_file_cache")
 	return attachlogic.Attach{}.GetZipFileContent(cacheRoot, zipPath, path)
 }

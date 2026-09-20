@@ -1080,30 +1080,40 @@ export default {
             this.syncSysboxDependency();
             this._initializing = false;
         },
-        submit(otherData, callback) {
+        submit(otherData, callback, errorCallback) {
             if (this.submitStartParamsOnly(otherData, callback)) return;
+
+            const fail = () => {
+                if (typeof errorCallback == 'function') errorCallback();
+            };
 
             this.$refs.formref.validate(async (errors) => {
                 if (errors) {
                     messageWarning(this.form.type == 'tradition'
                         ? '请检查传统应用配置中的错误项'
                         : '必填项不能为空');
+                    fail();
                     return;
                 }
 
                 const sysboxContainerNameError = this.validateSysboxContainerName();
                 if (sysboxContainerNameError) {
                     messageWarning(sysboxContainerNameError);
+                    fail();
                     return;
                 }
 
                 if (this.form.type == 'gateway-plugin') {
                     if (!this.form.gatewayPluginSupportGlobal && !this.form.gatewayPluginSupportRule) {
                         messageWarning('请至少选择一种支持范围');
+                        fail();
                         return;
                     }
                     const defaultConfig = this.parseGatewayPluginDefaultConfig(true);
-                    if (defaultConfig === null) { return }
+                    if (defaultConfig === null) {
+                        fail();
+                        return;
+                    }
                     this.json.platform.gatewayPlugin.defaultConfig = defaultConfig;
                 }
 
@@ -1120,6 +1130,7 @@ export default {
                     }
                 } catch (error) {
                     messageError(error?.response?.data?.error || error?.message || '制品配置保存失败');
+                    fail();
                     return;
                 }
 
@@ -1147,7 +1158,7 @@ export default {
                 }
                 this.yaml = jsyaml.dump(this.json);
 
-                this.$emit('complete', this.json, this.yaml, otherData, callback);
+                this.$emit('complete', this.json, this.yaml, otherData, callback, errorCallback);
             });
         },
         changeFormtype(nextType) {

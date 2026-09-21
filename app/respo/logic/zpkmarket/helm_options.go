@@ -65,7 +65,7 @@ func buildMenus(goodsID int32, orderSN string) []commonlogic.Menu {
 
 	return []commonlogic.Menu{{
 		Title:        "授权与续费",
-		Do:           "#/user-orders?tab=orders&order_sn=" + url.QueryEscape(orderSN),
+		Do:           "#/user-orders?tab=orders&order_sn=" + url.QueryEscape(orderSN) + "&include_related=1",
 		Location:     "left",
 		DisplayOrder: 0,
 	}}

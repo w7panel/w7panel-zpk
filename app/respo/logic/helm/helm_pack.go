@@ -70,6 +70,7 @@ type HelmPack struct {
 	IsSubFormula           bool
 	SharedStorageTargetApp string
 	Sidecars               []HelmSidecar
+	MicroAppPresentation   MicroAppPresentation
 }
 
 type helmValuesOptions struct {
@@ -1210,10 +1211,10 @@ func (hc *HelmPack) generateMicroAppTemplate(rootDir string, manifest logic2.Man
 		return err
 	}
 
-	return writeMicroAppTemplate(rootDir, manifest.Application, hc.IsSubFormula)
+	return writeMicroAppTemplate(rootDir, manifest.Application, hc.IsSubFormula, hc.MicroAppPresentation)
 }
 
-func writeMicroAppTemplate(rootDir string, application logic2.Application, isSubFormula bool) error {
+func writeMicroAppTemplate(rootDir string, application logic2.Application, isSubFormula bool, presentation MicroAppPresentation) error {
 	microAppFilePath := filepath.Join(rootDir, "microapp.yaml")
 	if function.FileExists(microAppFilePath) {
 		return nil
@@ -1239,14 +1240,22 @@ func writeMicroAppTemplate(rootDir string, application logic2.Application, isSub
 	if isSubFormula {
 		microAppResourceName = "{{ $fullName }}"
 	}
+	presentationLabel := ""
+	presentationAnnotation := ""
+	if presentation.Key != "" {
+		presentationLabel = fmt.Sprintf("    w7.cc/presentation-key: %s", strconv.Quote(presentation.Key))
+		presentationAnnotation = fmt.Sprintf("    w7.cc/presentation-mode: %s", strconv.Quote(presentation.Mode))
+	}
 	microAppTemplate = renderHelmTemplatePlaceholders(microAppTemplate, map[string]string{
-		"__APPLICATION_TYPE__":       application.Type,
-		"__APPLICATION_IDENTIFY__":   application.Identifie,
-		"__APPLICATION_VERSION__":    application.Version,
-		"__MANIFEST_TYPE__":          manifestType,
-		"__APP_TITLE__":              strconv.Quote(appName),
-		"__MICROAPP_ORDER__":         strconv.Itoa(application.Order),
-		"__MICROAPP_RESOURCE_NAME__": microAppResourceName,
+		"__APPLICATION_TYPE__":        application.Type,
+		"__APPLICATION_IDENTIFY__":    application.Identifie,
+		"__APPLICATION_VERSION__":     application.Version,
+		"__MANIFEST_TYPE__":           manifestType,
+		"__APP_TITLE__":               strconv.Quote(appName),
+		"__MICROAPP_ORDER__":          strconv.Itoa(application.Order),
+		"__MICROAPP_RESOURCE_NAME__":  microAppResourceName,
+		"__PRESENTATION_LABEL__":      presentationLabel,
+		"__PRESENTATION_ANNOTATION__": presentationAnnotation,
 	})
 
 	return writeFile(microAppFilePath, microAppTemplate)

@@ -34,9 +34,11 @@ metadata:
     {{- range .Values.backend_config }}
     role.w7.cc/{{ .role }}: "true"
     {{- end }}
+__PRESENTATION_LABEL__
   annotations:
     w7.cc/version: "__APPLICATION_VERSION__"
     w7.cc/manifest-type: "__MANIFEST_TYPE__"
+__PRESENTATION_ANNOTATION__
 spec:
   title: __APP_TITLE__
   frontendUrl: /ui/microapp/__APPLICATION_IDENTIFY__/__APPLICATION_VERSION__/index.html

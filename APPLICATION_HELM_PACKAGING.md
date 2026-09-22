@@ -258,6 +258,8 @@ Job 默认 `backoffLimit: 2`、完成 60 秒后清理。安装前/删除后的 J
 
 `${VALUE_NAME}` 会在打包时转为 `{{ .Values.VALUE_NAME }}`；`${system.xxx}` 保持原样。子应用的 MicroApp 名称使用子 Chart fullname，根应用使用 release name。
 
+动态 MicroApp 子 Chart 可以声明展示协议：`metadata.labels["w7.cc/presentation-key"]` 表示能力类型，`metadata.annotations["w7.cc/presentation-mode"]` 表示同一能力按 `singleton` 只展示一个或按 `multiple` 展示多个。ZPK Market 动态 MicroApp 使用 `presentation-key=zpk-market`、`presentation-mode=singleton`；应用插件也生成该 MicroApp，由面板沿用 AppGroup 依赖关系聚合，并按现有 MicroApp 显示顺序只展示第一个市场入口。
+
 `registerSite=true` 时根 Chart 还会生成 `Site` CR，绑定当前 `AppGroup`，并自动下载 `w7panel-cloudnoauth` Chart 作为 sidecar/local dependency。用户提供的 Helm Chart 若要真正装载 sidecar 容器，自己的 workload 模板必须调用 `_w7panel-sidecars.tpl` 规定的 include 插槽；ZPK 不会重写用户 workload。
 
 ## 5. 原生应用（`docker`）

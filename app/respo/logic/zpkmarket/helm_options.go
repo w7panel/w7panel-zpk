@@ -10,12 +10,9 @@ import (
 
 const microAppChartName = "zpk-market"
 const microAppOrder = 9999
+const microAppPresentationKey = "zpk-market"
 
 func BuildHelmOptions(application commonlogic.Application, marketURL string, goodsID int32, orderSN string) []helm.DynamicHelmPackageOption {
-	if application.Type == commonlogic.PluginApp {
-		return nil
-	}
-
 	bindings := buildBindings(marketURL, goodsID, orderSN)
 	if len(bindings) == 0 {
 		return nil
@@ -33,7 +30,10 @@ func BuildHelmOptions(application commonlogic.Application, marketURL string, goo
 	application.Order = microAppOrder
 
 	return []helm.DynamicHelmPackageOption{
-		helm.WithMicroAppSubchart(microAppChartName, application, bindings),
+		helm.WithPresentedMicroAppSubchart(microAppChartName, application, bindings, helm.MicroAppPresentation{
+			Key:  microAppPresentationKey,
+			Mode: helm.MicroAppPresentationModeSingleton,
+		}),
 	}
 }
 

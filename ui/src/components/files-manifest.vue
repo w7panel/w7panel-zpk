@@ -285,21 +285,24 @@
 
                             <a-alert v-if="form.type == 'tradition'" type="info" show-icon
                                 class="zpk-primary-alert mt-16 mb-20" title="说明" :closable="false">
-                                <div class="registry-alert-item">1. 传统应用会作为独立应用安装，运行方式固定为 Deployment。</div>
-                                <div class="registry-alert-item mt-6">2. 安装时通过“传统应用版本”启动参数替换运行容器镜像中的 {version}。</div>
-                                <div class="registry-alert-item mt-6">3. 传统应用容器的启动命令可在页面下方“应用配置”中配置。</div>
-                                <div class="registry-alert-item mt-6">4. 页面下方“脚本配置”中的安装、升级脚本只在安装或升级此制品时执行。</div>
+                                <div class="registry-alert-item">1. 运行方式：传统应用会作为独立应用安装。</div>
+                                <div class="registry-alert-item mt-6">2. 代码包：代码包为可选配置。请进入项目根目录后打包，压缩包根目录应直接包含安装内容，不要包含外层目录。例如：<code>cd 项目目录 &amp;&amp; zip -r app.zip .</code>。安装时会解压到 <code>/www/wwwroot/&lt;站点域名&gt;</code>，并随当前版本发布。</div>
+                                <div class="registry-alert-item mt-6">3. 镜像版本：安装时通过“传统应用版本”启动参数替换运行容器镜像中的 {version}。</div>
+                                <div class="registry-alert-item mt-6">4. 启动命令：传统应用容器的启动命令可在页面下方“应用配置”中配置。</div>
+                                <div class="registry-alert-item mt-6">5. 生命周期脚本：页面下方“脚本配置”中的安装、升级脚本只在安装或升级此制品时执行。</div>
                             </a-alert>
 
                             <a-alert v-if="form.type == 'app-plugin'" type="info" show-icon
                                 class="zpk-primary-alert mt-16 mb-20" title="说明" :closable="false">
-                                <div class="registry-alert-item">1. 系统只负责安装代码包，不会自动删除插件文件。</div>
-                                <div class="registry-alert-item mt-6">2. 请在脚本配置中添加“卸载前执行”或“卸载后执行”，由插件自行完成清理。</div>
-                                <div class="registry-alert-item mt-6">3. 可使用下面的写法取得当前传统应用的实际站点目录并清理插件文件：</div>
-                                <div class="mt-6"><code v-pre>code_install_path={{ print "/www/wwwroot/" (include "plugin.codeInstallDirectory" .) | quote }}</code></div>
-                                <div><code v-pre>plugin_install_path="$code_install_path/addons/your-plugin"</code></div>
+                                <div class="registry-alert-item">1. 代码包：请在应用插件的外层目录打包，并保留插件安装所需的完整目录结构。例如微擎插件需要将 <code>addon</code> 目录一起打包，使压缩包根目录直接包含 <code>addon</code> 目录。安装时会解压到 <code>/www/wwwroot/&lt;站点域名&gt;</code>，并随当前版本发布。</div>
+                                <div class="registry-alert-item mt-6">2. 卸载清理：系统只负责安装代码包，不会自动删除插件文件。</div>
+                                <div class="registry-alert-item mt-6">3. 卸载脚本：请在脚本配置中添加“卸载前执行”或“卸载后执行”，由插件自行完成清理。</div>
+                                <div class="registry-alert-item mt-6">4. 安装路径：可使用下面的写法取得当前传统应用的实际站点目录并清理插件文件：</div>
+                                <div class="mt-6"><code v-pre>set -eu</code></div>
+                                <div><code v-pre>code_install_path={{ print "/www/wwwroot/" (include "plugin.codeInstallDirectory" .) | quote }}</code></div>
+                                <div><code v-pre>plugin_install_path="$code_install_path/addon/your-plugin"</code></div>
                                 <div><code v-pre>rm -rf -- "$plugin_install_path"</code></div>
-                                <div class="registry-alert-item mt-6">4. 请将 <code>addons/your-plugin</code> 替换为插件真实目录。不要直接删除 <code>code_install_path</code>，否则会清空整个站点；如果插件文件散落在站点根目录，请在脚本中逐项删除插件拥有的文件。</div>
+                                <div class="registry-alert-item mt-6">5. 安全提示：请将 <code>addon/your-plugin</code> 替换为插件真实目录。不要直接删除 <code>code_install_path</code>，否则会清空整个站点；如果插件文件散落在站点根目录，请在脚本中逐项删除插件拥有的文件。</div>
                             </a-alert>
 
                             <a-form-item v-if="form.type == 'tradition'" label="传统应用配置"
@@ -424,16 +427,6 @@
                                         </div>
                                     </files-upload>
                                     <div class="c-blue cursor ml-20" @click="deleteUpload">删除</div>
-                                    <a-tooltip v-if="form.type == 'app-plugin'"
-                                        content="请在应用插件的外层目录打包，并保留插件安装所需的完整目录结构。例如微擎插件需要将 addons 目录一起打包，使压缩包根目录直接包含 addons 目录。安装时会解压到 /www/wwwroot/&lt;站点域名&gt;，并随当前版本发布。"
-                                        position="top">
-                                        <icon-exclamation-circle-fill class="fs-16 c-99 ml-4" />
-                                    </a-tooltip>
-                                    <a-tooltip v-else-if="form.type == 'tradition'"
-                                        content="代码包为可选配置。请进入项目根目录后打包，压缩包根目录应直接包含安装内容，不要包含外层目录。例如：cd 项目目录 && zip -r app.zip .。安装时会解压到 /www/wwwroot/&lt;站点域名&gt;，并随当前版本发布。"
-                                        position="top">
-                                        <icon-exclamation-circle-fill class="fs-16 c-99 ml-4" />
-                                    </a-tooltip>
                                 </div>
                                 <div v-if="zip.hasDockerfile === false && !['tradition', 'app-plugin'].includes(form.type)" class="c-red mt-10">没有检测到Dockerfile文件，请重新上传
                                 </div>

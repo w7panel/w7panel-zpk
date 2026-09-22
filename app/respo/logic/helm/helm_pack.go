@@ -37,6 +37,8 @@ type Maintainer struct {
 	URL   string `yaml:"url,omitempty" json:"url"`
 }
 
+const internalPostDeleteShellType = "internal-post-delete"
+
 // ChartYAML 结构体
 type ChartYAML struct {
 	APIVersion   string            `yaml:"apiVersion" json:"apiVersion"`
@@ -1304,33 +1306,30 @@ func (hc *HelmPack) buildShellJobValues(items []logic2.Shell) []map[string]inter
 		hookName := ""
 		switch item.Type {
 		case "pre-install,pre-upgrade":
-			// The shared install/upgrade preparation must run before every other
-			// shell hook in either lifecycle phase.
+			// Run managed package installation after the user-defined
+			// pre-install/pre-upgrade hooks and before the matching post hook.
 			shellWeight = -6
 			hookName = "pre-install,pre-upgrade"
-		case "requireinstall":
-			shellWeight = -5
-			hookName = "pre-install"
 		case "pre-install":
-			shellWeight = -4
+			shellWeight = -7
 			hookName = "pre-install"
 		case "pre-upgrade":
-			shellWeight = -4
+			shellWeight = -7
 			hookName = "pre-upgrade"
-		case "install":
-			shellWeight = -3
-			hookName = "post-install"
 		case "post-install":
-			shellWeight = -2
+			shellWeight = -3
 			hookName = "post-install"
-		case "upgrade":
+		case "post-upgrade":
 			shellWeight = -3
 			hookName = "post-upgrade"
-		case "post-upgrade":
-			shellWeight = -2
-			hookName = "post-upgrade"
-		case "uninstall":
+		case "pre-delete":
+			shellWeight = -7
+			hookName = "pre-delete"
+		case "post-delete":
 			shellWeight = -1
+			hookName = "post-delete"
+		case internalPostDeleteShellType:
+			shellWeight = -2
 			hookName = "post-delete"
 		case "custom":
 			shellWeight = 0

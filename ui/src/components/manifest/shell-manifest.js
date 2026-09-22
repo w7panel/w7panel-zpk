@@ -14,14 +14,26 @@ export function shellManifestState() {
     };
 }
 
+const legacyShellTypeAliases = Object.freeze({
+    requireinstall: 'pre-install',
+    install: 'post-install',
+    upgrade: 'post-upgrade',
+    uninstall: 'post-delete',
+});
+
+function normalizeShellType(type) {
+    return legacyShellTypeAliases[type] || type;
+}
+
 export const shellManifestComputed = {
     shellTypeOptions() {
         return [
-            { label: '安装前执行', value: 'requireinstall' },
-            { label: '安装后执行', value: 'install' },
+            { label: '安装前执行', value: 'pre-install' },
+            { label: '安装后执行', value: 'post-install' },
             { label: '升级前执行', value: 'pre-upgrade' },
-            { label: '升级后执行', value: 'upgrade' },
-            { label: '卸载后执行', value: 'uninstall' },
+            { label: '升级后执行', value: 'post-upgrade' },
+            { label: '卸载前执行', value: 'pre-delete' },
+            { label: '卸载后执行', value: 'post-delete' },
             { label: '手动触发', value: 'custom' },
         ];
     },
@@ -55,9 +67,13 @@ export const shellManifestWatch = {
 
 export const shellManifestMethods = {
     initShellManifest(platform = {}) {
-        this.form.shell = JSON.parse(JSON.stringify(
+        const shells = JSON.parse(JSON.stringify(
             platform.shells || platform?.['container-v2']?.[0]?.shells || [],
         ));
+        this.form.shell = shells.map(item => item ? {
+            ...item,
+            type: normalizeShellType(item.type),
+        } : item);
         this.fillDefaultShellContainer();
     },
     addShellTask() {

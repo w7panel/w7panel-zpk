@@ -164,7 +164,7 @@ func (hc *HelmPack) traditionAppHelmValuesOptions() helmValuesOptions {
 	options.platform = withTraditionAppImages(platform)
 	options.platform.Shells = append([]logic2.Shell(nil), options.platform.Shells...)
 	if strings.TrimSpace(hc.Manifest.Source.Url) != "" {
-		// Keep one highest-priority pre-install,pre-upgrade hook rather than
+		// Keep one pre-install,pre-upgrade hook rather than
 		// separate install/upgrade jobs.
 		options.platform.Shells = append(options.platform.Shells,
 			logic2.Shell{
@@ -175,7 +175,7 @@ func (hc *HelmPack) traditionAppHelmValuesOptions() helmValuesOptions {
 			},
 			logic2.Shell{
 				Title: traditionCodeUninstallJobTitle,
-				Type:  "uninstall",
+				Type:  internalPostDeleteShellType,
 				Image: managedCodeInstallShellImage,
 				Shell: traditionCodeUninstallShell,
 			},
@@ -195,7 +195,7 @@ func (hc *HelmPack) traditionAppHelmValuesOptions() helmValuesOptions {
 			},
 			logic2.Shell{
 				Title: traditionNginxVhostUninstallJobTitle,
-				Type:  "uninstall",
+				Type:  internalPostDeleteShellType,
 				Image: managedCodeInstallShellImage,
 				Shell: traditionNginxVhostUninstallShell,
 			},

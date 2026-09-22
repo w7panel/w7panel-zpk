@@ -291,6 +291,17 @@
                                 <div class="registry-alert-item mt-6">4. 页面下方“脚本配置”中的安装、升级脚本只在安装或升级此制品时执行。</div>
                             </a-alert>
 
+                            <a-alert v-if="form.type == 'app-plugin'" type="info" show-icon
+                                class="zpk-primary-alert mt-16 mb-20" title="说明" :closable="false">
+                                <div class="registry-alert-item">1. 系统只负责安装代码包，不会自动删除插件文件。</div>
+                                <div class="registry-alert-item mt-6">2. 请在脚本配置中添加“卸载前执行”或“卸载后执行”，由插件自行完成清理。</div>
+                                <div class="registry-alert-item mt-6">3. 可使用下面的写法取得当前传统应用的实际站点目录并清理插件文件：</div>
+                                <div class="mt-6"><code v-pre>code_install_path={{ print "/www/wwwroot/" (include "plugin.codeInstallDirectory" .) | quote }}</code></div>
+                                <div><code v-pre>plugin_install_path="$code_install_path/addons/your-plugin"</code></div>
+                                <div><code v-pre>rm -rf -- "$plugin_install_path"</code></div>
+                                <div class="registry-alert-item mt-6">4. 请将 <code>addons/your-plugin</code> 替换为插件真实目录。不要直接删除 <code>code_install_path</code>，否则会清空整个站点；如果插件文件散落在站点根目录，请在脚本中逐项删除插件拥有的文件。</div>
+                            </a-alert>
+
                             <a-form-item v-if="form.type == 'tradition'" label="传统应用配置"
                                 class="tradition-config-item">
                                 <a-spin :loading="formulaSettingLoading" class="tradition-config-spin">
@@ -1870,6 +1881,7 @@ export default {
 .show-on-hover-container:hover .show-on-hover {
     display: block;
 }
+
 </style>
 <style>
 .menulocation .arco-radio {

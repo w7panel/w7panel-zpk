@@ -23,19 +23,6 @@ trap 'rm -f "$tmp_zip"' EXIT
 wget -q -O "$tmp_zip" "$code_package_url"
 unzip -oq "$tmp_zip" -d "$code_install_path"`
 
-// pluginCodeUninstallShell clears the site directory while keeping the
-// subPath mount point itself. Removing the mount point directly would fail
-// with "device or resource busy" inside the Job container.
-const pluginCodeUninstallShell = `set -eu
-code_install_path={{ print "/www/wwwroot/" (include "plugin.codeInstallDirectory" .) | quote }}
-case "$code_install_path" in
-  /www/wwwroot/?*) ;;
-  *) echo "refusing to clean invalid traditional application path" >&2; exit 1 ;;
-esac
-if [ -d "$code_install_path" ]; then
-  find "$code_install_path" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} \;
-fi`
-
 // pluginPodAffinityValues keeps plugin workloads that use a traditional
 // application's ReadWriteOnce storage on the same node as that application.
 func pluginPodAffinityValues(identify string) map[string]interface{} {
@@ -158,18 +145,13 @@ func (hc *HelmPack) generatePluginAppTemplates(rootDir string) error {
 func (hc *HelmPack) getPluginAppShells() []logic2.Shell {
 	shells := append([]logic2.Shell(nil), hc.Manifest.Platform.Shells...)
 	if strings.TrimSpace(hc.Manifest.Source.Url) != "" {
-		// Keep one highest-priority pre-install,pre-upgrade hook rather than
+		// Keep one pre-install,pre-upgrade hook rather than
 		// separate install/upgrade jobs.
 		shells = append(shells, logic2.Shell{
 			Title: "安装应用插件代码",
 			Type:  "pre-install,pre-upgrade",
 			Image: managedCodeInstallShellImage,
 			Shell: pluginCodeInstallShell,
-		}, logic2.Shell{
-			Title: "卸载应用插件代码",
-			Type:  "uninstall",
-			Image: managedCodeInstallShellImage,
-			Shell: pluginCodeUninstallShell,
 		})
 	}
 	if image := hc.getPluginRuntimeImage(); image != "" {

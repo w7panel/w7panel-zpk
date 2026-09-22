@@ -218,18 +218,19 @@ OCI repository 名为：
 
 | manifest type | Helm hook | weight |
 | --- | --- | --- |
-| `pre-install,pre-upgrade` | `pre-install,pre-upgrade` | -6 |
-| `requireinstall` | `pre-install` | -5 |
-| `pre-install` | `pre-install` | -4 |
-| `pre-upgrade` | `pre-upgrade` | -4 |
-| `install` | `post-install` | -3 |
-| `post-install` | `post-install` | -2 |
-| `upgrade` | `post-upgrade` | -3 |
-| `post-upgrade` | `post-upgrade` | -2 |
-| `uninstall` | `post-delete` | -1 |
+| `pre-install` | `pre-install` | -7 |
+| `pre-install,pre-upgrade`（系统包任务） | `pre-install,pre-upgrade` | -6 |
+| `post-install` | `post-install` | -3 |
+| `pre-upgrade` | `pre-upgrade` | -7 |
+| `post-upgrade` | `post-upgrade` | -3 |
+| `pre-delete` | `pre-delete` | -7 |
+| `post-delete` | `post-delete` | -1 |
 | `custom` | 非 Helm hook，Job 初始 `suspend: true` | 0 |
 
 Job 默认 `backoffLimit: 2`、完成 60 秒后清理。安装前/删除后的 Job 使用 preferred affinity，其他阶段使用 required affinity，避免首次安装时目标 Workload 尚不存在导致无法调度。
+编辑器使用 Helm 标准事件名。安装前和升级前的自定义脚本会先于系统生成的 `pre-install,pre-upgrade` 包任务执行，安装后和升级后脚本在对应的 post hook 阶段执行；卸载前使用 `pre-delete`，卸载后使用 `post-delete`。
+编辑器读取历史数据时会将 `requireinstall/install/upgrade/uninstall` 分别转换为 `pre-install/post-install/post-upgrade/post-delete`，保存后只保留标准事件名；打包器不再处理旧名称。
+传统应用系统生成的代码和配置卸载任务使用内部事件 `internal-post-delete`；打包时映射为 `post-delete`、权重 `-2`，因此会在用户的 `pre-delete` 之后、用户的 `post-delete`（权重 `-1`）之前执行。应用插件不生成内置卸载任务。
 
 ### 4.6 子 Chart 与共享存储亲和性
 
@@ -349,7 +350,22 @@ info 接口会再解析/生成 `<TRADITION_APP>_RELEASE_NAME`。已有订单绑�
 打包器自动追加：
 
 - `pre-install,pre-upgrade`：用 `busybox:stable-uclibc` 下载 zip，并解压到 `/www/wwwroot/<domain>`。
-- `post-delete`：只清空站点目录内容，不删除 PVC 和挂载点。
+
+应用插件不会自动追加卸载任务。开发者必须通过 `pre-delete` 或 `post-delete` 自定义脚本自行清理插件文件。可按下面方式获取与安装任务一致的站点目录并删除插件自己的子目录：
+
+```sh
+set -eu
+
+# 实际目录示例：code_install_path="/www/wwwroot/example.com"
+code_install_path={{ print "/www/wwwroot/" (include "plugin.codeInstallDirectory" .) | quote }}
+
+# 改成插件自己拥有的相对目录
+plugin_install_path="$code_install_path/addons/your-plugin"
+
+rm -rf -- "$plugin_install_path"
+```
+
+不能直接删除 `$code_install_path`，否则会清空整个站点。如果插件文件散落在站点根目录，卸载脚本应逐项删除插件拥有的文件。
 
 域名会去掉 `http://`、`https://` 和末尾 `/`，且只允许字母、数字、点、下划线和中划线，防止路径逃逸。
 

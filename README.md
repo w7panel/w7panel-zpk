@@ -10,6 +10,8 @@ manifest 使用 `application.order` 声明 MicroApp 顺序。生成的 MicroApp 
 
 `market` 菜单默认只对 `founder` 显示，使用现有 MicroApp 字段，不新增 `external_services`、`roles`、`icon` 或 `key` 协议字段。
 
+非网关插件制品的默认前端注入表包含 `reverse_dependent_apps: ${system.reverse_dependent_apps}`，值由面板根据 MicroApp 的反向依赖标签注入；每项包含 `appgroup`、`identifie`、`type`、`title`、`version`。
+
 市场域名只写入 `backend_config[role=zpk-market].backend_url`，菜单 `do` 仅写入 `#/user-orders?...` 路由；应用详情页通过 Binding 名称选择同名运行配置。
 
 市场前端地址通过环境变量 `DEPOT_MARKET_FRONTEND_URL` 配置，默认值为 `https://zm.w7.com`。

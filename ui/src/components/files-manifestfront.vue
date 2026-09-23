@@ -1244,7 +1244,7 @@ export default {
             }));
         },
         frontendDefaultProps() {
-            return [
+            const props = [
                 {
                     key: 'url',
                     value: this.wrapConfigVariable('system.url'),
@@ -1291,6 +1291,14 @@ export default {
                     description: '微擎云端用户 access token',
                 }
             ];
+            if (this.form.type !== 'gateway-plugin') {
+                props.push({
+                    key: 'reverse_dependent_apps',
+                    value: this.wrapConfigVariable('system.reverse_dependent_apps'),
+                    description: '反向依赖当前应用的应用列表；每项包含 appgroup、identifie、type、title、version',
+                });
+            }
+            return props;
         },
         variableGroups() {
             return [

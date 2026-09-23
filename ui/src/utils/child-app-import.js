@@ -20,12 +20,14 @@ export function childImportRepositoryURL(tab) {
         : '/respo/list';
 }
 
-export function normalizeChildImportList(list = []) {
+export function normalizeChildImportList(list = [], repositoryBaseURL = '') {
+    const sourceRepositoryURL = String(repositoryBaseURL || '').trim().replace(/\/+$/, '');
     return (Array.isArray(list) ? list : [])
         .filter(item => item?.identifie && item?.install_only_once)
         .map(item => ({
             ...item,
             name: item.name || item.identifie,
+            sourceRepositoryURL,
         }));
 }
 
@@ -33,7 +35,13 @@ export function fetchChildImportList(client, tab, params = {}) {
     return client.get(childImportRepositoryURL(tab), {
         params,
         dontalert: true,
-    }).then(response => normalizeChildImportList(response?.data?.data?.list || []));
+    }).then(response => {
+        const data = response?.data?.data || {};
+        // The request base may point at the panel's micro-app proxy. Persist
+        // the repository's public URL returned by the repository itself.
+        const repositoryBaseURL = data.webUrl || childImportRepositoryBaseURL(tab);
+        return normalizeChildImportList(data.list || [], repositoryBaseURL);
+    });
 }
 
 export function childImportRepositoryURLFromSource(source) {

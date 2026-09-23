@@ -498,6 +498,9 @@ export default {
         async importChild(record, tab = 'local') {
             if (!record?.identifie || this.importPicker.importing
                 || !this.ensureMainManifestSaved()) { return; }
+            const sourceRepositoryURL = String(
+                record.sourceRepositoryURL || childImportRepositoryBaseURL(tab),
+            ).trim().replace(/\/+$/, '');
             const dependency = {
                 identifie: record.identifie,
                 goodsId: Number(record.goods_id || record.goodsId || record.id || 0),
@@ -506,7 +509,7 @@ export default {
                 subname: '',
                 required: true,
                 type: 'in',
-                from: childImportRepositoryBaseURL(tab),
+                from: sourceRepositoryURL,
                 version: record.version?.name || '',
             };
             this.importPicker.importing = true;

@@ -261,12 +261,6 @@ export const dependencyManifestMethods = {
             });
         });
     },
-    changeDepend(index, data) {
-        if (!this.form.dependsIn?.[index]) return;
-        this.form.dependsIn[index] = data;
-        this.changeForm();
-        this.submit({ stop: true });
-    },
     addImportedDependencies(dependencies = []) {
         const imported = Array.isArray(dependencies) ? dependencies : [];
         const importedIdentifies = new Set(imported.map(item => item?.identifie).filter(Boolean));

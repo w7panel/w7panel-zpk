@@ -829,6 +829,9 @@ func (hc *HelmPack) generateValuesYaml(rootDir string, options helmValuesOptions
 		},
 		"w7panelSidecars": sidecarChartReferences(hc.Sidecars),
 	}
+	if len(hc.Sidecars) > 0 {
+		values["w7panelArtifact"] = map[string]interface{}{"serviceAccountName": `{{ include "common.serviceAccountName" . }}`}
+	}
 	if hc.Manifest.Application.Type == logic2.TraditionApp || hc.Manifest.Application.Type == logic2.SystemImageApp {
 		values["preserveRuntimeImageVersion"] = true
 	}

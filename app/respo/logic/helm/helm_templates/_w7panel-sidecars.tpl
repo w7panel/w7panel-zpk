@@ -179,9 +179,18 @@ instead of special-casing a particular annotation key.
 
 {{- define "w7panel.sidecars.resources" -}}
 {{- $root := . -}}
+{{- $artifactConfig := $root.Values.w7panelArtifact | default dict -}}
+{{- $artifactServiceAccountTemplate := get $artifactConfig "serviceAccountName" | default "" -}}
+{{- $artifactServiceAccountName := "" -}}
+{{- if $artifactServiceAccountTemplate -}}
+  {{- $artifactServiceAccountName = tpl (toString $artifactServiceAccountTemplate) $root | trim -}}
+{{- end -}}
 {{- $resources := list -}}
 {{- range $sidecar := ($root.Values.w7panelSidecars | default list) -}}
-  {{- $context := index $root.Subcharts $sidecar.chart -}}
+  {{- $context := deepCopy (index $root.Subcharts $sidecar.chart) -}}
+  {{- if $artifactServiceAccountName -}}
+    {{- $_ := set $context "W7PanelArtifact" (dict "serviceAccountName" $artifactServiceAccountName) -}}
+  {{- end -}}
   {{- $template := index $context.Chart.Annotations "w7.cc/sidecar-resources-template" -}}
   {{- with $template -}}
     {{- $rendered := include . $context | trim -}}

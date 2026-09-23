@@ -546,13 +546,6 @@ export default {
             this.isEditing = true;
             this.inputContent(content);
         },
-        cancelEdit() {
-            this.isEditing = true;
-            this.inputContent(this.currentContent);
-            this.$nextTick(() => {
-                this.patchMavonMarkdown();
-            });
-        },
         openCreateDialog() {
             this.persistEditorContent();
             this.createDialog.show = true;

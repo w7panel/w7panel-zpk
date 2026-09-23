@@ -946,46 +946,6 @@ export default {
                 this.deleteLoading = false;
             })
         },
-        del(row) {
-            confirm({
-                title: '提示',
-                content: '确定要删除"' + row.label + '"吗',
-                confirmButtonText: "确定",
-                cancelButtonText: "取消",
-                onOk: () => myAxios.post('/respo/manifest/file', {
-                    identifie: this.identifie,
-                    filename: row.label,
-                    content: '',
-                    version: this.version_id,
-
-                }).then(() => {
-                    messageSuccess('删除成功');
-                    this.getInfo(this.identifie, () => {
-                        this.publish(1);
-                        setTimeout(() => {
-                            this.getFile();
-                        }, 300)
-                    })
-                })
-            });
-        },
-        jsonp(url, name, callback) {
-            var win = window?.rawWindow || window;
-            win[name] = (data) => {
-                callback(data);
-                win[name] = null;
-            };
-            let u = new URL(url);
-            u.searchParams.append('callback', name);
-            let script = document.createElement("script");
-            script.type = "text/javascript";
-            script.setAttribute('ignore', 'true')
-            script.async = true;
-            script.src = u.href;
-            script.onload = function () { document.body.removeChild(this); };
-            script.onerror = function () { document.body.removeChild(this); };
-            document.body.append(script);
-        },
     },
 }
 </script>

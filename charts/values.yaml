@@ -26,6 +26,9 @@ serviceAccount:
 podAnnotations: {}
 
 w7panelSidecars: []
+w7panelArtifact:
+  serviceAccountName: '{{ include "zpk.serviceAccountName" . }}'
+
 
 podSecurityContext: {}
   # fsGroup: 2000

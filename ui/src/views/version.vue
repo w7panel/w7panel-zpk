@@ -639,9 +639,6 @@ export default {
                 this.crossUpgrade.loading = false;
             });
         },
-        formatCrossUpgradeCandidate(item) {
-            return `${item.title || item.name || item.identifie}（¥${item.price || 0}）`;
-        },
         getFormulaSetting() {
             this.crossUpgrade.settingLoading = true;
             myAxios.post('/respo/setting/get', {
@@ -685,9 +682,6 @@ export default {
         handleMarketPublishEnabledChange(checked) {
             this.marketPublish.enabled = checked;
             this.saveFormulaSetting();
-        },
-        normalizeCrossUpgradeIdentifiers(value) {
-            return this.normalizeCrossUpgradeTargets(value).map(item => item.identifie).filter(Boolean);
         },
         normalizeCrossUpgradeTargets(value) {
             let list = value;
@@ -767,52 +761,6 @@ export default {
                 this.crossUpgrade.saving = false;
             });
         },
-
-
-        openPublishGoods(row) {
-            this.publishGoods = {
-                show: true,
-                loading: false,
-                loadingTxt: '',
-
-                identifie: this.identifie,
-                version: row.name,
-                logo: '',
-                goods_imgs: [],
-                label_ids: [],
-                backend_attach_md5: '',
-                frontend_attach_md5: '',
-            }
-            this.submitPublishGoods();
-        },
-        async submitPublishGoods() {
-            this.publishGoods.loading = true;
-            try {
-                let icon = await myAxios.get('/respo/v2/info/' + this.identifie + '/' + this.publishGoods.version).then(res => res?.data?.data?.icon_url);
-                let iconfile = await this.downloadFileAsFile(icon);
-                let uploadIcon = await this.uploadImg({ file: iconfile });
-
-                await myAxios.post('/respo/goods/publish', {
-                    identifie: this.identifie,
-                    version: this.publishGoods.version,
-                    logo: uploadIcon
-                }).then(res => {
-                    messageSuccess('操作成功');
-                    this.publishGoods.loading = false;
-                    this.publishGoods.show = false;
-
-                    this.getInfo();
-                    this.getList();
-                }).catch(() => {
-                    this.publishGoods.loading = false;
-                })
-            } catch {
-                messageError('操作失败');
-                this.publishGoods.loading = false;
-            }
-        },
-
-
         addVersionPrice() {
             this.instFee.version_prices.push({ version: '', price: '' });
         },
@@ -930,12 +878,6 @@ export default {
         },
         editfront(item) {
             this.$router.push('/zpk-editfront?id=' + this.identifie + '&versionid=' + (item.name || ''));
-        },
-        editDescription() {
-            this.$router.push('/zpk-description?id=' + this.identifie);
-        },
-        editPublish() {
-            this.$router.push('/zpk-publish?id=' + this.identifie);
         },
         getInfo() {
             myAxios.get('/respo/info/' + this.identifie).then(res => {
@@ -1064,113 +1006,6 @@ export default {
         },
         getPublishStatusColor(status) {
             return { '-1': 'gray', 1: 'blue', 2: 'green', 3: 'red' }[status] || 'gray';
-        },
-        async uploadImg({ file, js_ticket, host }) {
-            let formData = new FormData();
-            formData.append('file', file);
-            formData.append('file_name', file.name);
-            let img = await myAxios.post('/respo/attach/upload-img', formData).then(res => {
-                if (!res?.data) { return }
-                let img = res.data?.data?.attach?.path || '';
-                return img;
-            });
-            return img;
-        },
-        async downloadFileAsFile(url, filename = '') {
-            const response = await fetch(url);
-            if (!response.ok) throw new Error(`下载失败: ${response.status}`);
-
-            const contentDisposition = response.headers.get('Content-Disposition');
-            const contentType = response.headers.get('Content-Type');
-
-
-            const imageMimeTypes = {
-                'image/jpeg': '.jpg',
-                'image/png': '.png',
-                'image/gif': '.gif',
-                'image/webp': '.webp',
-                'image/svg+xml': '.svg',
-                'image/bmp': '.bmp',
-            };
-
-
-            if (!filename && contentDisposition) {
-                const matches = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-                if (matches?.[1]) {
-                    filename = matches[1].replace(/['"]/g, '');
-                }
-            }
-
-
-            if (!filename) {
-                filename = new URL(url).pathname.split('/').pop() || 'image';
-            }
-
-            const blob = await response.blob();
-
-
-            if (!filename.includes('.')) {
-
-                if (contentType && imageMimeTypes[contentType]) {
-                    filename += imageMimeTypes[contentType];
-                }
-
-                else {
-                    const ext = await this.detectImageExtension(blob);
-                    if (ext) {
-                        filename += ext;
-                    } else {
-
-                        filename += '.jpg';
-                    }
-                }
-            }
-            return new File([blob], filename, { type: contentType });
-        },
-        async detectImageExtension(blob) {
-            return new Promise((resolve) => {
-                const reader = new FileReader();
-                reader.onloadend = () => {
-                    const buffer = reader.result;
-                    const view = new DataView(buffer);
-
-
-                    if (view.byteLength >= 3 &&
-                        view.getUint8(0) === 0xFF &&
-                        view.getUint8(1) === 0xD8 &&
-                        view.getUint8(2) === 0xFF) {
-                        resolve('.jpg');
-                    }
-
-                    else if (view.byteLength >= 8 &&
-                        view.getUint32(0) === 0x89504E47 &&
-                        view.getUint32(4) === 0x0D0A1A0A) {
-                        resolve('.png');
-                    }
-
-                    else if (view.byteLength >= 6 &&
-                        view.getUint32(0) === 0x47494638 &&
-                        (view.getUint16(4) === 0x3761 || view.getUint16(4) === 0x3961)) {
-                        resolve('.gif');
-                    }
-
-                    else if (view.byteLength >= 12 &&
-                        view.getUint32(0) === 0x52494646 &&
-                        view.getUint32(8) === 0x57454250) {
-                        resolve('.webp');
-                    }
-
-                    else if (view.byteLength >= 4) {
-                        const text = new TextDecoder().decode(buffer.slice(0, 200));
-                        if (text.includes('<svg')) {
-                            resolve('.svg');
-                        }
-                    }
-
-                    resolve('');
-                };
-                reader.readAsArrayBuffer(blob.slice(0, 200));
-            });
         },
     },
 }

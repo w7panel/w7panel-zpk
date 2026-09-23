@@ -152,6 +152,8 @@ annotations:
 ### 5.3 named template 上下文
 
 宿主通过 `.Subcharts[chart]` 获取 sidecar 上下文。因此 sidecar 模板内的 `.Values`、`.Chart` 及其他内置对象属于 sidecar 子 Chart，而不是主 Chart：
+`sidecar-resources-template` 还会收到 `.W7PanelArtifact.serviceAccountName`，其值由宿主在根 Chart
+上下文中求值，可用于把 RBAC 绑定到制品 Pod 实际使用的 ServiceAccount。
 
 ```yaml
 # sidecar values.yaml
@@ -169,13 +171,17 @@ image:
 
 ## 6. 主 Chart values
 
-主 Chart 只保存 sidecar 名称和顺序：
+`w7panelSidecars` 列表只保存 sidecar 名称和顺序：
 
 ```yaml
 w7panelSidecars:
   - chart: example-sidecar
   - chart: another-sidecar
 ```
+
+生成型 Chart 会另外写入 `w7panelArtifact.serviceAccountName` 模板并在资源聚合时以根 Chart
+上下文执行。用户提供的 Helm Chart 若使用非 `default` ServiceAccount，应显式设置该字段为账号名，
+或设置为能在根 Chart 上下文中求值的 Helm 模板字符串。
 
 顺序也是 annotations、containers、volumes 和 resources 的聚合顺序。不要再写旧版字段：
 
@@ -188,6 +194,47 @@ w7panelSidecars:
 ```
 
 对于用户提供的 Helm Chart，只要存在自动 sidecar，`configureHelmSidecarHost` 会覆盖整个 `w7panelSidecars` key，而不是与用户原有列表合并。宿主若已有手工 sidecar 配置，需要在打包结果中重点检查这一项。
+
+### 6.1 制品运行身份传递约定
+
+需要为独立资源生成 RBAC 的 sidecar，不创建或选择自己的 ServiceAccount。根 Chart 必须通过
+`w7panelArtifact.serviceAccountName` 声明制品 Pod 实际使用的账号。该值可以是固定名称，也可以是
+在根 Chart 上下文中执行的 Helm 模板字符串：
+
+```yaml
+w7panelArtifact:
+  serviceAccountName: '{{ include "<root-chart>.serviceAccountName" . }}'
+```
+
+`w7panel.sidecars.resources` 使用 `tpl` 在根 Chart 上下文中求出最终名称，再通过
+`.W7PanelArtifact.serviceAccountName` 注入 `sidecar-resources-template`。Sidecar 只能消费这个结果，
+不能在子 Chart 上下文中重新调用根 Chart 的 helper，也不应复制根 Chart 的账号命名规则。
+
+ZPK 生成型制品使用公共 helper：
+
+```yaml
+w7panelArtifact:
+  serviceAccountName: '{{ include "common.serviceAccountName" . }}'
+```
+
+w7panel-zpk 自身 Chart 使用自己的 helper：
+
+```yaml
+w7panelArtifact:
+  serviceAccountName: '{{ include "zpk.serviceAccountName" . }}'
+```
+
+Sidecar 资源模板按以下方式读取：
+
+```gotemplate
+subjects:
+  - kind: ServiceAccount
+    name: {{ .W7PanelArtifact.serviceAccountName }}
+    namespace: {{ .Release.Namespace }}
+```
+
+用户提供的 Helm Chart 若使用非 `default` ServiceAccount，必须提供相同字段；如果一个制品内的
+多个 Workload 使用不同账号，当前单值约定无法完整表达，需要扩展为账号列表后再生成多个 subject。
 
 ## 7. 宿主 Helper
 

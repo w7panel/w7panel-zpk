@@ -20,7 +20,7 @@
                             <a-form-item label="标识" field="identifie">
                                 <div class="df jc-b" style="width:500px;">
                                     <w7-identifie v-model:author="form.author" v-model:identifie="form.identifie"
-                                        @change="onChange" disabled />
+                                        disabled />
                                 </div>
                             </a-form-item>
                             <a-form-item label="描述">
@@ -1340,11 +1340,6 @@ export default {
         },
     },
     methods: {
-        onChange() { },
-        changeStartParamValue(item, value) {
-            item.value = value;
-            this.changeConfigValue(item);
-        },
         changeConfigValue(item) {
             let name = this.unwrapConfigVariable(item.value);
             item.isSelect = this.systemVarOptions.some(i => i.value == name);
@@ -1465,13 +1460,6 @@ export default {
             return this.getBackendPorts(identifie)
                 .filter(i => !q || String(i).includes(q))
                 .map(i => String(i));
-        },
-        queryBackendPortSuggestions(identifie, query, cb) {
-            let q = String(query || '');
-            let ports = this.getBackendPorts(identifie)
-                .filter(i => !q || String(i).includes(q))
-                .map(i => ({ value: String(i) }));
-            cb(ports);
         },
         getDefaultBackendIdentifie() {
             return this.currentBackendIdentifie || this.backendAppOptions[0]?.id || '';

@@ -167,11 +167,6 @@ export default {
             })
 
         },
-        changeBackendName(route, name) {
-            route.backend.name = name;
-            route.backend.port = this.getBackendPorts(name)[0] || '';
-            this.emitUpdate();
-        },
         getBackendPorts(name) {
             if (!name) { return [] }
             let ports = this.appPorts?.[name] || [];

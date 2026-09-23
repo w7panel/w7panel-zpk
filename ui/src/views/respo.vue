@@ -288,18 +288,6 @@ export default {
       let icon = /^(https?:)?\/\//.test(url) ? url : (url ? base + url : dfimg);
       return icon
     },
-    tagClick(item) {
-      this.search.tag = item.name;
-      this.toSearch();
-    },
-    toSearch() {
-      this.getData(1);
-    },
-    getTags() {
-      myAxios.post('/respo/tag/list', { limit: 999 }).then(res => {
-        this.tags = res.data?.data?.list || [];
-      });
-    },
     getData(page) {
       if (page) {
         this.page = page;

@@ -1,0 +1,11 @@
+app:
+  name: w7-tradition-plugin
+  env: ${APP_ENV-release}
+log:
+  default:
+    driver: stack
+    channels:
+      - console
+  console:
+    driver: console
+    level: info

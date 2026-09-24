@@ -26,9 +26,9 @@ func (c PluginInstall) Configure(cmd *cobra.Command) {
 	_ = cmd.MarkFlagRequired("package-dir")
 }
 func (c PluginInstall) Handle(cmd *cobra.Command, args []string) {
-	dataDir, siteDir, plugin := pluginFlagValues(cmd)
+	pluginStateDir, siteDir, plugin := pluginFlagValues(cmd)
 	packageDir, _ := cmd.Flags().GetString("package-dir")
-	service := logic.NewInstaller(dataDir)
+	service := logic.NewInstaller(pluginStateDir)
 	result, err := service.InstallPlugin(siteDir, packageDir, plugin, readPolicy(cmd))
 	if err != nil {
 		panic(err)
@@ -42,8 +42,8 @@ func (c PluginUninstall) GetDescription() string {
 }
 func (c PluginUninstall) Configure(cmd *cobra.Command) { pluginCommonFlags(cmd) }
 func (c PluginUninstall) Handle(cmd *cobra.Command, args []string) {
-	dataDir, siteDir, plugin := pluginFlagValues(cmd)
-	service := logic.NewInstaller(dataDir)
+	pluginStateDir, siteDir, plugin := pluginFlagValues(cmd)
+	service := logic.NewInstaller(pluginStateDir)
 	result, err := service.UninstallPlugin(siteDir, plugin, readPolicy(cmd))
 	if err != nil {
 		panic(err)
@@ -52,18 +52,18 @@ func (c PluginUninstall) Handle(cmd *cobra.Command, args []string) {
 }
 
 func pluginCommonFlags(cmd *cobra.Command) {
-	cmd.Flags().String("data-dir", "", "保存 OCI 数据和安装状态的持久化目录")
+	cmd.Flags().String("plugin-state-dir", "", "保存当前传统应用插件文件管理状态的目录")
 	cmd.Flags().String("site-dir", "", "传统应用实际运行的站点根目录")
 	cmd.Flags().String("plugin", "", "插件唯一标识，必须与配置文件中的 identifie 完全一致")
 	addPolicyFlag(cmd)
-	_ = cmd.MarkFlagRequired("data-dir")
+	_ = cmd.MarkFlagRequired("plugin-state-dir")
 	_ = cmd.MarkFlagRequired("site-dir")
 	_ = cmd.MarkFlagRequired("plugin")
 }
 
 func pluginFlagValues(cmd *cobra.Command) (string, string, string) {
-	dataDir, _ := cmd.Flags().GetString("data-dir")
+	pluginStateDir, _ := cmd.Flags().GetString("plugin-state-dir")
 	siteDir, _ := cmd.Flags().GetString("site-dir")
 	plugin, _ := cmd.Flags().GetString("plugin")
-	return dataDir, siteDir, plugin
+	return pluginStateDir, siteDir, plugin
 }

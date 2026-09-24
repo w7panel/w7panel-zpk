@@ -36,13 +36,13 @@ code_install_path="/www/wwwroot"
 case "$domain_url" in
   .|..|*[!A-Za-z0-9._,-]*) echo "invalid traditional application code path" >&2; exit 1 ;;
 esac
-data_dir="/var/lib/w7-tradition-plugin/.w7-tradition-plugin/$domain_url"
+plugin_state_dir="/var/lib/w7-tradition-plugin/.w7-tradition-plugin/$domain_url"
 policy_json="${TRADITION_PLUGIN_POLICY:-}"
 if [ -z "$policy_json" ]; then
   policy_json='{"platform":{"tradition":{"plugins":[]}}}'
 fi
 mkdir -p "$code_install_path"
-mkdir -p "$data_dir"
+mkdir -p "$plugin_state_dir"
 tmp_dir="$(mktemp -d /tmp/tradition-code.XXXXXX)"
 trap 'rm -rf "$tmp_dir"' EXIT
 tmp_zip="$tmp_dir/application.zip"
@@ -52,9 +52,9 @@ mkdir -p "$package_dir"
 wget -q -O "$tmp_zip" "$code_package_url"
 unzip -oq "$tmp_zip" -d "$package_dir"
 unzip -oq "$tmp_zip" -d "$code_install_path"
-printf '%s' "$policy_json" > "$policy_file"
+echo "$policy_json" > "$policy_file"
 w7-tradition-plugin app update \
-  --data-dir "$data_dir" \
+  --plugin-state-dir "$plugin_state_dir" \
   --site-dir "$code_install_path" \
   --package-dir "$package_dir" \
   --policy-file "$policy_file"`

@@ -12,13 +12,36 @@ OCI Layout 只有一个逻辑制品和一个 `current` tag：config 只保存每
 make build
 ```
 
+## 构建并推送镜像
+
+默认镜像地址为 `zpk.w7.cc/public/tradition-plugin:v1.0.0`：
+
+```bash
+# 构建当前平台镜像
+make image-build
+
+# 构建并推送当前平台镜像
+make image-push
+
+# 构建并推送 linux/amd64、linux/arm64 多平台镜像
+make image-push-multi
+```
+
+发布新版本时可覆盖镜像版本：
+
+```bash
+make image-push-multi IMAGE_TAG=v1.0.1
+```
+
+推送前需要先通过 `docker login zpk.w7.cc` 登录制品库。镜像只使用 `tradition-plugin` 目录作为构建上下文，不依赖主项目源码。
+
 ## 命令
 
 参数说明：
 
 | 参数 | 使用命令 | 作用 |
 | --- | --- | --- |
-| `--data-dir` | 全部命令 | 保存 OCI Layout 和插件安装状态的持久化目录；同一个传统应用应始终使用同一目录。 |
+| `--plugin-state-dir` | 全部命令 | 保存当前传统应用插件文件管理状态的目录；同一个传统应用应始终使用同一目录。 |
 | `--site-dir` | 全部命令 | 传统应用实际运行的站点根目录，插件文件最终会应用到这里。 |
 | `--package-dir` | `app update` | 已解压的新传统应用包目录，用于更新插件涉及的原应用文件。 |
 | `--package-dir` | `plugin install` | 已解压的插件包目录，该目录内容会打成当前插件的 tar layer。 |
@@ -28,14 +51,14 @@ make build
 ```bash
 # 原有流程完成传统应用安装或升级后，刷新受管原文件并重新应用插件
 w7-tradition-plugin app update \
-  --data-dir "$data_dir" \
+  --plugin-state-dir "$plugin_state_dir" \
   --site-dir /www/wwwroot \
   --package-dir "$app_package_dir" \
   --policy-file "$app_json"
 
 # 安装插件
 w7-tradition-plugin plugin install \
-  --data-dir "$data_dir" \
+  --plugin-state-dir "$plugin_state_dir" \
   --site-dir /www/wwwroot \
   --package-dir "$plugin_package_dir" \
   --policy-file "$app_json" \
@@ -43,13 +66,13 @@ w7-tradition-plugin plugin install \
 
 # 卸载插件
 w7-tradition-plugin plugin uninstall \
-  --data-dir "$data_dir" \
+  --plugin-state-dir "$plugin_state_dir" \
   --site-dir /www/wwwroot \
   --policy-file "$app_json" \
   --plugin "$plugin_id"
 
 # 安装或卸载中断后，重新生成已管理的文件
-w7-tradition-plugin restore --data-dir "$data_dir" --site-dir /www/wwwroot
+w7-tradition-plugin restore --plugin-state-dir "$plugin_state_dir" --site-dir /www/wwwroot
 ```
 
 `app update` 和 `plugin install/uninstall` 会自动读取 `--policy-file` 中的最新插件优先级，不需要额外执行配置更新或检查命令。未配置优先级的插件会返回 `managed: false`，并由原有安装或卸载流程继续处理。

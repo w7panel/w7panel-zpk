@@ -4,10 +4,10 @@ go 1.25.0
 
 require (
 	github.com/containerd/containerd v1.7.30
+	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/image-spec v1.1.1
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.19.0
-	github.com/w7panel/w7panel-zpk v0.0.0
 	github.com/we7coreteam/w7-rangine-go/v2 v2.0.10
 	oras.land/oras-go/v2 v2.6.0
 )
@@ -60,7 +60,6 @@ require (
 	github.com/moby/sys/userns v0.1.0 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.3-0.20250322232337-35a7c28c31ee // indirect
-	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.2 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/redis/go-redis/v9 v9.7.3 // indirect
@@ -107,5 +106,3 @@ require (
 	gorm.io/hints v1.1.2 // indirect
 	gorm.io/plugin/dbresolver v1.5.1 // indirect
 )
-
-replace github.com/w7panel/w7panel-zpk => ..

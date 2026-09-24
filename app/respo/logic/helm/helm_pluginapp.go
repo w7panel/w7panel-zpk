@@ -22,7 +22,7 @@ const (
 // without a configured priority retain the original direct extraction flow.
 const pluginCodeInstallShell = `set -eu
 code_install_path="/www/wwwroot"
-data_dir={{ printf "/var/lib/w7-tradition-plugin/.w7-tradition-plugin/%s" (include "plugin.codeInstallDirectory" .) | quote }}
+plugin_state_dir={{ print "/var/lib/w7-tradition-plugin/.w7-tradition-plugin/" (include "plugin.codeInstallDirectory" .) | quote }}
 plugin_id={{ .Values.plugin.identifie | quote }}
 code_package_url={{ .Values.plugin.codePackageUrl | quote }}
 test -n "$code_package_url"
@@ -31,7 +31,7 @@ if [ -z "$policy_json" ]; then
   policy_json='{"platform":{"tradition":{"plugins":[]}}}'
 fi
 mkdir -p "$code_install_path"
-mkdir -p "$data_dir"
+mkdir -p "$plugin_state_dir"
 tmp_dir="$(mktemp -d /tmp/plugin-code.XXXXXX)"
 trap 'rm -rf "$tmp_dir"' EXIT
 tmp_zip="$tmp_dir/plugin.zip"
@@ -40,14 +40,14 @@ policy_file="$tmp_dir/policy.json"
 mkdir -p "$package_dir"
 wget -q -O "$tmp_zip" "$code_package_url"
 unzip -oq "$tmp_zip" -d "$package_dir"
-printf '%s' "$policy_json" > "$policy_file"
+echo "$policy_json" > "$policy_file"
 result="$(w7-tradition-plugin plugin install \
-  --data-dir "$data_dir" \
+  --plugin-state-dir "$plugin_state_dir" \
   --site-dir "$code_install_path" \
   --package-dir "$package_dir" \
   --policy-file "$policy_file" \
   --plugin "$plugin_id")"
-printf '%s\n' "$result"
+echo "$result"
 case "$result" in
   *'"managed":true'*) ;;
   *'"managed":false'*) unzip -oq "$tmp_zip" -d "$code_install_path" ;;
@@ -59,19 +59,19 @@ esac`
 // the responsibility of the developer's lifecycle script.
 const pluginCodeUninstallShell = `set -eu
 code_install_path="/www/wwwroot"
-data_dir={{ printf "/var/lib/w7-tradition-plugin/.w7-tradition-plugin/%s" (include "plugin.codeInstallDirectory" .) | quote }}
+plugin_state_dir={{ print "/var/lib/w7-tradition-plugin/.w7-tradition-plugin/" (include "plugin.codeInstallDirectory" .) | quote }}
 plugin_id={{ .Values.plugin.identifie | quote }}
 policy_json="${TRADITION_PLUGIN_POLICY:-}"
 if [ -z "$policy_json" ]; then
   policy_json='{"platform":{"tradition":{"plugins":[]}}}'
 fi
-mkdir -p "$data_dir"
+mkdir -p "$plugin_state_dir"
 tmp_dir="$(mktemp -d /tmp/plugin-uninstall.XXXXXX)"
 trap 'rm -rf "$tmp_dir"' EXIT
 policy_file="$tmp_dir/policy.json"
-printf '%s' "$policy_json" > "$policy_file"
+echo "$policy_json" > "$policy_file"
 w7-tradition-plugin plugin uninstall \
-  --data-dir "$data_dir" \
+  --plugin-state-dir "$plugin_state_dir" \
   --site-dir "$code_install_path" \
   --policy-file "$policy_file" \
   --plugin "$plugin_id"`

@@ -13,8 +13,8 @@ import (
 	"time"
 
 	containerdarchive "github.com/containerd/containerd/archive"
+	"github.com/opencontainers/go-digest"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
-	projectoci "github.com/w7panel/w7panel-zpk/common/service/oci"
 	"oras.land/oras-go/v2"
 	"oras.land/oras-go/v2/content"
 	ociStore "oras.land/oras-go/v2/content/oci"
@@ -132,7 +132,7 @@ func (service *Installer) packLayer(sourceDir, layerName string) (Layer, error) 
 	if err := temp.Close(); err != nil {
 		return Layer{}, err
 	}
-	descriptor, err := projectoci.GetOciDescriptorByPath(temp.Name(), v1.MediaTypeImageLayer)
+	descriptor, err := descriptorFromPath(temp.Name(), v1.MediaTypeImageLayer)
 	if err != nil {
 		return Layer{}, err
 	}
@@ -162,6 +162,28 @@ func (service *Installer) packLayer(sourceDir, layerName string) (Layer, error) 
 		Name:  layerName,
 		Blob:  *descriptor,
 		Files: files,
+	}, nil
+}
+
+// descriptorFromPath 根据文件内容计算摘要和大小，生成 OCI descriptor。
+func descriptorFromPath(path, mediaType string) (*v1.Descriptor, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+	info, err := file.Stat()
+	if err != nil {
+		return nil, err
+	}
+	fileDigest, err := digest.FromReader(file)
+	if err != nil {
+		return nil, err
+	}
+	return &v1.Descriptor{
+		MediaType: mediaType,
+		Digest:    fileDigest,
+		Size:      info.Size(),
 	}, nil
 }
 
@@ -236,25 +258,22 @@ func (service *Installer) saveState(state State, ordered []Layer) error {
 	if err != nil {
 		return err
 	}
-	configDescriptor, err := projectoci.GetOciDescriptorByData(
-		configContent, "application/vnd.w7.tradition-plugin.config.v1+json",
+	configDescriptor := content.NewDescriptorFromBytes(
+		"application/vnd.w7.tradition-plugin.config.v1+json", configContent,
 	)
-	if err != nil {
-		return err
-	}
-	exists, err := store.Exists(context.Background(), *configDescriptor)
+	exists, err := store.Exists(context.Background(), configDescriptor)
 	if err != nil {
 		return err
 	}
 	if !exists {
-		if err := store.Push(context.Background(), *configDescriptor, bytes.NewReader(configContent)); err != nil {
+		if err := store.Push(context.Background(), configDescriptor, bytes.NewReader(configContent)); err != nil {
 			return err
 		}
 	}
 	manifest, err := oras.PackManifest(
 		context.Background(), store, oras.PackManifestVersion1_1,
 		artifactType,
-		oras.PackManifestOptions{Layers: layers, ConfigDescriptor: configDescriptor},
+		oras.PackManifestOptions{Layers: layers, ConfigDescriptor: &configDescriptor},
 	)
 	if err != nil {
 		return err

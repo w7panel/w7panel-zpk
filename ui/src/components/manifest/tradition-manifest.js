@@ -1,4 +1,5 @@
 import { confirm, messageSuccess } from '@/utils/ui-feedback';
+import myAxios from '@/utils/index';
 
 export const traditionToolDependency = Object.freeze({
     identifie: 'w7-traditiontool',
@@ -13,11 +14,62 @@ export const traditionSysboxRootfsAnnotation = 'sysbox/rootfs-rw-layer';
 export const traditionSysboxRuntimeClassName = 'sysbox-runc-lite';
 
 const traditionGatewayStartParamName = 'gatewayEnabled';
+const traditionPluginPolicyStartParamName = 'TRADITION_PLUGIN_POLICY';
+const traditionPluginDefaultPriority = 0;
+
+function normalizeIdentifie(value) {
+    return String(value || '').trim().toLowerCase().replaceAll('_', '-');
+}
+
+function normalizeTraditionPluginPriority(value) {
+    const priority = Number(value);
+    if (!Number.isFinite(priority)) return traditionPluginDefaultPriority;
+    return Math.min(1000, Math.max(0, Math.trunc(priority)));
+}
+
+export function normalizeTraditionPlugins(plugins = []) {
+    const normalized = [];
+    const seen = new Set();
+    (plugins || []).forEach(plugin => {
+        const identifie = String(plugin?.identifie || plugin?.identify || '').trim();
+        const key = normalizeIdentifie(identifie);
+        if (!key || seen.has(key)) return;
+        seen.add(key);
+        normalized.push({
+            identifie,
+            name: String(plugin?.name || identifie).trim(),
+            goodsId: Number(plugin?.goodsId || plugin?.goods_id || 0),
+            priority: normalizeTraditionPluginPriority(plugin?.priority),
+        });
+    });
+    return normalized;
+}
+
+function traditionPluginPolicyValue(plugins = []) {
+    return JSON.stringify({
+        platform: {
+            tradition: {
+                plugins: normalizeTraditionPlugins(plugins).map(plugin => ({
+                    identifie: plugin.identifie,
+                    priority: plugin.priority,
+                })),
+            },
+        },
+    });
+}
+
+function marketPluginDependsOnTradition(plugin, traditionIdentifie) {
+    const target = normalizeIdentifie(traditionIdentifie);
+    return Boolean(target) && (plugin?.dependencies || []).some(dependency => (
+        normalizeIdentifie(dependency?.identifie || dependency?.identify) == target
+    ));
+}
 
 const traditionBuiltInStartParamNames = Object.freeze([
     'IMAGE_VERSION',
     'DOMAIN_URL',
     traditionGatewayStartParamName,
+    traditionPluginPolicyStartParamName,
     'PVC_NAME',
     'global.cluster.storageRWmode',
     'global.cluster.storageSize',
@@ -34,14 +86,16 @@ export function withTraditionStartParams(
     startParams = [],
     versions = [],
     gatewayEnabled = false,
+    plugins = [],
 ) {
     const customParams = (startParams || [])
         .filter(item => !isTraditionBuiltInStartParamName(item?.name));
     return [
         { mark: 'tradition', name: 'IMAGE_VERSION', title: '传统应用版本', required: true, values_text: (versions || []).join('|'), module_name: '', description: '选择要安装的传统应用版本', type: 'select' },
-        { mark: 'environment-site', name: 'DOMAIN_URL', title: '站点域名', required: true, values_text: '%DOMAIN_URL%', module_name: '', description: '用于站点访问', type: 'text' },
-        { mark: 'tradition-gateway', name: traditionGatewayStartParamName, title: '开启网关工具', required: true, values_text: String(Boolean(gatewayEnabled)), module_name: '', description: '启用传统应用网关工具', type: 'text', hidden: true },
-        { name: 'PVC_NAME', title: '存储', required: true, values_text: '%PVC_NAME%', module_name: '', description: '安装时选择的 PVC 名称', type: 'text', hidden: false },
+        { mark: 'environment-site', name: 'DOMAIN_URL', title: '站点域名', required: true, values_text: '%DOMAIN_URL%', module_name: '', description: '用于站点访问和区分不同站点的代码', type: 'text' },
+        { mark: 'tradition-gateway', name: traditionGatewayStartParamName, title: '开启网关服务', required: true, values_text: String(Boolean(gatewayEnabled)), module_name: '', description: '启用传统应用网关服务', type: 'text', hidden: true },
+        { mark: 'tradition-plugin-policy', name: traditionPluginPolicyStartParamName, title: '插件文件优先级配置', required: true, values_text: traditionPluginPolicyValue(plugins), module_name: '', description: '供应用插件安装工具读取', type: 'text', hidden: true },
+        { name: 'PVC_NAME', title: '存储', required: true, values_text: '%PVC_NAME%', module_name: '', description: '安装时选择的站点存储空间，代码按域名分开保存', type: 'text', hidden: false },
         ...customParams,
     ];
 }
@@ -140,7 +194,7 @@ export function withTraditionAppStorage(platform = {}) {
         container.volumeMounts.push({
             name: traditionStorageVolumeName,
             mountPath: '/www/wwwroot',
-            subPath: 'nginx-web-dir',
+            subPath: '{{ .Values.DOMAIN_URL }}',
         }, {
             name: traditionStorageVolumeName,
             mountPath: '/www/server',
@@ -328,6 +382,7 @@ export function traditionFormDefaults() {
         traditionSystemRebootRestore: true,
         traditionNginxGateway: false,
         traditionNginxVhostTemplate: '',
+        traditionPlugins: [],
     };
 }
 
@@ -337,6 +392,10 @@ export function traditionManifestState() {
         nginxTemplatePlaceholders,
         nginxTemplateExample,
         nginxTemplateExampleVisible: false,
+        traditionPluginList: [],
+        traditionPluginListLoading: false,
+        traditionPluginListError: '',
+        traditionPluginKeyword: '',
     };
 }
 
@@ -391,6 +450,19 @@ export const traditionManifestComputed = {
                 : `https://img.w7.cc${icon.startsWith('/') ? '' : '/'}${icon}`;
         };
     },
+    traditionPluginSelectValues() {
+        return (this.form.traditionPlugins || []).map(plugin => plugin.identifie);
+    },
+    traditionPluginOptions() {
+        const options = [...(this.traditionPluginList || [])];
+        const existing = new Set(options.map(plugin => normalizeIdentifie(plugin.identifie)));
+        (this.form.traditionPlugins || []).forEach(plugin => {
+            if (!existing.has(normalizeIdentifie(plugin.identifie))) {
+                options.push({ ...plugin, unavailable: true });
+            }
+        });
+        return options;
+    },
 };
 
 export const traditionManifestMethods = {
@@ -401,6 +473,105 @@ export const traditionManifestMethods = {
         this.ensureTraditionContainerDefaults();
         this.applyTraditionRebootRestoreConfig();
         this.syncTraditionIngress();
+        this.applyTraditionPlugins();
+    },
+    initTraditionManifest(platform = {}) {
+        this.form.traditionPlugins = normalizeTraditionPlugins(platform?.tradition?.plugins || []);
+    },
+    applyTraditionPlugins() {
+        if (this.form.type != 'tradition') return;
+        this.json.platform = this.json.platform || {};
+        const plugins = normalizeTraditionPlugins(this.form.traditionPlugins);
+        this.form.traditionPlugins = plugins;
+        if (!plugins.length) {
+            if (this.json.platform.tradition) {
+                delete this.json.platform.tradition.plugins;
+                if (!Object.keys(this.json.platform.tradition).length) {
+                    delete this.json.platform.tradition;
+                }
+            }
+            return;
+        }
+        this.json.platform.tradition = {
+            ...(this.json.platform.tradition || {}),
+            plugins,
+        };
+    },
+    changeTraditionPlugins(identifies = []) {
+        const current = new Map((this.form.traditionPlugins || [])
+            .map(plugin => [normalizeIdentifie(plugin.identifie), plugin]));
+        const options = new Map((this.traditionPluginOptions || [])
+            .map(plugin => [normalizeIdentifie(plugin.identifie), plugin]));
+        this.form.traditionPlugins = (identifies || []).map(identifie => {
+            const key = normalizeIdentifie(identifie);
+            const source = current.get(key) || options.get(key) || { identifie };
+            return normalizeTraditionPlugins([source])[0];
+        }).filter(Boolean);
+        this.changeForm();
+    },
+    traditionPluginDisplayName(identifie) {
+        const plugin = (this.traditionPluginOptions || [])
+            .find(item => normalizeIdentifie(item.identifie) == normalizeIdentifie(identifie));
+        return plugin?.name || identifie;
+    },
+    getTraditionPluginList() {
+        if (this.form.type != 'tradition') {
+            this._traditionPluginRequestId = (this._traditionPluginRequestId || 0) + 1;
+            this.traditionPluginList = [];
+            this.traditionPluginListError = '';
+            return Promise.resolve();
+        }
+        const traditionIdentifie = this.json?.application?.identifie
+            || ((this.form.author && this.form.identifie)
+                ? `${this.form.author}-${this.form.identifie}`
+                : this.identifie || '');
+        if (!traditionIdentifie) {
+            this.traditionPluginList = [];
+            return Promise.resolve();
+        }
+        const requestId = (this._traditionPluginRequestId || 0) + 1;
+        this._traditionPluginRequestId = requestId;
+        this.traditionPluginListLoading = true;
+        this.traditionPluginListError = '';
+        return myAxios.post('https://api.zm.w7.com/zpk-market/formula/list', {
+            status: [2, 99],
+            page: 1,
+            limit: 999,
+            tag: '应用插件',
+            keyword: String(this.traditionPluginKeyword || '').trim(),
+        }, { dontalert: true }).then(res => {
+            if (requestId != this._traditionPluginRequestId) return;
+            this.traditionPluginList = (res.data?.data?.list || [])
+                .filter(plugin => marketPluginDependsOnTradition(plugin, traditionIdentifie))
+                .map(plugin => ({
+                    ...plugin,
+                    identifie: String(plugin.identifie || plugin.identify || '').trim(),
+                    name: String(plugin.name || plugin.title
+                        || plugin.identifie || plugin.identify || '').trim(),
+                    goodsId: Number(plugin.goods_id || plugin.goodsId || plugin.id || 0),
+                }))
+                .filter(plugin => plugin.identifie);
+        }).catch(() => {
+            if (requestId != this._traditionPluginRequestId) return;
+            this.traditionPluginList = [];
+            this.traditionPluginListError = '插件列表获取失败，请稍后重试';
+        }).finally(() => {
+            if (requestId != this._traditionPluginRequestId) return;
+            this.traditionPluginListLoading = false;
+        });
+    },
+    searchTraditionPluginList(keyword = '') {
+        this.traditionPluginKeyword = String(keyword || '');
+        clearTimeout(this._traditionPluginSearchTimer);
+        this._traditionPluginSearchTimer = setTimeout(() => {
+            this._traditionPluginSearchTimer = null;
+            this.getTraditionPluginList();
+        }, 300);
+    },
+    cleanupTraditionPluginSearch() {
+        clearTimeout(this._traditionPluginSearchTimer);
+        this._traditionPluginSearchTimer = null;
+        this._traditionPluginRequestId = (this._traditionPluginRequestId || 0) + 1;
     },
     filterTraditionAnnotations(annotation = {}, type = this.form.type) {
         const filtered = { ...(annotation || {}) };
@@ -423,6 +594,8 @@ export const traditionManifestMethods = {
             .filter(item => !isTraditionAppDependency(item));
         this.form.depends = (this.form.depends || [])
             .filter(item => !isTraditionAppDependency(item));
+        this.form.traditionPlugins = [];
+        if (this.json.platform) delete this.json.platform.tradition;
     },
     useNginxTemplateExample() {
         const applyExample = () => {
@@ -466,8 +639,8 @@ export const traditionManifestMethods = {
             return;
         }
         confirm({
-            title: '关闭 NGINX 网关',
-            content: '关闭后将停止使用 NGINX 网关，是否继续？',
+            title: '关闭网关服务',
+            content: '关闭后将停止使用网关服务，是否继续？',
             confirmButtonText: '关闭',
             cancelButtonText: '取消',
             onOk: request,
@@ -501,6 +674,7 @@ export const traditionManifestMethods = {
             this.form.startParams,
             this.normalizeApplicationVersions(this.form.traditionImageVersion),
             this.form.traditionNginxGateway,
+            this.form.traditionPlugins,
         );
     },
     syncTraditionGatewayStartParam() {

@@ -225,12 +225,13 @@ OCI repository 名为：
 | `post-upgrade` | `post-upgrade` | -3 |
 | `pre-delete` | `pre-delete` | -7 |
 | `post-delete` | `post-delete` | -1 |
+| `internal-final-post-delete`（应用插件文件恢复） | `post-delete` | 0 |
 | `custom` | 非 Helm hook，Job 初始 `suspend: true` | 0 |
 
 Job 默认 `backoffLimit: 2`、完成 60 秒后清理。安装前/删除后的 Job 使用 preferred affinity，其他阶段使用 required affinity，避免首次安装时目标 Workload 尚不存在导致无法调度。
 编辑器使用 Helm 标准事件名。安装前和升级前的自定义脚本会先于系统生成的 `pre-install,pre-upgrade` 包任务执行，安装后和升级后脚本在对应的 post hook 阶段执行；卸载前使用 `pre-delete`，卸载后使用 `post-delete`。
 编辑器读取历史数据时会将 `requireinstall/install/upgrade/uninstall` 分别转换为 `pre-install/post-install/post-upgrade/post-delete`，保存后只保留标准事件名；打包器不再处理旧名称。
-传统应用系统生成的代码和配置卸载任务使用内部事件 `internal-post-delete`；打包时映射为 `post-delete`、权重 `-2`，因此会在用户的 `pre-delete` 之后、用户的 `post-delete`（权重 `-1`）之前执行。应用插件不生成内置卸载任务。
+传统应用系统生成的代码和配置卸载任务使用内部事件 `internal-post-delete`；打包时映射为 `post-delete`、权重 `-2`，因此会在用户的 `pre-delete` 之后、用户的 `post-delete`（权重 `-1`）之前执行。应用插件文件恢复任务使用 `internal-final-post-delete`，映射为 `post-delete`、权重 `0`，在用户的卸载后脚本之后执行。
 
 ### 4.6 子 Chart 与共享存储亲和性
 
@@ -343,6 +344,10 @@ platform:
       values_text: "%PVC_NAME%"
       module_name: <tradition-app>
       hidden: true
+    - name: TRADITION_PLUGIN_POLICY
+      values_text: "%TRADITION_PLUGIN_POLICY%"
+      module_name: <tradition-app>
+      hidden: true
 ```
 
 info 接口会再解析/生成 `<TRADITION_APP>_RELEASE_NAME`。已有订单绑定优先使用真实 app identify；未绑定的多实例传统应用生成 `<identify>-<12位随机串>`。应用插件 Job 的 affinity 使用这个具体 release name，同时再匹配传统应用标识。
@@ -351,15 +356,16 @@ info 接口会再解析/生成 `<TRADITION_APP>_RELEASE_NAME`。已有订单绑�
 
 打包器自动追加：
 
-- `pre-install,pre-upgrade`：用 `busybox:stable-uclibc` 下载 zip，并解压到 `/www/wwwroot/<domain>`。
+- `pre-install,pre-upgrade`：使用 `zpk.w7.cc/public/tradition-plugin:v1.0.0` 下载并解压代码包。传统应用已设置该插件优先级时，通过安装工具写入站点；未设置时直接解压到 `/www/wwwroot`。
+- `post-delete`：使用同一工具镜像卸载受管插件并恢复被覆盖的文件，权重为 `0`，在用户自定义“卸载后执行”脚本之后运行。
 
-应用插件不会自动追加卸载任务。开发者必须通过 `pre-delete` 或 `post-delete` 自定义脚本自行清理插件文件。可按下面方式获取与安装任务一致的站点目录并删除插件自己的子目录：
+未设置文件优先级的插件仍需通过 `pre-delete` 或 `post-delete` 自定义脚本自行清理插件文件。可按下面方式获取与安装任务一致的站点目录并删除插件自己的子目录：
 
 ```sh
 set -eu
 
-# 实际目录示例：code_install_path="/www/wwwroot/example.com"
-code_install_path={{ print "/www/wwwroot/" (include "plugin.codeInstallDirectory" .) | quote }}
+# Job 内的 /www/wwwroot 已经是域名 subPath 的根目录
+code_install_path="/www/wwwroot"
 
 # 改成插件自己拥有的相对目录
 plugin_install_path="$code_install_path/addons/your-plugin"
@@ -375,8 +381,8 @@ rm -rf -- "$plugin_install_path"
 
 - volume 名固定为 `site-storage`。
 - PVC 名取传统应用依赖导出的 `.Values.PVC_NAME`。
-- Job mountPath 为 `/www/wwwroot/<domain>`。
-- PVC subPath 为 `nginx-web-dir/<domain>`。
+- Job mountPath 为 `/www/wwwroot`。
+- PVC subPath 为 `<domain>`，与传统应用使用同一份域名目录。
 - 应用插件不创建、不拥有也不删除该 PVC。
 - 因为默认按 RWO 处理，Job 用传统应用 release 的 pod affinity 调度到传统应用所在节点。
 
@@ -389,7 +395,7 @@ rm -rf -- "$plugin_install_path"
 - 支持版本：`w7.cc/image_version`，同时生成必填 `IMAGE_VERSION` select 参数。
 - 域名：必填 `DOMAIN_URL` 参数。
 - 至少一个非 init container；UI 缺失时会补默认容器和 Deployment。
-- 固定共享 volume `site-storage`，主容器挂载 `/www/wwwroot` (`nginx-web-dir`) 和 `/www/server` (`server-dir`)。
+- 固定共享 volume `site-storage`，主容器挂载 `/www/wwwroot` (`<domain>`) 和 `/www/server` (`server-dir`)。
 
 打包时所有传统应用容器 image 中的 `{version}` 都替换为 `{{ .Values.IMAGE_VERSION }}`。
 
@@ -397,8 +403,8 @@ rm -rf -- "$plugin_install_path"
 
 `source.url` 可选。存在时自动追加：
 
-- 安装/升级前 Job：下载 zip 到临时文件，解压到 `/www/wwwroot/$DOMAIN_URL`；
-- 卸载后 Job：删除该域名目录，但保留 PVC。
+- 安装/升级前 Job：使用 `zpk.w7.cc/public/tradition-plugin:v1.0.0` 下载 zip，先更新 `/www/wwwroot`，再执行 `w7-tradition-plugin app update` 刷新原应用文件并重新应用受管插件层；OCI 状态保存在共享存储根目录的 `.w7-tradition-plugin/<domain>`；
+- 卸载后 Job：清空该域名挂载目录，但保留挂载点和 PVC。
 
 因此传统应用既可以只是一个语言/runtime 服务，也可以自带初始站点代码。
 
@@ -433,7 +439,7 @@ rm -rf -- "$plugin_install_path"
 ### 7.5 存储
 
 - 传统应用主容器的 `site-storage` claimName 默认为空，渲染时取 `.Values.PVC_NAME`。
-- 主容器挂载 `/www/wwwroot` (`nginx-web-dir`) 和 `/www/server` (`server-dir`)；每个域名的代码存于 `nginx-web-dir/<domain>/`。
+- 主容器把 PVC 的 `<domain>` 子目录挂载到 `/www/wwwroot`，`/www/server` 仍使用 `server-dir`；每个域名的代码存于 PVC 根目录的 `<domain>/`。
 - NGINX 子 Chart、传统应用代码 Job 和 vhost Job 应通过安装端传值复用同一 PVC。
 - 当前传统应用 Chart 不创建 PVC，安装方必须准备 PVC 并传 `PVC_NAME`。
 - 未开启系统层还原时，还会通过注解把容器系统层映射到该持久卷中的 `www/server/<container>/system` 逻辑路径。
@@ -732,8 +738,8 @@ sidecar 框架本身不创建、分配或回收固定存储，也没有独立的
 | --- | --- | --- | --- | --- |
 | 原生 Deployment/DaemonSet PVC volume | 安装方/外部系统 | `PVC_NAME` 或 manifest 固定 claimName | manifest 自定义 | 应用 Chart 不创建时也不拥有 |
 | 原生 StatefulSet claim template | StatefulSet Controller | Helm 全局 values | manifest 自定义 | 随 StatefulSet/PVC policy 处理 |
-| 应用插件 | 传统应用/安装方 | 从传统应用依赖注入 `PVC_NAME` | `nginx-web-dir/<domain>` | 只清目录，不删 PVC |
-| 传统应用 | 安装方 | `PVC_NAME` | `nginx-web-dir`，域名为子目录 | 卸载代码 Job 只删当前域名目录 |
+| 应用插件 | 传统应用/安装方 | 从传统应用依赖注入 `PVC_NAME` | `<domain>` | 只清目录，不删 PVC |
+| 传统应用 | 安装方 | `PVC_NAME` | `<domain>` | 卸载代码 Job 只清空当前域名目录 |
 | Helm 应用 | 用户 Chart | 用户 values | 用户定义 | 用户 Chart 定义 |
 | 系统镜像 | 安装方 | `PVC_NAME` | `/system-rootfs` 和 `system-rootfs/<应用标识>-${IMAGE_VERSION}/system` | Chart 不创建 PVC |
 

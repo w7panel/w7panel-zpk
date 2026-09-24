@@ -7,13 +7,19 @@ const pluginTraditionStartParamDefinitions = Object.freeze([
         name: 'DOMAIN_URL',
         title: '站点域名',
         values_text: '%DOMAIN_URL%',
-        description: '传统应用的站点域名',
+        description: '传统应用的站点域名，用于找到对应的站点目录',
     },
     {
         name: 'PVC_NAME',
         title: '存储',
         values_text: '%PVC_NAME%',
-        description: '传统应用使用的 PVC 名称',
+        description: '与所选传统应用共用的站点存储空间',
+    },
+    {
+        name: 'TRADITION_PLUGIN_POLICY',
+        title: '插件文件优先级配置',
+        values_text: '%TRADITION_PLUGIN_POLICY%',
+        description: '从所选传统应用读取插件文件优先级配置',
     },
 ]);
 

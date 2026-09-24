@@ -286,7 +286,7 @@
                             <a-alert v-if="form.type == 'tradition'" type="info" show-icon
                                 class="zpk-primary-alert mt-16 mb-20" title="说明" :closable="false">
                                 <div class="registry-alert-item">1. 运行方式：传统应用会作为独立应用安装。</div>
-                                <div class="registry-alert-item mt-6">2. 代码包：代码包为可选配置。请进入项目根目录后打包，压缩包根目录应直接包含安装内容，不要包含外层目录。例如：<code>cd 项目目录 &amp;&amp; zip -r app.zip .</code>。安装时会解压到 <code>/www/wwwroot/&lt;站点域名&gt;</code>，并随当前版本发布。</div>
+                                <div class="registry-alert-item mt-6">2. 代码包：代码包为可选配置。请进入项目根目录后打包，压缩包根目录应直接包含安装内容，不要包含外层目录。例如：<code>cd 项目目录 &amp;&amp; zip -r app.zip .</code>。安装后代码位于 <code>/www/wwwroot</code>。</div>
                                 <div class="registry-alert-item mt-6">3. 镜像版本：安装时通过“传统应用版本”启动参数替换运行容器镜像中的 {version}。</div>
                                 <div class="registry-alert-item mt-6">4. 启动命令：传统应用容器的启动命令可在页面下方“应用配置”中配置。</div>
                                 <div class="registry-alert-item mt-6">5. 生命周期脚本：页面下方“脚本配置”中的安装、升级脚本只在安装或升级此制品时执行。</div>
@@ -294,15 +294,14 @@
 
                             <a-alert v-if="form.type == 'app-plugin'" type="info" show-icon
                                 class="zpk-primary-alert mt-16 mb-20" title="说明" :closable="false">
-                                <div class="registry-alert-item">1. 代码包：请在应用插件的外层目录打包，并保留插件安装所需的完整目录结构。例如微擎插件需要将 <code>addons</code> 目录一起打包，使压缩包根目录直接包含 <code>addons</code> 目录。安装时会解压到 <code>/www/wwwroot/&lt;站点域名&gt;</code>，并随当前版本发布。</div>
-                                <div class="registry-alert-item mt-6">2. 卸载清理：系统只负责安装代码包，不会自动删除插件文件。</div>
-                                <div class="registry-alert-item mt-6">3. 卸载脚本：请在脚本配置中添加“卸载前执行”或“卸载后执行”，由插件自行完成清理。</div>
-                                <div class="registry-alert-item mt-6">4. 安装路径：可使用下面的写法取得当前传统应用的实际站点目录并清理插件文件：</div>
+                                <div class="registry-alert-item">1. 代码包：请在应用插件的外层目录打包，并保留插件安装所需的完整目录结构。例如微擎插件需要将 <code>addons</code> 目录一起打包，使压缩包根目录直接包含 <code>addons</code> 目录。安装时会写入所选传统应用的站点目录，插件代码位于 <code>/www/wwwroot</code>。</div>
+                                <div class="registry-alert-item mt-6">2. 文件恢复：如果所选传统应用已为该插件设置文件优先级，系统会在卸载时自动恢复被覆盖的文件；未设置时仍按原方式直接安装。</div>
+                                <div class="registry-alert-item mt-6">3. 卸载脚本：自定义“卸载后执行”脚本会先运行，系统文件恢复会在最后运行。未设置文件优先级的插件仍需自行清理代码。</div>
+                                <div class="registry-alert-item mt-6">4. 手动清理：<code>/www/wwwroot</code> 就是当前站点的代码目录，未设置文件优先级时可使用下面的写法：</div>
                                 <div class="mt-6"><code v-pre>set -eu</code></div>
-                                <div><code v-pre>code_install_path={{ print "/www/wwwroot/" (include "plugin.codeInstallDirectory" .) | quote }}</code></div>
-                                <div><code v-pre>plugin_install_path="$code_install_path/addons/your-plugin"</code></div>
+                                <div><code v-pre>plugin_install_path="/www/wwwroot/addons/your-plugin"</code></div>
                                 <div><code v-pre>rm -rf -- "$plugin_install_path"</code></div>
-                                <div class="registry-alert-item mt-6">5. 安全提示：请将 <code>addons/your-plugin</code> 替换为插件真实目录。不要直接删除 <code>code_install_path</code>，否则会清空整个站点；如果插件文件散落在站点根目录，请在脚本中逐项删除插件拥有的文件。</div>
+                                <div class="registry-alert-item mt-6">5. 安全提示：请将 <code>addons/your-plugin</code> 替换为插件真实目录。不要直接删除 <code>/www/wwwroot</code>，否则会清空整个站点。</div>
                             </a-alert>
 
                             <a-form-item v-if="form.type == 'tradition'" label="传统应用配置"
@@ -345,13 +344,51 @@
                                                 <span class="c-99 mt-6">关闭后使用持久存储保留容器系统层。</span>
                                             </div>
                                         </a-form-item>
-                                        <a-form-item v-if="option?.edit" label="NGINX 网关"
+                                        <a-form-item label="应用插件" style="margin-bottom:18px;">
+                                            <div class="tradition-plugin-policy">
+                                                <a-select :model-value="traditionPluginSelectValues" multiple
+                                                    allow-search allow-clear :loading="traditionPluginListLoading"
+                                                    :filter-option="false"
+                                                    placeholder="输入插件名称或标识搜索"
+                                                    @search="searchTraditionPluginList"
+                                                    @change="changeTraditionPlugins">
+                                                    <a-option v-for="plugin in traditionPluginOptions"
+                                                        :key="plugin.identifie" :value="plugin.identifie"
+                                                        :label="plugin.unavailable ? `${plugin.name}（已保存）` : plugin.name" />
+                                                </a-select>
+                                                <div class="tradition-plugin-policy-help">
+                                                    <span class="c-99">如果多个插件会修改同一文件，请在这里选择它们并设置优先级；未选择的插件仍按原方式安装。</span>
+                                                    <a-button type="text" size="mini"
+                                                        :loading="traditionPluginListLoading"
+                                                        @click="getTraditionPluginList">刷新列表</a-button>
+                                                </div>
+                                                <span v-if="traditionPluginListError" class="c-red fs-12">
+                                                    {{ traditionPluginListError }}
+                                                </span>
+                                                <div v-if="form.traditionPlugins.length"
+                                                    class="tradition-plugin-priority-list">
+                                                    <div v-for="plugin in form.traditionPlugins"
+                                                        :key="plugin.identifie"
+                                                        class="tradition-plugin-priority-row">
+                                                        <span class="tradition-plugin-priority-name">
+                                                            {{ traditionPluginDisplayName(plugin.identifie) }}
+                                                        </span>
+                                                        <span class="c-99">优先级</span>
+                                                        <a-input-number v-model="plugin.priority" :min="0" :max="1000"
+                                                            :precision="0" style="width:120px;"
+                                                            @change="changeForm" />
+                                                    </div>
+                                                    <span class="c-99 fs-12">数值越大，发生文件冲突时越优先使用该插件的文件。</span>
+                                                </div>
+                                            </div>
+                                        </a-form-item>
+                                        <a-form-item v-if="option?.edit" label="网关服务"
                                             style="margin-bottom:18px;">
                                             <div class="df df-c" style="align-items:flex-start;">
                                                 <a-switch v-model="form.traditionNginxGateway"
                                                     :disabled="traditionNginxGatewayChanging"
                                                     @change="toggleTraditionNginxGateway" />
-                                                <span class="c-99 mt-6">开启后安装时会将 NGINX 服务作为对外网关，用于转发请求至后端服务。</span>
+                                                <span class="c-99 mt-6">开启后会使用网关服务对外提供访问，并将请求转发至后端服务。</span>
                                                 <span class="c-99 mt-6">常用于 PHP-FPM FastCGI 等无法直接提供 HTTP 服务的场景；若后端可直接提供 HTTP 服务，则无需启用。</span>
                                             </div>
                                         </a-form-item>
@@ -934,6 +971,9 @@ export default {
         this.initManifestYaml();
         this.init(this.data);
         const initializationRequests = [];
+        if (this.form.type == 'tradition') {
+            initializationRequests.push(this.getTraditionPluginList());
+        }
         if (!this.option?.pureManifest) {
             if (['tradition', 'gateway-plugin', 'system-image'].includes(this.form.type)) {
                 initializationRequests.push(this.loadFormulaSetting());
@@ -958,6 +998,9 @@ export default {
         data() {
             this.init(this.data);
             const initializationRequests = [];
+            if (this.form.type == 'tradition') {
+                initializationRequests.push(this.getTraditionPluginList());
+            }
             if (!this.option?.pureManifest && ['tradition', 'gateway-plugin', 'system-image'].includes(this.form.type)) {
                 initializationRequests.push(this.loadFormulaSetting());
             }
@@ -965,6 +1008,7 @@ export default {
         },
     },
     beforeUnmount() {
+        this.cleanupTraditionPluginSearch();
         this.cleanupManifestYaml();
     },
     methods: {
@@ -1066,6 +1110,7 @@ export default {
 
             this.initManifestMetadata(j);
             this.initGatewayPluginManifest(j?.platform || {});
+            this.initTraditionManifest(j?.platform || {});
             this.applyTraditionAnnotationForm(j?.application?.annotation || {});
             this.applySystemImageAnnotationForm(j?.application?.annotation || {});
             this.initSystemImageManifest(j?.platform || {});
@@ -1205,6 +1250,9 @@ export default {
             if (this.form.type == 'app-plugin') {
                 this.getStart();
             }
+            if (this.form.type == 'tradition') {
+                this.getTraditionPluginList();
+            }
             if (this.form.type == 'system-image') {
                 this.syncSystemImageConfig();
             }
@@ -1280,6 +1328,36 @@ export default {
 .tradition-config-spin {
     display: block;
     width: 100%;
+}
+
+.tradition-plugin-policy {
+    width: 500px;
+}
+
+.tradition-plugin-policy-help,
+.tradition-plugin-priority-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.tradition-plugin-priority-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 10px;
+    padding: 10px 12px;
+    border-radius: 4px;
+    background: var(--color-fill-1);
+}
+
+.tradition-plugin-priority-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 

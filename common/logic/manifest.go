@@ -101,6 +101,7 @@ type Platform struct {
 	Workload             Workload                   `yaml:"workload" json:"workload"`
 	Helm                 Helm                       `yaml:"helm" json:"helm"`
 	Plugin               *Plugin                    `yaml:"plugin,omitempty" json:"plugin,omitempty"`
+	Tradition            *Tradition                 `yaml:"tradition,omitempty" json:"tradition,omitempty"`
 	Ingress              []Ingress                  `yaml:"ingress" json:"ingress"`
 	Depends              []Depend                   `yaml:"depends" json:"depends"`
 	StartParams          []StartParams              `yaml:"startParams" json:"startParams"`
@@ -148,6 +149,17 @@ type Plugin struct {
 	TraditionLanguage      string `yaml:"traditionLanguage" json:"traditionLanguage"`
 	TraditionImageTemplate string `yaml:"traditionImageTemplate,omitempty" json:"traditionImageTemplate,omitempty"`
 	CodeAttachUrl          string `yaml:"-" json:"-"`
+}
+
+type Tradition struct {
+	Plugins []TraditionPlugin `yaml:"plugins,omitempty" json:"plugins,omitempty"`
+}
+
+type TraditionPlugin struct {
+	Identifie string `yaml:"identifie" json:"identifie"`
+	Name      string `yaml:"name,omitempty" json:"name,omitempty"`
+	GoodsID   int    `yaml:"goodsId,omitempty" json:"goodsId,omitempty"`
+	Priority  int    `yaml:"priority" json:"priority"`
 }
 
 type HelmDependYaml struct {
@@ -443,7 +455,10 @@ func GetManifestV2(manifest Manifest) Manifest {
 
 	for index, item := range manifest.Platform.ContainerV2s {
 		if item.Name == "" {
-			manifest.Platform.ContainerV2s[index].Name = manifest.Application.Identifie + strconv.Itoa(index)
+			manifest.Platform.ContainerV2s[index].Name = manifest.Application.Identifie
+			if index > 0 {
+				manifest.Platform.ContainerV2s[index].Name += strconv.Itoa(index)
+			}
 		}
 	}
 	if len(manifest.Platform.ContainerV2s) > 0 {

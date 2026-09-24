@@ -37,7 +37,10 @@ type Maintainer struct {
 	URL   string `yaml:"url,omitempty" json:"url"`
 }
 
-const internalPostDeleteShellType = "internal-post-delete"
+const (
+	internalPostDeleteShellType      = "internal-post-delete"
+	internalFinalPostDeleteShellType = "internal-final-post-delete"
+)
 
 // ChartYAML 结构体
 type ChartYAML struct {
@@ -1342,6 +1345,11 @@ func (hc *HelmPack) buildShellJobValues(items []logic2.Shell) []map[string]inter
 			hookName = "post-delete"
 		case internalPostDeleteShellType:
 			shellWeight = -2
+			hookName = "post-delete"
+		case internalFinalPostDeleteShellType:
+			// Plugin file restoration must run after the developer-defined
+			// post-delete hook, whose weight is -1.
+			shellWeight = 0
 			hookName = "post-delete"
 		case "custom":
 			shellWeight = 0

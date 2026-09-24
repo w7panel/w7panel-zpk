@@ -174,29 +174,37 @@ func (service *Installer) change(
 	}
 	lastPluginRemoved := state.Base != nil && len(state.Plugins) == 0
 	desired := trackedFiles(state.PluginFiles)
-	if !lastPluginRemoved && hasRemovedFiles(previous, desired) {
+	// 站点使用裁剪前的 Base 恢复退出管理的原文件，OCI 仅保存裁剪后的 Base。
+	siteLayers, err := orderedLayers(state, policy)
+	if err != nil {
+		return OperationResult{}, err
+	}
+	removedFiles := hasRemovedFiles(previous, desired)
+	basePruned := state.Base != nil && !lastPluginRemoved && removedFiles
+	if basePruned {
 		if err := service.cleanupBase(&state, desired); err != nil {
 			return OperationResult{}, err
 		}
 	}
-	layers, err := orderedLayers(state, policy)
-	if err != nil {
-		return OperationResult{}, err
-	}
-	if err := service.saveState(state, layers); err != nil {
-		return OperationResult{}, err
+	storedLayers := siteLayers
+	if basePruned {
+		storedLayers, err = orderedLayers(state, policy)
+		if err != nil {
+			return OperationResult{}, err
+		}
 	}
 	if err := removePaths(siteDir, sortedPaths(previous, false)); err != nil {
 		return OperationResult{}, err
 	}
-	if err := service.applyLayers(siteDir, layerDescriptors(layers)); err != nil {
+	if err := service.applyLayers(siteDir, layerDescriptors(siteLayers)); err != nil {
 		return OperationResult{}, err
 	}
 	if lastPluginRemoved {
 		state.Base = nil
-		if err := service.saveState(state, nil); err != nil {
-			return OperationResult{}, err
-		}
+		storedLayers = nil
+	}
+	if err := service.saveState(state, storedLayers); err != nil {
+		return OperationResult{}, err
 	}
 	return result, nil
 }

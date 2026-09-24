@@ -59,6 +59,64 @@ func TestPluginPriorityAndUninstallFallback(t *testing.T) {
 	assertCurrentOCI(t, service, 1, 0)
 }
 
+func TestUninstallRestoresExclusiveBaseFile(t *testing.T) {
+	tests := []struct {
+		name          string
+		plugin        string
+		sharedContent string
+		restoredFile  string
+		restoredValue string
+		baseFiles     []string
+	}{
+		{
+			name:          "high priority plugin",
+			plugin:        "plugin-high",
+			sharedContent: "low",
+			restoredFile:  "high.php",
+			restoredValue: "high-base",
+			baseFiles:     []string{"low.php", "system.php"},
+		},
+		{
+			name:          "low priority plugin",
+			plugin:        "plugin-low",
+			sharedContent: "high",
+			restoredFile:  "low.php",
+			restoredValue: "low-base",
+			baseFiles:     []string{"high.php", "system.php"},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			service, root, _ := newTestInstaller(t)
+			writeTestFile(t, root, "system.php", "base")
+			writeTestFile(t, root, "low.php", "low-base")
+			writeTestFile(t, root, "high.php", "high-base")
+
+			low := t.TempDir()
+			writeTestFile(t, low, "system.php", "low")
+			writeTestFile(t, low, "low.php", "low-plugin")
+			if _, err := service.InstallPlugin(root, low, "plugin-low", priorityPolicy); err != nil {
+				t.Fatal(err)
+			}
+
+			high := t.TempDir()
+			writeTestFile(t, high, "system.php", "high")
+			writeTestFile(t, high, "high.php", "high-plugin")
+			if _, err := service.InstallPlugin(root, high, "plugin-high", priorityPolicy); err != nil {
+				t.Fatal(err)
+			}
+
+			if _, err := service.UninstallPlugin(root, test.plugin, priorityPolicy); err != nil {
+				t.Fatal(err)
+			}
+			assertTestFile(t, root, "system.php", test.sharedContent)
+			assertTestFile(t, root, test.restoredFile, test.restoredValue)
+			assertBaseFiles(t, service, test.baseFiles)
+			assertCurrentOCI(t, service, 2, 1)
+		})
+	}
+}
+
 func TestApplicationUpdateReappliesManagedPlugin(t *testing.T) {
 	policy := Policy{Plugins: map[string]int{"plugin-a": 100}}
 	service, root, base := newTestInstaller(t)

@@ -15,6 +15,7 @@ const (
 	traditionImageLanguageAnnotation       = "w7.cc/image_language"
 	traditionNginxVhostAnnotation          = "w7.cc/nginx_vhost_template"
 	traditionToolRestartRevisionAnnotation = "w7.cc/tradition-tool-restart-revision"
+	traditionCodeInstallJobTitle           = "安装传统应用代码"
 	traditionCodeUninstallJobTitle         = "卸载传统应用代码"
 	traditionNginxVhostJobTitle            = "安装传统应用 NGINX 配置"
 	traditionNginxVhostUninstallJobTitle   = "卸载传统应用 NGINX 配置"
@@ -22,31 +23,52 @@ const (
 
 // traditionCodeInstallShell is added to the generated chart as an internal
 // shell task.  It deliberately uses the same volume mount as the workload;
-// the traditional application editor persists that mount at /www/wwwroot backed by the
-// shared site-storage PVC. DOMAIN_URL and the package URL are rendered from
+// the traditional application editor persists that mount at /www/wwwroot,
+// backed by the matching domain subPath in the shared site-storage PVC.
+// DOMAIN_URL and the package URL are rendered from
 // the final chart values, so installer-selected values are used at runtime.
 const traditionCodeInstallShell = `set -eu
 domain_url={{ .Values.DOMAIN_URL | quote }}
 : "${domain_url:?DOMAIN_URL is required}"
 code_package_url={{ .Values.tradition.code.packageUrl | quote }}
 test -n "$code_package_url"
-code_install_path="/www/wwwroot/$domain_url"
+code_install_path="/www/wwwroot"
+case "$domain_url" in
+  .|..|*[!A-Za-z0-9._,-]*) echo "invalid traditional application code path" >&2; exit 1 ;;
+esac
+data_dir="/var/lib/w7-tradition-plugin/.w7-tradition-plugin/$domain_url"
+policy_json="${TRADITION_PLUGIN_POLICY:-}"
+if [ -z "$policy_json" ]; then
+  policy_json='{"platform":{"tradition":{"plugins":[]}}}'
+fi
 mkdir -p "$code_install_path"
-tmp_zip="$(mktemp /tmp/tradition-code.XXXXXX)"
-trap 'rm -f "$tmp_zip"' EXIT
+mkdir -p "$data_dir"
+tmp_dir="$(mktemp -d /tmp/tradition-code.XXXXXX)"
+trap 'rm -rf "$tmp_dir"' EXIT
+tmp_zip="$tmp_dir/application.zip"
+package_dir="$tmp_dir/package"
+policy_file="$tmp_dir/policy.json"
+mkdir -p "$package_dir"
 wget -q -O "$tmp_zip" "$code_package_url"
-unzip -oq "$tmp_zip" -d "$code_install_path"`
+unzip -oq "$tmp_zip" -d "$package_dir"
+unzip -oq "$tmp_zip" -d "$code_install_path"
+printf '%s' "$policy_json" > "$policy_file"
+w7-tradition-plugin app update \
+  --data-dir "$data_dir" \
+  --site-dir "$code_install_path" \
+  --package-dir "$package_dir" \
+  --policy-file "$policy_file"`
 
-// traditionCodeUninstallShell removes only the traditional application's domain
-// directory from the shared site-storage PVC. The PVC itself remains intact.
+// traditionCodeUninstallShell clears only the mounted domain directory from
+// the shared site-storage PVC. The mount point and PVC remain intact.
 const traditionCodeUninstallShell = `set -eu
 domain_url={{ .Values.DOMAIN_URL | quote }}
 : "${domain_url:?DOMAIN_URL is required}"
 case "$domain_url" in
   .|..|*[!A-Za-z0-9._,-]*) echo "refusing to remove invalid traditional application code path" >&2; exit 1 ;;
 esac
-code_install_path="/www/wwwroot/$domain_url"
-rm -rf -- "$code_install_path"`
+code_install_path="/www/wwwroot"
+rm -rf -- "$code_install_path"/* "$code_install_path"/.[!.]* "$code_install_path"/..?*`
 
 // traditionNginxVhostShell writes the rendered site-manager vhost into the
 // nginx-dir subtree mounted from the embedded w7-traditiontool application.
@@ -116,10 +138,34 @@ func (hc *HelmPack) addTraditionAppValues(values map[string]interface{}) error {
 			"nginxVhostTemplate": nginxVhostTemplate,
 		},
 	}
+	applyTraditionPluginInstallerVolumeMount(values)
 	if traditionGatewayEnabled(hc.Manifest) {
 		applyTraditionToolJobVolumeMounts(values)
 	}
 	return nil
+}
+
+// applyTraditionPluginInstallerVolumeMount gives the application update task
+// access to the PVC root where the per-domain OCI state is persisted.
+func applyTraditionPluginInstallerVolumeMount(values map[string]interface{}) {
+	jobs, ok := values["jobs"].([]map[string]interface{})
+	if !ok {
+		return
+	}
+	for _, job := range jobs {
+		if job["title"] != traditionCodeInstallJobTitle {
+			continue
+		}
+		container, ok := job["container"].(map[string]interface{})
+		if !ok {
+			continue
+		}
+		mounts, _ := container["volumeMounts"].([]v1.VolumeMount)
+		container["volumeMounts"] = append(mounts, v1.VolumeMount{
+			Name:      traditionStorageVolumeName,
+			MountPath: pluginInstallerDataMount,
+		})
+	}
 }
 
 func traditionGatewayEnabled(manifest logic2.Manifest) bool {
@@ -168,9 +214,9 @@ func (hc *HelmPack) traditionAppHelmValuesOptions() helmValuesOptions {
 		// separate install/upgrade jobs.
 		options.platform.Shells = append(options.platform.Shells,
 			logic2.Shell{
-				Title: "安装传统应用代码",
+				Title: traditionCodeInstallJobTitle,
 				Type:  "pre-install,pre-upgrade",
-				Image: managedCodeInstallShellImage,
+				Image: pluginInstallerImage,
 				Shell: traditionCodeInstallShell,
 			},
 			logic2.Shell{

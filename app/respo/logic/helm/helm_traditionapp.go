@@ -38,9 +38,9 @@ case "$domain_url" in
   .|..|*[!A-Za-z0-9._,-]*) echo "invalid traditional application code path" >&2; exit 1 ;;
 esac
 plugin_state_dir="/var/lib/w7-tradition-plugin"
-policy_json="${TRADITION_PLUGIN_POLICY:-}"
-if [ -z "$policy_json" ]; then
-  policy_json='{"platform":{"tradition":{"plugins":[]}}}'
+policy_base64="${TRADITION_PLUGIN_POLICY:-}"
+if [ -z "$policy_base64" ]; then
+  policy_base64='eyJwbGF0Zm9ybSI6eyJ0cmFkaXRpb24iOnsicGx1Z2lucyI6W119fX0='
 fi
 mkdir -p "$code_install_path"
 mkdir -p "$plugin_state_dir"
@@ -53,7 +53,7 @@ mkdir -p "$package_dir"
 wget -q -O "$tmp_zip" "$code_package_url"
 unzip -oq "$tmp_zip" -d "$package_dir"
 unzip -oq "$tmp_zip" -d "$code_install_path"
-echo "$policy_json" > "$policy_file"
+printf '%s' "$policy_base64" | base64 -d > "$policy_file"
 w7-tradition-plugin app update \
   --plugin-state-dir "$plugin_state_dir" \
   --site-dir "$code_install_path" \

@@ -26,9 +26,9 @@ plugin_state_dir="/var/lib/w7-tradition-plugin"
 plugin_id={{ .Values.plugin.identifie | quote }}
 code_package_url={{ .Values.plugin.codePackageUrl | quote }}
 test -n "$code_package_url"
-policy_json="${TRADITION_PLUGIN_POLICY:-}"
-if [ -z "$policy_json" ]; then
-  policy_json='{"platform":{"tradition":{"plugins":[]}}}'
+policy_base64="${TRADITION_PLUGIN_POLICY:-}"
+if [ -z "$policy_base64" ]; then
+  policy_base64='eyJwbGF0Zm9ybSI6eyJ0cmFkaXRpb24iOnsicGx1Z2lucyI6W119fX0='
 fi
 mkdir -p "$code_install_path"
 mkdir -p "$plugin_state_dir"
@@ -40,7 +40,7 @@ policy_file="$tmp_dir/policy.json"
 mkdir -p "$package_dir"
 wget -q -O "$tmp_zip" "$code_package_url"
 unzip -oq "$tmp_zip" -d "$package_dir"
-echo "$policy_json" > "$policy_file"
+printf '%s' "$policy_base64" | base64 -d > "$policy_file"
 result="$(w7-tradition-plugin plugin install \
   --plugin-state-dir "$plugin_state_dir" \
   --site-dir "$code_install_path" \
@@ -61,15 +61,15 @@ const pluginCodeUninstallShell = `set -eu
 code_install_path="/www/wwwroot"
 plugin_state_dir="/var/lib/w7-tradition-plugin"
 plugin_id={{ .Values.plugin.identifie | quote }}
-policy_json="${TRADITION_PLUGIN_POLICY:-}"
-if [ -z "$policy_json" ]; then
-  policy_json='{"platform":{"tradition":{"plugins":[]}}}'
+policy_base64="${TRADITION_PLUGIN_POLICY:-}"
+if [ -z "$policy_base64" ]; then
+  policy_base64='eyJwbGF0Zm9ybSI6eyJ0cmFkaXRpb24iOnsicGx1Z2lucyI6W119fX0='
 fi
 mkdir -p "$plugin_state_dir"
 tmp_dir="$(mktemp -d /tmp/plugin-uninstall.XXXXXX)"
 trap 'rm -rf "$tmp_dir"' EXIT
 policy_file="$tmp_dir/policy.json"
-echo "$policy_json" > "$policy_file"
+printf '%s' "$policy_base64" | base64 -d > "$policy_file"
 w7-tradition-plugin plugin uninstall \
   --plugin-state-dir "$plugin_state_dir" \
   --site-dir "$code_install_path" \

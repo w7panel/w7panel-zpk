@@ -352,6 +352,8 @@ platform:
 
 info 接口会再解析/生成 `<TRADITION_APP>_RELEASE_NAME`。已有订单绑定优先使用真实 app identify；未绑定的多实例传统应用生成 `<identify>-<12位随机串>`。应用插件 Job 的 affinity 使用这个具体 release name，同时再匹配传统应用标识。
 
+`TRADITION_PLUGIN_POLICY` 保存的是策略 JSON 的 UTF-8 Base64 编码，用于避免 JSON 中的 `{}` 和 `,` 被 Helm `--set` 语法解析。传统应用和插件的内置 Job 会在调用安装工具前将其解码为 `policy.json`。
+
 ### 6.4 安装和卸载
 
 打包器自动追加：

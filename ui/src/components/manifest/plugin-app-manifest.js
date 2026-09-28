@@ -19,7 +19,7 @@ const pluginTraditionStartParamDefinitions = Object.freeze([
         name: 'TRADITION_PLUGIN_POLICY',
         title: '插件文件优先级配置',
         values_text: '%TRADITION_PLUGIN_POLICY%',
-        description: '从所选传统应用读取插件文件优先级配置',
+        description: '从所选传统应用读取 Base64 编码的插件文件优先级配置',
     },
 ]);
 

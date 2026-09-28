@@ -231,15 +231,16 @@ func (service *Installer) applyLayers(
 	return nil
 }
 
-// saveState 保存状态 config 和有序层 manifest，更新 current tag 并清理旧 manifest。
-func (service *Installer) saveState(state State, ordered []Layer) error {
+// saveState 保存状态 config 和有序层 manifest，并原子更新 current tag。
+// 旧 manifest 在站点与 OCI 都提交成功后再由 cleanupPreviousState 清理。
+func (service *Installer) saveState(state State, ordered []Layer) (*v1.Descriptor, v1.Descriptor, error) {
 	store, err := service.store()
 	if err != nil {
-		return err
+		return nil, v1.Descriptor{}, err
 	}
 	previous, resolveErr := store.Resolve(context.Background(), currentTag)
 	if resolveErr != nil && !errors.Is(resolveErr, errdef.ErrNotFound) {
-		return resolveErr
+		return nil, v1.Descriptor{}, resolveErr
 	}
 	layers := make([]v1.Descriptor, 0, len(ordered))
 	for _, layer := range ordered {
@@ -256,18 +257,18 @@ func (service *Installer) saveState(state State, ordered []Layer) error {
 	}
 	configContent, err := json.Marshal(state)
 	if err != nil {
-		return err
+		return nil, v1.Descriptor{}, err
 	}
 	configDescriptor := content.NewDescriptorFromBytes(
 		"application/vnd.w7.tradition-plugin.config.v1+json", configContent,
 	)
 	exists, err := store.Exists(context.Background(), configDescriptor)
 	if err != nil {
-		return err
+		return nil, v1.Descriptor{}, err
 	}
 	if !exists {
 		if err := store.Push(context.Background(), configDescriptor, bytes.NewReader(configContent)); err != nil {
-			return err
+			return nil, v1.Descriptor{}, err
 		}
 	}
 	manifest, err := oras.PackManifest(
@@ -276,23 +277,34 @@ func (service *Installer) saveState(state State, ordered []Layer) error {
 		oras.PackManifestOptions{Layers: layers, ConfigDescriptor: &configDescriptor},
 	)
 	if err != nil {
-		return err
+		return nil, v1.Descriptor{}, err
 	}
 	if err := store.Tag(context.Background(), manifest, currentTag); err != nil {
-		return err
-	}
-	if resolveErr == nil && previous.Digest != manifest.Digest {
-		store.AutoGC = true
-		store.AutoSaveIndex = true
-		if err := store.Delete(context.Background(), previous); err != nil {
-			return err
-		}
-		return nil
+		return nil, v1.Descriptor{}, err
 	}
 	if err := store.SaveIndex(); err != nil {
-		return err
+		return nil, v1.Descriptor{}, err
 	}
-	return nil
+	if resolveErr != nil || previous.Digest == manifest.Digest {
+		return nil, manifest, nil
+	}
+	return &previous, manifest, nil
+}
+
+// cleanupPreviousState 清理 current 已不再引用的旧 manifest 与悬空 Blob。
+// 清理失败不影响已经一致提交的站点和 current 状态，后续操作仍可继续回收。
+func (service *Installer) cleanupPreviousState(previous *v1.Descriptor, current v1.Descriptor) {
+	if previous == nil || previous.Digest == current.Digest {
+		return
+	}
+	store, err := service.store()
+	if err != nil {
+		return
+	}
+	store.AutoGC = true
+	store.AutoSaveIndex = true
+	_ = store.Delete(context.Background(), *previous)
+	_ = store.GC(context.Background())
 }
 
 // orderedLayers 将 Base 放在最底层，再按优先级从低到高排列插件层。

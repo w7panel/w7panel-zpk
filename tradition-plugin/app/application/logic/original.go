@@ -1,6 +1,8 @@
 package logic
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -98,11 +100,25 @@ func copySelected(
 	if err != nil {
 		return err
 	}
+	targetDir, err = targetRoot(targetDir)
+	if err != nil {
+		return err
+	}
+	source, err := os.OpenRoot(sourceDir)
+	if err != nil {
+		return err
+	}
+	defer source.Close()
+	target, err := os.OpenRoot(targetDir)
+	if err != nil {
+		return err
+	}
+	defer target.Close()
 	for _, name := range sortedPaths(selected, false) {
 		if _, exists := excluded[name]; exists {
 			continue
 		}
-		if err := copyPath(sourceDir, targetDir, name); err != nil && !os.IsNotExist(err) {
+		if err := copyPath(source, target, name); err != nil && !os.IsNotExist(err) {
 			return err
 		}
 	}
@@ -110,29 +126,31 @@ func copySelected(
 }
 
 // copyPath 按原类型和权限复制一个目录、普通文件或符号链接。
-func copyPath(sourceDir, targetDir, name string) error {
-	from := filepath.Join(sourceDir, filepath.FromSlash(name))
-	info, err := os.Lstat(from)
+func copyPath(source, target *os.Root, name string) error {
+	name, err := safeRelativePath(name)
 	if err != nil {
 		return err
 	}
-	to := filepath.Join(targetDir, filepath.FromSlash(name))
+	info, err := source.Lstat(name)
+	if err != nil {
+		return err
+	}
 	switch {
 	case info.IsDir():
-		return replaceDirectory(to, info.Mode().Perm())
+		return replaceDirectory(target, name, info.Mode().Perm())
 	case info.Mode().IsRegular():
-		file, err := os.Open(from)
+		file, err := source.Open(name)
 		if err != nil {
 			return err
 		}
 		defer file.Close()
-		return replaceFile(to, file, info.Mode().Perm())
+		return replaceFile(target, name, file, info.Mode().Perm())
 	case info.Mode()&os.ModeSymlink != 0:
-		link, err := os.Readlink(from)
+		link, err := source.Readlink(name)
 		if err != nil {
 			return err
 		}
-		return replaceSymlink(to, link)
+		return replaceSymlink(target, name, link)
 	default:
 		return fmt.Errorf("unsupported file %q", name)
 	}
@@ -161,12 +179,21 @@ func treeFiles(directory string) ([]string, error) {
 
 // removePaths 按由深到浅的顺序删除受管路径，并保留仍包含其他内容的目录。
 func removePaths(siteDir string, previous []string) error {
+	root, err := os.OpenRoot(siteDir)
+	if err != nil {
+		return err
+	}
+	defer root.Close()
 	paths := make(map[string]struct{}, len(previous))
 	for _, name := range previous {
 		paths[name] = struct{}{}
 	}
 	for _, name := range sortedPaths(paths, true) {
-		if err := os.Remove(filepath.Join(siteDir, filepath.FromSlash(name))); err != nil &&
+		name, err := safeRelativePath(name)
+		if err != nil {
+			return err
+		}
+		if err := root.Remove(name); err != nil &&
 			!os.IsNotExist(err) && !errors.Is(err, syscall.ENOTEMPTY) {
 			return err
 		}
@@ -175,52 +202,61 @@ func removePaths(siteDir string, previous []string) error {
 }
 
 // replaceDirectory 确保目标路径为具有指定权限的目录。
-func replaceDirectory(name string, mode os.FileMode) error {
-	info, err := os.Lstat(name)
+func replaceDirectory(root *os.Root, name string, mode os.FileMode) error {
+	info, err := root.Lstat(name)
 	if err == nil && !info.IsDir() {
-		if err := os.Remove(name); err != nil {
+		if err := root.RemoveAll(name); err != nil {
 			return err
 		}
 	} else if err != nil && !os.IsNotExist(err) {
 		return err
 	}
-	if err := os.MkdirAll(name, mode); err != nil {
+	if err := root.MkdirAll(name, mode); err != nil {
 		return err
 	}
-	return os.Chmod(name, mode)
+	return root.Chmod(name, mode)
 }
 
 // replaceFile 使用 reader 的内容和指定权限原子替换目标文件。
-func replaceFile(name string, reader io.Reader, mode os.FileMode) error {
-	if info, err := os.Lstat(name); err == nil && info.IsDir() {
-		if err := os.Remove(name); err != nil {
+func replaceFile(root *os.Root, name string, reader io.Reader, mode os.FileMode) error {
+	if info, err := root.Lstat(name); err == nil && info.IsDir() {
+		if err := root.Remove(name); err != nil {
 			return err
 		}
 	}
-	return atomicWrite(name, reader, mode)
+	return atomicWrite(root, name, reader, mode)
 }
 
 // replaceSymlink 将目标路径替换为指向 target 的符号链接。
-func replaceSymlink(name, target string) error {
-	if err := os.MkdirAll(filepath.Dir(name), 0o755); err != nil {
+func replaceSymlink(root *os.Root, name, target string) error {
+	if err := safeSymlinkTarget(name, target); err != nil {
 		return err
 	}
-	if err := os.RemoveAll(name); err != nil {
+	if err := root.MkdirAll(filepath.Dir(name), 0o755); err != nil {
 		return err
 	}
-	return os.Symlink(target, name)
+	if err := root.RemoveAll(name); err != nil {
+		return err
+	}
+	return root.Symlink(target, name)
 }
 
 // atomicWrite 先写入同目录临时文件，再通过重命名原子替换目标文件。
-func atomicWrite(name string, reader io.Reader, mode os.FileMode) error {
-	if err := os.MkdirAll(filepath.Dir(name), 0o755); err != nil {
+func atomicWrite(root *os.Root, name string, reader io.Reader, mode os.FileMode) error {
+	directory := filepath.Dir(name)
+	if err := root.MkdirAll(directory, 0o755); err != nil {
 		return err
 	}
-	temp, err := os.CreateTemp(filepath.Dir(name), ".w7-tradition-plugin-*")
+	random := make([]byte, 12)
+	if _, err := rand.Read(random); err != nil {
+		return err
+	}
+	tempName := filepath.Join(directory, ".w7-tradition-plugin-"+hex.EncodeToString(random))
+	temp, err := root.OpenFile(tempName, os.O_CREATE|os.O_EXCL|os.O_WRONLY, mode)
 	if err != nil {
 		return err
 	}
-	defer os.Remove(temp.Name())
+	defer root.Remove(tempName)
 	if err := temp.Chmod(mode); err != nil {
 		temp.Close()
 		return err
@@ -232,7 +268,29 @@ func atomicWrite(name string, reader io.Reader, mode os.FileMode) error {
 	if err := temp.Close(); err != nil {
 		return err
 	}
-	return os.Rename(temp.Name(), name)
+	return root.Rename(tempName, name)
+}
+
+// safeRelativePath 将状态或压缩层中的路径限制在操作根目录内。
+func safeRelativePath(name string) (string, error) {
+	name = filepath.Clean(filepath.FromSlash(name))
+	if name == "" || name == "." || filepath.IsAbs(name) || filepath.VolumeName(name) != "" ||
+		name == ".." || strings.HasPrefix(name, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("path %q escapes operation root", name)
+	}
+	return name, nil
+}
+
+// safeSymlinkTarget 拒绝会从目标根目录跳出的绝对链接或父级链接。
+func safeSymlinkTarget(name, target string) error {
+	if filepath.IsAbs(target) || filepath.VolumeName(target) != "" {
+		return fmt.Errorf("symlink %q points outside operation root", name)
+	}
+	resolved := filepath.Clean(filepath.Join(filepath.Dir(name), target))
+	if resolved == ".." || strings.HasPrefix(resolved, ".."+string(filepath.Separator)) {
+		return fmt.Errorf("symlink %q points outside operation root", name)
+	}
+	return nil
 }
 
 // sourceRoot 返回已解析符号链接的源目录绝对路径，并校验目录必须已存在。

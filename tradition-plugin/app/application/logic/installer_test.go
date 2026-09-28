@@ -227,6 +227,63 @@ func TestRestoreReappliesCurrentOCI(t *testing.T) {
 	assertTestFile(t, root, "system.php", "plugin")
 }
 
+func TestRestoreRejectsCorruptLayerBeforeChangingSite(t *testing.T) {
+	policy := Policy{Plugins: map[string]int{"plugin-a": 100}}
+	service, root, _ := newTestInstaller(t)
+	writeTestFile(t, root, "system.php", "base")
+	plugin := t.TempDir()
+	writeTestFile(t, plugin, "system.php", "plugin")
+	if _, err := service.InstallPlugin(root, plugin, "plugin-a", policy); err != nil {
+		t.Fatal(err)
+	}
+	writeTestFile(t, root, "system.php", "local-change")
+
+	layers := currentLayers(t, service)
+	pluginLayer := layers[len(layers)-1]
+	blobPath := filepath.Join(service.dataDir, "blobs", pluginLayer.Digest.Algorithm().String(), pluginLayer.Digest.Encoded())
+	if err := os.Chmod(blobPath, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(blobPath, []byte("corrupt"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.Restore(root); err == nil {
+		t.Fatal("restore must reject a corrupt OCI layer")
+	}
+	assertTestFile(t, root, "system.php", "local-change")
+}
+
+func TestReplaceSiteRollsBackWhenMaterializedPathIsUnsafe(t *testing.T) {
+	service, root, _ := newTestInstaller(t)
+	if err := service.ensureDataDir(); err != nil {
+		t.Fatal(err)
+	}
+	writeTestFile(t, root, "system.php", "original")
+	materialized := t.TempDir()
+	if err := os.Symlink("/tmp/outside", filepath.Join(materialized, "system.php")); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, _, err := service.replaceSiteFromTree(root, materialized, map[string]struct{}{"system.php": {}}); err == nil {
+		t.Fatal("unsafe materialized symlink must fail")
+	}
+	assertTestFile(t, root, "system.php", "original")
+}
+
+func TestRemovePathsRejectsSymlinkEscape(t *testing.T) {
+	site := t.TempDir()
+	outside := t.TempDir()
+	writeTestFile(t, outside, "secret.txt", "keep")
+	if err := os.Symlink(outside, filepath.Join(site, "linked")); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := removePaths(site, []string{"linked/secret.txt"}); err == nil {
+		t.Fatal("removal through an escaping symlink must fail")
+	}
+	assertTestFile(t, outside, "secret.txt", "keep")
+}
+
 func TestPriorityOnlyChangesManifestOrder(t *testing.T) {
 	service, root, base := newTestInstaller(t)
 	writeTestFile(t, base, "system.php", "base")

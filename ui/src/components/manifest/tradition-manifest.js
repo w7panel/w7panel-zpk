@@ -36,7 +36,7 @@ export function normalizeTraditionPlugins(plugins = []) {
         if (!key || seen.has(key)) return;
         seen.add(key);
         normalized.push({
-            identifie,
+            identifie: key,
             name: String(plugin?.name || identifie).trim(),
             goodsId: Number(plugin?.goodsId || plugin?.goods_id || 0),
             priority: normalizeTraditionPluginPriority(plugin?.priority),
@@ -195,10 +195,6 @@ export function withTraditionAppStorage(platform = {}) {
             name: traditionStorageVolumeName,
             mountPath: '/www/wwwroot',
             subPath: '{{ .Values.DOMAIN_URL }}',
-        }, {
-            name: traditionStorageVolumeName,
-            mountPath: '/www/server',
-            subPath: 'server-dir',
         });
     }
     nextPlatform['container-v2'] = containers;

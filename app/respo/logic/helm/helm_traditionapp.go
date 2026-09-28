@@ -68,7 +68,9 @@ case "$domain_url" in
   .|..|*[!A-Za-z0-9._,-]*) echo "refusing to remove invalid traditional application code path" >&2; exit 1 ;;
 esac
 code_install_path="/www/wwwroot"
-rm -rf -- "$code_install_path"/* "$code_install_path"/.[!.]* "$code_install_path"/..?*`
+plugin_state_dir="/var/lib/w7-tradition-plugin/.w7-tradition-plugin/$domain_url"
+rm -rf -- "$code_install_path"/* "$code_install_path"/.[!.]* "$code_install_path"/..?*
+rm -rf -- "$plugin_state_dir"`
 
 // traditionNginxVhostShell writes the rendered site-manager vhost into the
 // nginx-dir subtree mounted from the embedded w7-traditiontool application.
@@ -138,22 +140,22 @@ func (hc *HelmPack) addTraditionAppValues(values map[string]interface{}) error {
 			"nginxVhostTemplate": nginxVhostTemplate,
 		},
 	}
-	applyTraditionPluginInstallerVolumeMount(values)
+	applyTraditionPluginStateVolumeMount(values)
 	if traditionGatewayEnabled(hc.Manifest) {
 		applyTraditionToolJobVolumeMounts(values)
 	}
 	return nil
 }
 
-// applyTraditionPluginInstallerVolumeMount gives the application update task
-// access to the PVC root where the per-domain OCI state is persisted.
-func applyTraditionPluginInstallerVolumeMount(values map[string]interface{}) {
+// applyTraditionPluginStateVolumeMount gives the application update and
+// uninstall tasks access to the PVC root containing per-domain OCI state.
+func applyTraditionPluginStateVolumeMount(values map[string]interface{}) {
 	jobs, ok := values["jobs"].([]map[string]interface{})
 	if !ok {
 		return
 	}
 	for _, job := range jobs {
-		if job["title"] != traditionCodeInstallJobTitle {
+		if job["title"] != traditionCodeInstallJobTitle && job["title"] != traditionCodeUninstallJobTitle {
 			continue
 		}
 		container, ok := job["container"].(map[string]interface{})

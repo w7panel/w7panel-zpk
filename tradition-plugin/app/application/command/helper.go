@@ -59,6 +59,9 @@ func decodePolicy(content []byte) (logic.Policy, error) {
 	if err := json.Unmarshal(content, &input); err != nil {
 		return logic.Policy{}, err
 	}
+	if input.Platform.Tradition.Plugins == nil {
+		return logic.Policy{}, fmt.Errorf("traditional plugin policy is required")
+	}
 	plugins := make(map[string]int, len(input.Platform.Tradition.Plugins))
 	for _, item := range input.Platform.Tradition.Plugins {
 		if item.Identifie == "" || item.Priority < 0 || item.Priority > maxPluginPriority {

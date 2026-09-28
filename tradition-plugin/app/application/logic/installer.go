@@ -1,6 +1,7 @@
 package logic
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -133,12 +134,16 @@ func (service *Installer) Restore(siteDir string) (RecoveryResult, error) {
 	if err != nil {
 		return RecoveryResult{}, err
 	}
-	if err := removePaths(siteDir, sortedPaths(trackedFiles(state.PluginFiles), false)); err != nil {
+	materialized, err := service.materializeLayers(manifest.Layers)
+	if err != nil {
 		return RecoveryResult{}, err
 	}
-	if err := service.applyLayers(siteDir, manifest.Layers); err != nil {
+	defer os.RemoveAll(materialized)
+	_, cleanup, err := service.replaceSiteFromTree(siteDir, materialized, trackedFiles(state.PluginFiles))
+	if err != nil {
 		return RecoveryResult{}, err
 	}
+	defer cleanup()
 	return RecoveryResult{Recovered: true}, nil
 }
 
@@ -193,20 +198,86 @@ func (service *Installer) change(
 			return OperationResult{}, err
 		}
 	}
-	if err := removePaths(siteDir, sortedPaths(previous, false)); err != nil {
-		return OperationResult{}, err
-	}
-	if err := service.applyLayers(siteDir, layerDescriptors(siteLayers)); err != nil {
-		return OperationResult{}, err
-	}
 	if lastPluginRemoved {
 		state.Base = nil
 		storedLayers = nil
 	}
-	if err := service.saveState(state, storedLayers); err != nil {
+	materialized, err := service.materializeLayers(layerDescriptors(siteLayers))
+	if err != nil {
 		return OperationResult{}, err
 	}
+	defer os.RemoveAll(materialized)
+	rollback, cleanup, err := service.replaceSiteFromTree(siteDir, materialized, previous)
+	if err != nil {
+		return OperationResult{}, err
+	}
+	defer cleanup()
+	previousManifest, currentManifest, err := service.saveState(state, storedLayers)
+	if err != nil {
+		if rollbackErr := rollback(); rollbackErr != nil {
+			return OperationResult{}, errors.Join(err, fmt.Errorf("restore site after OCI save failure: %w", rollbackErr))
+		}
+		return OperationResult{}, err
+	}
+	service.cleanupPreviousState(previousManifest, currentManifest)
 	return result, nil
+}
+
+// materializeLayers 先在临时目录应用并校验全部 OCI 层，避免损坏层写入实际站点。
+func (service *Installer) materializeLayers(layers []v1.Descriptor) (string, error) {
+	directory, err := os.MkdirTemp(filepath.Join(service.dataDir, "tmp"), "materialized-*")
+	if err != nil {
+		return "", err
+	}
+	if err := service.applyLayers(directory, layers); err != nil {
+		os.RemoveAll(directory)
+		return "", err
+	}
+	return directory, nil
+}
+
+// replaceSiteFromTree 备份本次涉及的站点路径，再以具象化目录替换；返回失败时使用的回滚函数。
+func (service *Installer) replaceSiteFromTree(
+	siteDir, materialized string,
+	previous map[string]struct{},
+) (rollback func() error, cleanup func(), err error) {
+	materializedFiles, err := treeFiles(materialized)
+	if err != nil {
+		return nil, nil, err
+	}
+	affected := unionSets(previous, stringSet(materializedFiles))
+	backup, err := os.MkdirTemp(filepath.Join(service.dataDir, "tmp"), "backup-*")
+	if err != nil {
+		return nil, nil, err
+	}
+	cleanup = func() { _ = os.RemoveAll(backup) }
+	if err := copySelected(siteDir, backup, affected, nil); err != nil {
+		cleanup()
+		return nil, nil, err
+	}
+	backupFiles, err := treeFiles(backup)
+	if err != nil {
+		cleanup()
+		return nil, nil, err
+	}
+	rollback = func() error {
+		if err := removePaths(siteDir, sortedPaths(affected, false)); err != nil {
+			return err
+		}
+		return copySelected(backup, siteDir, stringSet(backupFiles), nil)
+	}
+	if err := removePaths(siteDir, sortedPaths(affected, false)); err != nil {
+		cleanup()
+		return nil, nil, err
+	}
+	if err := copySelected(materialized, siteDir, stringSet(materializedFiles), nil); err != nil {
+		if rollbackErr := rollback(); rollbackErr != nil {
+			err = errors.Join(err, fmt.Errorf("restore site after apply failure: %w", rollbackErr))
+		}
+		cleanup()
+		return nil, nil, err
+	}
+	return rollback, cleanup, nil
 }
 
 // cleanupBase 删除 Base 中已不再被任何受管插件使用的原应用文件。
@@ -235,6 +306,18 @@ func stringSet(values []string) map[string]struct{} {
 	result := make(map[string]struct{}, len(values))
 	for _, value := range values {
 		result[value] = struct{}{}
+	}
+	return result
+}
+
+// unionSets 返回两个路径集合的并集。
+func unionSets(left, right map[string]struct{}) map[string]struct{} {
+	result := make(map[string]struct{}, len(left)+len(right))
+	for name := range left {
+		result[name] = struct{}{}
+	}
+	for name := range right {
+		result[name] = struct{}{}
 	}
 	return result
 }

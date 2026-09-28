@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	pluginInstallerImage        = "zpk.w7.cc/public/tradition-plugin:v1.0.0"
+	pluginInstallerImage        = "zpk.w7.cc/public/tradition-plugin:v1.0.1"
 	pluginInstallerDataMount    = "/var/lib/w7-tradition-plugin"
 	pluginCodeInstallJobTitle   = "安装应用插件代码"
 	pluginCodeUninstallJobTitle = "卸载应用插件代码"

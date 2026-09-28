@@ -3,7 +3,7 @@ CLI_DIR := $(shell pwd)
 BIN_DIR := $(CLI_DIR)/bin
 GO_BUILD := CGO_ENABLED=0 go build -trimpath -ldflags "-s -w"
 IMAGE_REPOSITORY ?= zpk.w7.cc/public/tradition-plugin
-IMAGE_TAG ?= v1.0.1
+IMAGE_TAG ?= v1.0.2
 IMAGE ?= $(IMAGE_REPOSITORY):$(IMAGE_TAG)
 PLATFORMS ?= linux/amd64,linux/arm64
 GOPROXY ?= https://goproxy.cn,direct

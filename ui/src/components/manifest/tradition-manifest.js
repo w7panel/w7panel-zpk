@@ -352,10 +352,12 @@ export const nginxTemplateExample = String.raw`server {
         # 关键 FastCGI 参数
         include fastcgi_params;
         fastcgi_split_path_info ^(.+\.php)(/.+)$;
+        fastcgi_param DOCUMENT_ROOT /www/wwwroot;
         fastcgi_param SCRIPT_FILENAME /www/wwwroot$fastcgi_script_name;
         fastcgi_param SCRIPT_NAME $fastcgi_script_name;
         fastcgi_param PATH_INFO $fastcgi_path_info;
         fastcgi_param PATH_TRANSLATED /www/wwwroot$fastcgi_path_info;
+        fastcgi_param PHP_ADMIN_VALUE "open_basedir=/www/wwwroot:/home/:/tmp/:/usr/tmp/:/proc/";
         fastcgi_index index.php;
 
         # 必要的请求头

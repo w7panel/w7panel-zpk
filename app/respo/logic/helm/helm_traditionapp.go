@@ -53,7 +53,7 @@ mkdir -p "$package_dir"
 wget -q -O "$tmp_zip" "$code_package_url"
 unzip -oq "$tmp_zip" -d "$package_dir"
 unzip -oq "$tmp_zip" -d "$code_install_path"
-printf '%s' "$policy_base64" | base64 -d > "$policy_file"
+echo -n "$policy_base64" | base64 -d > "$policy_file"
 w7-tradition-plugin app update \
   --plugin-state-dir "$plugin_state_dir" \
   --site-dir "$code_install_path" \

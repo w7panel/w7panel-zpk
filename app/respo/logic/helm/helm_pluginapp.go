@@ -40,7 +40,7 @@ policy_file="$tmp_dir/policy.json"
 mkdir -p "$package_dir"
 wget -q -O "$tmp_zip" "$code_package_url"
 unzip -oq "$tmp_zip" -d "$package_dir"
-printf '%s' "$policy_base64" | base64 -d > "$policy_file"
+echo -n "$policy_base64" | base64 -d > "$policy_file"
 result="$(w7-tradition-plugin plugin install \
   --plugin-state-dir "$plugin_state_dir" \
   --site-dir "$code_install_path" \
@@ -69,7 +69,7 @@ mkdir -p "$plugin_state_dir"
 tmp_dir="$(mktemp -d /tmp/plugin-uninstall.XXXXXX)"
 trap 'rm -rf "$tmp_dir"' EXIT
 policy_file="$tmp_dir/policy.json"
-printf '%s' "$policy_base64" | base64 -d > "$policy_file"
+echo -n "$policy_base64" | base64 -d > "$policy_file"
 w7-tradition-plugin plugin uninstall \
   --plugin-state-dir "$plugin_state_dir" \
   --site-dir "$code_install_path" \

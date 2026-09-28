@@ -131,7 +131,7 @@ func (hc *HelmPack) getPluginShellJobContainerValues() map[string]interface{} {
 		"image": imageValues(hc.getPluginRuntimeImage(), v1.PullIfNotPresent), "env": []v1.EnvVar{},
 		"resources": v1.ResourceRequirements{},
 		"volumeMounts": []v1.VolumeMount{
-			{Name: traditionStorageVolumeName, MountPath: "/www/wwwroot", SubPath: "{{ include \"plugin.codeInstallDirectory\" . }}"},
+			{Name: traditionStorageVolumeName, MountPath: "/www/wwwroot", SubPath: "nginx-web-dir/{{ include \"plugin.codeInstallDirectory\" . }}"},
 			{Name: traditionStorageVolumeName, MountPath: pluginInstallerDataMount},
 		},
 		"securityContext": map[string]interface{}{},

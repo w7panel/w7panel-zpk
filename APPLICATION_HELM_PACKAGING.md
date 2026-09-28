@@ -364,7 +364,7 @@ info 接口会再解析/生成 `<TRADITION_APP>_RELEASE_NAME`。已有订单绑�
 ```sh
 set -eu
 
-# Job 内的 /www/wwwroot 已经是域名 subPath 的根目录
+# Job 内的 /www/wwwroot 已经是 nginx-web-dir/<domain> subPath 的根目录
 code_install_path="/www/wwwroot"
 
 # 改成插件自己拥有的相对目录
@@ -382,7 +382,7 @@ rm -rf -- "$plugin_install_path"
 - volume 名固定为 `site-storage`。
 - PVC 名取传统应用依赖导出的 `.Values.PVC_NAME`。
 - Job mountPath 为 `/www/wwwroot`。
-- PVC subPath 为 `<domain>`，与传统应用使用同一份域名目录。
+- PVC subPath 为 `nginx-web-dir/<domain>`，与传统应用使用同一份站点代码目录。
 - 应用插件不创建、不拥有也不删除该 PVC。
 - 因为默认按 RWO 处理，Job 用传统应用 release 的 pod affinity 调度到传统应用所在节点。
 
@@ -395,7 +395,7 @@ rm -rf -- "$plugin_install_path"
 - 支持版本：`w7.cc/image_version`，同时生成必填 `IMAGE_VERSION` select 参数。
 - 域名：必填 `DOMAIN_URL` 参数。
 - 至少一个非 init container；UI 缺失时会补默认容器和 Deployment。
-- 固定共享 volume `site-storage`，主容器只将 `<domain>` 子目录挂载到 `/www/wwwroot`。
+- 固定共享 volume `site-storage`，主容器只将 `nginx-web-dir/<domain>` 子目录挂载到 `/www/wwwroot`。
 
 打包时所有传统应用容器 image 中的 `{version}` 都替换为 `{{ .Values.IMAGE_VERSION }}`。
 
@@ -434,12 +434,12 @@ rm -rf -- "$plugin_install_path"
 - 给 `w7-traditiontool` 子 Workload 写 `w7.cc/tradition-tool-restart-revision={{ .Release.Revision }}`，使传统应用升级时工具同步滚动；
 - 若配置了 `w7.cc/nginx_vhost_template`，生成安装/升级 vhost 和卸载 vhost 的 Job；
 - 从工具子 manifest 找出 `site-storage`/`nginx-dir` mounts，给 vhost Job 使用；
-- 支持 `{SERVER_NAME}`、`{LOG_DIR}`、`{ROOT_DIR}`、`{K8S_DOMAIN}`、`{UPSTREAM_APP_NAME}` 模板变量。
+- 支持 `{SERVER_NAME}`、`{LOG_DIR}`、`{ROOT_DIR}`、`{K8S_DOMAIN}`、`{UPSTREAM_APP_NAME}` 模板变量。其中 tradition-tool 将 PVC 的 `nginx-web-dir` 功能目录挂载到 `/www/wwwroot`，所以 `{ROOT_DIR}` 是 NGINX 容器看到的站点目录 `/www/wwwroot/<domain>`；FastCGI 转发给应用容器的代码路径固定为 `/www/wwwroot`。
 
 ### 7.5 存储
 
 - 传统应用主容器的 `site-storage` claimName 默认为空，渲染时取 `.Values.PVC_NAME`。
-- 主容器把 PVC 的 `<domain>` 子目录挂载到 `/www/wwwroot`；每个域名的代码存于 PVC 根目录的 `<domain>/`。
+- 主容器把 PVC 的 `nginx-web-dir/<domain>` 子目录挂载到 `/www/wwwroot`；每个域名的代码存于 PVC 的 `nginx-web-dir/<domain>/`。
 - NGINX 子 Chart、传统应用代码 Job 和 vhost Job 应通过安装端传值复用同一 PVC。
 - 当前传统应用 Chart 不创建 PVC，安装方必须准备 PVC 并传 `PVC_NAME`。
 - 未开启系统层还原时，还会通过注解把容器系统层映射到该持久卷中的 `www/server/<container>/system` 逻辑路径。

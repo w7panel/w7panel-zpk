@@ -24,7 +24,8 @@ const (
 // traditionCodeInstallShell is added to the generated chart as an internal
 // shell task.  It deliberately uses the same volume mount as the workload;
 // the traditional application editor persists that mount at /www/wwwroot,
-// backed by the matching domain subPath in the shared site-storage PVC.
+// backed by the matching nginx-web-dir/<domain> subPath in the shared
+// site-storage PVC.
 // DOMAIN_URL and the package URL are rendered from
 // the final chart values, so installer-selected values are used at runtime.
 const traditionCodeInstallShell = `set -eu

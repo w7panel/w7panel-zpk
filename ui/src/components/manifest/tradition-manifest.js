@@ -194,7 +194,7 @@ export function withTraditionAppStorage(platform = {}) {
         container.volumeMounts.push({
             name: traditionStorageVolumeName,
             mountPath: '/www/wwwroot',
-            subPath: '{{ .Values.DOMAIN_URL }}',
+            subPath: 'nginx-web-dir/{{ .Values.DOMAIN_URL }}',
         });
     }
     nextPlatform['container-v2'] = containers;
@@ -345,10 +345,10 @@ export const nginxTemplateExample = String.raw`server {
         # 关键 FastCGI 参数
         include fastcgi_params;
         fastcgi_split_path_info ^(.+\.php)(/.+)$;
-        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        fastcgi_param SCRIPT_FILENAME /www/wwwroot$fastcgi_script_name;
         fastcgi_param SCRIPT_NAME $fastcgi_script_name;
         fastcgi_param PATH_INFO $fastcgi_path_info;
-        fastcgi_param PATH_TRANSLATED $document_root$fastcgi_path_info;
+        fastcgi_param PATH_TRANSLATED /www/wwwroot$fastcgi_path_info;
         fastcgi_index index.php;
 
         # 必要的请求头

@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 )
@@ -48,7 +49,20 @@ func (service *Installer) UpdateApplication(
 	siteDir, packageDir string,
 	policy Policy,
 ) (OperationResult, error) {
-	return service.change(siteDir, policy, func(state *State, _ string, previous map[string]struct{}) (OperationResult, error) {
+	const operation = "app_update"
+	startedAt := time.Now()
+	logInfo("tradition plugin operation started",
+		"operation", operation,
+		"site_dir", siteDir,
+		"package_dir", packageDir,
+		"state_dir", service.dataDir,
+		"policy_plugin_count", len(policy.Plugins),
+	)
+	result, err := service.change(operation, siteDir, policy, func(state *State, _ string, previous map[string]struct{}) (OperationResult, error) {
+		logInfo("capturing application base files",
+			"operation", operation,
+			"tracked_file_count", len(previous),
+		)
 		base, err := service.captureBase(nil, packageDir, previous, nil)
 		if err != nil {
 			return OperationResult{}, err
@@ -56,6 +70,8 @@ func (service *Installer) UpdateApplication(
 		state.Base = base
 		return OperationResult{Managed: true}, nil
 	})
+	service.logOperationResult(operation, startedAt, result, err)
+	return result, err
 }
 
 // InstallPlugin 安装受策略管理的插件，并在首次覆盖某路径前保存该路径的原应用文件。
@@ -63,16 +79,30 @@ func (service *Installer) InstallPlugin(
 	siteDir, packageDir, plugin string,
 	policy Policy,
 ) (OperationResult, error) {
+	const operation = "plugin_install"
 	if plugin == "" {
 		return OperationResult{}, fmt.Errorf("plugin identifier is required")
 	}
-	return service.change(siteDir, policy, func(
+	startedAt := time.Now()
+	logInfo("tradition plugin operation started",
+		"operation", operation,
+		"plugin", plugin,
+		"site_dir", siteDir,
+		"package_dir", packageDir,
+		"state_dir", service.dataDir,
+		"policy_plugin_count", len(policy.Plugins),
+	)
+	result, err := service.change(operation, siteDir, policy, func(
 		state *State,
 		siteDir string,
 		previous map[string]struct{},
 	) (OperationResult, error) {
 		_, managed := policy.Plugins[plugin]
 		if !managed {
+			logInfo("plugin is not managed by file priority policy",
+				"operation", operation,
+				"plugin", plugin,
+			)
 			return OperationResult{Managed: false}, nil
 		}
 		layer, err := service.packLayer(packageDir, plugin)
@@ -92,6 +122,8 @@ func (service *Installer) InstallPlugin(
 		state.PluginFiles[plugin] = layer.Files
 		return OperationResult{Managed: true}, nil
 	})
+	service.logOperationResult(operation, startedAt, result, err, "plugin", plugin)
+	return result, err
 }
 
 // UninstallPlugin 删除指定插件层，并使用剩余 OCI 层重建受管文件。
@@ -99,56 +131,102 @@ func (service *Installer) UninstallPlugin(
 	siteDir, plugin string,
 	policy Policy,
 ) (OperationResult, error) {
+	const operation = "plugin_uninstall"
 	if plugin == "" {
 		return OperationResult{}, fmt.Errorf("plugin identifier is required")
 	}
-	return service.change(siteDir, policy, func(state *State, _ string, _ map[string]struct{}) (OperationResult, error) {
+	startedAt := time.Now()
+	logInfo("tradition plugin operation started",
+		"operation", operation,
+		"plugin", plugin,
+		"site_dir", siteDir,
+		"state_dir", service.dataDir,
+		"policy_plugin_count", len(policy.Plugins),
+	)
+	result, err := service.change(operation, siteDir, policy, func(state *State, _ string, _ map[string]struct{}) (OperationResult, error) {
 		if _, installed := state.Plugins[plugin]; !installed {
 			_, managed := policy.Plugins[plugin]
+			logInfo("plugin layer is not installed",
+				"operation", operation,
+				"plugin", plugin,
+				"managed", managed,
+			)
 			return OperationResult{Managed: managed}, nil
 		}
 		delete(state.Plugins, plugin)
 		delete(state.PluginFiles, plugin)
 		return OperationResult{Managed: true}, nil
 	})
+	service.logOperationResult(operation, startedAt, result, err, "plugin", plugin)
+	return result, err
 }
 
 // Restore 清理站点中的受管路径，再按 current manifest 的层顺序恢复文件。
 func (service *Installer) Restore(siteDir string) (RecoveryResult, error) {
+	const operation = "restore"
+	startedAt := time.Now()
+	logInfo("tradition plugin operation started",
+		"operation", operation,
+		"site_dir", siteDir,
+		"state_dir", service.dataDir,
+	)
 	if err := service.ensureDataDir(); err != nil {
+		logError("tradition plugin operation failed", "operation", operation, "error", err)
 		return RecoveryResult{}, err
 	}
 	unlock, err := service.lock(true)
 	if err != nil {
+		logError("tradition plugin operation failed", "operation", operation, "error", err)
 		return RecoveryResult{}, err
 	}
 	defer unlock()
 	state, manifest, err := service.loadTag(currentTag)
 	if err != nil {
+		logError("tradition plugin operation failed", "operation", operation, "error", err)
 		return RecoveryResult{}, err
 	}
+	logInfo("tradition plugin state loaded",
+		"operation", operation,
+		"has_base", state.Base != nil,
+		"managed_plugin_count", len(state.Plugins),
+		"tracked_file_count", len(trackedFiles(state.PluginFiles)),
+		"layer_count", len(manifest.Layers),
+	)
 	if state.Base == nil && len(state.Plugins) == 0 {
+		logInfo("tradition plugin restore skipped because state is empty",
+			"operation", operation,
+			"elapsed", time.Since(startedAt),
+		)
 		return RecoveryResult{Recovered: false}, nil
 	}
 	siteDir, err = targetRoot(siteDir)
 	if err != nil {
+		logError("tradition plugin operation failed", "operation", operation, "error", err)
 		return RecoveryResult{}, err
 	}
 	materialized, err := service.materializeLayers(manifest.Layers)
 	if err != nil {
+		logError("tradition plugin operation failed", "operation", operation, "error", err)
 		return RecoveryResult{}, err
 	}
 	defer os.RemoveAll(materialized)
 	_, cleanup, err := service.replaceSiteFromTree(siteDir, materialized, trackedFiles(state.PluginFiles))
 	if err != nil {
+		logError("tradition plugin operation failed", "operation", operation, "error", err)
 		return RecoveryResult{}, err
 	}
 	defer cleanup()
+	logInfo("tradition plugin operation completed",
+		"operation", operation,
+		"recovered", true,
+		"elapsed", time.Since(startedAt),
+	)
 	return RecoveryResult{Recovered: true}, nil
 }
 
 // change 统一完成加锁、状态变更、OCI 保存以及站点受管文件的重新应用。
 func (service *Installer) change(
+	operation string,
 	siteDir string,
 	policy Policy,
 	update func(*State, string, map[string]struct{}) (OperationResult, error),
@@ -166,6 +244,12 @@ func (service *Installer) change(
 		return OperationResult{}, err
 	}
 	previous := trackedFiles(state.PluginFiles)
+	logInfo("tradition plugin state loaded",
+		"operation", operation,
+		"has_base", state.Base != nil,
+		"managed_plugin_count", len(state.Plugins),
+		"tracked_file_count", len(previous),
+	)
 	siteDir, err = targetRoot(siteDir)
 	if err != nil {
 		return OperationResult{}, err
@@ -202,6 +286,16 @@ func (service *Installer) change(
 		state.Base = nil
 		storedLayers = nil
 	}
+	logInfo("tradition plugin site update planned",
+		"operation", operation,
+		"site_layer_count", len(siteLayers),
+		"stored_layer_count", len(storedLayers),
+		"previous_file_count", len(previous),
+		"desired_file_count", len(desired),
+		"removed_files", removedFiles,
+		"base_pruned", basePruned,
+		"last_plugin_removed", lastPluginRemoved,
+	)
 	materialized, err := service.materializeLayers(layerDescriptors(siteLayers))
 	if err != nil {
 		return OperationResult{}, err
@@ -214,13 +308,49 @@ func (service *Installer) change(
 	defer cleanup()
 	previousManifest, currentManifest, err := service.saveState(state, storedLayers)
 	if err != nil {
+		logWarn("OCI state save failed; rolling back site files",
+			"operation", operation,
+			"error", err,
+		)
 		if rollbackErr := rollback(); rollbackErr != nil {
+			logError("site file rollback failed",
+				"operation", operation,
+				"error", rollbackErr,
+			)
 			return OperationResult{}, errors.Join(err, fmt.Errorf("restore site after OCI save failure: %w", rollbackErr))
 		}
+		logInfo("site files rolled back after OCI save failure", "operation", operation)
 		return OperationResult{}, err
 	}
+	logInfo("tradition plugin state committed",
+		"operation", operation,
+		"manifest_digest", currentManifest.Digest.String(),
+		"managed_plugin_count", len(state.Plugins),
+		"stored_layer_count", len(storedLayers),
+	)
 	service.cleanupPreviousState(previousManifest, currentManifest)
 	return result, nil
+}
+
+func (service *Installer) logOperationResult(
+	operation string,
+	startedAt time.Time,
+	result OperationResult,
+	err error,
+	args ...any,
+) {
+	fields := []any{
+		"operation", operation,
+		"managed", result.Managed,
+		"elapsed", time.Since(startedAt),
+	}
+	fields = append(fields, args...)
+	if err != nil {
+		fields = append(fields, "error", err)
+		logError("tradition plugin operation failed", fields...)
+		return
+	}
+	logInfo("tradition plugin operation completed", fields...)
 }
 
 // materializeLayers 先在临时目录应用并校验全部 OCI 层，避免损坏层写入实际站点。
@@ -246,6 +376,12 @@ func (service *Installer) replaceSiteFromTree(
 		return nil, nil, err
 	}
 	affected := unionSets(previous, stringSet(materializedFiles))
+	logInfo("replacing managed site files",
+		"site_dir", siteDir,
+		"previous_file_count", len(previous),
+		"materialized_file_count", len(materializedFiles),
+		"affected_file_count", len(affected),
+	)
 	backup, err := os.MkdirTemp(filepath.Join(service.dataDir, "tmp"), "backup-*")
 	if err != nil {
 		return nil, nil, err
@@ -261,6 +397,11 @@ func (service *Installer) replaceSiteFromTree(
 		return nil, nil, err
 	}
 	rollback = func() error {
+		logWarn("rolling back managed site files",
+			"site_dir", siteDir,
+			"affected_file_count", len(affected),
+			"backup_file_count", len(backupFiles),
+		)
 		if err := removePaths(siteDir, sortedPaths(affected, false)); err != nil {
 			return err
 		}
@@ -277,6 +418,10 @@ func (service *Installer) replaceSiteFromTree(
 		cleanup()
 		return nil, nil, err
 	}
+	logInfo("managed site files replaced",
+		"site_dir", siteDir,
+		"materialized_file_count", len(materializedFiles),
+	)
 	return rollback, cleanup, nil
 }
 

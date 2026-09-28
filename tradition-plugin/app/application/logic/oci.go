@@ -158,6 +158,13 @@ func (service *Installer) packLayer(sourceDir, layerName string) (Layer, error) 
 			return Layer{}, closeErr
 		}
 	}
+	logInfo("OCI layer packed",
+		"layer", layerName,
+		"file_count", len(files),
+		"digest", descriptor.Digest.String(),
+		"size", descriptor.Size,
+		"reused", exists,
+	)
 	return Layer{
 		Name:  layerName,
 		Blob:  *descriptor,
@@ -217,14 +224,27 @@ func (service *Installer) applyLayers(
 	siteDir string,
 	layers []v1.Descriptor,
 ) error {
-	for _, layer := range layers {
+	for index, layer := range layers {
 		if layer.MediaType == v1.MediaTypeEmptyJSON {
 			continue
 		}
 		if layer.MediaType != v1.MediaTypeImageLayer {
 			return fmt.Errorf("unsupported OCI layer media type %q", layer.MediaType)
 		}
+		logInfo("applying OCI layer",
+			"layer_index", index,
+			"layer", layer.Annotations[v1.AnnotationTitle],
+			"kind", layer.Annotations[layerKindAnnotation],
+			"digest", layer.Digest.String(),
+			"size", layer.Size,
+		)
 		if err := service.applyLayer(siteDir, layer); err != nil {
+			logError("OCI layer apply failed",
+				"layer_index", index,
+				"layer", layer.Annotations[v1.AnnotationTitle],
+				"digest", layer.Digest.String(),
+				"error", err,
+			)
 			return err
 		}
 	}
@@ -299,12 +319,25 @@ func (service *Installer) cleanupPreviousState(previous *v1.Descriptor, current 
 	}
 	store, err := service.store()
 	if err != nil {
+		logWarn("failed to open OCI store while cleaning previous state", "error", err)
 		return
 	}
 	store.AutoGC = true
 	store.AutoSaveIndex = true
-	_ = store.Delete(context.Background(), *previous)
-	_ = store.GC(context.Background())
+	if err := store.Delete(context.Background(), *previous); err != nil {
+		logWarn("failed to delete previous OCI manifest",
+			"manifest_digest", previous.Digest.String(),
+			"error", err,
+		)
+	}
+	if err := store.GC(context.Background()); err != nil {
+		logWarn("failed to garbage collect OCI store", "error", err)
+		return
+	}
+	logInfo("previous OCI state cleaned",
+		"previous_manifest_digest", previous.Digest.String(),
+		"current_manifest_digest", current.Digest.String(),
+	)
 }
 
 // orderedLayers 将 Base 放在最底层，再按优先级从低到高排列插件层。

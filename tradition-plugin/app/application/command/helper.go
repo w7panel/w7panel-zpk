@@ -3,6 +3,7 @@ package command
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -41,6 +42,11 @@ func readPolicy(cmd *cobra.Command) logic.Policy {
 	if err != nil {
 		panic(err)
 	}
+	slog.Info("tradition plugin policy loaded",
+		"component", "tradition-plugin",
+		"policy_file", path,
+		"managed_plugin_count", len(policy.Plugins),
+	)
 	return policy
 }
 

@@ -22,7 +22,7 @@ const (
 // without a configured priority retain the original direct extraction flow.
 const pluginCodeInstallShell = `set -eu
 code_install_path="/www/wwwroot"
-plugin_state_dir={{ print "/var/lib/w7-tradition-plugin/.w7-tradition-plugin/" (include "plugin.codeInstallDirectory" .) | quote }}
+plugin_state_dir="/var/lib/w7-tradition-plugin"
 plugin_id={{ .Values.plugin.identifie | quote }}
 code_package_url={{ .Values.plugin.codePackageUrl | quote }}
 test -n "$code_package_url"
@@ -59,7 +59,7 @@ esac`
 // the responsibility of the developer's lifecycle script.
 const pluginCodeUninstallShell = `set -eu
 code_install_path="/www/wwwroot"
-plugin_state_dir={{ print "/var/lib/w7-tradition-plugin/.w7-tradition-plugin/" (include "plugin.codeInstallDirectory" .) | quote }}
+plugin_state_dir="/var/lib/w7-tradition-plugin"
 plugin_id={{ .Values.plugin.identifie | quote }}
 policy_json="${TRADITION_PLUGIN_POLICY:-}"
 if [ -z "$policy_json" ]; then
@@ -132,7 +132,7 @@ func (hc *HelmPack) getPluginShellJobContainerValues() map[string]interface{} {
 		"resources": v1.ResourceRequirements{},
 		"volumeMounts": []v1.VolumeMount{
 			{Name: traditionStorageVolumeName, MountPath: "/www/wwwroot", SubPath: "nginx-web-dir/{{ include \"plugin.codeInstallDirectory\" . }}"},
-			{Name: traditionStorageVolumeName, MountPath: pluginInstallerDataMount},
+			{Name: traditionStorageVolumeName, MountPath: pluginInstallerDataMount, SubPath: "tradition-plugin-dir/{{ include \"plugin.codeInstallDirectory\" . }}"},
 		},
 		"securityContext": map[string]interface{}{},
 	}

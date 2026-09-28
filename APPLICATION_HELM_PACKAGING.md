@@ -383,6 +383,7 @@ rm -rf -- "$plugin_install_path"
 - PVC 名取传统应用依赖导出的 `.Values.PVC_NAME`。
 - Job mountPath 为 `/www/wwwroot`。
 - PVC subPath 为 `nginx-web-dir/<domain>`，与传统应用使用同一份站点代码目录。
+- 插件 OCI 状态挂载到 `/var/lib/w7-tradition-plugin`，对应 PVC 的 `tradition-plugin-dir/<domain>`。
 - 应用插件不创建、不拥有也不删除该 PVC。
 - 因为默认按 RWO 处理，Job 用传统应用 release 的 pod affinity 调度到传统应用所在节点。
 
@@ -403,7 +404,7 @@ rm -rf -- "$plugin_install_path"
 
 `source.url` 可选。存在时自动追加：
 
-- 安装/升级前 Job：使用 `zpk.w7.cc/public/tradition-plugin:v1.0.0` 下载 zip，先更新 `/www/wwwroot`，再执行 `w7-tradition-plugin app update` 刷新原应用文件并重新应用受管插件层；OCI 状态保存在共享存储根目录的 `.w7-tradition-plugin/<domain>`；
+- 安装/升级前 Job：使用 `zpk.w7.cc/public/tradition-plugin:v1.0.0` 下载 zip，先更新 `/www/wwwroot`，再执行 `w7-tradition-plugin app update` 刷新原应用文件并重新应用受管插件层；OCI 状态保存在 `tradition-plugin-dir/<domain>`；
 - 卸载后 Job：清空该域名挂载目录，但保留挂载点和 PVC。
 
 因此传统应用既可以只是一个语言/runtime 服务，也可以自带初始站点代码。
@@ -738,8 +739,8 @@ sidecar 框架本身不创建、分配或回收固定存储，也没有独立的
 | --- | --- | --- | --- | --- |
 | 原生 Deployment/DaemonSet PVC volume | 安装方/外部系统 | `PVC_NAME` 或 manifest 固定 claimName | manifest 自定义 | 应用 Chart 不创建时也不拥有 |
 | 原生 StatefulSet claim template | StatefulSet Controller | Helm 全局 values | manifest 自定义 | 随 StatefulSet/PVC policy 处理 |
-| 应用插件 | 传统应用/安装方 | 从传统应用依赖注入 `PVC_NAME` | `<domain>` | 只清目录，不删 PVC |
-| 传统应用 | 安装方 | `PVC_NAME` | `<domain>` | 卸载代码 Job 只清空当前域名目录 |
+| 应用插件 | 传统应用/安装方 | 从传统应用依赖注入 `PVC_NAME` | 代码 `nginx-web-dir/<domain>`；状态 `tradition-plugin-dir/<domain>` | 只清目录，不删 PVC |
+| 传统应用 | 安装方 | `PVC_NAME` | 代码 `nginx-web-dir/<domain>`；插件状态 `tradition-plugin-dir/<domain>` | 卸载代码 Job 只清空当前域名目录 |
 | Helm 应用 | 用户 Chart | 用户 values | 用户定义 | 用户 Chart 定义 |
 | 系统镜像 | 安装方 | `PVC_NAME` | `/system-rootfs` 和 `system-rootfs/<应用标识>-${IMAGE_VERSION}/system` | Chart 不创建 PVC |
 

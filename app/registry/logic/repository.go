@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/docker/distribution"
@@ -35,6 +36,15 @@ type TagInfo struct {
 
 type Repository struct {
 	logic.Logic
+}
+
+var repositoryPushLocks sync.Map
+
+func lockRepositoryPush(repository string) func() {
+	lock, _ := repositoryPushLocks.LoadOrStore(repository, &sync.Mutex{})
+	mu := lock.(*sync.Mutex)
+	mu.Lock()
+	return mu.Unlock
 }
 
 func (l Repository) GetByIdWithUser(id int, user *entity.RegistryUser) (*entity.RegistryRepository, error) {
@@ -65,59 +75,80 @@ func (l Repository) GetByNameAndNamespace(repositoryName string, namespace strin
 }
 
 func (l Repository) OnRepositoryPrepareOperate(payload registry.RegistryRepositoryPayLoad) {
-	if slices.Contains(payload.Scope.Actions, string(PermissionActionTypePush)) {
-		repositoryName, namespace := logic.ParseRepositoryNameAndNamespace(payload.Scope.Name)
+	if !slices.Contains(payload.Scope.Actions, string(PermissionActionTypePush)) {
+		return
+	}
 
-		userId := int32(0)
-		if payload.User != nil {
-			userId = payload.User.ID
-		}
+	_, namespace := logic.ParseRepositoryNameAndNamespace(payload.Scope.Name)
+	if namespaceModel, _ := (Namespace{}).GetByName(namespace); namespaceModel != nil {
+		return
+	}
 
-		namespaceModel, _ := Namespace{}.GetByName(namespace)
-		if namespaceModel == nil {
-			ignoreNamespaceConfig := facade.GetConfig().GetString("setting.registry.list_ignore_namespaces")
-			ignoredNamespaces := strings.Split(ignoreNamespaceConfig, ",")
-			if slices.Contains(ignoredNamespaces, namespace) {
-				namespaceVisibleType := VisibleTypePrivate
-				defaultNamespaceVisible := facade.GetConfig().GetInt("setting.registry.namespaces_default_visible." + namespace)
-				if defaultNamespaceVisible > 0 {
-					namespaceVisibleType = defaultNamespaceVisible
-				}
-				namespaceModel = &entity.RegistryNamespace{
-					Name:        namespace,
-					VisibleType: int32(namespaceVisibleType),
-					UserID:      userId,
-				}
-				err := dao.Q.RegistryNamespace.Create(namespaceModel)
-				if err != nil {
-					slog.Error("fail to create registry namespace", "namespace", namespace, "error", err)
-				}
-			} else {
-				slog.Info("ignore namespace", "namespace", namespace, "payload", payload)
-				return
-			}
-		}
+	ignoredNamespaces := strings.Split(facade.GetConfig().GetString("setting.registry.list_ignore_namespaces"), ",")
+	if !slices.Contains(ignoredNamespaces, namespace) {
+		slog.Info("ignore namespace", "namespace", namespace, "payload", payload)
+		return
+	}
 
-		repositoryModel, _ := Repository{}.GetByNameAndNamespace(repositoryName, namespace)
-		if repositoryModel == nil {
-			if userId == 0 && namespaceModel != nil {
-				userId = namespaceModel.UserID
-			}
-			err := dao.Q.RegistryRepository.Create(&entity.RegistryRepository{
-				Name:        repositoryName,
-				Namespace:   namespace,
-				VisibleType: int32(VisibleTypeFollowNamespace),
-				Desc:        "",
-				UserID:      userId,
-			})
-			if err != nil {
-				slog.Error("fail to create registry repository", "namespace", namespace, "repository", repositoryName, "scope", payload.Scope, "error", err)
-			}
+	userID := int32(0)
+	if payload.User != nil {
+		userID = payload.User.ID
+	}
+	namespaceVisibleType := facade.GetConfig().GetInt("setting.registry.namespaces_default_visible." + namespace)
+	if namespaceVisibleType <= 0 {
+		namespaceVisibleType = VisibleTypePrivate
+	}
+	if err := dao.Q.RegistryNamespace.Create(&entity.RegistryNamespace{
+		Name:        namespace,
+		VisibleType: int32(namespaceVisibleType),
+		UserID:      userID,
+	}); err != nil {
+		slog.Error("fail to create registry namespace", "namespace", namespace, "error", err)
+	}
+}
+
+func (l Repository) OnRepositoryPushedCreate(payload registry.RegistryRepositoryWebHookPayLoad) {
+	// Blob uploads also produce push events. Only create the repository after a
+	// tagged manifest has been committed successfully.
+	if payload.Event.Target.Tag == "" {
+		return
+	}
+
+	unlock := lockRepositoryPush(payload.Event.Target.Repository)
+	defer unlock()
+
+	repositoryName, namespace := logic.ParseRepositoryNameAndNamespace(payload.Event.Target.Repository)
+	if repositoryModel, _ := l.GetByNameAndNamespace(repositoryName, namespace); repositoryModel != nil {
+		return
+	}
+
+	namespaceModel, _ := Namespace{}.GetByName(namespace)
+	if namespaceModel == nil {
+		slog.Error("create registry repository after push", "namespace", namespace, "error", "namespace not found")
+		return
+	}
+
+	ownerUserID := namespaceModel.UserID
+	if payload.Event.Actor.Name != "" {
+		if actor, _ := (logic.User{}).GetByUsername(payload.Event.Actor.Name); actor != nil {
+			ownerUserID = actor.ID
 		}
+	}
+
+	if err := dao.Q.RegistryRepository.Create(&entity.RegistryRepository{
+		Name:        repositoryName,
+		Namespace:   namespace,
+		VisibleType: int32(VisibleTypeFollowNamespace),
+		Desc:        "",
+		UserID:      ownerUserID,
+	}); err != nil {
+		slog.Error("create registry repository after push", "namespace", namespace, "repository", repositoryName, "error", err)
 	}
 }
 
 func (l Repository) OnRepositoryPushed(payload registry.RegistryRepositoryWebHookPayLoad) {
+	l.OnRepositoryPushedCreate(payload)
+
 	repositoryName, namespace := logic.ParseRepositoryNameAndNamespace(payload.Event.Target.Repository)
 	repositoryModel, _ := Repository{}.GetByNameAndNamespace(repositoryName, namespace)
 	if repositoryModel != nil {

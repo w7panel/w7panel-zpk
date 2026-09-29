@@ -18,6 +18,7 @@ type ZpkMarketService struct {
 const (
 	InstallConflictDomainMismatch    = "domain_mismatch"
 	InstallConflictAppIdentifyExists = "app_identify_exists"
+	EntitlementStatusPaid            = "paid"
 	EntitlementStatusTrialExpired    = "trial_expired"
 )
 
@@ -94,7 +95,19 @@ func (s ZpkMarketService) CheckFormulaCanInstallOrUpgrade(goodsId, consoleUid in
 	if err != nil {
 		return FormulaInstallCheckResult{}, err
 	}
+	return ret, nil
+}
 
+func (s ZpkMarketService) GetFormulaOrderInfo(goodsId, consoleUid int32, orderSn string) (map[string]interface{}, error) {
+	ret := make(map[string]interface{})
+	err := postSigned(s, "/zpk-market/order/install-info", map[string]interface{}{
+		"goods_id":    goodsId,
+		"console_uid": consoleUid,
+		"order_sn":    orderSn,
+	}, &ret)
+	if err != nil {
+		return nil, err
+	}
 	return ret, nil
 }
 

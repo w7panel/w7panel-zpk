@@ -50,6 +50,21 @@ func CheckFormulaCanInstallOrUpgrade(formula formulalogic.Formula, consoleUid in
 	return ret
 }
 
+func GetFormulaRuntimeDynamicValues(formula formulalogic.Formula, consoleUid int32, orderSn string) (map[string]interface{}, error) {
+	if formula.GoodsId <= 0 || formula.ConsoleUid == consoleUid {
+		return map[string]interface{}{
+			"order_status": "none",
+			"license_type": "paid",
+			"validate": map[string]interface{}{
+				"valid":   true,
+				"reason":  "not_required",
+				"message": "当前制品无需订单授权",
+			},
+		}, nil
+	}
+	return w7.ZpkMarketSdk.GetFormulaOrderInfo(formula.GoodsId, consoleUid, orderSn)
+}
+
 func GetFormulaCanUpgradeVersion(formula formulalogic.Formula, consoleUid int32, orderSn string) (zpk_market.FormulaUpgradeVersionResult, error) {
 	slog.Info("check formula upgrade permission",
 		"formula_identify", formula.Name,

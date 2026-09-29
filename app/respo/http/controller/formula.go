@@ -122,19 +122,20 @@ func (c Formula) ImportRemoteChildApplications(ctx *gin.Context) {
 
 func (c Formula) Info(ctx *gin.Context) {
 	type ParamsValidate struct {
-		Identifie    string `uri:"id" json:"identifie" binding:"required"`
-		Version      string `uri:"version" json:"version"`
-		CName        string `uri:"cid" json:"cname"`
-		IsUpgrade    int32  `form:"is_upgrade" json:"is_upgrade"`
-		CheckUpgrade int32  `form:"check_upgrade" json:"check_upgrade"`
-		CurVersion   string `form:"cur_version" json:"cur_version"`
-		Token        string `form:"token" json:"token"`
-		OrderSn      string `form:"order_sn" json:"order_sn"`
-		ConsoleUid   int32  `form:"console_uid" json:"console_uid"`
-		Domain       string `form:"domain" json:"domain"`
-		AppIdentify  string `form:"app_identify" json:"app_identify"`
-		Reinstall    bool   `form:"reinstall" json:"reinstall"`
-		FullManifest bool   `form:"full_manifest" json:"full_manifest"`
+		Identifie      string `uri:"id" json:"identifie" binding:"required"`
+		Version        string `uri:"version" json:"version"`
+		CName          string `uri:"cid" json:"cname"`
+		IsUpgrade      int32  `form:"is_upgrade" json:"is_upgrade"`
+		CheckUpgrade   int32  `form:"check_upgrade" json:"check_upgrade"`
+		CurVersion     string `form:"cur_version" json:"cur_version"`
+		Token          string `form:"token" json:"token"`
+		OrderSn        string `form:"order_sn" json:"order_sn"`
+		ConsoleUid     int32  `form:"console_uid" json:"console_uid"`
+		Domain         string `form:"domain" json:"domain"`
+		AppIdentify    string `form:"app_identify" json:"app_identify"`
+		Reinstall      bool   `form:"reinstall" json:"reinstall"`
+		FullManifest   bool   `form:"full_manifest" json:"full_manifest"`
+		RuntimeContext bool   `form:"runtime_context" json:"runtime_context"`
 	}
 	params := ParamsValidate{}
 	if !c.Validate(ctx, &params) {
@@ -154,6 +155,15 @@ func (c Formula) Info(ctx *gin.Context) {
 	canUpgradeVersion := ""
 	formulaExpire := false
 	targetFormulaIdentify := ""
+	dynamicValues := map[string]interface{}{
+		"order_status": "none",
+		"license_type": "paid",
+		"validate": map[string]interface{}{
+			"valid":   true,
+			"reason":  "not_required",
+			"message": "当前制品无需订单授权",
+		},
+	}
 
 	user := logic2.User{}.GetUser(ctx)
 	isAdminUser := false
@@ -170,6 +180,15 @@ func (c Formula) Info(ctx *gin.Context) {
 				return
 			}
 		} else {
+			if params.RuntimeContext {
+				dynamicValues, err = zpkmarket.GetFormulaRuntimeDynamicValues(*formula, consoleUid, params.OrderSn)
+				if err != nil {
+					c.JsonResponseWithServerError(ctx, err)
+					return
+				}
+				c.JsonResponseWithoutError(ctx, gin.H{"dynamic_values": dynamicValues})
+				return
+			}
 			checkResult := zpkmarket.CheckFormulaCanInstallOrUpgrade(*formula, consoleUid, params.OrderSn, params.IsUpgrade > 0, params.Reinstall, params.Domain, params.AppIdentify)
 			if checkResult.EntitlementStatus == zpk_market.EntitlementStatusTrialExpired {
 				marketURL := strings.TrimRight(facade.GetConfig().GetString("setting.depot_market.frontend_url"), "/")
@@ -229,6 +248,10 @@ func (c Formula) Info(ctx *gin.Context) {
 				targetFormulaIdentify = upgradeResult.FormulaIdentify
 			}
 		}
+	}
+	if params.RuntimeContext {
+		c.JsonResponseWithoutError(ctx, gin.H{"dynamic_values": dynamicValues})
+		return
 	}
 
 	if targetFormulaIdentify != "" {

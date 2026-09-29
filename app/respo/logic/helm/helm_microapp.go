@@ -16,8 +16,18 @@ const (
 	MicroAppPresentationModeMultiple  = "multiple"
 )
 
+// MicroAppPresentation describes how a panel should present MicroApps that
+// provide the same capability. Key identifies the capability group and Mode
+// controls whether the panel displays only one entry or every entry in that
+// group. When both fields are empty, no presentation metadata is written and
+// the panel's default MicroApp behavior is preserved.
 type MicroAppPresentation struct {
-	Key  string `json:"key"`
+	// Key is written to the w7.cc/presentation-key label. MicroApps with the
+	// same key are treated as members of the same capability group.
+	Key string `json:"key"`
+
+	// Mode is written to the w7.cc/presentation-mode annotation. Singleton
+	// displays one MicroApp from the group, while multiple displays all of them.
 	Mode string `json:"mode"`
 }
 

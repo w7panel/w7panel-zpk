@@ -74,7 +74,7 @@ func (service *Installer) UpdateApplication(
 	return result, err
 }
 
-// InstallPlugin 安装受策略管理的插件，并在首次覆盖某路径前保存该路径的原应用文件。
+// InstallPlugin 安装显式或自动受管的插件，并在首次覆盖某路径前保存该路径的原应用文件。
 func (service *Installer) InstallPlugin(
 	siteDir, packageDir, plugin string,
 	policy Policy,
@@ -99,7 +99,29 @@ func (service *Installer) InstallPlugin(
 	) (OperationResult, error) {
 		_, managed := policy.Plugins[plugin]
 		if !managed {
-			logInfo("plugin is not managed by file priority policy",
+			packageRoot, err := sourceRoot(packageDir)
+			if err != nil {
+				return OperationResult{}, err
+			}
+			pluginFiles, err := treeFiles(packageRoot)
+			if err != nil {
+				return OperationResult{}, err
+			}
+			managed, err = hasSharedFiles(siteDir, pluginFiles)
+			if err != nil {
+				return OperationResult{}, err
+			}
+		}
+		if managed {
+			if _, configured := policy.Plugins[plugin]; !configured {
+				logInfo("plugin is automatically managed because it shares files with the base",
+					"operation", operation,
+					"plugin", plugin,
+				)
+			}
+		}
+		if !managed {
+			logInfo("plugin does not require file priority management",
 				"operation", operation,
 				"plugin", plugin,
 			)
@@ -453,6 +475,21 @@ func stringSet(values []string) map[string]struct{} {
 		result[value] = struct{}{}
 	}
 	return result
+}
+
+// hasSharedFiles 判断目录中是否存在给定列表中的任一文件。
+func hasSharedFiles(directory string, files []string) (bool, error) {
+	directoryFiles, err := treeFiles(directory)
+	if err != nil {
+		return false, err
+	}
+	directoryFileSet := stringSet(directoryFiles)
+	for _, name := range files {
+		if _, exists := directoryFileSet[name]; exists {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // unionSets 返回两个路径集合的并集。

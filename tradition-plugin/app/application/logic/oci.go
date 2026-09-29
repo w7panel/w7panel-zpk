@@ -340,20 +340,20 @@ func (service *Installer) cleanupPreviousState(previous *v1.Descriptor, current 
 	)
 }
 
-// orderedLayers 将 Base 放在最底层，再按优先级从低到高排列插件层。
+// orderedLayers 将 Base 放在最底层，未配置但自动纳管的插件次之，最后按显式优先级排列插件层。
 func orderedLayers(state State, policy Policy) ([]Layer, error) {
 	plugins := make([]Layer, 0, len(state.Plugins))
-	for name, plugin := range state.Plugins {
-		if _, exists := policy.Plugins[name]; !exists {
-			return nil, fmt.Errorf("managed plugin %q has no priority", name)
-		}
+	for _, plugin := range state.Plugins {
 		plugins = append(plugins, plugin)
 	}
 	sort.Slice(plugins, func(i, j int) bool {
-		left := policy.Plugins[plugins[i].Name]
-		right := policy.Plugins[plugins[j].Name]
-		if left != right {
-			return left < right
+		leftPriority, leftConfigured := policy.Plugins[plugins[i].Name]
+		rightPriority, rightConfigured := policy.Plugins[plugins[j].Name]
+		if leftConfigured != rightConfigured {
+			return !leftConfigured
+		}
+		if leftConfigured && leftPriority != rightPriority {
+			return leftPriority < rightPriority
 		}
 		return plugins[i].Name < plugins[j].Name
 	})

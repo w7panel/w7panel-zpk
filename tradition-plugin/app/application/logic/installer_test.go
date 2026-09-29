@@ -152,21 +152,59 @@ func TestApplicationUpdateReappliesManagedPlugin(t *testing.T) {
 	assertTestFile(t, root, "system.php", "base-v2")
 }
 
-func TestUnmanagedPluginIsIgnored(t *testing.T) {
+func TestUnconfiguredPluginOverwritingSiteIsManagedAtLowestPriority(t *testing.T) {
 	policy := Policy{Plugins: map[string]int{}}
 	service, root, base := newTestInstaller(t)
 	writeTestFile(t, base, "system.php", "base")
 	writeTestFile(t, root, "system.php", "base")
+	automatic := t.TempDir()
+	writeTestFile(t, automatic, "system.php", "automatic")
+	writeTestFile(t, automatic, "automatic.php", "automatic-only")
+	result, err := service.InstallPlugin(root, automatic, "automatic", policy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.Managed {
+		t.Fatal("unconfigured plugin overwriting the site must be managed")
+	}
+	assertTestFile(t, root, "system.php", "automatic")
+
+	configured := t.TempDir()
+	writeTestFile(t, configured, "system.php", "configured")
+	configuredPolicy := Policy{Plugins: map[string]int{"configured": 0}}
+	if _, err := service.InstallPlugin(root, configured, "configured", configuredPolicy); err != nil {
+		t.Fatal(err)
+	}
+	assertTestFile(t, root, "system.php", "configured")
+	assertLayerOrder(t, currentLayers(t, service), "base", "automatic", "configured")
+
+	if _, err := service.UninstallPlugin(root, "configured", configuredPolicy); err != nil {
+		t.Fatal(err)
+	}
+	assertTestFile(t, root, "system.php", "automatic")
+	if _, err := service.UninstallPlugin(root, "automatic", policy); err != nil {
+		t.Fatal(err)
+	}
+	assertTestFile(t, root, "system.php", "base")
+	assertTestMissing(t, root, "automatic.php")
+}
+
+func TestUnconfiguredPluginAddingOnlyFilesIsIgnored(t *testing.T) {
+	policy := Policy{Plugins: map[string]int{}}
+	service, root, _ := newTestInstaller(t)
+	writeTestFile(t, root, "system.php", "base")
 	plugin := t.TempDir()
-	writeTestFile(t, plugin, "system.php", "plugin")
+	writeTestFile(t, plugin, "plugin.php", "plugin")
+
 	result, err := service.InstallPlugin(root, plugin, "unmanaged", policy)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if result.Managed {
-		t.Fatal("unconfigured plugin must not be managed")
+		t.Fatal("unconfigured plugin adding only new files must not be managed")
 	}
 	assertTestFile(t, root, "system.php", "base")
+	assertTestMissing(t, root, "plugin.php")
 	store, err := service.store()
 	if err != nil {
 		t.Fatal(err)
@@ -180,10 +218,10 @@ func TestPluginIdentifierUsesExactValue(t *testing.T) {
 	policy := Policy{Plugins: map[string]int{"Plugin_Name": 100}}
 	service, root, _ := newTestInstaller(t)
 	writeTestFile(t, root, "system.php", "base")
-	plugin := t.TempDir()
-	writeTestFile(t, plugin, "system.php", "plugin")
+	unconfigured := t.TempDir()
+	writeTestFile(t, unconfigured, "plugin.php", "plugin")
 
-	result, err := service.InstallPlugin(root, plugin, "plugin-name", policy)
+	result, err := service.InstallPlugin(root, unconfigured, "plugin-name", policy)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -192,6 +230,8 @@ func TestPluginIdentifierUsesExactValue(t *testing.T) {
 	}
 	assertTestFile(t, root, "system.php", "base")
 
+	plugin := t.TempDir()
+	writeTestFile(t, plugin, "system.php", "plugin")
 	result, err = service.InstallPlugin(root, plugin, "Plugin_Name", policy)
 	if err != nil {
 		t.Fatal(err)

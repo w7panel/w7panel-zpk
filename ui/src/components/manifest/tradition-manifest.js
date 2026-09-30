@@ -237,11 +237,8 @@ function firstPort(value) {
 
 export function traditionAppDefaultContainerPort(source = {}, fallback = 80) {
     const value = source?.platform || source || {};
-    for (const container of value['container-v2'] || []) {
-        if (container?.isInitContainer) continue;
-        const port = firstPort(container);
-        if (port) return port;
-    }
+    const port = firstPort(value['container-v2']?.[0]);
+    if (port) return port;
     const legacyPort = firstPort(value.container) || firstPort(value.port);
     return legacyPort || fallback;
 }
@@ -707,7 +704,7 @@ export const traditionManifestMethods = {
         const containers = Array.isArray(this.json.platform['container-v2'])
             ? this.json.platform['container-v2']
             : [];
-        let mainContainer = containers.find(item => !item?.isInitContainer);
+        let mainContainer = containers[0];
         if (!mainContainer) {
             mainContainer = {
                 name: (this.form.author && this.form.identifie)

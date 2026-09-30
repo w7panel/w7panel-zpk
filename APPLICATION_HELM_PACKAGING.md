@@ -445,7 +445,7 @@ rm -rf -- "$plugin_install_path"
 - 主容器把 PVC 的 `nginx-web-dir/<domain>` 子目录挂载到 `/www/wwwroot`；每个域名的代码存于 PVC 的 `nginx-web-dir/<domain>/`。
 - NGINX 子 Chart、传统应用代码 Job 和 vhost Job 应通过安装端传值复用同一 PVC。
 - 当前传统应用 Chart 不创建 PVC，安装方必须准备 PVC 并传 `PVC_NAME`。
-- 未开启系统层还原时，还会通过注解把容器系统层映射到该持久卷中的 `www/server/<container>/system` 逻辑路径。
+- 未开启系统层还原时，还会通过注解把容器系统层映射到该持久卷中的 `www/server/<release-name>/<应用标识>-<版本>/system` 逻辑路径。
 
 ## 8. Helm/K8sYaml 应用（`helm`）
 
@@ -520,7 +520,7 @@ UI 会强制：
 - `hostUsers: false`；
 - volume `system-rootfs`；
 - 第一个容器挂载 `/system-rootfs`；
-- `sysbox/rootfs-rw-layer` 注解中的 `name` 与主容器名一致，path 为 `system-rootfs/<应用标识>-${IMAGE_VERSION}/system`；
+- `sysbox/rootfs-rw-layer` 注解中的 `name` 与主容器名一致，path 为 `system-rootfs/<release-name>/<应用标识>-${IMAGE_VERSION}/system`；
 - 增加外部必选依赖 `w7panel-sysbox`。
 
 ### 9.2 打包
@@ -744,7 +744,7 @@ sidecar 框架本身不创建、分配或回收固定存储，也没有独立的
 | 应用插件 | 传统应用/安装方 | 从传统应用依赖注入 `PVC_NAME` | 代码 `nginx-web-dir/<domain>`；状态 `tradition-plugin-dir/<domain>` | 只清目录，不删 PVC |
 | 传统应用 | 安装方 | `PVC_NAME` | 代码 `nginx-web-dir/<domain>`；插件状态 `tradition-plugin-dir/<domain>` | 卸载代码 Job 只清空当前域名目录 |
 | Helm 应用 | 用户 Chart | 用户 values | 用户定义 | 用户 Chart 定义 |
-| 系统镜像 | 安装方 | `PVC_NAME` | `/system-rootfs` 和 `system-rootfs/<应用标识>-${IMAGE_VERSION}/system` | Chart 不创建 PVC |
+| 系统镜像 | 安装方 | `PVC_NAME` | `/system-rootfs` 和 `system-rootfs/<release-name>/<应用标识>-${IMAGE_VERSION}/system` | Chart 不创建 PVC |
 
 ### 11.2 ZPK 服务自身存储
 

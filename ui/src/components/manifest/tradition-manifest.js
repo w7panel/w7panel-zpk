@@ -132,10 +132,11 @@ export function traditionAppRootfsAnnotation(
     const name = String(containerName || '').trim().replaceAll('_', '-');
     if (!identifie || !name) return '';
     const version = '${IMAGE_VERSION}';
+    const releaseName = '${RELEASE_NAME}';
     return JSON.stringify([{
         name,
         volumeName: traditionStorageVolumeName,
-        path: `www/server/${identifie}-${version}/system`,
+        path: `www/server/${releaseName}/${identifie}-${version}/system`,
         persistentSpecialMounts: true,
     }]);
 }

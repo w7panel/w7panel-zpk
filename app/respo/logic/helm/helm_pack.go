@@ -1112,10 +1112,6 @@ func (hc *HelmPack) generateBuildImageJobTemplate(rootDir string) error {
 	return writeHelmTemplateFile(rootDir, "container-build-image.yaml", "container-build-image.yaml.tpl")
 }
 
-func getStartParamsEnvJSONTemplate() string {
-	return `{{- $startParamsEnv := dict -}}{{- range $qkey, $qvalue := .Values.startParams }}{{- $_ := set $startParamsEnv $qkey (tpl $qvalue $) -}}{{- end }}{{ $startParamsEnv | toJson | b64enc }}`
-}
-
 var helmValuesPlaceholderRegexp = regexp.MustCompile(`\$\{([A-Za-z_][A-Za-z0-9_.-]*)\}`)
 
 func renderHelmValuesPlaceholders(value string) string {
@@ -1123,6 +1119,9 @@ func renderHelmValuesPlaceholders(value string) string {
 		parts := helmValuesPlaceholderRegexp.FindStringSubmatch(match)
 		if len(parts) != 2 || strings.HasPrefix(parts[1], "system.") {
 			return match
+		}
+		if parts[1] == "RELEASE_NAME" {
+			return "{{ .Release.Name }}"
 		}
 		return "{{ .Values." + parts[1] + " }}"
 	})

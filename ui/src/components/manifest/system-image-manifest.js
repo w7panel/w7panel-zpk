@@ -37,11 +37,12 @@ export function systemImageRootfsAnnotation(
         .replace(/^-+|-+$/g, '');
     if (!name || !identifie) return '';
     const imageVersion = '${IMAGE_VERSION}';
+    const releaseName = '${RELEASE_NAME}';
     const rootfsPathName = `${identifie}-${imageVersion}`;
     return JSON.stringify([{
         name,
         volumeName: systemImageRootfsVolumeName,
-        path: `${systemImageRootfsVolumeName}/${rootfsPathName}/system`,
+        path: `${systemImageRootfsVolumeName}/${releaseName}/${rootfsPathName}/system`,
         persistentSpecialMounts: true,
     }]);
 }

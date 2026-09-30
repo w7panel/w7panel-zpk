@@ -9,9 +9,6 @@ export const systemImageAnnotationKeys = Object.freeze({
 const systemImageBuiltInStartParamNames = Object.freeze([
     'IMAGE_VERSION',
     'PVC_NAME',
-    'global.cluster.storageRWmode',
-    'global.cluster.storageSize',
-    'global.cluster.storageClassName',
 ]);
 
 export function isSystemImageBuiltInStartParamName(name) {
@@ -26,9 +23,6 @@ export function withSystemImageStartParams(startParams = [], versions = []) {
     return [
         { mark: 'system-image', name: 'IMAGE_VERSION', title: '镜像版本', required: true, values_text: versions.join('|'), module_name: '', description: '选择要安装的镜像版本', type: 'select' },
         { name: 'PVC_NAME', title: '存储', required: true, values_text: '%PVC_NAME%', module_name: '', description: '安装时选择的 PVC 名称', type: 'text', hidden: false },
-        { mark: 'storage', name: 'global.cluster.storageRWmode', title: '读写模式', required: true, values_text: '%STORAGE_RW_MODE%', module_name: '', description: '', type: 'text' },
-        { mark: 'storage', name: 'global.cluster.storageSize', title: '存储大小', required: true, values_text: '%STORAGE_SIZE%', module_name: '', description: '', type: 'text' },
-        { mark: 'storage', name: 'global.cluster.storageClassName', title: '存储类', required: true, values_text: '%STORAGE_CLASS_NAME%', module_name: '', description: '', type: 'text' },
         ...customParams,
     ];
 }
@@ -221,7 +215,7 @@ export const systemImageManifestMethods = {
         if (this.form.type != 'system-image') return;
         this.form.systemImageVersions = this.normalizeApplicationVersions(this.form.systemImageVersions);
         this.form.startParams = this.systemImageStartParams();
-        this.form.storage = true;
+        this.form.storage = false;
         this.json.platform = this.json.platform || {};
         this.ensureSystemImageContainer();
         this.changeForm();

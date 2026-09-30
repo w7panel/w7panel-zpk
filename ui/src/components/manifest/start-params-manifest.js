@@ -154,7 +154,7 @@ export const startParamsManifestMethods = {
 
         if (this.form.type == 'system-image') {
             this.form.startParams = this.systemImageStartParams();
-            this.form.storage = true;
+            this.form.storage = false;
             this.ensureSystemImageContainer();
         } else if (this.form.type == 'tradition') {
             this.ensureTraditionContainerDefaults();

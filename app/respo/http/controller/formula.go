@@ -33,6 +33,13 @@ type Formula struct {
 	Abstract
 }
 
+func formulaRuntimeContextResponse(title string, dynamicValues map[string]interface{}) gin.H {
+	return gin.H{
+		"title":          title,
+		"dynamic_values": dynamicValues,
+	}
+}
+
 func (c Formula) Add(ctx *gin.Context) {
 	type ParamsValidate struct {
 		Identifie string `form:"identifie" binding:"required"`
@@ -186,7 +193,7 @@ func (c Formula) Info(ctx *gin.Context) {
 					c.JsonResponseWithServerError(ctx, err)
 					return
 				}
-				c.JsonResponseWithoutError(ctx, gin.H{"dynamic_values": dynamicValues})
+				c.JsonResponseWithoutError(ctx, formulaRuntimeContextResponse(formula.Title, dynamicValues))
 				return
 			}
 			checkResult := zpkmarket.CheckFormulaCanInstallOrUpgrade(*formula, consoleUid, params.OrderSn, params.IsUpgrade > 0, params.Reinstall, params.Domain, params.AppIdentify)
@@ -250,7 +257,7 @@ func (c Formula) Info(ctx *gin.Context) {
 		}
 	}
 	if params.RuntimeContext {
-		c.JsonResponseWithoutError(ctx, gin.H{"dynamic_values": dynamicValues})
+		c.JsonResponseWithoutError(ctx, formulaRuntimeContextResponse(formula.Title, dynamicValues))
 		return
 	}
 

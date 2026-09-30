@@ -99,6 +99,9 @@ spec:
         - name: {{ .name }}
           image: "{{ .image.repository }}:{{ tpl .image.tag $rootCtx }}"
           imagePullPolicy: {{ .image.pullPolicy }}
+          {{- with .workingDir }}
+          workingDir: {{ . | quote }}
+          {{- end }}
           {{- with .command }}
           command: {{- toYaml . | nindent 12 }}
           {{- end }}
@@ -157,6 +160,9 @@ spec:
         - name: {{ .name }}
           image: "{{ .image.repository }}:{{ tpl .image.tag $rootCtx }}"
           imagePullPolicy: {{ .image.pullPolicy }}
+          {{- with .workingDir }}
+          workingDir: {{ . | quote }}
+          {{- end }}
           {{- with .command }}
           command: {{- toYaml . | nindent 12 }}
           {{- end }}

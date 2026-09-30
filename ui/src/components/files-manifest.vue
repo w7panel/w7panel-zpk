@@ -286,7 +286,7 @@
                             <a-alert v-if="form.type == 'tradition'" type="info" show-icon
                                 class="zpk-primary-alert mt-16 mb-20" title="说明" :closable="false">
                                 <div class="registry-alert-item">1. 运行方式：传统应用会作为独立应用安装。</div>
-                                <div class="registry-alert-item mt-6">2. 代码包：代码包为可选配置。请进入项目根目录后打包，压缩包根目录应直接包含安装内容，不要包含外层目录。例如：<code>cd 项目目录 &amp;&amp; zip -r app.zip .</code>。安装后代码位于 <code>/www/wwwroot</code>。</div>
+                                <div class="registry-alert-item mt-6">2. 代码包：代码包为可选配置。请进入项目根目录后打包，压缩包根目录应直接包含安装内容，不要包含外层目录。例如：<code>cd 项目目录 &amp;&amp; zip -r app.zip .</code>。安装后代码位于 <code>/www/wwwroot</code>，该目录可通过 <code>pwd</code> 获取。</div>
                                 <div class="registry-alert-item mt-6">3. 镜像版本：安装时通过“传统应用版本”启动参数替换运行容器镜像中的 {version}。</div>
                                 <div class="registry-alert-item mt-6">4. 启动命令：传统应用容器的启动命令可在页面下方“应用配置”中配置。</div>
                                 <div class="registry-alert-item mt-6">5. 生命周期脚本：页面下方“脚本配置”中的安装、升级脚本只在安装或升级此制品时执行。</div>
@@ -297,11 +297,12 @@
                                 <div class="registry-alert-item">1. 代码包：请在应用插件的外层目录打包，并保留插件安装所需的完整目录结构。例如微擎插件需要将 <code>addons</code> 目录一起打包，使压缩包根目录直接包含 <code>addons</code> 目录。安装时会写入所选传统应用的站点目录，插件代码位于 <code>/www/wwwroot</code>。</div>
                                 <div class="registry-alert-item mt-6">2. 文件恢复：如果所选传统应用已为该插件设置文件优先级，系统会在卸载时自动恢复被覆盖的文件；未设置时仍按原方式直接安装。</div>
                                 <div class="registry-alert-item mt-6">3. 卸载脚本：自定义“卸载后执行”脚本会先运行，系统文件恢复会在最后运行。未设置文件优先级的插件仍需自行清理代码。</div>
-                                <div class="registry-alert-item mt-6">4. 手动清理：<code>/www/wwwroot</code> 就是当前站点的代码目录，未设置文件优先级时可使用下面的写法：</div>
+                                <div class="registry-alert-item mt-6">4. 手动清理：当前站点目录可通过 <code>pwd</code> 获取。未设置文件优先级时可使用下面的写法：</div>
                                 <div class="mt-6"><code v-pre>set -eu</code></div>
-                                <div><code v-pre>plugin_install_path="/www/wwwroot/addons/your-plugin"</code></div>
+                                <div><code v-pre>site_dir="$(pwd)"</code></div>
+                                <div><code v-pre>plugin_install_path="$site_dir/addons/your-plugin"</code></div>
                                 <div><code v-pre>rm -rf -- "$plugin_install_path"</code></div>
-                                <div class="registry-alert-item mt-6">5. 安全提示：请将 <code>addons/your-plugin</code> 替换为插件真实目录。不要直接删除 <code>/www/wwwroot</code>，否则会清空整个站点。</div>
+                                <div class="registry-alert-item mt-6">5. 安全提示：请将 <code>addons/your-plugin</code> 替换为插件真实目录。不要直接删除 <code>$site_dir</code>，否则会清空整个站点。</div>
                             </a-alert>
 
                             <a-form-item v-if="form.type == 'tradition'" label="传统应用配置"

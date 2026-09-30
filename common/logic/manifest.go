@@ -125,6 +125,7 @@ type ContainerV2 struct {
 	Name            string                  `yaml:"name" json:"name" protobuf:"bytes,1,opt,name=name"`
 	Image           string                  `yaml:"image" json:"image,omitempty" protobuf:"bytes,2,opt,name=image"`
 	CodeAttachUrl   string                  `yaml:"-" json:"-"`
+	WorkingDir      string                  `yaml:"workingDir,omitempty" json:"workingDir,omitempty" protobuf:"bytes,5,opt,name=workingDir"`
 	Command         []string                `yaml:"command" json:"command,omitempty" protobuf:"bytes,3,rep,name=command"`
 	Args            []string                `yaml:"args" json:"args,omitempty" protobuf:"bytes,4,rep,name=args"`
 	Ports           []v1.ContainerPort      `yaml:"ports" json:"ports,omitempty" patchStrategy:"merge" patchMergeKey:"containerPort" protobuf:"bytes,6,rep,name=ports"`

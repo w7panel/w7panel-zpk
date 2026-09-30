@@ -128,9 +128,11 @@ func withPluginAppStorageClaimName(platform logic2.Platform) logic2.Platform {
 
 func (hc *HelmPack) getPluginShellJobContainerValues() map[string]interface{} {
 	return map[string]interface{}{
-		"name":  strings.ReplaceAll(hc.Manifest.Application.Identifie, "_", "-"),
-		"image": imageValues(hc.getPluginRuntimeImage(), v1.PullIfNotPresent), "env": []v1.EnvVar{},
-		"resources": v1.ResourceRequirements{},
+		"name":       strings.ReplaceAll(hc.Manifest.Application.Identifie, "_", "-"),
+		"image":      imageValues(hc.getPluginRuntimeImage(), v1.PullIfNotPresent),
+		"workingDir": traditionApplicationWorkingDir,
+		"env":        []v1.EnvVar{},
+		"resources":  v1.ResourceRequirements{},
 		"volumeMounts": []v1.VolumeMount{
 			{Name: traditionStorageVolumeName, MountPath: "/www/wwwroot", SubPath: "nginx-web-dir/{{ include \"plugin.codeInstallDirectory\" . }}"},
 			{Name: traditionStorageVolumeName, MountPath: pluginInstallerDataMount, SubPath: "tradition-plugin-dir/{{ include \"plugin.codeInstallDirectory\" . }}"},

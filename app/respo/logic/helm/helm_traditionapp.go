@@ -19,6 +19,7 @@ const (
 	traditionCodeUninstallJobTitle         = "卸载传统应用代码"
 	traditionNginxVhostJobTitle            = "安装传统应用 NGINX 配置"
 	traditionNginxVhostUninstallJobTitle   = "卸载传统应用 NGINX 配置"
+	traditionApplicationWorkingDir         = "/www/wwwroot"
 )
 
 // traditionCodeInstallShell is added to the generated chart as an internal
@@ -110,11 +111,13 @@ rm -f -- "/www/server/nginx/conf.d/$nginx_vhost_file"`
 func withTraditionAppImages(platform logic2.Platform) logic2.Platform {
 	platform.ContainerV2s = append([]logic2.ContainerV2(nil), platform.ContainerV2s...)
 	for index := range platform.ContainerV2s {
-		platform.ContainerV2s[index].Image = strings.ReplaceAll(
-			platform.ContainerV2s[index].Image,
+		container := &platform.ContainerV2s[index]
+		container.Image = strings.ReplaceAll(
+			container.Image,
 			"{version}",
 			"{{ .Values.IMAGE_VERSION }}",
 		)
+		container.WorkingDir = traditionApplicationWorkingDir
 	}
 	return platform
 }
@@ -194,6 +197,7 @@ func applyTraditionToolJobVolumeMounts(values map[string]interface{}) {
 			continue
 		}
 		if container, ok := job["container"].(map[string]interface{}); ok {
+			delete(container, "workingDir")
 			container["volumeMounts"] = []v1.VolumeMount{{
 				Name:      traditionStorageVolumeName,
 				MountPath: "/www/server/nginx",

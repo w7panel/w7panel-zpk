@@ -1016,12 +1016,13 @@ func (hc *HelmPack) generateContainerV2Values(container logic2.ContainerV2, appl
 	}
 
 	return map[string]interface{}{
-		"name":    strings.ReplaceAll(container.Name, "_", "-"),
-		"image":   hc.getImageValues(container),
-		"command": container.Command,
-		"args":    container.Args,
-		"ports":   ports,
-		"env":     container.Env,
+		"name":       strings.ReplaceAll(container.Name, "_", "-"),
+		"image":      hc.getImageValues(container),
+		"workingDir": container.WorkingDir,
+		"command":    container.Command,
+		"args":       container.Args,
+		"ports":      ports,
+		"env":        container.Env,
 		// 制品中配置的资源限制暂不写入 Helm，由安装/调度侧统一设置。
 		"resources":       v1.ResourceRequirements{},
 		"volumeMounts":    container.VolumeMounts,
@@ -1416,6 +1417,7 @@ func (hc *HelmPack) getShellJobContainerValues(platform logic2.Platform, contain
 	return map[string]interface{}{
 		"name":            strings.ReplaceAll(container.Name, "_", "-"),
 		"image":           hc.getImageValues(container),
+		"workingDir":      container.WorkingDir,
 		"env":             container.Env,
 		"resources":       container.Resources,
 		"volumeMounts":    container.VolumeMounts,

@@ -171,7 +171,7 @@ export function withTraditionAppSysbox(
 
     nextPlatform.runtimeClassName = traditionSysboxRuntimeClassName;
     const containers = nextPlatform['container-v2'] || [];
-    const container = containers.find(item => !item?.isInitContainer);
+    const container = containers[0];
     const rootfs = traditionAppRootfsAnnotation(applicationIdentifie, container?.name);
     if (rootfs) {
         annotations[traditionSysboxRootfsAnnotation] = rootfs;
@@ -195,7 +195,7 @@ export function withTraditionAppStorage(platform = {}) {
     });
     nextPlatform.volumes = volumes;
 
-    const container = containers.find(item => !item?.isInitContainer);
+    const container = containers[0];
     if (container) {
         container.volumeMounts = container.volumeMounts
             .filter(item => item?.name !== traditionStorageVolumeName);

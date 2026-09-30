@@ -72,6 +72,9 @@ spec:
           image: "{{ $job.container.image.repository }}:{{ tpl $job.container.image.tag $root }}"
           {{- end }}
           imagePullPolicy: {{ $job.container.image.pullPolicy | default "IfNotPresent" }}
+          {{- with $job.container.workingDir }}
+          workingDir: {{ . | quote }}
+          {{- end }}
           command: ["/bin/sh", "-c"]
           args:
             - {{ tpl $job.shell $root | quote }}

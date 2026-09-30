@@ -366,16 +366,16 @@ info 接口会再解析/生成 `<TRADITION_APP>_RELEASE_NAME`。已有订单绑�
 ```sh
 set -eu
 
-# Job 内的 /www/wwwroot 已经是 nginx-web-dir/<domain> subPath 的根目录
-code_install_path="/www/wwwroot"
+# Job 的 workingDir 已经是 nginx-web-dir/<domain> subPath 的根目录
+site_dir="$(pwd)"
 
 # 改成插件自己拥有的相对目录
-plugin_install_path="$code_install_path/addons/your-plugin"
+plugin_install_path="$site_dir/addons/your-plugin"
 
 rm -rf -- "$plugin_install_path"
 ```
 
-不能直接删除 `$code_install_path`，否则会清空整个站点。如果插件文件散落在站点根目录，卸载脚本应逐项删除插件拥有的文件。
+不能直接删除 `$site_dir`，否则会清空整个站点。如果插件文件散落在站点根目录，卸载脚本应逐项删除插件拥有的文件。
 
 域名会去掉 `http://`、`https://` 和末尾 `/`，且只允许字母、数字、点、下划线和中划线，防止路径逃逸。
 
@@ -383,7 +383,7 @@ rm -rf -- "$plugin_install_path"
 
 - volume 名固定为 `site-storage`。
 - PVC 名取传统应用依赖导出的 `.Values.PVC_NAME`。
-- Job mountPath 为 `/www/wwwroot`。
+- Job mountPath 和 workingDir 均为 `/www/wwwroot`。
 - PVC subPath 为 `nginx-web-dir/<domain>`，与传统应用使用同一份站点代码目录。
 - 插件 OCI 状态挂载到 `/var/lib/w7-tradition-plugin`，对应 PVC 的 `tradition-plugin-dir/<domain>`。
 - 应用插件不创建、不拥有也不删除该 PVC。
@@ -442,7 +442,7 @@ rm -rf -- "$plugin_install_path"
 ### 7.5 存储
 
 - 传统应用主容器的 `site-storage` claimName 默认为空，渲染时取 `.Values.PVC_NAME`。
-- 主容器把 PVC 的 `nginx-web-dir/<domain>` 子目录挂载到 `/www/wwwroot`；每个域名的代码存于 PVC 的 `nginx-web-dir/<domain>/`。
+- 主容器把 PVC 的 `nginx-web-dir/<domain>` 子目录挂载到 `/www/wwwroot`，并以该目录作为 workingDir，可在容器及相关代码 Job 中通过 `pwd` 获取；每个域名的代码存于 PVC 的 `nginx-web-dir/<domain>/`。
 - NGINX 子 Chart、传统应用代码 Job 和 vhost Job 应通过安装端传值复用同一 PVC。
 - 当前传统应用 Chart 不创建 PVC，安装方必须准备 PVC 并传 `PVC_NAME`。
 - 未开启系统层还原时，还会通过注解把容器系统层映射到该持久卷中的 `www/server/<release-name>/<应用标识>-<版本>/system` 逻辑路径。

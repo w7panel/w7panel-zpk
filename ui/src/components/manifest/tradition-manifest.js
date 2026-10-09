@@ -4,7 +4,7 @@ import myAxios from '@/utils/index';
 export const traditionToolDependency = Object.freeze({
     identifie: 'w7-traditiontool',
     name: 'w7-traditiontool',
-    source: 'https://zpk.fan.b2.sz.w7.com',
+    source: 'https://zpk.w7.cc',
 });
 
 export const traditionStorageVolumeName = 'site-storage';

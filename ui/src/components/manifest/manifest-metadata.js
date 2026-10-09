@@ -194,22 +194,34 @@ export const manifestMetadataMethods = {
         }
         this.formulaBaseInfo = JSON.parse(JSON.stringify(nextBaseInfo));
     },
-    getDefaultTypeTagName(type = this.form.type) {
+    getDefaultTypeCategoryName(type = this.form.type) {
         if (type == 'app-plugin') return '应用插件';
         if (type == 'tradition') return '传统应用';
         if (type == 'system-image') return '系统镜像';
         if (type == 'gateway-plugin') return '网关插件';
         return '';
     },
-    async ensureDefaultTypeTags() {
+    async syncFormulaCategory(currentCategories = []) {
         if (this.option?.pureManifest || !this.identifie) return;
-        const names = [...new Set([
-            this.getDefaultTypeTagName(this.initialApplicationType),
-            this.getDefaultTypeTagName(this.form.type),
-        ].filter(Boolean))];
-        await Promise.all(names.map(name => myAxios.post('/respo/tag/add', {
+
+        const categoriesResponse = await myAxios.post('/respo/category/list', { limit: 999 });
+        const categories = categoriesResponse?.data?.data?.list || [];
+        const categoryNames = new Set(categories.map(category => category.name));
+        const defaultCategoryName = this.getDefaultTypeCategoryName(this.form.type);
+        const validDefaultCategoryName = categoryNames.has(defaultCategoryName)
+            ? defaultCategoryName
+            : '';
+        const currentCategoryName = currentCategories
+            .find(category => categoryNames.has(category.name))?.name || '';
+        const name = validDefaultCategoryName || currentCategoryName;
+        const categoryUnchanged = currentCategories.length == (name ? 1 : 0)
+            && (!name || currentCategories[0]?.name == name);
+        if (categoryUnchanged) return;
+
+        await myAxios.post('/respo/category/save', {
             identifie: this.identifie,
             name,
-        })));
+        });
+        this.$emit('category-sync', name ? [{ name }] : []);
     },
 };

@@ -81,7 +81,8 @@
                 </div>
                 <files-manifest v-show="dependsIndex == -1" :data="manifest" :version_id="version_id" ref="form"
                     :option="{ edit: true, imginstall: true, mainapp: true, app_ports: this.app_ports }"
-                    :identifie="identifie" @addfile="addfileInside" @complete="complete"
+                    :identifie="identifie" :info="formulaInfo" @addfile="addfileInside" @complete="complete"
+                    @category-sync="updateFormulaCategories"
                     @tradition-nginx-gateway-change="handleTraditionNginxGatewayChange"
                     @structure="structure"></files-manifest>
                 <files-manifest v-for="(item, index) in depends" :key="item.identifie" :ref="'depends' + index"
@@ -156,6 +157,7 @@ export default {
             identifie: '',
             version_id: '',
             manifest: '',
+            formulaInfo: null,
             tree: [],
             addfile: {
                 show: false,
@@ -751,7 +753,8 @@ export default {
         getManifest() {
             this.deleteLoading = true;
             return myAxios.get('/respo/v2/info/' + this.identifie + '/' + this.version_id).then(res => {
-                let nativeManifest = res?.data?.data?.manifest
+                this.formulaInfo = res?.data?.data || null;
+                let nativeManifest = this.formulaInfo?.manifest
                 this.manifest = nativeManifest || defaultManifest;
 
                 this.json = jsyaml.load(this.manifest);
@@ -790,6 +793,13 @@ export default {
             }).finally(() => {
                 this.deleteLoading = false;
             });
+        },
+
+        updateFormulaCategories(categories) {
+            this.formulaInfo = {
+                ...(this.formulaInfo || {}),
+                tags: categories,
+            };
         },
 
         async dependsComplete(json, yaml, otherData) {

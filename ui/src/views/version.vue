@@ -457,7 +457,7 @@ export default {
                 service_fee: [{ required: true, message: '请输入费用', trigger: 'blur' },],
             },
             pgRules: {
-                label_ids: [{ required: true, message: '请选择标签', trigger: 'blur' },],
+                label_ids: [{ required: true, message: '请选择分类', trigger: 'blur' },],
                 goods_imgs: [{ required: true, message: '请上传图片', trigger: 'blur' },],
             },
 

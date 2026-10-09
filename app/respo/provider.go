@@ -147,10 +147,9 @@ func (provider *Provider) Register(httpServer *http_server.Server, console conso
 		cors.GET("/zip/icon/:path", controller.FormulaAttach{}.GetIcon)
 		cors.GET("/zpk/zip/icon/:path", controller.FormulaAttach{}.GetIcon)
 
-		// 标签
-		cors.Match([]string{"POST", "OPTIONS"}, "/respo/tag/add", middleware.DenyDomainReq{}.Process, middleware.Auth{}.Process, controller.Tag{}.Add)
-		cors.Match([]string{"POST", "OPTIONS"}, "/respo/tag/delete", middleware.DenyDomainReq{}.Process, middleware.Auth{}.Process, controller.Tag{}.Delete)
-		cors.Match([]string{"POST", "OPTIONS"}, "/respo/tag/list", controller.Tag{}.List)
+		// 分类
+		cors.Match([]string{"POST", "OPTIONS"}, "/respo/category/save", middleware.DenyDomainReq{}.Process, middleware.Auth{}.Process, controller.Category{}.Save)
+		cors.Match([]string{"POST", "OPTIONS"}, "/respo/category/list", controller.Category{}.List)
 
 		cors.Match([]string{"GET", "OPTIONS"}, "/static/*path", controller.Static{}.File)
 
@@ -164,11 +163,6 @@ func (provider *Provider) Register(httpServer *http_server.Server, console conso
 	err := formula.RegisterDepot()
 	if err != nil {
 		panic(err)
-	}
-
-	err = logic.Tag{}.ResetTags()
-	if err != nil {
-		slog.Error("tag reset fail", "err", err)
 	}
 
 	depot, _ := formula.NewDepot()

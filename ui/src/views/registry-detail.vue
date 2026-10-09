@@ -16,8 +16,24 @@
         <div class="bg-white" style="padding: 0 24px 6px;">
             <a-tabs v-model:active-key="tabsActive">
                 <a-tab-pane key="version" title="版本管理">
-                    <a-table :loading="loading" :data="tags" style="width: 100%" class="table-header"
-                        :pagination="false" row-key="TagName">
+                    <div class="zpk-page-toolbar registry-version-toolbar">
+                        <div class="zpk-toolbar-left">
+                            <a-popconfirm :content="`确认删除选中的 ${selectedTagKeys.length} 个版本吗？`" type="warning"
+                                ok-text="确定" cancel-text="取消" content-class="zpk-delete-popconfirm"
+                                :ok-button-props="{ status: 'danger', loading: batchDeleting }"
+                                :cancel-button-props="{ type: 'secondary' }" @ok="batchDelTags">
+                                <a-button status="danger" :disabled="selectedTagKeys.length === 0" :loading="batchDeleting">
+                                    批量删除
+                                </a-button>
+                            </a-popconfirm>
+                            <span v-if="selectedTagKeys.length" class="registry-version-selected">
+                                已选择 {{ selectedTagKeys.length }} 项
+                            </span>
+                        </div>
+                    </div>
+                    <a-table :loading="loading || batchDeleting" :data="tags" style="width: 100%" class="table-header"
+                        :pagination="false" row-key="TagName" v-model:selected-keys="selectedTagKeys"
+                        :row-selection="{ type: 'checkbox', showCheckedAll: true, onlyCurrent: true }">
                         <template #columns>
                             <a-table-column title="镜像版本">
                                 <template #cell="{ record }">
@@ -76,9 +92,10 @@
                             </a-table-column>
                         </template>
                     </a-table>
-                    <div v-if="tagPage.total > tagPage.pageSize" class="df jc-e mt-20">
-                        <a-pagination v-model:current="tagPage.page" :total="tagPage.total"
-                            :page-size="tagPage.pageSize" @change="getVersion" />
+                    <div class="df jc-e mt-20">
+                        <a-pagination v-model:current="tagPage.page" v-model:page-size="tagPage.pageSize"
+                            :total="tagPage.total" :page-size-options="[10, 20, 30, 40, 50]" show-page-size
+                            @page-size-change="handleTagPageSizeChange" @change="getVersion" />
                     </div>
                 </a-tab-pane>
                 <a-tab-pane key="info" title="仓库信息">
@@ -366,7 +383,7 @@ import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
 import userMixin from "@/utils/user-mixin";
-import { messageSuccess } from "@/utils/ui-feedback";
+import { messageError, messageSuccess } from "@/utils/ui-feedback";
 import { IconArrowLeft, IconCopy, IconEdit, IconPlus } from '@arco-design/web-vue/es/icon';
 
 export default {
@@ -397,6 +414,8 @@ export default {
             loading: true,
             data: {},
             tags: [],
+            selectedTagKeys: [],
+            batchDeleting: false,
             tagPage: {
                 page: 1,
                 pageSize: 10,
@@ -799,8 +818,53 @@ export default {
                 tag: tag.TagName
             }).then(() => {
                 messageSuccess("删除成功");
-                this.getData();
+                this.reloadTagsAfterDelete(1);
             }).catch(() => { })
+        },
+        async batchDelTags() {
+            const tags = [...this.selectedTagKeys];
+            if (!tags.length || this.batchDeleting) { return Promise.resolve(); }
+
+            this.batchDeleting = true;
+            let deletedCount = 0;
+            let failedCount = 0;
+            try {
+                for (const tag of tags) {
+                    try {
+                        await myAxios.post("/v2/api/repository/tags/del", {
+                            id: parseInt(this.$route.params.id),
+                            tag,
+                        }, { dontalert: true });
+                        deletedCount++;
+                    } catch {
+                        failedCount++;
+                    }
+                }
+
+                if (deletedCount > 0) {
+                    messageSuccess(`已删除 ${deletedCount} 个版本`);
+                }
+                if (failedCount > 0) {
+                    messageError(`${failedCount} 个版本删除失败`);
+                }
+                this.selectedTagKeys = [];
+                await this.reloadTagsAfterDelete(deletedCount);
+            } finally {
+                this.batchDeleting = false;
+            }
+        },
+        reloadTagsAfterDelete(deletedCount) {
+            const remainingTotal = Math.max(0, this.tagPage.total - deletedCount);
+            const lastPage = Math.max(1, Math.ceil(remainingTotal / this.tagPage.pageSize));
+            if (this.tagPage.page > lastPage) {
+                this.tagPage.page = lastPage;
+            }
+            return this.getVersion();
+        },
+        handleTagPageSizeChange() {
+            this.tagPage.page = 1;
+            this.selectedTagKeys = [];
+            this.getVersion();
         },
         delBuild(row) {
             return myAxios.post('/v2/api/repository/deploy_rule/del', {
@@ -859,7 +923,8 @@ export default {
 
         getVersion() {
             this.loading = true;
-            myAxios.post("/v2/api/repository/tags/list", {
+            this.selectedTagKeys = [];
+            return myAxios.post("/v2/api/repository/tags/list", {
                 id: this.id,
                 "page": this.tagPage.page,
                 "page_size": this.tagPage.pageSize,
@@ -973,6 +1038,15 @@ export default {
 .registry-detail-breadcrumb {
     height: 56px;
     padding: 0 24px;
+}
+
+.registry-version-toolbar {
+    margin: 12px 0 16px;
+}
+
+.registry-version-selected {
+    margin-left: 12px;
+    color: var(--color-text-3);
 }
 
 .icon-action {

@@ -2,6 +2,7 @@ package zpk_market
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -53,8 +54,13 @@ type DependencyOrderBinding struct {
 }
 
 type FormulaCategory struct {
-	ID   int32  `json:"id"`
-	Name string `json:"name"`
+	ID      int32                  `json:"id"`
+	Name    string                 `json:"name"`
+	Setting FormulaCategorySetting `json:"setting"`
+}
+
+type FormulaCategorySetting struct {
+	SupportCluster string `json:"support_cluster"`
 }
 
 type FormulaCategoryListResult struct {
@@ -144,8 +150,12 @@ func (s ZpkMarketService) GetDependencyOrders(consoleUid int32, orderSn string) 
 }
 
 func (s ZpkMarketService) GetFormulaCategories(limit int) ([]FormulaCategory, error) {
+	return s.GetFormulaCategoriesWithContext(context.Background(), limit)
+}
+
+func (s ZpkMarketService) GetFormulaCategoriesWithContext(ctx context.Context, limit int) ([]FormulaCategory, error) {
 	ret := FormulaCategoryListResult{}
-	err := postSigned(s, "/zpk-market/formula/tag/list", map[string]interface{}{
+	err := postSignedWithContext(ctx, s, "/zpk-market/formula/tag/list", map[string]interface{}{
 		"limit": limit,
 	}, &ret)
 	if err != nil {
@@ -155,12 +165,16 @@ func (s ZpkMarketService) GetFormulaCategories(limit int) ([]FormulaCategory, er
 }
 
 func postSigned[T any](s ZpkMarketService, path string, params map[string]interface{}, result *T) error {
+	return postSignedWithContext(context.Background(), s, path, params, result)
+}
+
+func postSignedWithContext[T any](ctx context.Context, s ZpkMarketService, path string, params map[string]interface{}, result *T) error {
 	targetUrl := s.BaseUrl + path
 	payload, err := json.Marshal(params)
 	if err != nil {
 		return err
 	}
-	convertSign, err := s.ConvertRequestSign(map[string]string{
+	convertSign, err := s.ConvertRequestSignWithContext(ctx, map[string]string{
 		"body": string(payload),
 	}, targetUrl)
 	if err != nil {
@@ -170,7 +184,7 @@ func postSigned[T any](s ZpkMarketService, path string, params map[string]interf
 	client := &http.Client{
 		Timeout: 30 * time.Second,
 	}
-	req, err := http.NewRequest("POST", targetUrl, bytes.NewReader(convertSign))
+	req, err := http.NewRequestWithContext(ctx, "POST", targetUrl, bytes.NewReader(convertSign))
 	if err != nil {
 		return err
 	}

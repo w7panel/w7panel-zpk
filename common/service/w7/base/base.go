@@ -2,6 +2,7 @@ package base
 
 import (
 	"bytes"
+	"context"
 	"crypto/md5"
 	"encoding/hex"
 	"encoding/json"
@@ -87,6 +88,10 @@ func (s Base) ConvertRequestSignByJson(params map[string]string, targetServerUrl
 }
 
 func (s Base) ConvertRequestSign(params map[string]string, targetServerUrl string) ([]byte, error) {
+	return s.ConvertRequestSignWithContext(context.Background(), params, targetServerUrl)
+}
+
+func (s Base) ConvertRequestSignWithContext(ctx context.Context, params map[string]string, targetServerUrl string) ([]byte, error) {
 	slog.Info("ConvertRequestSign", "params", params, "targetServerUrl", targetServerUrl)
 
 	url, err := url.Parse(targetServerUrl)
@@ -109,7 +114,7 @@ func (s Base) ConvertRequestSign(params map[string]string, targetServerUrl strin
 	client := &http.Client{
 		Timeout: 30 * time.Second,
 	}
-	req, err := http.NewRequest("POST", "http://api.w7.cc/util/app/convert-sign", paramsReader)
+	req, err := http.NewRequestWithContext(ctx, "POST", "http://api.w7.cc/util/app/convert-sign", paramsReader)
 	if err != nil {
 		return nil, err
 	}

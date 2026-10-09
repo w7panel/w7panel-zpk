@@ -300,6 +300,11 @@ func (c Formula) Info(ctx *gin.Context) {
 			return
 		}
 	}
+	supportCluster, supportErr := zpkmarket.GetFormulaClusterSupport(ctx.Request.Context(), *formula)
+	if supportErr != nil {
+		c.JsonResponseWithServerError(ctx, supportErr)
+		return
+	}
 	schemaHttp := "https://"
 	_ = depotLogin.GetFormulaBackendZipDownloadUrl(formula, false)
 	zipUrl := depotLogin.GetFormulaBackendZipDownloadUrl(formula, true)
@@ -446,6 +451,7 @@ func (c Formula) Info(ctx *gin.Context) {
 		"tags":                   formula.Tags,
 		"install_formulas":       installFormulas,
 		"formula_type":           formula.Manifest.Application.Type,
+		"support_cluster":        supportCluster,
 	}
 	if params.FullManifest {
 		// `helmURL` is the URL of the packaged root chart. It must not be

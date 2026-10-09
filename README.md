@@ -25,3 +25,5 @@ manifest 使用 `application.order` 声明 MicroApp 顺序。生成的 MicroApp 
 网关插件 WasmPlugin 与配置 MicroApp 统一写入相同的 `metadata.labels["w7.cc/group-name"]` 归组关联，不再生成 `w7.cc/plugin-microapp` 注解。
 
 子应用导入会按选择的制品版本读取完整 manifest，并将附件来源纳入本地存储键，避免不同仓库中的同名同版本附件相互覆盖。子文件全部保存成功后才更新主 manifest；导入失败会恢复导入前的主 manifest。带 `from` 的子应用会通过原制品列表接口检查新版本，并支持在编辑页重新导入更新。
+
+制品 `info` 接口会按市场分类设置汇总并返回 `support_cluster=all|main|sub|none`。分类查询的签名与市场请求共用 10 秒超时；超时时返回空值，由旧版面板兼容为不限制安装，其他接口或数据错误仍正常返回。

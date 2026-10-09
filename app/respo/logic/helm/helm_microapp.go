@@ -139,7 +139,7 @@ func buildMicroAppValues(bindings []logic2.Bindings) ([]map[string]interface{}, 
 		for key, value := range frontendProps {
 			values[key] = value
 		}
-		values["app_name"] = `{{ include "common.fullname" . }}`
+		values["app_name"] = `{{ include "__cur__.fullname" . }}`
 		frontendProps = values
 		menuConfigs = append(menuConfigs, map[string]interface{}{
 			"title":   binding.Title,

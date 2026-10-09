@@ -489,7 +489,7 @@ value 会先按 YAML 标量解析，所以 `true`、数字、数组、对象可�
 - ZPK 子应用和自动 sidecar 作为 `charts/<name>/` 本地 dependency 合并进去。
 - ZPK 不会执行 `helm dependency update`；用户原包需要已经包含其离线依赖，或者依赖在安装环境可解析。
 - 用户原始模板和值语义不由 ZPK 验证，最终由 `helm template/install` 暴露问题。
-- 用户 Helm Chart 若有 ZPK MicroApp bindings，`frontend_props.app_name` 会调用 `common.fullname`；宿主 Chart 应提供这个 named template。
+- 用户 Helm Chart 若有 ZPK MicroApp bindings，`frontend_props.app_name` 会调用 MicroApp 模板自带的 `__cur__.fullname`，不依赖宿主 Chart 的 named template。
 - 用户 Helm Chart 若使用 ZPK sidecar，需要在自己的 Pod/Job 模板显式调用 `w7panel.*` helper 插槽。
 
 ### 8.4 存储

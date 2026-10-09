@@ -801,19 +801,9 @@
                                                     <div class="selicon cursor df ai-c jc-c" v-if="record.icon_svg"
                                                         @click="dialogVisible = true; activeItem = record;"
                                                         v-html="elementsToSvg(record.icon_svg)"></div>
-                                                    <div class="selicon cursor df ai-c jc-c" v-else-if="record.icon"
-                                                        @click="dialogVisible = true; activeItem = record;"><i
-                                                            class="fs-24 wi" :class="'wi-' + record.icon"></i>
-                                                    </div>
                                                     <div class="selicon cursor df ai-c jc-c" v-else
                                                         @click="dialogVisible = true; activeItem = record;">
-                                                        <svg class="default-menu-icon"
-                                                            xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"
-                                                            aria-hidden="true">
-                                                            <path fill="currentColor"
-                                                                d="M160 448a32 32 0 0 1-32-32V160.064a32 32 0 0 1 32-32h256a32 32 0 0 1 32 32V416a32 32 0 0 1-32 32zm448 0a32 32 0 0 1-32-32V160.064a32 32 0 0 1 32-32h255.936a32 32 0 0 1 32 32V416a32 32 0 0 1-32 32zM160 896a32 32 0 0 1-32-32V608a32 32 0 0 1 32-32h256a32 32 0 0 1 32 32v256a32 32 0 0 1-32 32zm448 0a32 32 0 0 1-32-32V608a32 32 0 0 1 32-32h255.936a32 32 0 0 1 32 32v256a32 32 0 0 1-32 32z">
-                                                            </path>
-                                                        </svg>
+                                                        <icon-menu class="default-menu-icon" :size="24" />
                                                     </div>
                                                     <div v-for="(sub, subid) in record.children" :key="subid"
                                                         class="df ai-c jc-c mt-10" style="width:36px; height:36px;">
@@ -943,6 +933,7 @@ import {
     IconCheckCircleFill,
     IconEdit,
     IconExclamationCircleFill,
+    IconMenu,
     IconQuestionCircleFill,
     IconUpload,
 } from '@arco-design/web-vue/es/icon';
@@ -970,6 +961,7 @@ export default {
         IconCheckCircleFill,
         IconEdit,
         IconExclamationCircleFill,
+        IconMenu,
         IconQuestionCircleFill,
         IconUpload,
     },
@@ -1120,7 +1112,6 @@ export default {
             downloadUrl: "",
 
             dialogVisible: false,
-            icons: [],
             activeItem: null,
 
             frameVisible: false,
@@ -1175,13 +1166,9 @@ export default {
         this.initPanelRoles();
         this.init(this.data);
 
-
-
         this.jsonp('https://console.w7.cc/zpk?path=/respo/list&page=1&limit=99&tag=%E8%BF%90%E8%A1%8C%E7%8E%AF%E5%A2%83', 'getlanguage' + (this.json?.application?.identifie || Math.random()), (data) => {
             this.languageList = data?.data?.list || [];
         });
-
-        this.getIcon();
     },
     watch: {
         'dependForm.identifie_before'() {
@@ -1728,7 +1715,7 @@ export default {
             this.getMenu();
         },
         addMenu(menu) {
-            menu.push({ title: '', icon: '', displayorder: 0, is_default: 0, location: 'normal' });
+            menu.push({ title: '', displayorder: 0, is_default: 0, location: 'normal' });
             this.normalizeMenuDefault(menu);
             this.getMenu();
         },
@@ -1748,17 +1735,6 @@ export default {
             this.normalizeMenuDefault(menu, item);
             this.getMenu();
         },
-        getIcon() {
-            const xhr = new XMLHttpRequest();
-            xhr.open("GET", "https://cdn.w7.cc/ued/font/w7/iconfont.css");
-            xhr.send();
-            xhr.onreadystatechange = () => {
-                if (xhr.readyState === 4 && xhr.status === 200) {
-                    let css = xhr.response;
-                    this.icons = css.match(/(?<=\.)wi-[^:]+/g);
-                }
-            }
-        },
         addSub(menu, item) {
             item.children = item.children || [];
             let selected = this.getCurrentMenuDefault(menu);
@@ -1770,6 +1746,7 @@ export default {
             this.getMenu();
         },
         selectIcon(item) {
+            delete this.activeItem.icon;
             this.activeItem.icon_svg = item.json;
             this.dialogVisible = false;
             this.getMenu();
@@ -1951,7 +1928,6 @@ export default {
                         displayorder: Number(o.displayorder),
                         do: o.do,
                         title: o.title,
-                        icon: o.icon,
                         icon_svg: o.icon_svg,
                         location: o.location,
                         is_default: o.is_default || 0,
@@ -1966,7 +1942,6 @@ export default {
                                 displayorder: Number(c.displayorder),
                                 do: c.do,
                                 title: c.title,
-                                icon: c.icon,
                                 icon_svg: o.icon_svg,
                                 is_default: c.is_default || 0,
                                 parent: o.do,
@@ -2661,21 +2636,6 @@ export default {
 
 .branch.last::after {
     display: none;
-}
-
-.icon {
-    border: 1px solid #f0f0f0;
-    box-sizing: border-box;
-    width: 64px;
-    height: 64px;
-}
-
-.icon:hover i {
-    color: #2d5fff;
-}
-
-.icon:hover {
-    border-color: #2d5fff;
 }
 
 .selicon {

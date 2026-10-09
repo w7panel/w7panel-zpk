@@ -73,10 +73,10 @@ func PublishGoods(formula *formulalogic.Formula, publishGoodsReq devcenter.Publi
 		return err
 	}
 	if len(tags) == 0 {
-		return errors.New("请先设置制品标签")
+		return errors.New("请先设置制品分类")
 	}
-	if len(tags) > 5 {
-		tags = tags[:5]
+	if len(tags) > 1 {
+		tags = tags[:1]
 	}
 	goodsTags, err := w7.DevCenterGoodsSdk.GoodsLabels(devcenter.GoodsLabelsReq{
 		Page:     1,

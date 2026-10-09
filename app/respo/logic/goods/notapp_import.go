@@ -195,6 +195,24 @@ func ImportNotAppToFormula(notAppId int, user *entity.RegistryUser, consoleUid i
 			List: versionPrices,
 		}
 	}
+	goodsCategoryName := ""
+	if len(goodsLabels) > 0 {
+		marketCategories, categoryErr := w7.ZpkMarketSdk.GetFormulaCategories(999)
+		if categoryErr != nil {
+			return categoryErr
+		}
+		availableCategories := make(map[string]struct{}, len(marketCategories))
+		for _, category := range marketCategories {
+			availableCategories[strings.TrimSpace(category.Name)] = struct{}{}
+		}
+		for _, label := range goodsLabels {
+			name := strings.TrimSpace(label.Title)
+			if _, exists := availableCategories[name]; exists {
+				goodsCategoryName = name
+				break
+			}
+		}
+	}
 
 	err = dao.Q.Transaction(func(tx *dao.Query) error {
 		if goodsLabels != nil {
@@ -203,11 +221,11 @@ func ImportNotAppToFormula(notAppId int, user *entity.RegistryUser, consoleUid i
 				return err
 			}
 
-			for _, item := range goodsLabels {
-				tag, _ := tx.Tag.Where(tx.Tag.Name.Eq(item.Title)).First()
+			if goodsCategoryName != "" {
+				tag, _ := tx.Tag.Where(tx.Tag.Name.Eq(goodsCategoryName)).First()
 				if tag == nil {
 					tag = &entity.Tag{
-						Name: item.Title,
+						Name: goodsCategoryName,
 					}
 					err = tx.Tag.Create(tag)
 					if err != nil {

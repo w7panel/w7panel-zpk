@@ -25,13 +25,13 @@
                     <a-textarea v-model="form.description" placeholder="请输入应用描述" :max-length="500"
                         show-word-limit :auto-size="{ minRows: 2, maxRows: 5 }" />
                 </a-form-item>
-                <a-form-item label="标签">
+                <a-form-item label="分类">
                     <div class="application-tag-field">
-                        <a-tag v-if="requiredTagName" color="blue" class="application-required-tag">
-                            {{ requiredTagName }}
+                        <a-tag v-if="requiredCategoryName" color="blue" class="application-required-tag">
+                            {{ requiredCategoryName }}
                         </a-tag>
-                        <a-select v-model="form.tagIds" multiple allow-search placeholder="请选择标签" style="flex:1;">
-                            <a-option v-for="item in editableTags" :key="item.id" :value="item.id"
+                        <a-select v-else v-model="form.category" allow-search allow-clear placeholder="请选择分类" style="flex:1;">
+                            <a-option v-for="item in categories" :key="item.id" :value="item.name"
                                 :label="item.name" />
                         </a-select>
                     </div>
@@ -127,14 +127,14 @@ export default {
             selectedIcon: null,
             objectIconUrl: '',
             iconPreview: '',
-            tags: [],
-            initialTagIds: [],
+            categories: [],
+            initialCategories: [],
             applicationType: '',
             form: {
                 name: '',
                 description: '',
                 introduction: '',
-                tagIds: [],
+                category: '',
                 annotations: [],
                 once: false,
                 clusterPrivileges: false,
@@ -197,15 +197,16 @@ export default {
         isRegisterSiteDisabled() {
             return this.applicationType == 'gateway-plugin';
         },
-        requiredTagName() {
+        requiredCategoryName() {
+            const name = this.defaultCategoryName;
+            return this.categories.some(item => item.name == name) ? name : '';
+        },
+        defaultCategoryName() {
             if (this.applicationType == 'app-plugin') { return '应用插件' }
             if (this.applicationType == 'tradition') { return '传统应用' }
             if (this.applicationType == 'system-image') { return '系统镜像' }
             if (this.applicationType == 'gateway-plugin') { return '网关插件' }
             return '';
-        },
-        editableTags() {
-            return this.tags.filter(item => item.name != this.requiredTagName);
         },
     },
     methods: {
@@ -231,11 +232,11 @@ export default {
             this.loadFailed = false;
             this.resetSelectedIcon();
             try {
-                let [infoRes, settingRes, filesRes, tagsRes] = await Promise.all([
+                let [infoRes, settingRes, filesRes, categoriesRes] = await Promise.all([
                     myAxios.get('/respo/info/' + this.identifie),
                     myAxios.post('/respo/setting/get', { identifie: this.identifie }),
                     myAxios.post('/respo/share-file/path-tree', { identifie: this.identifie }),
-                    myAxios.post('/respo/tag/list', { limit: 999 }),
+                    myAxios.post('/respo/category/list', { limit: 999 }),
                 ]);
                 let latestInfo = infoRes?.data?.data || this.info || {};
                 let baseInfo = settingRes?.data?.data?.base_info || {};
@@ -254,11 +255,12 @@ export default {
                 this.iconPreview = this.getIconUrl(latestInfo?.icon_url || this.info?.icon_url || '');
 
                 this.form.introduction = filesRes?.data?.data?.list?.['readme.md'] || '';
-                this.tags = tagsRes?.data?.data?.list || [];
-                this.initialTagIds = (latestInfo?.tags || this.info?.tags || [])
-                    .filter(item => item.name != this.requiredTagName)
-                    .map(item => Number(item.id));
-                this.form.tagIds = [...this.initialTagIds];
+                this.categories = categoriesRes?.data?.data?.list || [];
+                this.initialCategories = latestInfo?.tags || this.info?.tags || [];
+                const currentCategory = this.initialCategories.find(item => (
+                    this.categories.some(category => category.name == item.name)
+                ));
+                this.form.category = this.requiredCategoryName || currentCategory?.name || '';
             } catch (error) {
                 this.loadFailed = true;
                 messageError(error?.response?.data?.error || '基础信息加载失败');
@@ -299,9 +301,6 @@ export default {
 
             this.saving = true;
             try {
-                let latestRes = await myAxios.get('/respo/info/' + this.identifie);
-                let latestInfo = latestRes?.data?.data || this.info || {};
-
                 let annotation = this.form.annotations.reduce((result, item) => {
                     let key = (item?.key || '').trim();
                     if (key && item?.value !== undefined && item?.value !== null && String(item.value) !== '') {
@@ -333,25 +332,14 @@ export default {
                     content: this.form.introduction || '',
                 });
 
-                let nextTagIds = this.form.tagIds.map(id => Number(id));
-                let deletedTagIds = this.initialTagIds.filter(id => !nextTagIds.includes(id));
-                let addedTagIds = nextTagIds.filter(id => !this.initialTagIds.includes(id));
-                let formulaId = latestInfo?.version?.formula_id || this.info?.version?.formula_id;
-                if (this.requiredTagName) {
-                    await myAxios.post('/respo/tag/add', {
-                        identifie: this.identifie,
-                        name: this.requiredTagName,
-                    });
+                let categoryName = this.requiredCategoryName || this.form.category;
+                if (!this.categories.some(category => category.name == categoryName)) {
+                    categoryName = '';
                 }
-                for (let tagId of deletedTagIds) {
-                    await myAxios.post('/respo/tag/delete', { tagId, formulaId });
-                }
-                for (let tagId of addedTagIds) {
-                    let tag = this.tags.find(item => Number(item.id) === tagId);
-                    if (tag?.name) {
-                        await myAxios.post('/respo/tag/add', { identifie: this.identifie, name: tag.name });
-                    }
-                }
+                await myAxios.post('/respo/category/save', {
+                    identifie: this.identifie,
+                    name: categoryName,
+                });
 
                 let iconUpdated = false;
                 if (this.selectedIcon) {

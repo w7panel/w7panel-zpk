@@ -596,7 +596,7 @@ func (c Formula) List(ctx *gin.Context) {
 	if params.Tag != "" {
 		searchTag, _ := dao.Q.Tag.Where(dao.Q.Tag.Name.Eq(params.Tag)).First()
 		if searchTag == nil {
-			c.JsonResponseWithError(ctx, errors.New("标签不存在"), 500)
+			c.JsonResponseWithError(ctx, errors.New("分类不存在"), 500)
 			return
 		}
 		formulaTagList, _, _ := dao.Q.TagFormula.Where(dao.Q.TagFormula.TagID.Eq(searchTag.ID)).

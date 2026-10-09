@@ -52,6 +52,15 @@ type DependencyOrderBinding struct {
 	OrderSn     string `json:"order_sn"`
 }
 
+type FormulaCategory struct {
+	ID   int32  `json:"id"`
+	Name string `json:"name"`
+}
+
+type FormulaCategoryListResult struct {
+	List []FormulaCategory `json:"list"`
+}
+
 func (s ZpkMarketService) CheckToken(token, formulaIdentify string) error {
 	return postSigned[any](s, "/zpk-market/formula/check-token", map[string]interface{}{
 		"token":            token,
@@ -132,6 +141,17 @@ func (s ZpkMarketService) GetDependencyOrders(consoleUid int32, orderSn string) 
 		"order_sn":    orderSn,
 	}, &ret)
 	return ret, err
+}
+
+func (s ZpkMarketService) GetFormulaCategories(limit int) ([]FormulaCategory, error) {
+	ret := FormulaCategoryListResult{}
+	err := postSigned(s, "/zpk-market/formula/tag/list", map[string]interface{}{
+		"limit": limit,
+	}, &ret)
+	if err != nil {
+		return nil, err
+	}
+	return ret.List, nil
 }
 
 func postSigned[T any](s ZpkMarketService, path string, params map[string]interface{}, result *T) error {

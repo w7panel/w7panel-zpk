@@ -15,11 +15,11 @@ func (c ResetTags) GetName() string {
 }
 
 func (c ResetTags) GetDescription() string {
-	return "reset tags"
+	return "sync categories from artifact market"
 }
 
 func (c ResetTags) Handle(cmd *cobra.Command, args []string) {
-	err := logic.Tag{}.ResetTags()
+	err := logic.Category{}.Sync()
 	if err != nil {
 		panic(err)
 	}

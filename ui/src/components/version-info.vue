@@ -19,29 +19,33 @@
             <a-form-item label="描述" style="margin-bottom:10px;">
                 <span>{{ form.description || '-' }}</span>
             </a-form-item>
-            <a-form-item label="标签" style="margin-bottom:10px;">
+            <a-form-item label="分类" style="margin-bottom:10px;">
 
                 <div class="df df-ww">
-                    <a-tag color="blue" v-for="(item, index) in form.tags" :key="item.id || item.name"
-                        :visible="true"
-                        :closable="edit.type == 'tags' && item.name != requiredTagName"
-                        @close="deleteTag(index)" class="tag">{{ item.name }}</a-tag>
-                    <div v-if="edit.type == 'tags'" class="df">
-                        <a-select v-model="form.taginput" multiple :max-tag-count="1" style="width:140px;"
-                            placeholder="添加新标签">
-                            <a-option v-for="item in editableTags" :disabled="Boolean(form.tags.find(i => i.name == item.name))"
-                                :key="item.id" :label="item.name" :value="item.id"></a-option>
+                    <a-tag v-for="item in displayedCategories" :key="item.id || item.name"
+                        color="blue" class="tag">
+                        {{ item.name }}
+                    </a-tag>
+                    <div v-if="edit.type == 'category'" class="df">
+                        <a-select v-model="form.categoryInput" allow-clear style="width:140px;"
+                            placeholder="请选择分类">
+                            <a-option v-for="item in categories"
+                                :key="item.id" :label="item.name" :value="item.name"></a-option>
                         </a-select>
-                        <a-button type="primary" @click="addTag" style="margin-left:10px;">确定</a-button>
+                        <a-button type="primary" @click="saveCategory" style="margin-left:10px;">确定</a-button>
                         <a-button @click="edit.type = ''">取消</a-button>
                     </div>
                 </div>
 
-                <span v-if="edit.type != 'tags' && (!form.tags || !form.tags.length)">-</span>
-                <a-tooltip v-if="edit.type != 'tags'" content="修改">
-                    <a-button class="editbtn" type="text" shape="circle" size="mini" @click="edit.type = 'tags'">
-                        <template #icon><icon-edit /></template>
-                    </a-button>
+                <span v-if="edit.type != 'category' && !displayedCategories.length">-</span>
+                <a-tooltip v-if="edit.type != 'category' && !requiredCategoryName"
+                    :content="categoryEditTooltip">
+                    <span>
+                        <a-button class="editbtn" type="text" shape="circle" size="mini"
+                            :disabled="!categoriesLoaded" @click="startCategoryEdit">
+                            <template #icon><icon-edit /></template>
+                        </a-button>
+                    </span>
                 </a-tooltip>
             </a-form-item>
 
@@ -104,7 +108,7 @@ import jsyaml from "js-yaml";
 import myAxios from '@/utils';
 import ManifestConfigTable from '@/components/manifest-config-table.vue';
 import ManifestConfigTableColumn from '@/components/manifest-config-table-column.vue';
-import { messageSuccess } from '@/utils/ui-feedback';
+import { messageError, messageSuccess } from '@/utils/ui-feedback';
 import { IconEdit } from '@arco-design/web-vue/es/icon';
 
 const defaultManifest = `application:
@@ -136,14 +140,14 @@ export default {
 
             form: {
                 name: '',
-                tags: [],
+                category: null,
                 once: false,
                 clusterPrivileges: false,
                 registerSite: false,
                 officialApp: false,
                 denyDelete: false,
                 description: '',
-                taginput: [],
+                categoryInput: '',
             },
             edit: {
                 type: '',
@@ -157,18 +161,21 @@ export default {
                 show: false,
                 list: [],
             },
-            tags: [],
-            ensuringRequiredTags: {},
+            categories: [],
+            categoriesLoaded: false,
+            categoriesLoadFailed: false,
+            initialCategories: [],
+            ensuringRequiredCategories: {},
         }
     },
     created() {
         this.baseurl = window?.$wujie?.props?.url || '';
-        this.getTag();
+        this.getCategories();
         this.init();
     },
     watch: {
         identifie() {
-            this.getTag();
+            this.getCategories();
         },
         info() {
             this.init();
@@ -208,79 +215,101 @@ export default {
             if (this.logoimg && this.iconCacheKey) {
                 this.logoimg += (this.logoimg.includes('?') ? '&' : '?') + 'time=' + this.iconCacheKey;
             }
-            let tags = [...(this.info?.tags || [])];
-            if (this.requiredTagName) {
-                let requiredTagIndex = tags.findIndex(item => item.name == this.requiredTagName);
-                let requiredTag = requiredTagIndex >= 0
-                    ? tags.splice(requiredTagIndex, 1)[0]
-                    : { name: this.requiredTagName };
-                tags.unshift(requiredTag);
-                if (requiredTagIndex < 0) {
-                    this.ensureRequiredTag(this.requiredTagName);
+            let currentCategories = [...(this.info?.tags || [])];
+            this.initialCategories = currentCategories;
+            if (this.requiredCategoryName) {
+                let requiredCategory = currentCategories.find(item => item.name == this.requiredCategoryName);
+                this.form.category = requiredCategory || { name: this.requiredCategoryName };
+                if (!requiredCategory) {
+                    this.ensureRequiredCategory(this.requiredCategoryName);
                 }
+            } else {
+                this.form.category = currentCategories.find(item => !this.isCategoryDeleted(item))
+                    || null;
             }
-            this.form.tags = tags;
         },
 
-        ensureRequiredTag(name) {
-            if (!name || !this.identifie || this.ensuringRequiredTags[name]) { return }
-            this.ensuringRequiredTags[name] = true;
-            myAxios.post('/respo/tag/add', {
+        ensureRequiredCategory(name) {
+            if (!name || !this.identifie || this.ensuringRequiredCategories[name]) { return }
+            this.ensuringRequiredCategories[name] = true;
+            myAxios.post('/respo/category/save', {
                 identifie: this.identifie,
                 name,
             }).then(() => {
                 this.$emit('refresh');
             }).catch(() => undefined).finally(() => {
-                delete this.ensuringRequiredTags[name];
+                delete this.ensuringRequiredCategories[name];
             });
         },
 
-        async getTag() {
+        async getCategories() {
             if (!this.identifie) { return }
 
-            await myAxios.post('/respo/tag/list', { limit: 999 }).then(res => {
-                this.tags = res.data?.data?.list || [];
-            }).catch(() => { })
-
-        },
-
-        deleteTag(index) {
-            let tag = this.form.tags[index];
-            if (!tag?.id || tag.name == this.requiredTagName) { return }
-            let formulaId = this.info?.version?.formula_id;
-            if (!formulaId) { return }
-            myAxios.post('/respo/tag/delete', {
-                tagId: tag.id,
-                formulaId: formulaId,
-            }).then(() => {
-                messageSuccess('删除成功');
-                let deletedIndex = this.form.tags.findIndex(item => item.id == tag.id);
-                if (deletedIndex >= 0) {
-                    this.form.tags.splice(deletedIndex, 1);
-                }
-                this.edit.type = '';
-                this.$emit('refresh');
-            })
-        },
-
-        async addTag() {
-            if (!this.form.taginput?.length) { this.edit.type = ''; return }
-            let ids = this.form.taginput;
-            let names = ids?.map(id => {
-                return this.tags.find(i => i.id == Number(id))?.name
-            });
-            for (let i in names) {
-                let name = names[i];
-                await myAxios.post('/respo/tag/add', {
-                    identifie: this.identifie,
-                    name: name,
-                }).then(res => {
-                    messageSuccess('添加成功');
-                    this.form.tags.push({ name: name, id: res.data.id });
-                    this.form.taginput = [];
+            this.categoriesLoaded = false;
+            this.categoriesLoadFailed = false;
+            this.categories = [];
+            await myAxios.post('/respo/category/list', { limit: 999 }).then(res => {
+                this.categories = res.data?.data?.list || [];
+                this.categoriesLoaded = true;
+                this.init();
+            }).catch(() => {
+                this.categoriesLoadFailed = true;
+                if (this.edit.type == 'category') {
                     this.edit.type = '';
-                }).catch(() => { });
+                }
+                messageError('分类数据加载失败，请刷新后重试');
+            })
+
+        },
+
+        isCategoryDeleted(category) {
+            return this.categoriesLoaded && category?.name
+                && !this.categories.some(item => item.name == category.name);
+        },
+
+        startCategoryEdit() {
+            if (!this.categoriesLoaded) {
+                messageError('分类数据尚未加载完成，请刷新后重试');
+                return;
             }
+            this.form.categoryInput = this.form.category && !this.isCategoryDeleted(this.form.category)
+                ? this.form.category.name
+                : '';
+            this.edit.type = 'category';
+        },
+
+        async removeDeletedCategories() {
+            if (!this.categoriesLoaded) { return }
+            const deletedCategories = this.initialCategories.filter(item => this.isCategoryDeleted(item));
+            if (deletedCategories.length) {
+                const currentCategory = this.initialCategories.find(item => !this.isCategoryDeleted(item));
+                await myAxios.post('/respo/category/save', {
+                    identifie: this.identifie,
+                    name: currentCategory?.name || '',
+                });
+                this.initialCategories = currentCategory ? [currentCategory] : [];
+                this.form.category = currentCategory || null;
+            }
+        },
+
+        async saveCategory() {
+            if (!this.categoriesLoaded) {
+                messageError('分类数据尚未加载完成，请刷新后重试');
+                return;
+            }
+            let name = this.form.categoryInput;
+            if (!this.categories.some(category => category.name == name)) {
+                name = '';
+            }
+            await myAxios.post('/respo/category/save', {
+                identifie: this.identifie,
+                name,
+            });
+            messageSuccess('保存成功');
+            this.form.category = name ? { name } : null;
+            this.initialCategories = name ? [{ name }] : [];
+            this.form.categoryInput = '';
+            this.edit.type = '';
             this.$emit('refresh');
         },
         openAnnotationEdit() {
@@ -336,6 +365,7 @@ export default {
             this.submit();
         },
         async submit() {
+            await this.removeDeletedCategories();
             let settingRes = await myAxios.post('/respo/setting/get', {
                 identifie: this.identifie,
             });
@@ -373,15 +403,34 @@ export default {
         isRegisterSiteDisabled() {
             return this.applicationType == 'gateway-plugin';
         },
-        requiredTagName() {
+        requiredCategoryName() {
+            const name = this.defaultCategoryName;
+            return this.categories.some(item => item.name == name) ? name : '';
+        },
+        defaultCategoryName() {
             if (this.applicationType == 'app-plugin') { return '应用插件' }
             if (this.applicationType == 'tradition') { return '传统应用' }
             if (this.applicationType == 'system-image') { return '系统镜像' }
             if (this.applicationType == 'gateway-plugin') { return '网关插件' }
             return '';
         },
-        editableTags() {
-            return this.tags.filter(item => item.name != this.requiredTagName);
+        displayedCategories() {
+            if (!this.categoriesLoaded) {
+                return [];
+            }
+            const currentCategory = this.initialCategories.find(item => !this.isCategoryDeleted(item));
+            if (currentCategory) {
+                return [currentCategory];
+            }
+            return this.form.category && !this.isCategoryDeleted(this.form.category)
+                ? [this.form.category]
+                : [];
+        },
+        categoryEditTooltip() {
+            if (this.categoriesLoadFailed) {
+                return '分类数据加载失败，请刷新后重试';
+            }
+            return this.categoriesLoaded ? '修改' : '分类数据加载中';
         },
         annotationKeys() {
             const keys = Object.keys(this.json?.application?.annotation || [])

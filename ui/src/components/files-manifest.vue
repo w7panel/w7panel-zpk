@@ -899,13 +899,14 @@ import {
 } from '@/components/manifest/manifest-yaml';
 
 export default {
-    emits: ['writefile', 'tradition-nginx-gateway-change'],
+    emits: ['writefile', 'tradition-nginx-gateway-change', 'category-sync'],
     props: [
         'data',
         'submiting',
         'option',
         'identifie',
         'version_id',
+        'info',
     ],
     components: {
         filesUpload,
@@ -1171,7 +1172,7 @@ export default {
                     this.syncTraditionDependency();
                     this.syncSysboxDependency();
                     await this.saveFormulaTypeSetting();
-                    await this.ensureDefaultTypeTags();
+                    await this.syncFormulaCategory(this.info?.tags || []);
                     this.changeForm();
                     if (this.json.application) {
                         this.json.application.annotation = this.filterAnnotationsForType(

@@ -803,13 +803,7 @@
                                                         v-html="elementsToSvg(record.icon_svg)"></div>
                                                     <div class="selicon cursor df ai-c jc-c" v-else
                                                         @click="dialogVisible = true; activeItem = record;">
-                                                        <svg class="default-menu-icon"
-                                                            xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024"
-                                                            aria-hidden="true">
-                                                            <path fill="currentColor"
-                                                                d="M160 448a32 32 0 0 1-32-32V160.064a32 32 0 0 1 32-32h256a32 32 0 0 1 32 32V416a32 32 0 0 1-32 32zm448 0a32 32 0 0 1-32-32V160.064a32 32 0 0 1 32-32h255.936a32 32 0 0 1 32 32V416a32 32 0 0 1-32 32zM160 896a32 32 0 0 1-32-32V608a32 32 0 0 1 32-32h256a32 32 0 0 1 32 32v256a32 32 0 0 1-32 32zm448 0a32 32 0 0 1-32-32V608a32 32 0 0 1 32-32h255.936a32 32 0 0 1 32 32v256a32 32 0 0 1-32 32z">
-                                                            </path>
-                                                        </svg>
+                                                        <icon-menu class="default-menu-icon" :size="24" />
                                                     </div>
                                                     <div v-for="(sub, subid) in record.children" :key="subid"
                                                         class="df ai-c jc-c mt-10" style="width:36px; height:36px;">
@@ -939,6 +933,7 @@ import {
     IconCheckCircleFill,
     IconEdit,
     IconExclamationCircleFill,
+    IconMenu,
     IconQuestionCircleFill,
     IconUpload,
 } from '@arco-design/web-vue/es/icon';
@@ -966,6 +961,7 @@ export default {
         IconCheckCircleFill,
         IconEdit,
         IconExclamationCircleFill,
+        IconMenu,
         IconQuestionCircleFill,
         IconUpload,
     },

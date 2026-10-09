@@ -18,7 +18,7 @@
                 <a-tab-pane key="version" title="版本管理">
                     <div class="zpk-page-toolbar registry-version-toolbar">
                         <div class="zpk-toolbar-left">
-                            <a-popconfirm :content="`确认删除选中的 ${selectedTagKeys.length} 个版本吗？`" type="warning"
+                            <a-popconfirm :content="`确认删除选中的 ${selectedTagKeys.length} 个版本吗？`" type="warning" position="bl"
                                 ok-text="确定" cancel-text="取消" content-class="zpk-delete-popconfirm"
                                 :ok-button-props="{ status: 'danger', loading: batchDeleting }"
                                 :cancel-button-props="{ type: 'secondary' }" @ok="batchDelTags">

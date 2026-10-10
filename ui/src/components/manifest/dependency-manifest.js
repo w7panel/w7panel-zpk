@@ -29,7 +29,6 @@ export function dependencyManifestState() {
             required: true,
             from: '',
         },
-        dependsList: {},
         subDependsList: {},
         dependPicker: {
             show: false,
@@ -106,26 +105,13 @@ export const dependencyManifestMethods = {
     },
     getDependName(record) {
         if (!record) return '';
-        return record.name || this.dependsList?.[record.identifie] || record.identifie || '';
+        return record.name || record.identifie || '';
     },
     getSubDependsOptions(index) {
         return this.subDependsList?.[index] || { '': '无' };
     },
     getSubDependName(index, identifie) {
         return this.getSubDependsOptions(index)?.[identifie] || '';
-    },
-    normalizeDependList(list = []) {
-        return (list || []).filter(item => item?.install_only_once).map(item => ({
-            ...item,
-            name: item.name || item.identifie,
-        }));
-    },
-    mergeDependsList(list = []) {
-        const dependsList = { ...this.dependsList };
-        list.forEach(item => {
-            if (item?.identifie) dependsList[item.identifie] = item.name || item.identifie;
-        });
-        this.dependsList = dependsList;
     },
     openDependPicker(index = -1) {
         if (this.form.type == 'tradition') return;
@@ -187,12 +173,6 @@ export const dependencyManifestMethods = {
         } catch {
             // Ignore malformed dependency manifests returned by legacy records.
         }
-    },
-    getDependsList() {
-        myAxios.get('/respo/list?limit=999').then(response => {
-            const list = response.data?.data?.list || [];
-            this.mergeDependsList(this.normalizeDependList(list));
-        });
     },
     delDepend(index) {
         if (this.form.dependsIn.length - 1 < index) {

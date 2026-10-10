@@ -304,6 +304,41 @@ func (self *Depot) GetFormula(name string, version string, user *entity.Registry
 	return result, nil
 }
 
+// FormulaInstallOnlyOnce resolves the field required by dependency selectors.
+// Formula-level base info is stored in the database for newer records; legacy
+// records fall back to their root manifest without restoring source archives,
+// Helm charts, shared files, or icons from OCI.
+func (self *Depot) FormulaInstallOnlyOnce(row *entity.Formula) (bool, error) {
+	if row == nil {
+		return false, errors.New("formula is nil")
+	}
+	formula := &Formula{
+		ID:              row.ID,
+		Name:            row.Name,
+		Title:           row.Title,
+		VersionId:       row.VersionLatestID,
+		LatestVersionId: row.VersionLatestID,
+		Setting:         row.Setting,
+	}
+	if row.Setting != nil && row.Setting.BaseInfo != nil {
+		return formula.GetBaseInfo().InstallOnlyOnce, nil
+	}
+	if err := self.unPackManifestFilesFromOci(formula); err != nil {
+		return false, err
+	}
+	manifestPath := filepath.Join(self.basePath, formula.GetFilesRelativeDir(), "manifest.yaml")
+	content, err := os.ReadFile(manifestPath)
+	if err != nil {
+		return false, err
+	}
+	manifest, err := self.parseFormulaManifestFile(string(content))
+	if err != nil {
+		return false, err
+	}
+	formula.Manifest = manifest
+	return formula.GetBaseInfo().InstallOnlyOnce, nil
+}
+
 func (self *Depot) parseFormulaManifestFile(content string) (*logic.Manifest, error) {
 	manifest := &logic.Manifest{}
 	if err := yaml.Unmarshal([]byte(content), manifest); err != nil {

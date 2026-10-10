@@ -82,9 +82,10 @@ export default {
             page: 1,
             pageSize: 8,
             loading: false,
+            loadToken: 0,
             lists: {
-                local: [],
-                official: [],
+                local: { list: [], total: 0 },
+                official: { list: [], total: 0 },
             },
         };
     },
@@ -98,14 +99,13 @@ export default {
             },
         },
         currentList() {
-            return this.lists[this.activeTab] || [];
+            return this.lists[this.activeTab] || { list: [], total: 0 };
         },
         rows() {
-            const start = (this.page - 1) * this.pageSize;
-            return this.currentList.slice(start, start + this.pageSize);
+            return this.currentList.list;
         },
         total() {
-            return this.currentList.length;
+            return this.currentList.total;
         },
     },
     watch: {
@@ -121,17 +121,21 @@ export default {
     },
     methods: {
         load() {
+            const tab = this.activeTab;
+            const loadToken = ++this.loadToken;
             this.loading = true;
-            return fetchChildImportList(myAxios, this.activeTab, {
-                page: 1,
-                limit: 999,
+            return fetchChildImportList(myAxios, tab, {
+                page: this.page,
+                limit: this.pageSize,
                 keyword: this.keyword,
-            }).then(list => {
-                this.lists[this.activeTab] = list;
+            }).then(result => {
+                if (loadToken !== this.loadToken) return;
+                this.lists[tab] = result;
             }).catch(() => {
-                this.lists[this.activeTab] = [];
+                if (loadToken !== this.loadToken) return;
+                this.lists[tab] = { list: [], total: 0 };
             }).finally(() => {
-                this.loading = false;
+                if (loadToken === this.loadToken) this.loading = false;
             });
         },
         search() {
@@ -144,6 +148,7 @@ export default {
         },
         changePage(page) {
             this.page = page;
+            this.load();
         },
         select(record) {
             if (!record?.identifie || this.actionLoading) { return; }

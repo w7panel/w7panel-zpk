@@ -16,8 +16,8 @@ export function childImportRepositoryBaseURL(tab) {
 
 export function childImportRepositoryURL(tab) {
     return tab === 'official'
-        ? `${childImportRepositoryBaseURL(tab)}/zpk/respo/list?status=2&status=99`
-        : '/respo/list';
+        ? `${childImportRepositoryBaseURL(tab)}/zpk/respo/selectable/list?status=2&status=99`
+        : '/respo/selectable/list';
 }
 
 export function normalizeChildImportList(list = [], repositoryBaseURL = '') {
@@ -40,7 +40,12 @@ export function fetchChildImportList(client, tab, params = {}) {
         // The request base may point at the panel's micro-app proxy. Persist
         // the repository's public URL returned by the repository itself.
         const repositoryBaseURL = data.webUrl || childImportRepositoryBaseURL(tab);
-        return normalizeChildImportList(data.list || [], repositoryBaseURL);
+        return {
+            list: normalizeChildImportList(data.list || [], repositoryBaseURL),
+            total: Number(data.total || 0),
+            page: Number(data.page || params.page || 1),
+            limit: Number(data.limit || params.limit || 0),
+        };
     });
 }
 
@@ -56,11 +61,11 @@ export function childImportRepositoryURLFromSource(source) {
         url.search = '';
         let path = url.pathname.replace(/\/+$/, '');
         if (/\/respo\/(?:v2\/)?info(?:\/.*)?$/i.test(path)) {
-            path = path.replace(/\/respo\/(?:v2\/)?info(?:\/.*)?$/i, '/respo/list');
+            path = path.replace(/\/respo\/(?:v2\/)?info(?:\/.*)?$/i, '/respo/selectable/list');
         } else if (/\/zpk$/i.test(path)) {
-            path += '/respo/list';
+            path += '/respo/selectable/list';
         } else {
-            path += '/zpk/respo/list';
+            path += '/zpk/respo/selectable/list';
         }
         url.pathname = path;
         url.searchParams.append('status', '2');

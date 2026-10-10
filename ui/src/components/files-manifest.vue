@@ -968,7 +968,6 @@ export default {
         }
     },
     created() {
-        this.getDependsList();
         this.getTraditionList();
         this.initManifestYaml();
         this.init(this.data);

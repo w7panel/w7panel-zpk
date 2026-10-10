@@ -105,6 +105,7 @@ func (provider *Provider) Register(httpServer *http_server.Server, console conso
 		group.Match([]string{"POST", "OPTIONS"}, "/share-file/file", middleware.DenyDomainReq{}.Process, middleware.Auth{}.Process, controller.FormulaAttach{}.SaveSharedFile)
 		group.Match([]string{"POST", "OPTIONS"}, "/share-file/path-tree", middleware.DenyDomainReq{}.Process, middleware.Auth{}.Process, controller.FormulaAttach{}.SharedFiles)
 		group.Match([]string{"GET", "OPTIONS"}, "/list", middleware.Auth{CanSkip: true}.Process, middleware.ConsoleUser{CanSkip: true}.Process, controller.Formula{}.List)
+		group.Match([]string{"GET", "OPTIONS"}, "/selectable/list", middleware.Auth{CanSkip: true}.Process, middleware.ConsoleUser{CanSkip: true}.Process, controller.Formula{}.SelectableList)
 		group.Match([]string{"GET", "OPTIONS"}, "/detail/:id", controller.Formula{}.Detail)
 		group.Match([]string{"GET", "OPTIONS"}, "/v2/detail/:id/:version", controller.Formula{}.Detail)
 		group.Match([]string{"GET", "OPTIONS"}, "/info/:id", middleware.Auth{CanSkip: true}.Process, middleware.CloudAccessToken{}.Process, middleware.W7PanelUser{}.Process, middleware.ConsoleUser{CanSkip: true}.Process, controller.Formula{}.Info)

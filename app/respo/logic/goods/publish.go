@@ -187,9 +187,15 @@ func PublishGoods(formula *formulalogic.Formula, publishGoodsReq devcenter.Publi
 		return err
 	}
 
+	goodsProductId := 0
+	if len(goods.Products) > 0 {
+		goodsProductId = goods.Products[0].Id
+	}
+
 	marketBaseUrl := facade.GetConfig().GetString("setting.depot_market.base_url")
 	err = w7.IpGoodsSdk.SetOrderSetting(ip.SetGoodsSettingReq{
 		GoodsId:         goods.Id,
+		ProductId:       goodsProductId,
 		Appid:           facade.GetConfig().GetString("setting.depot_market.appid"),
 		ConsoleUid:      int32(publishGoodsReq.ConsoleUid),
 		PayNotifyUrl:    fmt.Sprintf("%s/%s", marketBaseUrl, "zpk-market/order/pay-notify"),
@@ -197,18 +203,6 @@ func PublishGoods(formula *formulalogic.Formula, publishGoodsReq devcenter.Publi
 	})
 	if err != nil {
 		return err
-	}
-
-	goodsInfo, err := w7.DevCenterGoodsSdk.PublishGoodsInfo(devcenter.PublishGoodsInfoReq{
-		ConsoleUid: publishGoodsReq.ConsoleUid,
-		Id:         goods.Id,
-	})
-	if err != nil {
-		return err
-	}
-	goodsProductId := 0
-	if goodsInfo.ProductsInfo != nil && len(goodsInfo.ProductsInfo) > 0 {
-		goodsProductId = goodsInfo.ProductsInfo[0].Id
 	}
 
 	_, err = dao.Formula.Where(dao.Formula.ID.Eq(formula.ID)).Updates(entity.Formula{

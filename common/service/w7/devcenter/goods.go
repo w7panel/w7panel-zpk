@@ -37,7 +37,8 @@ type PublishGoodsReq struct {
 }
 
 type PublishGoodsResp struct {
-	Id int `json:"id"`
+	Id       int            `json:"id"`
+	Products []GoodsProduct `json:"products"`
 }
 
 type PublishGoodsInfoReq struct {

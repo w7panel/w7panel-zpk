@@ -20,6 +20,7 @@ type GoodsService struct {
 
 type SetGoodsSettingReq struct {
 	GoodsId         int    `json:"goods_id"`
+	ProductId       int    `json:"product_id"`
 	Appid           string `json:"origin_appid"`
 	ConsoleUid      int32  `json:"user_id"`
 	PayNotifyUrl    string `json:"pay_notify_url"`
@@ -37,6 +38,7 @@ func (s GoodsService) SetOrderSetting(setGoodsSettingReq SetGoodsSettingReq) err
 	convertSign, err := s.ConvertRequestSign(map[string]string{
 		"origin_appid":      setGoodsSettingReq.Appid,
 		"goods_id":          strconv.Itoa(setGoodsSettingReq.GoodsId),
+		"product_id":        strconv.Itoa(setGoodsSettingReq.ProductId),
 		"user_id":           strconv.FormatInt(int64(setGoodsSettingReq.ConsoleUid), 10),
 		"pay_notify_url":    setGoodsSettingReq.PayNotifyUrl,
 		"return_notify_url": setGoodsSettingReq.ReturnNotifyUrl,
@@ -49,7 +51,7 @@ func (s GoodsService) SetOrderSetting(setGoodsSettingReq SetGoodsSettingReq) err
 		Timeout: 30 * time.Second,
 	}
 
-	req, err := http.NewRequest(http.MethodPut, notifyBaseUrl+"/api/thirdparty-pay/pay-goods-ip/modify-notify-url", bytes.NewReader(convertSign))
+	req, err := http.NewRequest(http.MethodPut, notifyBaseUrl+"/api/sdk/thirdparty-pay/pay-goods-ip/modify-notify-url", bytes.NewReader(convertSign))
 	if err != nil {
 		return err
 	}

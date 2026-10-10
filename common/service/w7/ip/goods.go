@@ -3,10 +3,11 @@ package ip
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"io"
-	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/w7panel/w7panel-zpk/common/service/w7/base"
@@ -14,34 +15,41 @@ import (
 
 type GoodsService struct {
 	base.Base
+	NotifyBaseUrl string
 }
 
 type SetGoodsSettingReq struct {
 	GoodsId         int    `json:"goods_id"`
-	Appid           string `json:"app_id"`
+	Appid           string `json:"origin_appid"`
+	ConsoleUid      int32  `json:"user_id"`
 	PayNotifyUrl    string `json:"pay_notify_url"`
-	RefundNotifyUrl string `json:"refund_notify_url"`
+	ReturnNotifyUrl string `json:"return_notify_url"`
 }
 
 func (s GoodsService) SetOrderSetting(setGoodsSettingReq SetGoodsSettingReq) error {
+	if setGoodsSettingReq.GoodsId <= 0 || setGoodsSettingReq.Appid == "" || setGoodsSettingReq.ConsoleUid <= 0 {
+		return errors.New("商品、通知应用和发布用户不能为空")
+	}
+	notifyBaseUrl := strings.TrimRight(s.NotifyBaseUrl, "/")
+	if notifyBaseUrl == "" {
+		notifyBaseUrl = "http://console.w7.cc"
+	}
 	convertSign, err := s.ConvertRequestSign(map[string]string{
-		"notify_appid":      setGoodsSettingReq.Appid,
+		"origin_appid":      setGoodsSettingReq.Appid,
 		"goods_id":          strconv.Itoa(setGoodsSettingReq.GoodsId),
-		"app_id":            setGoodsSettingReq.Appid,
+		"user_id":           strconv.FormatInt(int64(setGoodsSettingReq.ConsoleUid), 10),
 		"pay_notify_url":    setGoodsSettingReq.PayNotifyUrl,
-		"refund_notify_url": setGoodsSettingReq.RefundNotifyUrl,
-	}, s.BaseUrl)
+		"return_notify_url": setGoodsSettingReq.ReturnNotifyUrl,
+	}, notifyBaseUrl)
 	if err != nil {
 		return err
 	}
-
-	slog.Info("SetOrderSetting sign", "convertSign", convertSign, "setGoodsSettingReq", setGoodsSettingReq)
 
 	client := &http.Client{
 		Timeout: 30 * time.Second,
 	}
 
-	req, err := http.NewRequest("POST", s.BaseUrl+"/ddd-order/sdk/set-goods-setting", bytes.NewReader(convertSign))
+	req, err := http.NewRequest(http.MethodPut, notifyBaseUrl+"/api/thirdparty-pay/pay-goods-ip/modify-notify-url", bytes.NewReader(convertSign))
 	if err != nil {
 		return err
 	}
@@ -75,6 +83,10 @@ func (s GoodsService) SetOrderSetting(setGoodsSettingReq SetGoodsSettingReq) err
 		return apiError
 	}
 
+	var apiError base.ApiError
+	if json.Unmarshal(respBody, &apiError) == nil && apiError.ErrorMsg != "" {
+		return apiError
+	}
 	return nil
 }
 

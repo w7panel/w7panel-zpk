@@ -191,8 +191,9 @@ func PublishGoods(formula *formulalogic.Formula, publishGoodsReq devcenter.Publi
 	err = w7.IpGoodsSdk.SetOrderSetting(ip.SetGoodsSettingReq{
 		GoodsId:         goods.Id,
 		Appid:           facade.GetConfig().GetString("setting.depot_market.appid"),
+		ConsoleUid:      int32(publishGoodsReq.ConsoleUid),
 		PayNotifyUrl:    fmt.Sprintf("%s/%s", marketBaseUrl, "zpk-market/order/pay-notify"),
-		RefundNotifyUrl: fmt.Sprintf("%s/%s", marketBaseUrl, "zpk-market/order/refund-notify"),
+		ReturnNotifyUrl: fmt.Sprintf("%s/%s", marketBaseUrl, "zpk-market/order/refund-notify"),
 	})
 	if err != nil {
 		return err

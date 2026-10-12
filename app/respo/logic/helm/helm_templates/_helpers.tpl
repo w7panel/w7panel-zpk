@@ -67,7 +67,9 @@ Create the name of the service account to use
 */}}
 {{- define "common.serviceAccountName" -}}
 {{- if .Values.serviceAccount.create }}
-{{- default (include "common.fullname" .) .Values.serviceAccount.name }}
+{{- $artifactChart := dict "Name" ((.Values.global | default dict).name | default .Chart.Name | lower) -}}
+{{- $artifactContext := dict "Chart" $artifactChart "Values" .Values "Release" .Release -}}
+{{- default (include "common.fullname" $artifactContext) .Values.serviceAccount.name }}
 {{- else }}
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}

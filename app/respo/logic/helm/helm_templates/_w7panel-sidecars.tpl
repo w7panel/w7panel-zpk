@@ -180,6 +180,7 @@ instead of special-casing a particular annotation key.
 {{- define "w7panel.sidecars.resources" -}}
 {{- $root := . -}}
 {{- $artifactConfig := $root.Values.w7panelArtifact | default dict -}}
+{{- if not (get $artifactConfig "sharedSidecarResources") -}}
 {{- $artifactServiceAccountTemplate := get $artifactConfig "serviceAccountName" | default "" -}}
 {{- $artifactServiceAccountName := "" -}}
 {{- if $artifactServiceAccountTemplate -}}
@@ -201,5 +202,6 @@ instead of special-casing a particular annotation key.
 {{- end -}}
 {{- if $resources -}}
 {{ join "\n---\n" $resources }}
+{{- end -}}
 {{- end -}}
 {{- end -}}

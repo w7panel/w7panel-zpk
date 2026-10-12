@@ -73,6 +73,7 @@ type HelmPack struct {
 	IsSubFormula           bool
 	SharedStorageTargetApp string
 	Sidecars               []HelmSidecar
+	sharedSidecarsDir      string
 	MicroAppPresentation   MicroAppPresentation
 }
 
@@ -200,6 +201,9 @@ func (hc *HelmPack) PackToHelm() error {
 	if err := hc.generateSidecarResourcesTemplate(templatesDir); err != nil {
 		return err
 	}
+	if err := hc.generateClusterPermissionTemplates(templatesDir); err != nil {
+		return err
+	}
 
 	if shouldPackageMicroApp(hc.Manifest) {
 		if err := hc.generateMicroAppTemplate(templatesDir, hc.Manifest); err != nil {
@@ -220,6 +224,21 @@ func (hc *HelmPack) PackToHelm() error {
 	}
 
 	return nil
+}
+
+func withRegisterSite(manifest logic2.Manifest, enabled bool) logic2.Manifest {
+	manifest.Application.RegisterSite = enabled && manifest.Application.Type != logic2.GatewayPluginApp
+	annotations := make(map[string]interface{}, len(manifest.Application.Annotation)+1)
+	for key, value := range manifest.Application.Annotation {
+		annotations[key] = value
+	}
+	if manifest.Application.RegisterSite {
+		annotations["w7.cc/inject-root-ca"] = "true"
+	} else {
+		delete(annotations, "w7.cc/inject-root-ca")
+	}
+	manifest.Application.Annotation = annotations
+	return manifest
 }
 
 func shouldGenerateRegisterSite(manifest logic2.Manifest) bool {
@@ -586,17 +605,29 @@ func mergeValuesValue(dst, src interface{}) interface{} {
 
 // generateSubCharts 生成所有子应用的 Chart
 func (hc *HelmPack) generateSubCharts(rootDir string) error {
-	if hc.SubManifest == nil {
+	if len(hc.SubManifest) == 0 {
 		return nil
 	}
 	mainChartName := hc.Manifest.Application.Identifie
 	for _, subManifest := range hc.SubManifest {
-		//sharedStorageTargetApp := ""
-		//if hasSharedPersistentStorage(hc.Manifest.Platform.Volumes, subManifest.Platform.Volumes) {
-		//	sharedStorageTargetApp = mainChartName
-		//}
-		err := PackManifestToHelm(subManifest, nil, rootDir, true, mainChartName)
-		if err != nil {
+		for _, sidecar := range hc.Sidecars {
+			if subManifest.Application.Identifie == sidecar.Chart {
+				return fmt.Errorf("子应用标识 %s 与共享 Sidecar Chart 重名", sidecar.Chart)
+			}
+		}
+		// 站点开关、根 CA 注解和集群权限均跟随根制品。
+		subManifest = withRegisterSite(subManifest, hc.Manifest.Application.RegisterSite)
+		subManifest.Application.ClusterPrivileged = hc.Manifest.Application.ClusterPrivileged
+		chartVersion := "0.1.0"
+		if subManifest.Platform.Helm.Version != "" {
+			chartVersion = subManifest.Platform.Helm.Version
+		}
+		child := NewHelmPack(subManifest, nil, rootDir, chartVersion, true, mainChartName)
+		child.sharedSidecarsDir = rootDir
+		if subManifest.Application.Type != logic2.GatewayPluginApp {
+			child.Sidecars = append([]HelmSidecar(nil), hc.Sidecars...)
+		}
+		if err := child.PackToHelm(); err != nil {
 			return err
 		}
 	}
@@ -636,7 +667,13 @@ func (hc *HelmPack) packWorkloadApplication(rootDir, templatesDir string, values
 			return err
 		}
 	}
-	if !hc.Manifest.Application.ClusterPrivileged {
+	return nil
+}
+
+// The generated root owns the existing account and cluster permission resources.
+// Child workloads use the root artifact name through global.name.
+func (hc *HelmPack) generateClusterPermissionTemplates(templatesDir string) error {
+	if hc.IsSubFormula || hc.isHelmPackage() || hc.Manifest.Application.Type == logic2.GatewayPluginApp || !hc.Manifest.Application.ClusterPrivileged {
 		return nil
 	}
 	if err := hc.generateServiceAccountYaml(templatesDir); err != nil {
@@ -833,7 +870,10 @@ func (hc *HelmPack) generateValuesYaml(rootDir string, options helmValuesOptions
 		"w7panelSidecars": sidecarChartReferences(hc.Sidecars),
 	}
 	if len(hc.Sidecars) > 0 {
-		values["w7panelArtifact"] = map[string]interface{}{"serviceAccountName": `{{ include "common.serviceAccountName" . }}`}
+		values["w7panelArtifact"] = map[string]interface{}{
+			"serviceAccountName":     `{{ include "common.serviceAccountName" . }}`,
+			"sharedSidecarResources": hc.IsSubFormula,
+		}
 	}
 	if hc.Manifest.Application.Type == logic2.TraditionApp || hc.Manifest.Application.Type == logic2.SystemImageApp {
 		values["preserveRuntimeImageVersion"] = true

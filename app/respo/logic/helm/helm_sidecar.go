@@ -33,6 +33,17 @@ type helmSidecarInfo struct {
 }
 
 func (hc *HelmPack) prepareRemoteHelmSidecars(chartsDir string) error {
+	if hc.sharedSidecarsDir != "" {
+		// 子应用的 helper 从自身 .Subcharts 查找 Sidecar，因此需要复制主应用已下载的
+		// library Chart，避免重复下载，并保证整个制品使用同一版本。
+		// 这里只复用模板依赖；子应用注入容器，共享 Service/RBAC 仍只由主 Chart 输出。
+		for _, sidecar := range hc.Sidecars {
+			if err := copy2.Copy(filepath.Join(hc.sharedSidecarsDir, sidecar.Chart), filepath.Join(chartsDir, sidecar.Chart)); err != nil {
+				return fmt.Errorf("复制共享 Sidecar Chart %s 失败: %w", sidecar.Chart, err)
+			}
+		}
+		return nil
+	}
 	chartDownloads, err := requiredRemoteHelmCharts(hc.Manifest)
 	if err != nil {
 		return err
@@ -126,7 +137,7 @@ func sidecarChartReferences(sidecars []HelmSidecar) []map[string]string {
 }
 
 func requiredSidecarInfoURLs(application commonlogic.Application) []helmSidecarInfo {
-	if !application.RegisterSite {
+	if !application.RegisterSite || application.Type == commonlogic.GatewayPluginApp {
 		return nil
 	}
 	return []helmSidecarInfo{{
@@ -166,5 +177,11 @@ func (hc *HelmPack) configureHelmSidecarHost(chartDir string) error {
 	}
 
 	values["w7panelSidecars"] = sidecarChartReferences(hc.Sidecars)
+	artifactConfig, _ := values["w7panelArtifact"].(map[string]interface{})
+	if artifactConfig == nil {
+		artifactConfig = make(map[string]interface{})
+	}
+	artifactConfig["sharedSidecarResources"] = hc.IsSubFormula
+	values["w7panelArtifact"] = artifactConfig
 	return writeYAMLFile(valuesPath, values)
 }

@@ -1,6 +1,6 @@
 # Helm Sidecar 集成约定
 
-> 本文按当前工作树实现整理，描述 ZPK 在公式打包过程中如何下载、登记和渲染 Helm sidecar。最后核对日期：2026-09-09。
+> 本文按当前工作树实现整理，描述 ZPK 在公式打包过程中如何下载、登记和渲染 Helm sidecar。最后核对日期：2026-10-12。
 
 ## 1. 核心结论
 
@@ -23,6 +23,8 @@ application.registerSite=true
 ```
 
 manifest 当前没有允许用户任意填写 sidecar 列表的字段。`registerSite=false` 时不会自动下载 sidecar，生成 Chart 中的 `w7panelSidecars` 默认为空。
+
+`registerSite` 是制品级设置。主应用的开关和根 CA 注解沿用上游 manifest，`generateSubCharts` 在现有循环中同步各子 manifest，使根应用的值作用于内嵌子应用，忽略子 manifest 导入时保留的旧值；网关插件不注入 sidecar。启用时各宿主 Pod 分别注入代理和根 CA 注解，Site 与共享配套资源只由根 Chart 输出一次。
 
 ## 2. 与普通应用依赖的区别
 
@@ -49,7 +51,7 @@ depends:
 
 ## 3. Sidecar 下载和打包流程
 
-Sidecar 准备发生在原生、应用插件、传统应用、Helm 和系统镜像等应用类型分流之前，流程如下：
+各类应用统一在进入具体打包分支前准备 Sidecar。流程如下：
 
 1. `requiredSidecarInfoURLs` 根据 `application.registerSite` 计算所需 sidecar，并按 `Chart` 名称去重。
 2. 请求 sidecar 的 ZPK info URL，从响应中读取 `data.helm_url`；请求上下文超时为 2 分钟。
@@ -59,6 +61,8 @@ Sidecar 准备发生在原生、应用插件、传统应用、Helm 和系统镜�
 6. 生成或改写 `values.yaml`，写入 `w7panelSidecars`。
 7. 打包末尾扫描 `charts/*/Chart.yaml`，把 sidecar 登记成 `file://./charts/<目录名>` 本地 dependency。
 8. 向主 Chart 注入 `_w7panel-sidecars.tpl` 和 `w7panel-sidecar-resources.yaml`。
+
+根应用只下载一次。内嵌子应用从根应用已准备的目录复制同一版本的 library Chart，保留各自 Pod 的容器/volume 插槽；其 `w7panelArtifact.sharedSidecarResources=true`，资源 helper 输出为空。子应用不会重复生成 Service 和 RBAC。
 
 最终目录示例：
 
@@ -77,7 +81,7 @@ example-app/
     └── ...
 ```
 
-用户提供 Helm tgz 时，解包采用目录合并方式，不会清空提前准备好的 sidecar。用户 Chart 原有 dependencies 会保留，再按 dependency name 或 repository 与扫描到的本地 dependency 合并。
+用户提供 Helm tgz 时，Sidecar 也提前准备，解包时合并已有目录。用户 Chart 原有 dependencies 会保留，再按 dependency name 或 repository 与扫描到的本地 dependency 合并。
 
 完成打包后，sidecar 已包含在最终应用 tgz 内。安装阶段不再访问 sidecar info URL 或 `helm_url`。
 
@@ -152,8 +156,7 @@ annotations:
 ### 5.3 named template 上下文
 
 宿主通过 `.Subcharts[chart]` 获取 sidecar 上下文。因此 sidecar 模板内的 `.Values`、`.Chart` 及其他内置对象属于 sidecar 子 Chart，而不是主 Chart：
-`sidecar-resources-template` 还会收到 `.W7PanelArtifact.serviceAccountName`，其值由宿主在根 Chart
-上下文中求值，可用于把 RBAC 绑定到制品 Pod 实际使用的 ServiceAccount。
+`sidecar-resources-template` 还会收到 `.W7PanelArtifact.serviceAccountName`，用于把 RBAC 绑定到制品共用的 ServiceAccount。
 
 ```yaml
 # sidecar values.yaml
@@ -179,9 +182,15 @@ w7panelSidecars:
   - chart: another-sidecar
 ```
 
-生成型 Chart 会另外写入 `w7panelArtifact.serviceAccountName` 模板并在资源聚合时以根 Chart
-上下文执行。用户提供的 Helm Chart 若使用非 `default` ServiceAccount，应显式设置该字段为账号名，
-或设置为能在根 Chart 上下文中求值的 Helm 模板字符串。
+生成型 Chart 会额外写入已有账号的资源上下文：
+
+```yaml
+w7panelArtifact:
+  serviceAccountName: '{{ include "common.serviceAccountName" . }}'
+  sharedSidecarResources: false
+```
+
+子应用的 `sharedSidecarResources=true`，共享资源只输出一次；没有引入独立的 sidecar 账号命名。
 
 顺序也是 annotations、containers、volumes 和 resources 的聚合顺序。不要再写旧版字段：
 
@@ -197,44 +206,33 @@ w7panelSidecars:
 
 ### 6.1 制品运行身份传递约定
 
-需要为独立资源生成 RBAC 的 sidecar，不创建或选择自己的 ServiceAccount。根 Chart 必须通过
-`w7panelArtifact.serviceAccountName` 声明制品 Pod 实际使用的账号。该值可以是固定名称，也可以是
-在根 Chart 上下文中执行的 Helm 模板字符串：
+Sidecar 复用应用原来的 ServiceAccount。未开启根制品 `clusterPrivileges` 时，生成型主、子应用默认使用 namespace 的 `default`；开启时沿用主应用的 `common.serviceAccountName` 命名，通常是 `<Release.Name>-<主Chart名>`。子应用通过 Helm 继承已有的 `global.name`，默认跟随主应用账号名；账号及原有的 ClusterRole、Binding、token Secret 只由生成型根 Chart 创建一份。没有新增专用账号或全局身份配置。
+
+Sidecar 资源模板只消费已有的单账号字段：
+
+```gotemplate
+subjects:
+  - kind: ServiceAccount
+    name: {{ .W7PanelArtifact.serviceAccountName | quote }}
+    namespace: {{ .Release.Namespace }}
+```
+
+cloudnoauth 沿用该字段；没有该字段的旧宿主回退到 `sidecar.serviceAccountName`（默认 `default`）。两个 Binding 都只有一个 subject，不收集账号列表。
+
+cloudnoauth 只追加当前 namespace 的 Pod、ReplicaSet、Deployment 的 `get` 权限，以及当前 Release 对应 Site 的 `get` 权限。根制品显式启用 `clusterPrivileges` 时，仍按原逻辑额外生成全权限 ClusterRole、Binding 和 token Secret。未开启时不会为了 sidecar 创建额外账号或全权限资源。
+
+如果安装时自定义 `serviceAccount.name`、`nameOverride` 或 `fullnameOverride`，需要保证主、子应用最终使用相同账号；这些局部覆盖仍按原有 values 规则生效。
+
+用户 Helm Chart 继续负责自己账号的创建与选择，不会被重写。非 `default` 账号需通过 `w7panelArtifact.serviceAccountName` 传给资源模板，可使用固定名称或在根 Chart 上下文执行的模板字符串，例如：
 
 ```yaml
 w7panelArtifact:
   serviceAccountName: '{{ include "<root-chart>.serviceAccountName" . }}'
 ```
 
-`w7panel.sidecars.resources` 使用 `tpl` 在根 Chart 上下文中求出最终名称，再通过
-`.W7PanelArtifact.serviceAccountName` 注入 `sidecar-resources-template`。Sidecar 只能消费这个结果，
-不能在子 Chart 上下文中重新调用根 Chart 的 helper，也不应复制根 Chart 的账号命名规则。
+同时将其生成型子应用的 `serviceAccount.name` 配置为该账号。仓库自身 `charts/` 的部署账号仍由 `zpk.serviceAccountName` 管理。
 
-ZPK 生成型制品使用公共 helper：
-
-```yaml
-w7panelArtifact:
-  serviceAccountName: '{{ include "common.serviceAccountName" . }}'
-```
-
-w7panel-zpk 自身 Chart 使用自己的 helper：
-
-```yaml
-w7panelArtifact:
-  serviceAccountName: '{{ include "zpk.serviceAccountName" . }}'
-```
-
-Sidecar 资源模板按以下方式读取：
-
-```gotemplate
-subjects:
-  - kind: ServiceAccount
-    name: {{ .W7PanelArtifact.serviceAccountName }}
-    namespace: {{ .Release.Namespace }}
-```
-
-用户提供的 Helm Chart 若使用非 `default` ServiceAccount，必须提供相同字段；如果一个制品内的
-多个 Workload 使用不同账号，当前单值约定无法完整表达，需要扩展为账号列表后再生成多个 subject。
+共享资源使用根 Sidecar 的命名和配置。子宿主不要单独覆盖 `fullnameOverride`、`sidecar.upstream.serviceName` 等共享资源名称；覆盖时必须在所有宿主保持一致。
 
 ## 7. 宿主 Helper
 
@@ -260,6 +258,7 @@ subjects:
 - 同一 hostname 对应不同 IP 时直接 `fail`，使 `helm template` 失败。
 - containers、init containers 和 volumes 直接拼接数组，不检查重名，也不会执行 Kubernetes strategic merge。
 - resources 忽略空输出，不同 sidecar 的非空输出用 `---` 分隔。
+- 内嵌子宿主的 `sharedSidecarResources=true` 时不输出资源；根宿主只渲染一份共享资源并绑定共享账号。
 
 ## 8. Workload 宿主接入
 
@@ -277,6 +276,7 @@ spec:
         {{- $podAnnotations | nindent 8 }}
       {{- end }}
     spec:
+      serviceAccountName: {{ include "<root-chart>.serviceAccountName" . }}
       {{- $sidecarHostAliases := include "w7panel.sidecars.hostAliases" . }}
       {{- if $sidecarHostAliases }}
       hostAliases:
@@ -331,6 +331,8 @@ annotations:
 ```
 
 需要确认目标 Kubernetes 版本支持带 `restartPolicy: Always` 的原生 sidecar init container。否则该 Job 可能无法通过 API 校验或无法按预期结束。
+
+cloudnoauth 的 Job 容器使用 `/api/live` startupProbe，启动成功后才继续运行主任务。共享 Service、RBAC 仍为普通 Helm 资源；`pre-install` 创建前及 `post-delete` 删除后获取不到授权/配套资源，保持真实安装和卸载时序，不增加 hook 预创建或保留资源。
 
 ## 10. 五类应用的接入差异
 
@@ -390,6 +392,7 @@ helm template test-release <host-chart> --debug
 - 多个 sidecar 没有容器名、volume 名和资源名冲突；
 - Shell Job 的 sidecar 位于 `initContainers`，并符合目标 Kubernetes 版本能力；
 - 多个资源之间有正确的 `---` YAML 文档分隔符。
+- 主、子 Pod 各有代理，但整个制品只有一份共享 Service/RBAC；启用集群权限时只创建一个原有 ServiceAccount，主、子 Pod 与生命周期 Job 的 `serviceAccountName` 及两个 Binding 的 subject 一致；未启用时沿用 `default`。
 
 ## 14. 主要代码位置
 

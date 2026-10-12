@@ -2,7 +2,7 @@
 
 > 本文基于仓库当前工作树实现整理，覆盖原生应用、应用插件、传统应用、Helm/K8sYaml 应用和系统镜像。文中“当前实现”指当前 Go/Vue 文件表达的运行路径，不把 `DEPENDENCY_EXPORTS_DESIGN.md` 中尚未落地的建议当成现有能力。
 >
-> 最后核对日期：2026-09-11。
+> 最后核对日期：2026-10-12。
 
 ## 1. 结论摘要
 
@@ -111,7 +111,7 @@ OCI repository 名为：
 - `name`、`identifie`、`description`、`author`、`version`。
 - `type`：五类应用的分流字段。
 - `once`：是否只允许安装一次。传统应用和系统镜像的 UI 强制为 `false`。
-- `clusterPrivileges`：为生成型应用追加 ServiceAccount、ClusterRole、ClusterRoleBinding 和 service-account-token Secret。
+- `clusterPrivileges`：生成型根 Chart 追加一份原有 ServiceAccount、ClusterRole、ClusterRoleBinding 和 service-account-token Secret，子应用默认沿用根账号及权限；未开启时沿用 `default`，sidecar 仅追加所需读取权限。用户 Helm Chart 自己管理账号和权限。
 - `registerSite`：根 Chart 追加 `Site` CR，同时自动引入 `w7panel-cloudnoauth` sidecar Chart。
 - `annotation`：直接参与 Pod 注解；传统应用和系统镜像也在这里保存类型专属元数据。
 
@@ -490,7 +490,7 @@ value 会先按 YAML 标量解析，所以 `true`、数字、数组、对象可�
 - ZPK 不会执行 `helm dependency update`；用户原包需要已经包含其离线依赖，或者依赖在安装环境可解析。
 - 用户原始模板和值语义不由 ZPK 验证，最终由 `helm template/install` 暴露问题。
 - 用户 Helm Chart 若有 ZPK MicroApp bindings，`frontend_props.app_name` 会调用 MicroApp 模板自带的 `__cur__.fullname`，不依赖宿主 Chart 的 named template。
-- 用户 Helm Chart 若使用 ZPK sidecar，需要在自己的 Pod/Job 模板显式调用 `w7panel.*` helper 插槽。
+- 用户 Helm Chart 若使用 ZPK sidecar，需要在自己的 Pod/Job 模板显式调用 `w7panel.*` helper 插槽。账号仍由原 Chart 管理，通过 `w7panelArtifact.serviceAccountName` 声明已有账号；自定义账号时需同时配置生成型子应用的 `serviceAccount.name`。打包器不会重写用户 PodSpec。
 
 ### 8.4 存储
 
@@ -588,7 +588,9 @@ application.registerSite=true
 
 也就是说，manifest 目前没有一个可供用户任意填写的 sidecar 列表；`requiredSidecarInfoURLs` 根据应用能力返回代码内固定的 sidecar 来源。来源会按 `Chart` 名称去重。普通应用在 `registerSite=false` 时，`w7panelSidecars` 默认为空，也不会远程下载 sidecar。
 
-sidecar 准备发生在应用类型分流之前，因此原生、应用插件、传统应用、Helm 和系统镜像五类 Chart 都共用这一步；是否真正进入某个 Pod，还取决于该分支模板有没有调用对应 helper。
+原生、应用插件、传统应用、Helm 和系统镜像五类 Chart 都共用 sidecar 准备步骤，统一在进入具体打包分支前准备。是否真正进入某个 Pod，还取决于该分支模板有没有调用对应 helper。
+
+`registerSite` 是制品级设置：主应用沿用上游 manifest 的开关和根 CA 注解，`generateSubCharts` 在现有循环中同步各子 manifest，子应用打包不再重复处理，子 manifest 的旧值不再独立触发 sidecar。根应用下载一次，子应用复制同一版本并分别注入代理；Site 和共享 Service/RBAC 只由根 Chart 输出。网关插件不注入。
 
 #### 10.4.2 下载和打包流程
 
@@ -622,7 +624,7 @@ w7panelSidecars:
 
 6. 向宿主 `templates/` 注入 `_w7panel-sidecars.tpl` 和 `w7panel-sidecar-resources.yaml`。后者始终调用资源聚合 helper，没有资源时输出为空。
 
-对于用户提供的 Helm tgz，解包采用目录合并方式，不会清空已经准备好的 `charts/` sidecar；用户 Chart 原有 dependency 也会保留，并按 dependency name 或 repository 与扫描到的本地 dependency 合并。
+对于用户提供的 Helm tgz，Sidecar 同样提前准备，解包时合并已有目录；用户 Chart 原有 dependency 保留，并按 dependency name 或 repository 与扫描到的本地 dependency 合并。
 
 完成打包后 sidecar 已是最终 tgz 内的本地 dependency，安装阶段不再访问 sidecar 的 info URL 或下载地址。
 
@@ -687,6 +689,7 @@ sidecar 的制品标识、复制目录、`w7panelSidecars[].chart`、`Chart.yaml
 - hostAliases 按 IP 分组，hostname 去重，最终按 IP 字母序输出。条目没有 IP 会直接 `fail`；同一 hostname 被映射到不同 IP 时也会让 `helm template` 失败。
 - volumes、init containers 和 containers 按 sidecar 顺序直接拼接数组，不检查 Kubernetes 对象名称是否重复，也不解决 volume/container 重名冲突。
 - resources 会去除首尾空白后，用 `---` 分隔各 sidecar 的非空输出；sidecar 模板自己输出多份 YAML 时，也必须保证文档边界正确。
+- 子宿主设置 `w7panelArtifact.sharedSidecarResources=true`，不重复输出共享资源。Sidecar 复用 `common.serviceAccountName` 的原有账号；生成型子应用通过已有 `global.name` 默认沿用根账号，账号和集群权限资源只由根 Chart 创建。未开启 `clusterPrivileges` 时仍用 `default`。资源 helper 将名称以 `.W7PanelArtifact.serviceAccountName` 交给 sidecar，两个 Binding 都只有一个 subject，详细规则见 `HELM_SIDECAR.md`。
 - 缺少某个可选注解时，对应 helper 输出为空；旧版在 `w7panelSidecars` 中保存 `containerTemplate`、`volumesTemplate` 等字段的写法不再兼容。
 
 #### 10.4.5 Workload、Job 和五类应用的接入差异

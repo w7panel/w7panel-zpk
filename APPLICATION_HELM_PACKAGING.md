@@ -491,6 +491,7 @@ value 会先按 YAML 标量解析，所以 `true`、数字、数组、对象可�
 - 用户原始模板和值语义不由 ZPK 验证，最终由 `helm template/install` 暴露问题。
 - 用户 Helm Chart 若有 ZPK MicroApp bindings，`frontend_props.app_name` 会调用 MicroApp 模板自带的 `__cur__.fullname`，不依赖宿主 Chart 的 named template。
 - 用户 Helm Chart 若使用 ZPK sidecar，需要在自己的 Pod/Job 模板显式调用 `w7panel.*` helper 插槽。账号仍由原 Chart 管理，通过 `w7panelArtifact.serviceAccountName` 声明已有账号；自定义账号时需同时配置生成型子应用的 `serviceAccount.name`。打包器不会重写用户 PodSpec。
+- Chart 作者可参考 [Helm Chart 接入 Sidecar 示例](HELM_SIDECAR_INTEGRATION.md)，其中包含根 CA 注解、完整 Pod/Job 模板及 Helm 主子应用的账号对齐方式。当前单账号 Binding 不会自动授权其他宿主账号。
 
 ### 8.4 存储
 

@@ -2,6 +2,8 @@
 
 > 本文按当前工作树实现整理，描述 ZPK 在公式打包过程中如何下载、登记和渲染 Helm sidecar。最后核对日期：2026-10-12。
 
+上传或导入 Helm 包的 Chart 作者，可直接参考 [Helm Chart 接入 Sidecar 示例](HELM_SIDECAR_INTEGRATION.md)，包含完整 Deployment、Job、账号声明和主子应用配置。
+
 ## 1. 核心结论
 
 Helm sidecar 不是普通 `platform.depends`，而是一套独立的组合协议：
@@ -24,7 +26,7 @@ application.registerSite=true
 
 manifest 当前没有允许用户任意填写 sidecar 列表的字段。`registerSite=false` 时不会自动下载 sidecar，生成 Chart 中的 `w7panelSidecars` 默认为空。
 
-`registerSite` 是制品级设置。主应用的开关和根 CA 注解沿用上游 manifest，`generateSubCharts` 在现有循环中同步各子 manifest，使根应用的值作用于内嵌子应用，忽略子 manifest 导入时保留的旧值；网关插件不注入 sidecar。启用时各宿主 Pod 分别注入代理和根 CA 注解，Site 与共享配套资源只由根 Chart 输出一次。
+`registerSite` 是制品级设置。主应用的开关和根 CA 注解沿用上游 manifest，`generateSubCharts` 在现有循环中同步各子 manifest，使根应用的值作用于内嵌子应用，忽略子 manifest 导入时保留的旧值；网关插件不注入 sidecar。生成型宿主 Pod 会分别注入代理和根 CA 注解；用户 Helm Chart 需自行接入模板并补齐根 CA 注解。Site 与共享配套资源只由根 Chart 输出一次。
 
 ## 2. 与普通应用依赖的区别
 
@@ -206,7 +208,7 @@ w7panelSidecars:
 
 ### 6.1 制品运行身份传递约定
 
-Sidecar 复用应用原来的 ServiceAccount。未开启根制品 `clusterPrivileges` 时，生成型主、子应用默认使用 namespace 的 `default`；开启时沿用主应用的 `common.serviceAccountName` 命名，通常是 `<Release.Name>-<主Chart名>`。子应用通过 Helm 继承已有的 `global.name`，默认跟随主应用账号名；账号及原有的 ClusterRole、Binding、token Secret 只由生成型根 Chart 创建一份。没有新增专用账号或全局身份配置。
+Sidecar 复用应用原来的 ServiceAccount。根应用和子应用均为生成型 Chart 时，未开启根制品 `clusterPrivileges` 默认使用 namespace 的 `default`；开启时沿用主应用的 `common.serviceAccountName` 命名，通常是 `<Release.Name>-<主Chart名>`。子应用通过 Helm 继承已有的 `global.name`，默认跟随主应用账号名；账号及原有的 ClusterRole、Binding、token Secret 只由生成型根 Chart 创建一份。没有新增专用账号或全局身份配置。
 
 Sidecar 资源模板只消费已有的单账号字段：
 
@@ -230,7 +232,9 @@ w7panelArtifact:
   serviceAccountName: '{{ include "<root-chart>.serviceAccountName" . }}'
 ```
 
-同时将其生成型子应用的 `serviceAccount.name` 配置为该账号。仓库自身 `charts/` 的部署账号仍由 `zpk.serviceAccountName` 管理。
+同时将其生成型子应用的 `serviceAccount.name` 配置为该账号。Helm 根 Chart 不会自动把账号传给子应用；开启集群权限时尤其需要避免子应用引用未创建的默认账号。Helm 子 Chart 的 Pod 和账号创建开关也由作者自行调整。仓库自身 `charts/` 的部署账号仍由 `zpk.serviceAccountName` 管理。
+
+当前仍是单账号授权，尚未实现按多个宿主账号自动建立 Binding。多个代理 Pod 使用不同账号时，需统一实际账号或由 Chart 自行维护额外授权，不能仅靠设置 `global.name` 或声明根账号解决。具体操作见 [主子应用账号配置示例](HELM_SIDECAR_INTEGRATION.md#3-包含主子应用时如何配置账号)。
 
 共享资源使用根 Sidecar 的命名和配置。子宿主不要单独覆盖 `fullnameOverride`、`sidecar.upstream.serviceName` 等共享资源名称；覆盖时必须在所有宿主保持一致。
 
@@ -263,6 +267,8 @@ w7panelArtifact:
 ## 8. Workload 宿主接入
 
 ZPK 生成型 Workload 已经接入这些 helper。用户提供的 Helm/K8sYaml 应用只会被注入 helper 和资源模板，ZPK 不会重写用户的 Deployment、StatefulSet、DaemonSet 或 Job。
+
+用户 Helm 模板还需保证 Pod 上有根 CA 注解和制品分组标签。当前 cloudnoauth Chart 未导出 Pod 注解模板，Helm 分支也不会把 manifest 注解自动合并到原 values；下面片段中的 annotation helper 调用需要配合 Chart 作者显式补齐 `w7.cc/inject-root-ca: "true"`。完整可复制示例见 [接入文档](HELM_SIDECAR_INTEGRATION.md)。
 
 用户 Workload 必须主动调用插槽，下面是结构正确的 Deployment 片段：
 
@@ -332,7 +338,7 @@ annotations:
 
 需要确认目标 Kubernetes 版本支持带 `restartPolicy: Always` 的原生 sidecar init container。否则该 Job 可能无法通过 API 校验或无法按预期结束。
 
-cloudnoauth 的 Job 容器使用 `/api/live` startupProbe，启动成功后才继续运行主任务。共享 Service、RBAC 仍为普通 Helm 资源；`pre-install` 创建前及 `post-delete` 删除后获取不到授权/配套资源，保持真实安装和卸载时序，不增加 hook 预创建或保留资源。
+cloudnoauth 的 Job 容器作为原生 sidecar 放在 `initContainers`，当前不额外配置 startupProbe 或等待代理就绪的步骤。共享 Service、RBAC 仍为普通 Helm 资源；`pre-install` 创建前及 `post-delete` 删除后获取不到授权/配套资源，保持真实安装和卸载时序，不增加 hook 预创建或保留资源。
 
 ## 10. 五类应用的接入差异
 
@@ -371,6 +377,8 @@ Sidecar 框架没有固定存储，也不自动创建、选择或回收 PVC。�
 6. containers、volumes 和额外资源不检查重名，可能在 Kubernetes 校验或安装时失败。
 7. 用户 Chart 原有 `w7panelSidecars` 会被自动列表整体覆盖。
 8. Job sidecar 依赖目标 Kubernetes 对原生 sidecar init container 的支持。
+9. Helm 与生成型应用混合时不会自动对齐实际账号；共享 Binding 只绑定根声明的一个账号。
+10. Helm Chart 作者需要显式补齐 Pod 的根 CA 注解，不能仅依赖 manifest 的创建站点开关。
 
 ## 13. 验收清单
 
@@ -392,7 +400,7 @@ helm template test-release <host-chart> --debug
 - 多个 sidecar 没有容器名、volume 名和资源名冲突；
 - Shell Job 的 sidecar 位于 `initContainers`，并符合目标 Kubernetes 版本能力；
 - 多个资源之间有正确的 `---` YAML 文档分隔符。
-- 主、子 Pod 各有代理，但整个制品只有一份共享 Service/RBAC；启用集群权限时只创建一个原有 ServiceAccount，主、子 Pod 与生命周期 Job 的 `serviceAccountName` 及两个 Binding 的 subject 一致；未启用时沿用 `default`。
+- 主、子 Pod 各有代理，但整个制品只有一份共享 sidecar Service/RBAC；纯生成型主子应用启用集群权限时只创建一个原有 ServiceAccount，未启用时沿用 `default`。包含 Helm 应用时按实际 Chart 配置检查账号存在，所有代理 Pod/Job 的 `serviceAccountName` 与共享 Binding subject 一致，或已有额外授权。
 
 ## 14. 主要代码位置
 

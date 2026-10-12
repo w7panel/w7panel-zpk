@@ -2,6 +2,10 @@
 openssl genpkey -algorithm RSA -out registry-key.pem -pkeyopt rsa_keygen_bits:4096
 openssl req -new -x509 -key registry-key.pem -out registry-cert.pem -days 365 -subj "/CN=registry.w7.com"
 
+## Helm Sidecar 接入
+
+上传或导入 Helm 包时，Chart 作者需主动接入 sidecar 模板插槽并声明实际运行账号，参考 [Helm Chart 接入 Sidecar 示例](HELM_SIDECAR_INTEGRATION.md)。完整打包协议见 [Helm Sidecar 集成约定](HELM_SIDECAR.md)。
+
 ## 制品市场菜单
 
 制品存在商品订单菜单时，仓库 `info` 接口会基于当前 Helm 包状态和 Bindings 内容生成缓存键，覆盖包内 MicroApp 的 `name: market` 菜单及独立的外部 iframe `backend_config`。没有市场 Binding 时直接返回原 Helm 包地址，不解包或重打；相同基础包和 Bindings 复用已有动态包，内容变化时才重新生成。动态包与 `PackFormulaToHelmAndPack` 产物位于同一目录，文件名格式为 `{原文件名去扩展名}-{hash}.tgz`，空闲 24 小时后清理。

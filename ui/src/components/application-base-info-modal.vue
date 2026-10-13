@@ -319,7 +319,7 @@ export default {
                     identifie: this.identifie,
                     base_info: {
                         name,
-                        description: this.form.description || '',
+                        description: (this.form.description || '').trim(),
                         annotation,
                         once: this.isInstallOnlyOnceType ? true : (this.isInstallNeverOnceType ? false : Boolean(this.form.once)),
                         cluster_privileges: Boolean(this.form.clusterPrivileges),

@@ -82,6 +82,7 @@ func (c FormulaSetting) Set(ctx *gin.Context) {
 	}
 	if params.BaseInfo != nil {
 		params.BaseInfo.Name = strings.TrimSpace(params.BaseInfo.Name)
+		params.BaseInfo.Description = strings.TrimSpace(params.BaseInfo.Description)
 		if params.BaseInfo.Name == "" {
 			c.JsonResponseWithServerError(ctx, errors.New("制品名称不能为空"))
 			return

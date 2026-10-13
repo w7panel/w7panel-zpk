@@ -24,7 +24,7 @@ func UseOrder(ticketInfo formulalogic.TicketInfo, panelDeviceSN, panelURL string
 	return w7.ZpkMarketSdk.UseOrder(ticketInfo.ConsoleUid, ticketInfo.OrderSn, ticketInfo.FormulaVersion, ticketInfo.FormulaType, ticketInfo.IsUpgrade, ticketInfo.Reinstall, panelDeviceSN, panelURL, ticketInfo.AppIdentify, ticketInfo.Domain)
 }
 
-func CheckFormulaCanInstallOrUpgrade(formula formulalogic.Formula, consoleUid int32, orderSn string, isUpgrade, reinstall bool, domain, appIdentify string) zpk_market.FormulaInstallCheckResult {
+func CheckFormulaCanInstallOrUpgrade(formula formulalogic.Formula, consoleUid int32, orderSn string, isUpgrade, reinstall bool, domain, appIdentify string) (zpk_market.FormulaInstallCheckResult, error) {
 	slog.Info("check formula install permission",
 		"formula_identify", formula.Name,
 		"formula_version", formula.Version,
@@ -36,7 +36,7 @@ func CheckFormulaCanInstallOrUpgrade(formula formulalogic.Formula, consoleUid in
 		"app_identify", appIdentify,
 	)
 	if formula.GoodsId <= 0 || formula.ConsoleUid == consoleUid {
-		return zpk_market.FormulaInstallCheckResult{CanInstallOrUpgrade: true}
+		return zpk_market.FormulaInstallCheckResult{CanInstallOrUpgrade: true}, nil
 	}
 
 	ret, err := w7.ZpkMarketSdk.CheckFormulaCanInstallOrUpgrade(formula.GoodsId, consoleUid, orderSn, isUpgrade, reinstall, domain, appIdentify)
@@ -44,10 +44,7 @@ func CheckFormulaCanInstallOrUpgrade(formula formulalogic.Formula, consoleUid in
 		"install_result", ret,
 		"err", err,
 	)
-	if err != nil {
-		return zpk_market.FormulaInstallCheckResult{}
-	}
-	return ret
+	return ret, err
 }
 
 func GetFormulaRuntimeDynamicValues(formula formulalogic.Formula, consoleUid int32, orderSn string) (map[string]interface{}, error) {

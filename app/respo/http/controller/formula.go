@@ -196,7 +196,11 @@ func (c Formula) Info(ctx *gin.Context) {
 				c.JsonResponseWithoutError(ctx, formulaRuntimeContextResponse(formula.Title, dynamicValues))
 				return
 			}
-			checkResult := zpkmarket.CheckFormulaCanInstallOrUpgrade(*formula, consoleUid, params.OrderSn, params.IsUpgrade > 0, params.Reinstall, params.Domain, params.AppIdentify)
+			checkResult, checkErr := zpkmarket.CheckFormulaCanInstallOrUpgrade(*formula, consoleUid, params.OrderSn, params.IsUpgrade > 0, params.Reinstall, params.Domain, params.AppIdentify)
+			if checkErr != nil {
+				c.JsonResponseWithError(ctx, checkErr, 500)
+				return
+			}
 			if checkResult.EntitlementStatus == zpk_market.EntitlementStatusTrialExpired {
 				marketURL := strings.TrimRight(facade.GetConfig().GetString("setting.depot_market.frontend_url"), "/")
 				if marketURL != "" {

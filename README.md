@@ -20,6 +20,31 @@ manifest 使用 `application.order` 声明 MicroApp 顺序。生成的 MicroApp 
 
 市场前端地址通过环境变量 `DEPOT_MARKET_FRONTEND_URL` 配置，默认值为 `https://zm.w7.com`。
 
+### 安装授权 HTML 提示
+
+制品 `respo/info` 通过查询参数 `notice_format=html` 协商 HTML 提示。只有主动声明支持的请求，其试用到期、未找到有效已购订单、VIP 未开通/等级不足/过期及退款处理中限制才返回 HTTP 403、`code: ZPK_HTML_NOTICE`。`error` 保留纯文本提示，`data` 提供 `title`、`html`、`reason`、`goods_id`、`order_sn`、`trial_expire_at`、`restriction` 和 `market_url`。
+
+未携带该参数或参数值不是 `html` 时，试用到期仍返回原 HTTP 403 / `ZPK_TRIAL_EXPIRED` 及原消息、元数据，其他授权限制返回原 HTTP 500 / 数字错误码的纯文本错误（VIP 保留具体原因），不返回 HTML。绑定冲突始终保持原 HTTP 409。新面板后端在请求 ZPK 时添加能力参数；旧 ZPK 忽略未知参数，新面板继续处理原有响应。因此可先升级 ZPK 或先升级面板，不要求同步部署；前后端分开部署面板时应先更新支持 HTML 的前端，再更新声明能力的后端。
+
+HTML 由 ZPK 生成并转义动态文案，按市场的 Hash 路由生成购买/续费入口 `/#/site-detail/{goods_id}`、VIP 入口 `/#/vip` 和退款订单入口 `/#/user-center/orders`，保留市场前端部署路径前缀；仅接受 HTTP(S) 且不含用户名密码的市场地址，无有效地址时不生成链接。面板使用已实现的白名单过滤及 Shadow DOM 内容弹框展示，无需为每种业务新增弹框。
+
+市场返回独立授权错误码，SDK 仅在安装及升级校验的市场业务响应中按码识别，不匹配文案；网络、签名、解析及数据库异常不会被转成购买提示。正常返回的 `service_expire` 及可用历史版本规则保持不变，不因展示调整额外禁止安装。域名和应用标识绑定冲突继续返回 HTTP 409 及原结构化字段。
+
+示例响应：
+
+```json
+{
+  "code": "ZPK_HTML_NOTICE",
+  "error": "该应用需要 VIP2，请先开通 VIP",
+  "data": {
+    "title": "需要开通 VIP",
+    "reason": "vip_required",
+    "html": "<p>该应用需要 VIP2，请先开通 VIP</p><a href=\"https://zm.w7.com/#/vip\">去购买 VIP</a>",
+    "market_url": "https://zm.w7.com/#/vip"
+  }
+}
+```
+
 面板在安装阶段调用制品 `info` 时传入应用域名和规范化应用标识，ZPK 将二者写入加密 ticket。安装完成通知不再单独传递应用标识，ZPK 解票后再把 ticket 中的 `domain` 和 `app_identify` 传给制品市场订单核销接口。
 
 订单安装或升级预检会返回已绑定的 `panel_url`、`panel_device_sn` 和 `app_identify`；校验失败时通过 `conflict_reason` 区分 `domain_mismatch`（域名不一致）和 `app_identify_exists`（已有应用标识绑定）。
@@ -31,3 +56,16 @@ manifest 使用 `application.order` 声明 MicroApp 顺序。生成的 MicroApp 
 子应用导入会按选择的制品版本读取完整 manifest，并将附件来源纳入本地存储键，避免不同仓库中的同名同版本附件相互覆盖。子文件全部保存成功后才更新主 manifest；导入失败会恢复导入前的主 manifest。带 `from` 的子应用会通过原制品列表接口检查新版本，并支持在编辑页重新导入更新。
 
 制品 `info` 接口会按市场分类设置汇总并返回 `support_cluster=all|main|sub|none`。分类查询的签名与市场请求共用 10 秒超时；超时时返回空值，由旧版面板兼容为不限制安装，其他接口或数据错误仍正常返回。
+
+
+### 自定义弹框与安装冲突操作
+
+
+按钮格式为 {"label":"按钮文案","type":"link","url":"完整 HTTP(S) 地址"} 或 {"label":"强制清除并安装","type":"reinstall"}。域名冲突仅展示绑定域名；应用绑定冲突提供原面板卸载链接，非升级时才下发重装动作。面板只执行预先支持的动作，重装必须有本地安装重试上下文、非采集模式且经过固定二次确认；不能用远程 HTML 执行脚本或任意请求。原面板链接复用 /app/apps?uninstallApp=应用标识，应用标识经 URL 编码，所有动态 HTML 内容转义。
+
+
+退款处理中提示的“查看订单”链接携带 Hash 路由参数 `order_sn`，例如 `https://zm.w7.com/#/user-center/orders?order_sn=ORDER-123`，市场订单页据此筛选相关订单。订单号为空时保留订单列表入口。
+
+提示操作全部包含在 data.html 中，不再使用 actions 字段。绑定冲突显示应用、订单及原绑定信息；域名冲突额外显示当前安装域名，空字段显示“未提供”。退款提示正文显示订单号，并通过“查看此订单”携带订单号跳转。面板过滤后为空的 HTML 使用文字提示或原冲突弹框回退。
+
+市场安装/升级授权拒绝按数字业务码识别：40301 未找到有效订单，40302 未开通 VIP，40303 VIP 等级不足，40304 VIP 过期。不再匹配错误文案；未知码和旧市场纯文字错误保留原错误处理。应先升级市场再升级 ZPK，以维持完整 HTML 提示体验。

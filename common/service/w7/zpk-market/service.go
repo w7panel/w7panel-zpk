@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"io"
 	"net/http"
 	"time"
@@ -108,7 +107,7 @@ func (s ZpkMarketService) CheckFormulaCanInstallOrUpgrade(goodsId, consoleUid in
 		"app_identify": appIdentify,
 	}, &ret)
 	if err != nil {
-		return FormulaInstallCheckResult{}, err
+		return FormulaInstallCheckResult{}, classifyInstallAccessError(err)
 	}
 	return ret, nil
 }
@@ -134,7 +133,7 @@ func (s ZpkMarketService) GetFormulaCanUpgradeVersion(goodsId, consoleUid int32,
 		"order_sn":    orderSn,
 	}, &ret)
 	if err != nil {
-		return FormulaUpgradeVersionResult{}, err
+		return FormulaUpgradeVersionResult{}, classifyInstallAccessError(err)
 	}
 
 	return ret, nil
@@ -214,7 +213,7 @@ func postSignedWithContext[T any](ctx context.Context, s ZpkMarketService, path 
 			apiError.ErrorMsg = string(respBody)
 			apiError.Code = resp.StatusCode
 		}
-		return apiError
+		return &marketResponseError{ApiError: apiError}
 	}
 
 	wrappedResp := apiResponse[T]{}
@@ -225,7 +224,7 @@ func postSignedWithContext[T any](ctx context.Context, s ZpkMarketService, path 
 		if wrappedResp.Err == "" {
 			wrappedResp.Err = "zpk market api error"
 		}
-		return errors.New(wrappedResp.Err)
+		return &marketResponseError{ApiError: base.ApiError{ErrorMsg: wrappedResp.Err, Code: wrappedResp.Code}}
 	}
 	if result != nil {
 		*result = wrappedResp.Data

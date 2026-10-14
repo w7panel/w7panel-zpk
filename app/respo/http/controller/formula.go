@@ -198,43 +198,24 @@ func (c Formula) Info(ctx *gin.Context) {
 			}
 			checkResult, checkErr := zpkmarket.CheckFormulaCanInstallOrUpgrade(*formula, consoleUid, params.OrderSn, params.IsUpgrade > 0, params.Reinstall, params.Domain, params.AppIdentify)
 			if checkErr != nil {
+				if writeFormulaAccessError(ctx, formula.GoodsId, params.OrderSn, checkErr) {
+					return
+				}
 				c.JsonResponseWithError(ctx, checkErr, 500)
 				return
 			}
 			if checkResult.EntitlementStatus == zpk_market.EntitlementStatusTrialExpired {
-				marketURL := strings.TrimRight(facade.GetConfig().GetString("setting.depot_market.frontend_url"), "/")
-				if marketURL != "" {
-					marketURL = fmt.Sprintf("%s/site-detail/%d", marketURL, formula.GoodsId)
-				}
-				ctx.JSON(http.StatusForbidden, gin.H{
-					"code":  "ZPK_TRIAL_EXPIRED",
-					"error": "免费试用已到期",
-					"data": gin.H{
-						"goods_id":        formula.GoodsId,
-						"order_sn":        checkResult.OrderSn,
-						"trial_expire_at": checkResult.TrialExpireAt,
-						"restriction":     "application_operation",
-						"market_url":      marketURL,
-					},
-				})
+				writeFormulaAccessNotice(ctx, formula.GoodsId, checkResult, zpk_market.EntitlementStatusTrialExpired, "免费试用已到期，请购买或续费后继续使用")
 				return
 			}
 			if !checkResult.CanInstallOrUpgrade {
 				switch checkResult.ConflictReason {
 				case zpk_market.InstallConflictDomainMismatch, zpk_market.InstallConflictAppIdentifyExists:
-					ctx.JSON(http.StatusConflict, gin.H{
-						"code":  http.StatusConflict,
-						"error": "制品安装绑定冲突",
-						"data": gin.H{
-							"conflict_reason": checkResult.ConflictReason,
-							"domain":          checkResult.ConflictDomain,
-							"panel_url":       checkResult.PanelURL,
-							"panel_device_sn": checkResult.PanelDeviceSN,
-							"app_identify":    checkResult.ConflictAppIdentify,
-						},
-					})
+					writeFormulaInstallConflict(ctx, checkResult, params.IsUpgrade <= 0, formulaConflictNoticeContext{AppTitle: formula.Title, OrderSN: params.OrderSn, Domain: params.Domain})
+				case zpk_market.InstallConflictRefundPending:
+					writeFormulaAccessNotice(ctx, formula.GoodsId, checkResult, zpk_market.InstallConflictRefundPending, "订单退款处理中，暂不能安装或升级，请前往制品市场查看订单")
 				default:
-					c.JsonResponseWithError(ctx, errors.New("请先购买后再安装"), 500)
+					writeFormulaAccessNotice(ctx, formula.GoodsId, checkResult, zpk_market.AccessReasonPurchaseRequired, "请先购买后再安装")
 				}
 				return
 			}
@@ -247,6 +228,9 @@ func (c Formula) Info(ctx *gin.Context) {
 				"err", checkErr,
 			)
 			if checkErr != nil {
+				if writeFormulaAccessError(ctx, formula.GoodsId, params.OrderSn, checkErr) {
+					return
+				}
 				c.JsonResponseWithError(ctx, checkErr, 500)
 				return
 			}

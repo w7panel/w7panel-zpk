@@ -54,12 +54,12 @@ func formulaAccessNoticePayload(frontendURL string, goodsID int32, result zpk_ma
 		}
 	}
 	marketURL := formulaAccessMarketURL(frontendURL, path)
-	content := `<div style="padding:16px"><p style="margin:0 0 24px;line-height:1.8">` + html.EscapeString(message) + `</p>`
+	content := `<div style="line-height:1.8"><p style="margin:0 0 12px">` + html.EscapeString(message) + `</p>`
 	if reason == zpk_market.InstallConflictRefundPending {
 		content += formulaNoticeField("订单号", result.OrderSn)
 	}
 	if marketURL != "" {
-		content += `<a style="display:inline-block;padding:10px 20px;background-color:#165dff;color:#fff;text-decoration:none;border-radius:4px" href="` + html.EscapeString(marketURL) + `" target="_blank" rel="noopener noreferrer">` + html.EscapeString(action) + `</a>`
+		content += formulaNoticeFooter(formulaNoticeLink(marketURL, action))
 	} else {
 		content += `<p>请前往制品市场查看授权或购买、续费。</p>`
 	}
@@ -127,12 +127,21 @@ type formulaConflictNoticeContext struct {
 	Domain   string
 }
 
+// Navigation uses the primary action style; the panel owns its native close button.
+func formulaNoticeLink(target, label string) string {
+	return `<a style="display:inline-flex;align-items:center;justify-content:center;padding:0 16px;line-height:30px;font-size:14px;color:#fff;background-color:#165dff;border:1px solid #165dff;border-radius:2px;text-decoration:none;font-weight:400" href="` + html.EscapeString(target) + `" target="_blank" rel="noopener noreferrer">` + html.EscapeString(label) + `</a>`
+}
+
+func formulaNoticeFooter(content string) string {
+	return `<div data-notice-footer style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">` + content + `</div>`
+}
+
 func formulaNoticeField(label, value string) string {
 	value = strings.TrimSpace(value)
 	if value == "" {
 		value = "未提供"
 	}
-	return `<p>` + html.EscapeString(label) + `：<strong>` + html.EscapeString(value) + `</strong></p>`
+	return `<p style="margin:0 0 8px">` + html.EscapeString(label) + `：<strong>` + html.EscapeString(value) + `</strong></p>`
 }
 
 func writeFormulaInstallConflict(ctx *gin.Context, result zpk_market.FormulaInstallCheckResult, allowReinstall bool, info formulaConflictNoticeContext) {
@@ -147,19 +156,24 @@ func writeFormulaInstallConflict(ctx *gin.Context, result zpk_market.FormulaInst
 		if strings.TrimSpace(orderSN) == "" {
 			orderSN = info.OrderSN
 		}
+		footer := ""
 		metadata := formulaNoticeField("应用", info.AppTitle) + formulaNoticeField("订单号", orderSN)
 		if result.ConflictReason == zpk_market.InstallConflictDomainMismatch {
-			data["html"] = `<p>当前域名与订单原绑定域名不一致，请使用原绑定域名安装。</p>` + metadata + formulaNoticeField("当前安装域名", info.Domain) + formulaNoticeField("原绑定域名", result.ConflictDomain)
+			data["html"] = `<p style="margin:0 0 12px">当前域名与订单原绑定域名不一致，请使用原绑定域名安装。</p>` + metadata + formulaNoticeField("当前安装域名", info.Domain) + formulaNoticeField("原绑定域名", result.ConflictDomain)
 		} else {
-			data["html"] = `<p>该订单已有应用安装记录，请先在原面板卸载原应用后重试。</p>` + metadata + formulaNoticeField("已绑定应用标识", result.ConflictAppIdentify) + formulaNoticeField("原面板地址", result.PanelURL)
+			data["html"] = `<p style="margin:0 0 12px">该订单已有应用安装记录，请先在原面板卸载原应用后重试。</p>` + metadata + formulaNoticeField("已绑定应用标识", result.ConflictAppIdentify) + formulaNoticeField("原面板地址", result.PanelURL)
 			if target := formulaOriginalPanelURL(result.PanelURL, result.ConflictAppIdentify); target != "" {
-				data["html"] = data["html"].(string) + `<p><a style="display:inline-block;padding:8px 16px;background-color:#165dff;color:#fff;text-decoration:none;border-radius:4px" href="` + html.EscapeString(target) + `" target="_blank" rel="noopener noreferrer">前往原面板卸载</a></p>`
+				footer += formulaNoticeLink(target, "前往原面板卸载")
 			}
 			if allowReinstall {
-				data["html"] = data["html"].(string) + `<p style="color:#f53f3f">强制清除并安装会覆盖旧应用的安装记录，可能导致老应用状态丢失、无法继续升级，请谨慎操作。</p>`
-				data["html"] = data["html"].(string) + `<button data-panel-action="reinstall" style="padding:8px 16px;background-color:#f53f3f;color:#fff;border:0;border-radius:4px">强制清除并安装</button>`
+				data["html"] = data["html"].(string) + `<p style="margin:16px 0 12px;color:#f53f3f">强制清除并安装会覆盖旧应用的安装记录，可能导致老应用状态丢失、无法继续升级，请谨慎操作。</p>`
+				footer += `<button data-panel-action="reinstall" style="display:inline-flex;align-items:center;justify-content:center;padding:0 16px;line-height:30px;font-size:14px;color:#fff;background-color:#f53f3f;border:1px solid transparent;border-radius:2px;text-decoration:none;font-weight:400">强制清除并安装</button>`
 			}
 		}
+		if footer != "" {
+			data["html"] = data["html"].(string) + formulaNoticeFooter(footer)
+		}
+		data["html"] = `<div style="line-height:1.8">` + data["html"].(string) + `</div>`
 	}
 	// Keep the original conflict protocol so older panels can still handle it.
 	ctx.JSON(http.StatusConflict, gin.H{"code": http.StatusConflict, "error": "制品安装绑定冲突", "data": data})

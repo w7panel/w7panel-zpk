@@ -74,8 +74,8 @@ plugin_state_dir="/var/lib/w7-tradition-plugin"
 rm -rf -- "$code_install_path"/* "$code_install_path"/.[!.]* "$code_install_path"/..?*
 rm -rf -- "$plugin_state_dir"/* "$plugin_state_dir"/.[!.]* "$plugin_state_dir"/..?*`
 
-// traditionNginxVhostShell writes the rendered site-manager vhost into the
-// nginx-dir subtree mounted from the embedded w7-traditiontool application.
+// traditionNginxVhostShell updates unmodified vhosts and keeps user changes.
+// The previous template is compared before publishing the latest candidate.
 const traditionNginxVhostShell = `{{- $rawDomain := toString .Values.DOMAIN_URL -}}
 {{- $domain := replace "https://" "" $rawDomain -}}
 {{- $domain = replace "http://" "" $domain -}}
@@ -94,9 +94,57 @@ const traditionNginxVhostShell = `{{- $rawDomain := toString .Values.DOMAIN_URL 
 set -eu
 nginx_vhost_file={{ print $primaryDomain ".conf" | quote }}
 nginx_vhost_config_b64={{ $config | b64enc | quote }}
-mkdir -p /www/server/nginx/conf.d
-echo -n "$nginx_vhost_config_b64" | base64 -d > "/www/server/nginx/conf.d/$nginx_vhost_file"
-test -s "/www/server/nginx/conf.d/$nginx_vhost_file"`
+mkdir -p /www/server/nginx/conf.d /www/server/nginx/template-configs
+nginx_tmp_dir=$(mktemp -d /www/server/nginx/template-configs/.vhost.XXXXXX)
+trap 'rm -rf "$nginx_tmp_dir"' EXIT
+echo "$nginx_vhost_config_b64" | base64 -d > "$nginx_tmp_dir/new.conf"
+test -s "$nginx_tmp_dir/new.conf"
+chmod 644 "$nginx_tmp_dir/new.conf"
+# Ignore CRLF/LF and blank lines outside quoted values. Keep all other text.
+normalize_nginx_config() {
+  LC_ALL=C awk '
+  {
+    sub(/\r$/, "")
+    if ($0 ~ /^[ \t]*$/ && quote == "" && !escaped) next
+    print
+    escaped = 0
+    for (i = 1; i <= length($0); i++) {
+      c = substr($0, i, 1)
+      if (escaped) { escaped = 0; continue }
+      if (c == "\\") { escaped = 1; continue }
+      if (quote != "") {
+        if (c == quote) quote = ""
+        continue
+      }
+      if (c == "#") break
+      if (c == "\"" || c == "\047") quote = c
+    }
+  }' "$1"
+}
+update_nginx_vhost=true
+if [ -e "/www/server/nginx/conf.d/$nginx_vhost_file" ] || [ -L "/www/server/nginx/conf.d/$nginx_vhost_file" ]; then
+  update_nginx_vhost=false
+  if [ -f "/www/server/nginx/conf.d/$nginx_vhost_file" ] && [ ! -L "/www/server/nginx/conf.d/$nginx_vhost_file" ] && [ -f "/www/server/nginx/template-configs/$nginx_vhost_file" ]; then
+    normalize_nginx_config "/www/server/nginx/conf.d/$nginx_vhost_file" > "$nginx_tmp_dir/current.normalized"
+    normalize_nginx_config "/www/server/nginx/template-configs/$nginx_vhost_file" > "$nginx_tmp_dir/previous.normalized"
+    if cmp -s "$nginx_tmp_dir/current.normalized" "$nginx_tmp_dir/previous.normalized"; then
+      update_nginx_vhost=true
+    else
+      compare_status=$?
+      if [ "$compare_status" -ne 1 ]; then
+        echo "cannot compare nginx vhost: $nginx_vhost_file" >&2
+        exit "$compare_status"
+      fi
+    fi
+  fi
+fi
+if [ "$update_nginx_vhost" = true ]; then
+  cp "$nginx_tmp_dir/new.conf" "$nginx_tmp_dir/live.conf"
+  mv "$nginx_tmp_dir/live.conf" "/www/server/nginx/conf.d/$nginx_vhost_file"
+else
+  echo "preserving existing nginx vhost: $nginx_vhost_file"
+fi
+mv "$nginx_tmp_dir/new.conf" "/www/server/nginx/template-configs/$nginx_vhost_file"`
 
 const traditionNginxVhostUninstallShell = `{{- $rawDomain := toString .Values.DOMAIN_URL -}}
 {{- $domain := replace "https://" "" $rawDomain -}}
@@ -106,12 +154,13 @@ const traditionNginxVhostUninstallShell = `{{- $rawDomain := toString .Values.DO
 {{- $primaryDomain := first (splitList " " (trimAll " " $serverName)) -}}
 set -eu
 nginx_vhost_file={{ print $primaryDomain ".conf" | quote }}
-rm -f -- "/www/server/nginx/conf.d/$nginx_vhost_file"`
+rm -f -- "/www/server/nginx/conf.d/$nginx_vhost_file" "/www/server/nginx/template-configs/$nginx_vhost_file"`
 
 func withTraditionAppImages(platform logic2.Platform) logic2.Platform {
 	platform.ContainerV2s = append([]logic2.ContainerV2(nil), platform.ContainerV2s...)
 	for index := range platform.ContainerV2s {
 		container := &platform.ContainerV2s[index]
+		// preserveRuntimeConfig keeps the runtime image version selected by tradition-tool.
 		container.Image = strings.ReplaceAll(
 			container.Image,
 			"{version}",
@@ -123,6 +172,7 @@ func withTraditionAppImages(platform logic2.Platform) logic2.Platform {
 }
 
 func (hc *HelmPack) addTraditionAppValues(values map[string]interface{}) error {
+	values["preserveRuntimeConfig"] = true
 	annotation := hc.Manifest.Application.Annotation
 	if annotation == nil {
 		annotation = map[string]interface{}{}

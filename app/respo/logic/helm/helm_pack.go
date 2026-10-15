@@ -875,8 +875,8 @@ func (hc *HelmPack) generateValuesYaml(rootDir string, options helmValuesOptions
 			"sharedSidecarResources": hc.IsSubFormula,
 		}
 	}
-	if hc.Manifest.Application.Type == logic2.TraditionApp || hc.Manifest.Application.Type == logic2.SystemImageApp {
-		values["preserveRuntimeImageVersion"] = true
+	if hc.Manifest.Application.Type == logic2.SystemImageApp {
+		values["preserveRuntimeConfig"] = true
 	}
 	values["jobs"] = hc.buildJobValues(platform, options.shellJobContainerValues)
 	if options.addValues != nil {
@@ -1498,7 +1498,7 @@ func (hc *HelmPack) getServiceValues(platform logic2.Platform) map[string]interf
 			allPorts = append(allPorts, map[string]interface{}{
 				"name":       logic2.GetPortName(port),
 				"port":       port.ContainerPort,
-				"targetPort": port.ContainerPort,
+				"targetPort": logic2.GetPortName(port),
 				"protocol":   string(port.Protocol),
 			})
 		}
@@ -1522,7 +1522,7 @@ func (hc *HelmPack) getNodePortServiceValues(platform logic2.Platform) map[strin
 				allPorts = append(allPorts, map[string]interface{}{
 					"name":       logic2.GetPortName(port),
 					"port":       port.HostPort,
-					"targetPort": port.ContainerPort,
+					"targetPort": logic2.GetPortName(port),
 					"protocol":   string(port.Protocol),
 				})
 			}

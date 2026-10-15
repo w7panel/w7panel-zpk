@@ -181,6 +181,8 @@ OCI repository 名为：
 
 不是每个文件都会产生 Kubernetes 对象；很多模板会根据 values 中是否有端口、容器、Job 等条件输出为空。
 
+通用 Workload 生成器的普通 Service 和对外 LoadBalancer Service 均使用命名 `targetPort`，与容器端口统一由 `GetPortName` 生成（如 `port-9000`）；Service 的访问端口仍按原规则设置。工具保持端口名称不变、仅修改容器端口号时，无需修改已使用该名称的 Service targetPort。此规则适用于重新生成的 Chart，已安装的旧数字 targetPort 不会自动迁移；运行配置保留机制仍按现有 Service 的实际映射处理。
+
 ### 4.3 公共 values
 
 生成的 `values.yaml` 至少包含：
@@ -402,6 +404,21 @@ rm -rf -- "$plugin_install_path"
 
 打包时所有传统应用容器 image 中的 `{version}` 都替换为 `{{ .Values.IMAGE_VERSION }}`。
 
+传统应用开启 `preserveRuntimeConfig`：渲染时读取同名工作负载现有 `IMAGE_VERSION`，未找到时使用本次 values；系统镜像也统一使用 `preserveRuntimeConfig`，开关设置仍在 `helm_pack.go` 中。
+
+额外运行配置使用工作负载 metadata annotation `w7.cc/tradition-runtime-config` 显式选择保留字段，例如 `{"containers":{"php":["command","args","ports","readinessProbe"]},"servicePorts":true}`。工具应在修改资源时同步写入标记。容器按名称匹配，仅支持 command、args、ports、livenessProbe、readinessProbe、startupProbe；被标记但已清空的字段保持清空。Service 端口按实际同名 Service 保留，不复制 nodePort 等集群分配字段。标记会随工作负载重新渲染保存，删除标记项即可恢复跟随制品。未标记字段、新容器、首次安装及离线渲染使用制品默认值。此机制不保留 init/Sidecar 容器、nginx 文件，也不自动推导端口关联；工具仍须协调 Service、探针和 nginx。升级需要读取工作负载及 Service 的权限；删除重建和 Helm 回滚不保证保留运行覆盖。现有工具未写标记时仅镜像版本保留生效。
+
+
+#### tradition-tool 动态创建 Service 的契约
+
+制品未定义端口时 Chart 不生成 Service。工具后续新增端口时，应创建与 `common.fullname` 相同名称、同 namespace 的 Service，并完成以下操作：
+
+- 使用当前工作负载的实际 Release 归属设置 `app.kubernetes.io/managed-by: Helm` label、`meta.helm.sh/release-name` 和 `meta.helm.sh/release-namespace` annotations；不能把子 Chart 名当作 Release 名。
+- 写入指向当前主 Deployment / StatefulSet / DaemonSet 的 `ownerReferences`，使用真实 apiVersion、kind、name、UID，省略 controller / blockOwnerDeletion。这样在 Service 尚未进入 Release manifest 前卸载应用，也能由 Kubernetes 回收；删除重建工作负载同样会触发回收。
+- Service selector 使用实际工作负载的 Pod labels；同步修改容器端口以及必要的探针、nginx，再在工作负载 metadata annotation `w7.cc/tradition-runtime-config` 中设置 `servicePorts: true`。这些跨资源操作不是事务，工具需处理失败和重试，全部完成后才报告成功。
+
+后续升级即使 Chart 默认端口为空，也会读取已标记 Service 的端口和类型、渲染 Service 并纳入 Release；ownerReferences 由工具创建 Service 时设置，ZPK 模板不读取或输出该字段。ZPK 模板只读取同名 Service，不额外校验其 Helm 归属，也不修改现有资源补归属；首次纳入 Release 时仍受 Helm 自身的接管校验约束，工具应在创建时完成归属设置。仅新增 Helm metadata 并不会使资源立即进入旧 Release 的 manifest，因此首次升级前的清理依赖 ownerReference。现有工具尚未实现此创建流程，本仓库仅提供模板支持及契约；需在 `~/Develop/go/w7panel-sitemanager` 配套实现。
+
 ### 7.2 代码包
 
 `source.url` 可选。存在时自动追加：
@@ -435,7 +452,8 @@ rm -rf -- "$plugin_install_path"
 打包时工具已经是普通本地子 Chart，并非每次仅根据 `depends.from` 临时下载。传统应用打包器还会：
 
 - 给 `w7-traditiontool` 子 Workload 写 `w7.cc/tradition-tool-restart-revision={{ .Release.Revision }}`，使传统应用升级时工具同步滚动；
-- 若配置了 `w7.cc/nginx_vhost_template`，生成安装/升级 vhost 和卸载 vhost 的 Job；
+- 若配置了 `w7.cc/nginx_vhost_template`，生成安装/升级 vhost 和卸载 vhost 的 Job。安装/升级先将当前生效配置与上次保存的模板比较，再保存本次模板：当前文件不存在时生成；内容与上次模板一致时自动更新；有实际修改（包括清空文件）、没有上次模板或生效路径为符号链接时保留当前文件，不自动合并。比较统一 CRLF/LF 换行并忽略引号外的空白行，其余空格、缩进、注释和引号内多行内容保留；规范化只用于比较，不直接改写用户配置。不需要额外基准文件或修改标记，使用已有模板文件作为上次内容。卸载仍删除当前域名的配置文件；
+- 每次安装/升级同时将本次渲染出的完整配置保存到共享 nginx 目录的 `template-configs/<主域名>.conf`，只保留最近一次 Hook 生成的模板，通过临时文件写完后替换；比较或生效配置更新失败时不发布新模板。该目录位于 `conf.d` 外，不参与默认 nginx 加载；传统应用卸载时同步删除对应模板文件。tradition-tool 的 nginx 页面可读取它，按同样的比较规则判断与当前生效配置有差异时，提示用户查看、复制后手动合并。旧 Chart 没有该文件时仍可编辑现有配置；该文件是最近一次 Hook 生成的候选内容，升级后续步骤失败时不代表整个应用升级已成功；
 - 从工具子 manifest 找出 `site-storage`/`nginx-dir` mounts，给 vhost Job 使用；
 - 支持 `{SERVER_NAME}`、`{LOG_DIR}`、`{ROOT_DIR}`、`{K8S_DOMAIN}`、`{UPSTREAM_APP_NAME}` 模板变量。其中 tradition-tool 将 PVC 的 `nginx-web-dir` 功能目录挂载到 `/www/wwwroot`，所以 `{ROOT_DIR}` 是 NGINX 容器看到的站点目录 `/www/wwwroot/<domain>`；FastCGI 转发给应用容器的代码路径固定为 `/www/wwwroot`。
 

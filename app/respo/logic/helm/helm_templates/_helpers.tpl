@@ -123,8 +123,7 @@ source of truth; new installations use the original deterministic fallback.
 
 {{/*
 Keep the externally switched image version when upgrading traditional
-applications and system images. Charts for those application types enable
-this helper through preserveRuntimeImageVersion. A new installation, an
+applications and system images through preserveRuntimeConfig. A new installation, an
 offline render, or a workload without IMAGE_VERSION falls back to the value
 passed to Helm.
 */}}
@@ -132,7 +131,7 @@ passed to Helm.
 {{- $root := . -}}
 {{- $fallback := toString (get $root.Values "IMAGE_VERSION") -}}
 {{- $runtimeVersion := "" -}}
-{{- if ($root.Values.preserveRuntimeImageVersion | default false) -}}
+{{- if ($root.Values.preserveRuntimeConfig | default false) -}}
   {{- $workloadName := include "common.fullname" $root -}}
   {{- $workloadKind := $root.Values.workload.kind | default "Deployment" -}}
   {{- $existing := lookup "apps/v1" $workloadKind $root.Release.Namespace $workloadName -}}
@@ -224,3 +223,43 @@ Used by Job templates, which cannot consume StatefulSet volumeClaimTemplates.
 {{- tpl (toYaml $validMounts) $root }}
 {{- end }}
 {{- end }}
+
+{{/* Read only explicitly marked runtime fields; keep new chart defaults otherwise.
+The helper returns data as JSON so preserved commands never pass through tpl.
+*/}}
+{{- define "common.runtimeConfig" -}}
+{{- $result := dict "containers" (dict) "selection" (dict) -}}
+{{- if (.Values.preserveRuntimeConfig | default false) -}}
+  {{- $existing := lookup "apps/v1" (.Values.workload.kind | default "Deployment") .Release.Namespace (include "common.fullname" .) -}}
+  {{- if $existing -}}
+    {{- $annotations := dig "metadata" "annotations" (dict) $existing -}}
+    {{- $raw := get $annotations "w7.cc/tradition-runtime-config" -}}
+    {{- if $raw -}}
+      {{- $selection := mustFromJson $raw -}}
+      {{- $_ := set $result "selection" $selection -}}
+      {{- range $container := dig "spec" "template" "spec" "containers" (list) $existing -}}
+        {{- $fields := get (get $selection "containers" | default dict) $container.name | default list -}}
+        {{- $overrides := dict -}}
+        {{- range $field := list "command" "args" "ports" "livenessProbe" "readinessProbe" "startupProbe" -}}
+          {{- if has $field $fields -}}
+            {{- $_ := set $overrides $field (get $container $field) -}}
+          {{- end -}}
+        {{- end -}}
+        {{- $_ := set (get $result "containers") $container.name $overrides -}}
+      {{- end -}}
+      {{- if (get $selection "servicePorts" | default false) -}}
+        {{- $service := lookup "v1" "Service" .Release.Namespace (include "common.fullname" .) -}}
+        {{- if $service -}}
+          {{- $_ := set $result "serviceType" (dig "spec" "type" "ClusterIP" $service) -}}
+          {{- $ports := list -}}
+          {{- range $port := dig "spec" "ports" (list) $service -}}
+            {{- $ports = append $ports (pick $port "name" "port" "targetPort" "protocol" "appProtocol") -}}
+          {{- end -}}
+          {{- $_ := set $result "servicePorts" $ports -}}
+        {{- end -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- toJson $result -}}
+{{- end -}}

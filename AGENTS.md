@@ -27,6 +27,31 @@
 - 数据库逻辑兼顾 MySQL 和 SQLite 以及现有数据库切换 / 禁写保护，不未经授权运行迁移命令或操作工作目录中的真实数据库。
 - 前端复用既有组件、Vuex / utils 和请求方式；不为局部功能改用 Vite、TypeScript 或另一套 UI 库。
 
+## respo/info HTML 提示职责与契约
+
+先按以下职责划分确定修改位置，再处理协议细节：
+
+| 层级 | 负责内容 | 开发约束 |
+| --- | --- | --- |
+| ZPK | 判断安装 / 升级授权与绑定冲突；生成业务标题、文案、风险说明、导航链接和允许的按钮 HTML；执行后端授权与身份校验 | 业务提示内容统一在 `formula_notice.go` 维护；新增授权原因或调整提示内容优先修改 ZPK，不要求 server / UI 按原因补写文案或专用弹框 |
+| w7panel-server | 向 ZPK 声明 HTML 能力；校验远程响应状态、错误码、结构与长度；转发约定的提示和冲突字段；保留本地请求及身份校验 | 沿用 `repo.go` 与 `app/zpk/http/zpk.go` 的协商 / 转发入口，不拼接提示 HTML、购买链接，不根据文案猜测业务类型，不因收到按钮自动重装 |
+| 面板 UI 的 `repo-notice.ts` | 识别 ZPK 提示协议，适配通用弹框；持有本地安装重试上下文，执行重装二次确认 | 只承载协议适配和重装交互，不为购买、VIP、试用、退款等原因重新拼接 ZPK 的提示内容 |
+| 面板 UI 的 `html-notice.ts` | 通用 HTML 净化、Shadow DOM 展示、安全链接、底部操作区、关闭按钮、去重和动作执行锁 | 不引入 ZPK 业务错误码、授权原因或重装规则；只执行调用方明确允许的本地动作回调 |
+
+- HTML 描述业务提示与可选操作，不承载授权结果或执行权限。ZPK 决定是否允许安装 / 升级及是否提供重装入口，server / UI 保留各自校验；按钮展示、点击或二次确认均不能替代后端校验。
+- **面板不过多干预 ZPK 的业务错误提示逻辑。** 对协议合法、可安全展示的提示，server 转发 ZPK 返回的内容，UI 经通用净化后展示；不根据 `reason`、错误文案、商品或订单状态重新判断提示含义，不覆盖标题、正文、风险说明、按钮文案和导航地址，不增删业务提示或另行拼接专用弹框。新增购买、VIP、试用、退款等提示分支应由 ZPK 维护，面板不为每个分支增加业务判断。
+- 面板的必要干预限于协议 / 长度校验、HTML 和 URL 安全过滤、通用展示，以及已支持动作的本地上下文与权限约束（如重装二次确认）。只有响应无法按协议处理或净化后无有效内容时才使用纯文本兜底；不能以统一提示为由替换有效的 ZPK 业务内容，也不能为了展示完整而放宽安全规则。
+- 文案、购买地址、风险说明或已有动作的展示变化由 ZPK 维护；只有响应协议、HTML 白名单或本地动作能力变化时才需要核对 server / UI 的配套实现。跨仓库修改先说明职责和兼容性影响，按已授权范围实施。
+
+- 修改安装 / 升级授权错误或绑定冲突提示前，核对 `app/respo/http/controller/formula.go`、`formula_notice.go`、`formula_notice_test.go` 和 README 的“安装授权 HTML 提示”；同时只读核对面板仓库 `~/Develop/go/w7panel/w7panel-ui/src/utils/html-notice.ts` 与 `repo-notice.ts`（实际文件名不是 `respo-notice`）。本仓库 `ui/` 不是该面板前端，不自动修改其他仓库。
+- HTML 是 JSON 错误响应中的 `data.html` 片段，不是直接返回 `text/html` 页面。只有查询参数严格为 `notice_format=html` 才启用：授权限制返回 HTTP 403、字符串 `code: ZPK_HTML_NOTICE`，保留纯文本 `error`，以及 `data.title/html/reason/goods_id/order_sn/trial_expire_at/restriction/market_url`。不要把网络、未知市场错误或所有 500 错误统一转成 HTML 提示。
+- 未声明 HTML 能力时保持旧协议：试用到期为 HTTP 403 / `ZPK_TRIAL_EXPIRED`，其他授权限制沿用原 HTTP 500 / 数字错误码及具体纯文本原因；绑定冲突无论是否协商均保持 HTTP 409、数字 `code: 409` 和原结构化字段，协商后仅补充 `data.title/html`。面板 `repo-notice.ts` 仅识别约定的 403 提示，以及 `domain_mismatch` / `app_identify_exists` 的 409 提示。
+- 展示文案、导航和操作放在 `data.html`；不恢复独立 `actions` 字段或为每种业务增加专用弹框。操作区使用 `<div data-notice-footer>…</div>`，由面板净化后移入弹框底部，与面板原生“关闭”按钮并排展示；HTML 不自行实现关闭按钮。面板通用 `html-notice.ts` 负责白名单净化、Shadow DOM 隔离、重复错误去重及纯文本兜底，输入长度上限为 64 × 1024 个 JavaScript 字符。
+- HTML 只使用前端白名单支持的标签和内联排版样式，不依赖脚本、事件属性、iframe、表单、外部样式或远程 CSS 变量。动态文案、字段和链接属性须在 ZPK 端转义；URL 必须校验为不含用户名密码的完整 HTTP(S) 地址，不能仅靠 HTML 转义或前端过滤。
+- 市场链接复用 `formulaAccessMarketURL`：保留部署路径前缀，按 Hash 路由生成购买 / 续费 `/#/site-detail/{goods_id}`、VIP `/#/vip`、退款订单 `/#/user-center/orders?order_sn=…`；订单号正确编码，无有效市场地址时只显示文字。原面板卸载链接复用 `formulaOriginalPanelURL`，沿用 `/app/apps?uninstallApp=…`。导航使用安全的新窗口链接。
+- 强制重装只使用 `<button data-panel-action="reinstall">`，仅应用标识绑定冲突且非升级时由 ZPK 输出；域名冲突和升级不能提供该动作。面板还须具备本地 `onReinstall` 重试上下文，并通过固定二次确认；HTML 不能授予权限、执行任意请求或绕过后端 `reinstall` / 升级身份校验。空绑定字段显示“未提供”，订单信息优先使用市场返回值。
+- 跨版本兼容保持能力协商：面板后端声明参数，旧 ZPK 可忽略未知参数；前后端分开部署时先更新支持 HTML 的面板前端，再更新声明能力的后端。市场授权拒绝按既有数字业务码识别，不匹配错误文案；未知码和旧市场纯文字错误保持原错误处理，不扩大降级范围。
+
 ## 制品与打包契约
 
 - 变更 manifest、应用类型、依赖、PVC、生命周期或 Chart 生成前，阅读 `APPLICATION_HELM_PACKAGING.md` 中相关章节；涉及 Sidecar 时同时阅读 `HELM_SIDECAR.md`。实现与文档矛盾时先说明，不擅自新增协议字段。
@@ -47,6 +72,7 @@
 - `cli/`：`go test ./...`、`go vet ./...`、`go build ./...`。
 - `tradition-plugin/`：`go test ./...`、`go vet ./...`、`go build ./...`。根 `make test` 只覆盖主模块和 CLI，涉及 tradition-plugin 时需额外执行其测试。
 - 并发改动对相关包运行 `go test -race`；单测使用隔离文件 / 数据库，外部请求优先使用 mock 或 `httptest`。
+- 修改 HTML 提示协议时运行 `go test ./app/respo/http/controller -run 'TestFormula(AccessNotice|RefundNotice|InstallConflictNotice|ConflictNotice)' -count=1`，覆盖能力协商、旧协议、绑定冲突、升级禁重装、字段转义和 URL 安全；涉及面板端时核对其 `scripts/repo-html-notice.test.cjs` 的过滤、底部操作区和动作确认测试，遵循该仓库指引，不因本仓库文档调整自动修改面板。
 - 前端在 `ui/`：`npm run lint -- --no-fix src/相关文件.vue`、`npm run build`；保留现有 dist 时使用 `npm run build -- --dest <临时目录>/dist`。
 - 前端 CI 当前使用 npm；安装前检查现有锁文件，不混用 npm / yarn 或无故更新依赖锁文件。
 - 修改服务部署 Chart 时可运行 `helm lint ./charts` 与 `helm template zpk ./charts`；修改制品 Chart 生成器时运行相关 Go 模板测试，并检查实际生成的 Chart，不能只验证服务 Chart。

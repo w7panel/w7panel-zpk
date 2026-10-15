@@ -1,6 +1,7 @@
+{{- $runtimeConfig := include "common.runtimeConfig" . | fromJson -}}
 {{- $rootCtx := dict "Values" (deepCopy .Values) "Chart" .Chart "Release" .Release "Capabilities" .Capabilities "Template" .Template "Files" .Files "Subcharts" .Subcharts -}}
 {{- $runtimeImageVersion := include "common.resolveRuntimeImageVersion" . | trim -}}
-{{- if and (.Values.preserveRuntimeImageVersion | default false) $runtimeImageVersion -}}
+{{- if and (.Values.preserveRuntimeConfig | default false) $runtimeImageVersion -}}
   {{- $_ := set $rootCtx.Values "IMAGE_VERSION" $runtimeImageVersion -}}
 {{- end -}}
 apiVersion: apps/v1
@@ -11,6 +12,9 @@ metadata:
     {{- include "common.labels" . | nindent 4 }}
     w7.cc/group-name: {{ .Release.Name }}
   annotations:
+    {{- if $runtimeConfig.selection }}
+    w7.cc/tradition-runtime-config: {{ toJson $runtimeConfig.selection | quote }}
+    {{- end }}
     title: {{ .Values.app.title | quote }}
     w7.cc.app/title: {{ .Values.app.title | quote }}
     w7.cc/create-svc: 'false'
@@ -96,6 +100,11 @@ spec:
       containers:
       {{- range .Values.containers }}
       {{- if not .isInitContainer }}
+      {{- $container := deepCopy . }}
+      {{- range $field, $value := (get $runtimeConfig.containers .name | default dict) }}
+        {{- $_ := set $container $field $value }}
+      {{- end }}
+      {{- with $container }}
         - name: {{ .name }}
           image: "{{ .image.repository }}:{{ tpl .image.tag $rootCtx }}"
           imagePullPolicy: {{ .image.pullPolicy }}
@@ -142,6 +151,7 @@ spec:
           {{- with .securityContext }}
           securityContext: {{- toYaml . | nindent 12 }}
           {{- end }}
+      {{- end }}
       {{- end }}
       {{- end }}
       {{- include "w7panel.sidecars.containers" . | nindent 8 }}

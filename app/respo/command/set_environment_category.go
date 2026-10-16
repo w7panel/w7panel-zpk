@@ -19,7 +19,7 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
-const environmentApplicationCategory = "环境应用"
+const environmentApplicationCategory = "运行环境"
 
 type environmentCategoryDepot interface {
 	GetFormula(string, string, *entity.RegistryUser) (*formula.Formula, error)

@@ -3,6 +3,7 @@
 {{- $appName := .Values.global.name -}}
 {{- $releaseName := .Release.Name -}}
 {{- $domain := .Values.DOMAIN_URL -}}
+{{- $backends := include "common.runtimeIngressBackends" (dict "root" . "name" (print $fullName "-__INGRESS_NAME__")) | fromJson -}}
 {{- if and .Values.ingress.__INGRESS_NAME__.ingressClassName (not (semverCompare ">=1.18-0" .Capabilities.KubeVersion.GitVersion)) }}
   {{- if not (hasKey .Values.ingress.__INGRESS_NAME__.annotations "kubernetes.io/ingress.class") }}
   {{- $_ := set .Values.ingress.__INGRESS_NAME__.annotations "kubernetes.io/ingress.class" .Values.ingress.__INGRESS_NAME__.ingressClassName}}
@@ -24,7 +25,11 @@ metadata:
     w7.cc/group-name: {{ $releaseName }}
     __PARENT_INGRESS_LABEL__
   annotations:
-  {{- with .Values.ingress.__INGRESS_NAME__.annotations }}
+  {{- $annotations := deepCopy (.Values.ingress.__INGRESS_NAME__.annotations | default dict) }}
+  {{- if $backends }}
+    {{- $_ := set $annotations "w7.cc/ingress-backends" (toJson $backends) }}
+  {{- end }}
+  {{- with $annotations }}
     {{- toYaml . | nindent 4 }}
   {{- end }}
     {{- if .Values.ingressForceHttps }}
@@ -47,6 +52,11 @@ spec:
       http:
         paths:
           {{- range .paths }}
+          {{- $backendName := $fullName -}}
+          {{- if ne .backend.service.name "self" -}}
+            {{- $backendName = tpl .backend.service.name $ -}}
+          {{- end -}}
+          {{- $backend := get $backends $backendName | default (dict "name" $backendName "port" .backend.service.port) }}
           - path: {{ .path }}
             {{- if and .pathType (semverCompare ">=1.18-0" $.Capabilities.KubeVersion.GitVersion) }}
             pathType: {{ .pathType }}
@@ -54,20 +64,12 @@ spec:
             backend:
               {{- if semverCompare ">=1.19-0" $.Capabilities.KubeVersion.GitVersion }}
               service:
-                {{- if eq .backend.service.name "self" }}
-                name: {{ $fullName }}
-                {{- else }}
-                name: {{ tpl .backend.service.name $ }}
-                {{- end }}
+                name: {{ $backend.name | quote }}
                 port:
-                  number: {{ .backend.service.port.number }}
+                  {{- toYaml $backend.port | nindent 18 }}
               {{- else }}
-              {{- if eq .backend.service.name "self" }}
-              serviceName: {{ $fullName }}
-              {{- else }}
-              serviceName: {{ tpl .backend.service.name $ }}
-              {{- end }}
-              servicePort: {{ .backend.service.port.number }}
+              serviceName: {{ $backend.name | quote }}
+              servicePort: {{ if hasKey $backend.port "name" }}{{ $backend.port.name | quote }}{{ else }}{{ $backend.port.number }}{{ end }}
               {{- end }}
           {{- end }}
     {{- end }}

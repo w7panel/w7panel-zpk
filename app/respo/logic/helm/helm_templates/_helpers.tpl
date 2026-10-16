@@ -263,3 +263,34 @@ The helper returns data as JSON so preserved commands never pass through tpl.
 {{- end -}}
 {{- toJson $result -}}
 {{- end -}}
+
+{{/* When runtime preservation is enabled, keep explicitly marked Service backend replacements.
+Only backend name/port is overridden; hosts, paths and all other settings use the new chart.
+The writer validates Service names and port values; this helper checks only the JSON structure.
+*/}}
+{{- define "common.runtimeIngressBackends" -}}
+{{- $root := .root -}}
+{{- $backends := dict -}}
+{{- if ($root.Values.preserveRuntimeConfig | default false) -}}
+  {{- $apiVersion := "extensions/v1beta1" -}}
+  {{- if semverCompare ">=1.19-0" $root.Capabilities.KubeVersion.GitVersion -}}
+    {{- $apiVersion = "networking.k8s.io/v1" -}}
+  {{- else if semverCompare ">=1.14-0" $root.Capabilities.KubeVersion.GitVersion -}}
+    {{- $apiVersion = "networking.k8s.io/v1beta1" -}}
+  {{- end -}}
+  {{- $existing := lookup $apiVersion "Ingress" $root.Release.Namespace .name -}}
+  {{- $raw := dig "metadata" "annotations" "w7.cc/ingress-backends" "" $existing -}}
+  {{- if $raw -}}
+    {{- $backends = mustFromJson $raw -}}
+    {{- if not (kindIs "map" $backends) -}}{{- fail "w7.cc/ingress-backends must be a JSON object" -}}{{- end -}}
+    {{- range $target := $backends -}}
+      {{- if not (kindIs "map" $target) -}}{{- fail "ingress backend override must contain name and port" -}}{{- end -}}
+      {{- if or (not (kindIs "string" $target.name)) (not $target.name) -}}{{- fail "ingress backend override must contain a non-empty name" -}}{{- end -}}
+      {{- $port := $target.port -}}
+      {{- if not (kindIs "map" $port) -}}{{- fail "ingress backend override port must contain number or name" -}}{{- end -}}
+      {{- if or (ne (len $port) 1) (not (or (hasKey $port "number") (hasKey $port "name"))) -}}{{- fail "ingress backend override port must contain exactly one number or name" -}}{{- end -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- toJson $backends -}}
+{{- end -}}

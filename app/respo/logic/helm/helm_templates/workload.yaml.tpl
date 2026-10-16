@@ -1,9 +1,13 @@
 {{- $runtimeConfig := include "common.runtimeConfig" . | fromJson -}}
 {{- $rootCtx := dict "Values" (deepCopy .Values) "Chart" .Chart "Release" .Release "Capabilities" .Capabilities "Template" .Template "Files" .Files "Subcharts" .Subcharts -}}
+
+{{/* 传统应用和系统镜像的镜像版本切换处理：升级时保留运行中的 IMAGE_VERSION，
+让镜像、环境变量及 rootfs 路径使用同一版本；仅修改当前 Workload 的 Values 副本。 */}}
 {{- $runtimeImageVersion := include "common.resolveRuntimeImageVersion" . | trim -}}
 {{- if and (.Values.preserveRuntimeConfig | default false) $runtimeImageVersion -}}
   {{- $_ := set $rootCtx.Values "IMAGE_VERSION" $runtimeImageVersion -}}
 {{- end -}}
+
 apiVersion: apps/v1
 kind: {{ .Values.workload.kind }}
 metadata:

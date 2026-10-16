@@ -213,6 +213,9 @@ OCI repository 名为：
 - 只要启动参数中存在域名占位符就会启用域名逻辑；没有显式 ingress 时，默认路由到第一个容器的第一个端口。
 - Ingress class 固定为 `higress`，支持 Higress Header、Query、Method 匹配和 host/path rewrite 注解。
 - Ingress 后端指向子应用时，通过子 Chart 对应 values 的 `fullnameOverride` 获取服务名。
+- 安装后切换 Ingress 转发仅在 `preserveRuntimeConfig=true` 时允许沿用运行配置，未开启时不 lookup Ingress，后端按新版 Chart 正常升级。开启后还需通用注解 `w7.cc/ingress-backends` 明确标记需要保留的 Service 转发，不依赖应用类型或 `gatewayEnabled`。JSON 按发布配置解析出的来源 Service 名称匹配，例如 `{"app-service":{"name":"proxy-service","port":{"number":80}}}`；也支持 `port: {"name":"http"}`。同一个 Ingress 中所有指向该来源 Service 的路由使用指定目标；未匹配的后端继续使用新版 Chart。
+- `common.runtimeIngressBackends` 只负责开关、读取注解及必要的 JSON/结构检查：映射为对象，目标包含非空名称，端口对象仅含 `number` 或 `name` 之一。Service 名称格式、端口类型和合法范围由 tradition-tool 等写入方在保存时校验，模板不重复实现；旧版 Ingress API 的兼容选择保留。
+- 模板 lookup 同名 Ingress 并保留上述注解，仅应用 Service 名称/端口覆盖；域名、路径、TLS、其他注解和未匹配后端仍由新版 Chart 生成。未开启保留或未设置运行标记时，按发布配置正常渲染；仅在 values 中配置同名注解不会自动启用保留，空对象表示无保留规则。修改工具须将转发目标与注解在同一次带资源版本校验的 Patch 中写入，单独修改 spec 不会自动记录保留意图。该记录随 Ingress 卸载删除，无额外资源；离线 `helm template` 无法读取运行中的注解，使用升级时的集群 lookup 生效。
 
 ### 4.5 Shell 生命周期
 
@@ -448,6 +451,12 @@ rm -rf -- "$plugin_install_path"
 5. 把工具子应用的 `PVC_NAME.module_name` 指向当前传统应用。
 
 开启 NGINX 网关时，编辑器给 `w7-traditiontool` 设置隐藏启动参数 `gatewayEnabled=true`，并把传统应用 Ingress 后端改为工具子应用及其实际端口。关闭网关时显式设置 `gatewayEnabled=false`，不删除工具依赖。
+
+tradition-tool 支持安装后切换网关：直接修改工具自身的镜像、启动命令和端口等容器配置，并在工具 Deployment 的 `w7.cc/tradition-runtime-config` 标记需要保留的 image、imagePullPolicy、command、args、ports、env，以及 `servicePorts: true`。不再在主应用上存储 `gatewayEnabled` 运行开关，也不通过 `w7.cc/tradition-runtime-workload` 关联主 Deployment。工具 Chart 默认开启自己的 `preserveRuntimeConfig`，升级时只读取同名工具 Deployment/Service 的标记与实际配置，保留已修改字段及 Service 类型/端口；空字段保持清空，不复制 nodePort 等集群分配字段，资源限制和挂载等未标记字段仍随新版 Chart。没有标记时按本次发布默认生成，工具的 `gatewayEnabled` values 只负责默认容器选择。页面依据工具实际容器配置显示状态。Ingress 转发在主应用已开启 `preserveRuntimeConfig` 的前提下使用 4.4 节的通用保留注解：工具将应用与工具两个来源 Service 映射到本次选定的目标，并与实际后端同时更新；关闭时使用应用当前 Service 端口。根 Chart 的通用 Ingress 模板只读取该映射，不识别网关开关或传统应用类型。
+
+配套能力统一由 tradition-tool 自身的 Chart 声明：工具 Deployment 的 `w7.cc/tradition-gateway` 提供自身 Service 名称和实际保留的 HTTP 端口，`w7.cc/tradition-gateway-containers` 提供开启和关闭两份容器配置，供 UI 复用镜像、启动脚本和挂载。主应用通过现有 AppGroup 定位，直连端口查询实际 Service，仅 Service 返回 404 时视为不存在，其他查询错误阻止操作。ZPK 的通用 Workload 模板不输出工具能力注解，也不增加 `traditionGateway` values 或工具依赖判断。它们是工具 Chart 输出的 Kubernetes 注解，不增加 manifest 输入字段。UI 需要新版工具 Chart 才启用开关，旧版运行中的 nginx 仍可编辑配置；完整升级保留需要更新工具 Chart/UI，并使用已支持通用 Ingress 后端保留机制的应用 Chart。
+
+后期开启时由工具先切为带 shell 的 nginx 准备容器，在现有 PVC 挂载中优先使用已有站点配置；文件不存在时由工具自行生成常用初始配置（有 Service 端口时，PHP 镜像使用 PHP-FPM 配置、其他应用使用 HTTP 反向代理；无端口时提供静态站点配置），允许用户在开启前调整。准备 shell 属于临时步骤，不标记为需要保留的容器配置；校验成功后保存正式 nginx 的运行字段，启动 nginx、等待就绪后再切换 Ingress；已有配置不覆盖。关闭先恢复直连应用的 Ingress，再切回 pause 并保存工具自身的运行字段，配置目录保留。操作使用资源版本校验，跨资源部分失败明确提示并支持重试。发布时未开启网关的配置 Job 挂载逻辑保持不变，后期开启不依赖该 Job 写入配置。最新模板始终从共享存储的 `template-configs/<主域名>.conf` 读取，文件缺失时不显示最新模板入口，工具生成的初始配置不充当应用最新模板。
 
 打包时工具已经是普通本地子 Chart，并非每次仅根据 `depends.from` 临时下载。传统应用打包器还会：
 

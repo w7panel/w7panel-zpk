@@ -6,6 +6,18 @@ openssl req -new -x509 -key registry-key.pem -out registry-cert.pem -days 365 -s
 
 上传或导入 Helm 包时，Chart 作者需主动接入 sidecar 模板插槽并声明实际运行账号，参考 [Helm Chart 接入 Sidecar 示例](HELM_SIDECAR_INTEGRATION.md)。完整打包协议见 [Helm Sidecar 集成约定](HELM_SIDECAR.md)。
 
+## 修改制品为环境应用分类和原生应用类型
+
+在 ZPK 服务所在环境中执行（`server` 为服务端可执行文件，不是独立上传 CLI）：
+
+```sh
+./server respo:set-environment-category --identifie=w7-phptool
+```
+
+命令使用服务当前配置的数据库，按标识查找制品，将原分类替换为“环境应用”，同时将最新版本的根 `manifest.yaml` 中 `application.type` 改为 `docker`（原生应用）。历史版本、子应用和其他配置保持原样，重复执行不会重写已经是原生应用的 manifest。
+
+分类须存在于当前配置的制品市场中；分类保存失败时会恢复原 manifest，恢复失败会明确报错，数据库迁移期间禁止修改。需要指定服务配置时可附加 `--config-file /path/to/config.yaml`。类型修改沿用配置编辑器的 manifest 保存方式，不会自动发布 OCI、重新打包 Helm 或同步修改市场商品；要让安装包使用新类型，需再按原流程打包发布。
+
 ## 制品市场菜单
 
 制品存在商品订单菜单时，仓库 `info` 接口会基于当前 Helm 包状态和 Bindings 内容生成缓存键，覆盖包内 MicroApp 的 `name: market` 菜单及独立的外部 iframe `backend_config`。没有市场 Binding 时直接返回原 Helm 包地址，不解包或重打；相同基础包和 Bindings 复用已有动态包，内容变化时才重新生成。动态包与 `PackFormulaToHelmAndPack` 产物位于同一目录，文件名格式为 `{原文件名去扩展名}-{hash}.tgz`，空闲 24 小时后清理。

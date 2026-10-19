@@ -239,10 +239,10 @@ func (self *Depot) GetFormula(name string, version string, user *entity.Registry
 		slog.Error("unPackManifestFilesFromOci err", "formula_name", result.Name, "version", result.Version, "err", err)
 		return nil, err
 	}
-	sharedFilesDir := self.getSharedFilesDir(result.Name)
+	sharedFilesDir := self.getAssetsDir(result.Name)
 	if !function.FileExists(sharedFilesDir) || function.IsDirEmpty(sharedFilesDir) {
-		if err = self.unPackSharedFilesFromOci(result); err != nil {
-			slog.Error("unPackSharedFilesFromOci err", "formula_name", result.Name, "version", result.Version, "err", err)
+		if err = self.restoreAssetsFromOCI(result); err != nil {
+			slog.Error("restoreAssetsFromOCI err", "formula_name", result.Name, "version", result.Version, "err", err)
 			return nil, err
 		}
 	}
@@ -418,7 +418,8 @@ func (self *Depot) SaveManifestFile(formula *Formula, filename string, content s
 	return self.saveFile(filepath.Join(self.basePath, formula.GetFilesRelativeDir()), filename, content)
 }
 
-func (self *Depot) SaveSharedFile(formula *Formula, filename string, content string) error {
+// SaveAssetFile 仅保存制品附属资源到本地，不同步 OCI，也不允许写入版本专属 manifest。
+func (self *Depot) SaveAssetFile(formula *Formula, filename string, content string) error {
 	filename, err := NormalizeFormulaFilePath(filename)
 	if err != nil {
 		return err
@@ -426,7 +427,7 @@ func (self *Depot) SaveSharedFile(formula *Formula, filename string, content str
 	if IsFormulaManifestPath(filename) {
 		return fmt.Errorf("manifest 文件必须保存到版本目录: %s", filename)
 	}
-	return self.saveFile(self.getSharedFilesDir(formula.Name), filename, content)
+	return self.saveFile(self.getAssetsDir(formula.Name), filename, content)
 }
 
 func (self *Depot) saveFile(filesDir, filename, content string) error {
@@ -493,8 +494,9 @@ func (self *Depot) GetManifestFileList(formula *Formula) (map[string]string, err
 	return files, nil
 }
 
-func (self *Depot) GetSharedFileList(formula *Formula) (map[string]string, error) {
-	files, err := self.getFileList(self.getSharedFilesDir(formula.Name))
+// GetAssetFiles 返回本地制品附属资源的相对路径及内容，不包含版本专属 manifest。
+func (self *Depot) GetAssetFiles(formula *Formula) (map[string]string, error) {
+	files, err := self.getFileList(self.getAssetsDir(formula.Name))
 	if err != nil {
 		return nil, err
 	}
@@ -529,7 +531,7 @@ func (self *Depot) getFileList(dir string) (map[string]string, error) {
 	return files, nil
 }
 
-func (self *Depot) getSharedFilesDir(formulaName string) string {
+func (self *Depot) getAssetsDir(formulaName string) string {
 	return filepath.Join(self.basePath, GetFormulaRelativeDir(formulaName, 0), "files")
 }
 
@@ -541,7 +543,7 @@ func (self *Depot) GetBackendZipFileList(formula *Formula) ([]string, error) {
 	}
 
 	fileList, _ := self.GetManifestFileList(formula)
-	sharedFiles, _ := self.GetSharedFileList(formula)
+	sharedFiles, _ := self.GetAssetFiles(formula)
 	for path, content := range sharedFiles {
 		fileList[path] = content
 	}

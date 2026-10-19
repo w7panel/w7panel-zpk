@@ -177,7 +177,7 @@ func (c FormulaAttach) ManifestFiles(ctx *gin.Context) {
 	})
 }
 
-func (c FormulaAttach) SaveSharedFile(ctx *gin.Context) {
+func (c FormulaAttach) SaveAssetFile(ctx *gin.Context) {
 	type ParamsValidate struct {
 		Identifie string `form:"identifie" json:"identifie" binding:"required"`
 		Filename  string `form:"filename" json:"filename" binding:"required"`
@@ -198,7 +198,7 @@ func (c FormulaAttach) SaveSharedFile(ctx *gin.Context) {
 		c.JsonResponseWithError(ctx, err, 500)
 		return
 	}
-	if err = depot.PersistSharedFile(formula, params.Filename, sanitizeFormulaAttachContent(params.Content)); err != nil {
+	if err = depot.SaveAssetFileAndSyncOCI(formula, params.Filename, sanitizeFormulaAttachContent(params.Content)); err != nil {
 		c.JsonResponseWithError(ctx, err, 500)
 		return
 	}
@@ -206,7 +206,7 @@ func (c FormulaAttach) SaveSharedFile(ctx *gin.Context) {
 	c.JsonSuccessResponse(ctx)
 }
 
-func (c FormulaAttach) SharedFiles(ctx *gin.Context) {
+func (c FormulaAttach) AssetFiles(ctx *gin.Context) {
 	type ParamsValidate struct {
 		Identifie string `form:"identifie" json:"identifie" binding:"required"`
 	}
@@ -221,7 +221,7 @@ func (c FormulaAttach) SharedFiles(ctx *gin.Context) {
 		c.JsonResponseWithError(ctx, err, 500)
 		return
 	}
-	fileList, err := depot.GetSharedFileList(formula)
+	fileList, err := depot.GetAssetFiles(formula)
 	if err != nil {
 		c.JsonResponseWithError(ctx, err, 500)
 		return

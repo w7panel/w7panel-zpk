@@ -11,24 +11,26 @@ import (
 	commonlogic "github.com/w7panel/w7panel-zpk/common/logic"
 )
 
-// FormulaSharedOciTag stores formula-level files which are shared by all
-// versions. It is reserved and must never be treated as a formula version.
-const FormulaSharedOciTag = "shared"
+// AssetsOCITag 是保存制品附属资源的保留 OCI tag。
+// 这些资源归属于制品，不随版本隔离，也不包含版本专属 manifest。
+// tag 值沿用 shared，以兼容已有附件数据。
+const AssetsOCITag = "shared"
 
-// PersistSharedFile keeps the original local-file editing flow and persists
-// the complete shared working directory to OCI after the mutation succeeds.
-func (d *Depot) PersistSharedFile(formula *Formula, filename, content string) error {
-	if err := d.SaveSharedFile(formula, filename, content); err != nil {
+// SaveAssetFileAndSyncOCI 先在本地保存一份制品附属资源，再同步全部制品附属资源到 OCI。
+// 如只需本地保存，使用 SaveAssetFile。
+func (d *Depot) SaveAssetFileAndSyncOCI(formula *Formula, filename, content string) error {
+	if err := d.SaveAssetFile(formula, filename, content); err != nil {
 		return err
 	}
-	if err := d.packSharedFilesToOci(formula); err != nil {
+	if err := d.syncAssetsToOCI(formula); err != nil {
 		return fmt.Errorf("保存共享文件到 OCI 失败: %w", err)
 	}
 	return nil
 }
 
-func (d *Depot) packSharedFilesToOci(formula *Formula) error {
-	files, err := d.GetSharedFileList(formula)
+// syncAssetsToOCI 将本地的全部制品附属资源上传到保留的 OCI tag。
+func (d *Depot) syncAssetsToOCI(formula *Formula) error {
+	files, err := d.GetAssetFiles(formula)
 	if err != nil {
 		return err
 	}
@@ -40,16 +42,16 @@ func (d *Depot) packSharedFilesToOci(formula *Formula) error {
 	if err != nil {
 		return err
 	}
-	return commonlogic.PushOciToRemote(remoteOci, FormulaSharedOciTag, descriptors, nil)
+	return commonlogic.PushOciToRemote(remoteOci, AssetsOCITag, descriptors, nil)
 }
 
-// unPackSharedFilesFromOci restores the local shared working directory.
-func (d *Depot) unPackSharedFilesFromOci(formula *Formula) error {
+// restoreAssetsFromOCI 从 OCI 恢复制品附属资源到本地目录。
+func (d *Depot) restoreAssetsFromOCI(formula *Formula) error {
 	remoteOci, err := commonlogic.GetDefaultRemoteOci(commonlogic.GetFormulaOciName(formula.Name))
 	if err != nil {
 		return err
 	}
-	manifest, err := commonlogic.GetOciManifest(remoteOci, FormulaSharedOciTag)
+	manifest, err := commonlogic.GetOciManifest(remoteOci, AssetsOCITag)
 	if errors.Is(err, commonlogic.OciManifestNotFoundErr) {
 		return nil
 	}
@@ -63,7 +65,7 @@ func (d *Depot) unPackSharedFilesFromOci(formula *Formula) error {
 			return err
 		}
 
-		targetDir := d.getSharedFilesDir(formula.Name)
+		targetDir := d.getAssetsDir(formula.Name)
 		for name, content := range files {
 			targetPath, resolveErr := resolveFormulaFilePath(targetDir, name)
 			if resolveErr != nil {

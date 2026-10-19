@@ -16,18 +16,17 @@ const (
 	MicroAppPresentationModeMultiple  = "multiple"
 )
 
-// MicroAppPresentation describes how a panel should present MicroApps that
-// provide the same capability. Key identifies the capability group and Mode
-// controls whether the panel displays only one entry or every entry in that
-// group. When both fields are empty, no presentation metadata is written and
-// the panel's default MicroApp behavior is preserved.
+// MicroAppPresentation 声明面板的菜单展示策略：相同 name 的 MicroApp
+// 按依赖关系归入同一个大菜单时，组内只显示一个入口，还是全部显示。
+// ZPK 仅输出展示元数据，具体菜单归组和入口选择由面板实现。
+// Key 和 Mode 都为空时，不输出展示元数据，沿用面板默认行为。
 type MicroAppPresentation struct {
-	// Key is written to the w7.cc/presentation-key label. MicroApps with the
-	// same key are treated as members of the same capability group.
+	// Key 写入 w7.cc/presentation-key label，作为菜单展示分组标识；
+	// 不替代 MicroApp 的 name 或依赖关系。
 	Key string `json:"key"`
 
-	// Mode is written to the w7.cc/presentation-mode annotation. Singleton
-	// displays one MicroApp from the group, while multiple displays all of them.
+	// Mode 写入 w7.cc/presentation-mode annotation：
+	// singleton 表示组内只显示一个入口，multiple 表示全部显示。
 	Mode string `json:"mode"`
 }
 

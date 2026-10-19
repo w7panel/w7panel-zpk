@@ -856,7 +856,7 @@ helm template <release> <generated-chart-dir> -f <install-values.yaml>
 | 远程子应用导入 | `app/respo/logic/formula/formula_child_app_import.go`、`ui/src/utils/child-app-import.js` |
 | 应用插件/传统应用 manifest 整形 | `ui/src/utils/plugin-app.js`、`ui/src/utils/tradition-app.js` |
 | 五类应用编辑器 | `ui/src/components/files-manifest.vue` |
-| 制品本地/OCI 存储 | `app/respo/logic/formula/depot.go`、`app/respo/logic/formula/formula_share_file.go`、`common/logic/oci_pack.go` |
+| 制品本地/OCI 存储及附属资源 | `app/respo/logic/formula/depot.go`、`app/respo/logic/formula/depot_oci.go`、`app/respo/logic/formula/depot_assets.go`、`common/logic/oci_pack.go` |
 | 附件存储、永久下载 Token 与 ZIP 缓存 | `app/respo/logic/attach/attach.go`、`app/respo/logic/attach/storage.go` |
 | 上传/下载 | `app/respo/http/controller/attach.go` |
 | info/helm_url/install_formulas | `app/respo/http/controller/formula.go` |

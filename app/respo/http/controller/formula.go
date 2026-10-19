@@ -470,7 +470,7 @@ func (c Formula) Detail(ctx *gin.Context) {
 		return
 	}
 
-	fileList, err := depotLogin.GetSharedFileList(formula)
+	fileList, err := depotLogin.GetAssetFiles(formula)
 	if err != nil {
 		c.JsonResponseWithError(ctx, err, 500)
 		return

@@ -50,7 +50,7 @@ func (self Depot) OnRepositoryPushed(payload registry.RegistryRepositoryWebHookP
 		return
 	}
 	tag := payload.Event.Target.Tag
-	if tag == "" || tag == FormulaSharedOciTag {
+	if tag == "" || tag == AssetsOCITag {
 		return
 	}
 

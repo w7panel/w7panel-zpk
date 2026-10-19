@@ -186,6 +186,10 @@ func (hc *HelmPack) PackToHelm() error {
 		if err := hc.packTraditionApp(helmDir, templatesDir); err != nil {
 			return err
 		}
+	} else if hc.Manifest.Application.Type == logic2.SystemImageApp {
+		if err := hc.packSystemImageApp(helmDir, templatesDir); err != nil {
+			return err
+		}
 	} else {
 		if err := hc.packWorkloadApplication(helmDir, templatesDir, hc.defaultHelmValuesOptions(), true, nil); err != nil {
 			return err
@@ -559,8 +563,8 @@ func isNumericPathPart(part string) bool {
 	if part == "" {
 		return false
 	}
-	_, err := strconv.Atoi(part)
-	return err == nil
+	index, err := strconv.Atoi(part)
+	return err == nil && index >= 0
 }
 
 func mergeValuesMap(dst, src map[string]interface{}) {
@@ -874,9 +878,6 @@ func (hc *HelmPack) generateValuesYaml(rootDir string, options helmValuesOptions
 			"serviceAccountName":     `{{ include "common.serviceAccountName" . }}`,
 			"sharedSidecarResources": hc.IsSubFormula,
 		}
-	}
-	if hc.Manifest.Application.Type == logic2.SystemImageApp {
-		values["preserveRuntimeConfig"] = true
 	}
 	values["jobs"] = hc.buildJobValues(platform, options.shellJobContainerValues)
 	if options.addValues != nil {
@@ -1327,9 +1328,6 @@ func (hc *HelmPack) getImageValues(container logic2.ContainerV2) map[string]inte
 	imageName := container.Image
 	if imageName == "" {
 		imageName = GetBuildImageName(hc.Manifest.Application)
-	}
-	if hc.Manifest.Application.Type == logic2.SystemImageApp {
-		imageName = strings.ReplaceAll(imageName, "{version}", "{{ .Values.IMAGE_VERSION }}")
 	}
 	return imageValues(imageName, container.ImagePullPolicy)
 }

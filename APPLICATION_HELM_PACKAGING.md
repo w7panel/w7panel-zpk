@@ -14,7 +14,7 @@
 | 应用插件 | `app-plugin` | 应用插件专用 Job 打包器 | Helm hook Job，可选 MicroApp/Site；没有自己的常驻 Workload | 复用所选传统应用的 `site-storage` PVC |
 | 传统应用 | `tradition` | 通用工作负载生成器 + 传统应用增强 | Workload、Service、Ingress、代码/NGINX Job、可选 NGINX 子 Chart | 安装方传入的 `PVC_NAME`，主要挂载为 `site-storage` |
 | Helm/K8sYaml 应用 | `helm` | 解包并改写用户 Chart，或把 YAML 写入 templates | 完全由用户 Chart/YAML 决定，ZPK 可追加子 Chart、MicroApp、Site、sidecar | 完全由用户 Chart/YAML 决定 |
-| 系统镜像 | `system-image` | 通用工作负载生成器 | Sysbox Deployment、Service、Job | 安装方传入的 `PVC_NAME`，挂载到 `/system-rootfs` |
+| 系统镜像 | `system-image` | `helm_systemimageapp.go`，复用通用工作负载生成器 | Sysbox Deployment、Service、Job | 安装方传入的 `PVC_NAME`，挂载到 `/system-rootfs` |
 
 最重要的边界：
 
@@ -144,7 +144,8 @@ OCI repository 名为：
 2. 只要 `platform.helm.chartName`、`repository` 或 `depend_yamls` 任一个非空，就走用户 Helm 包分支。
 3. `app-plugin` 走应用插件分支。
 4. `tradition` 走传统应用分支。
-5. 其余类型，包括 `docker` 和 `system-image`，走通用 Workload 分支。
+5. `system-image` 走系统镜像分支，复用通用 Workload 生成器。
+6. 其余类型，包括 `docker`，走通用 Workload 分支。
 
 读取旧 manifest 时，`environment` 会迁移为 `tradition`。
 
@@ -407,7 +408,7 @@ rm -rf -- "$plugin_install_path"
 
 打包时所有传统应用容器 image 中的 `{version}` 都替换为 `{{ .Values.IMAGE_VERSION }}`。
 
-传统应用开启 `preserveRuntimeConfig`：渲染时读取同名工作负载现有 `IMAGE_VERSION`，未找到时使用本次 values；系统镜像也统一使用 `preserveRuntimeConfig`，开关设置仍在 `helm_pack.go` 中。
+传统应用开启 `preserveRuntimeConfig`：渲染时读取同名工作负载现有 `IMAGE_VERSION`，未找到时使用本次 values；系统镜像也统一使用 `preserveRuntimeConfig`，开关设置在 `helm_systemimageapp.go` 中。
 
 额外运行配置使用工作负载 metadata annotation `w7.cc/tradition-runtime-config` 显式选择保留字段，例如 `{"containers":{"php":["command","args","ports","readinessProbe"]},"servicePorts":true}`。工具应在修改资源时同步写入标记。容器按名称匹配，仅支持 command、args、ports、livenessProbe、readinessProbe、startupProbe；被标记但已清空的字段保持清空。Service 端口按实际同名 Service 保留，不复制 nodePort 等集群分配字段。标记会随工作负载重新渲染保存，删除标记项即可恢复跟随制品。未标记字段、新容器、首次安装及离线渲染使用制品默认值。此机制不保留 init/Sidecar 容器、nginx 文件，也不自动推导端口关联；工具仍须协调 Service、探针和 nginx。升级需要读取工作负载及 Service 的权限；删除重建和 Helm 回滚不保证保留运行覆盖。现有工具未写标记时仅镜像版本保留生效。
 
@@ -553,7 +554,7 @@ UI 会强制：
 
 ### 9.2 打包
 
-系统镜像没有单独 packer，而是走通用 Workload 生成器。差异仅在 `getImageValues` 把 `{version}` 改为 `{{ .Values.IMAGE_VERSION }}`，其余 Workload、Service、Shell 和权限模板与原生应用一致。
+系统镜像通过 `helm_systemimageapp.go` 的 `packSystemImageApp` 进入通用 Workload 生成器。独立文件负责类型专属 values（`preserveRuntimeConfig`），并通过 `withSystemImageAppImages` 克隆容器列表、把镜像中的 `{version}` 改为 `{{ .Values.IMAGE_VERSION }}`，供 Workload 和 Shell Job 共用，不修改原 manifest。其余 Workload、Service、Shell 和权限模板与原生应用一致。分流仍位于用户 Helm 包分支之后，保留既有优先级。
 
 `runtimeClassName` 包含 `sysbox-runc` 时，Pod 还会设置 `enableServiceLinks: false`。
 

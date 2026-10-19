@@ -7,6 +7,13 @@
 - 开始先查看 `git status --short`、相关差异和文档，保留用户的修改、未跟踪文件与暂存状态；不擅自提交、暂存、回退或清理。
 - 保持任务范围和现有架构；跨市场、面板、控制台的协议变更需要说明兼容性，不自动修改其他仓库。
 
+## AI 编码阅读入口
+
+- 本文件提供默认加载的项目规则与核心逻辑摘要。分析或修改代码时，先阅读 [AI_CODING_GUIDE.md](AI_CODING_GUIDE.md) 的相关模块导航，再按任务阅读 [AI_CODE_LOGIC.md](AI_CODE_LOGIC.md) 的具体调用链、UI 状态转换与失败分支；纯文档或简单局部任务按需读取。
+- 以 `provider.go → controller → logic → service / DAO` 追踪后端，以 `router → views → components → utils → API` 追踪 UI；不能只根据文件名或依赖列表推断架构。
+- 两份参考文档是代码扫描快照，不是测试通过证明。协议修改同时核对专项文档、当前实现和相关测试；发现不一致先说明，不自行新增字段或扩大兼容降级。
+- 保留历史目录和协议拼写 `respo`、`identifie`。区分数据库版本 ID、版本字符串、登录 token、下载 token 和安装 ticket，不能因命名相似而互换。
+
 ## 项目结构
 
 - 主 Go 模块为 `github.com/w7panel/w7panel-zpk`，Go 版本见 `go.mod`（当前 1.25.0），使用 Gin、Rangine、GORM、OCI / ORAS、Helm 和 Kubernetes SDK。
@@ -15,8 +22,31 @@
 - `app/respo/logic/formula/`：制品 manifest、版本、附件、依赖和安装 ticket；`logic/helm/`：Chart 生成和动态打包；`logic/goods/`：商品发布；`logic/zpkmarket/`：市场订单及运行配置。
 - `common/service/`：W7 SDK、OCI、registry 和本地 / S3 附件存储；`common/entity/`、`common/dao/` 为模型及生成查询，`common/accessor/` 为字段类型；`database/table.yaml` 为生成配置。
 - `cli/` 与 `tradition-plugin/` 各有独立 `go.mod`，需分别测试；CLI 通过本地 replace 引用主模块。根目录的测试不会自动覆盖两个子模块。
-- `ui/` 是 Vue 3、Vue Router、Vuex、Arco Design、JavaScript / Vue CLI 前端；根 `package.json` 不是业务前端。
+- `ui/` 是 Vue 3、Vue Router、Arco Design、JavaScript / Vue CLI 前端；实际状态主要通过组件 data/computed/watch、props、事件与 utils 管理。虽声明 Vuex 依赖，目前 `ui/src` 未见 store 使用，不假定已有统一状态仓库；根 `package.json` 不是业务前端。
 - `charts/` 是 ZPK 服务自身的部署 Chart；制品运行 Chart 的生成逻辑在 `app/respo/logic/helm/`，不要混淆两者。
+
+## 后端核心逻辑摘要
+
+- **启动有写入副作用**：`main.go` 加载配置及数据库切换状态、初始化 DAO/SDK，再注册三个 Provider。Provider 可能迁移数据库、规范化制品名、初始化默认用户/命名空间、恢复后台任务。不能为查看帮助或验证启动直接使用真实配置运行服务。
+- **制品加载不是纯查询**：`Depot.GetFormula` 聚合数据库元数据、版本文件、制品级 BaseInfo 与子 manifest，可能从 OCI 恢复附件并异步恢复图标。传入非管理员 user 才在此处限制所属用户；传 nil 的调用者须有自己的准入规则。轻量选择器优先沿用 `SelectableList` / `FormulaInstallOnlyOnce`。
+- **数据分层**：版本目录保存根/子 manifest；制品级设置、简介和图标独立维护；完整 manifest 不只存在数据库中。根 manifest 保存会应用 BaseInfo。`FormulaSetting.Get` 在旧记录缺 BaseInfo 时可能写回；设置中的 `*bool` 区分省略与显式 false。
+- **保存与发布分阶段**：版本发布先同步打包 OCI，按设置同步市场商品，再进入 `publish_loop.go` 后台构建 Helm。接口“发起打包成功”不等于全部发布完成；保留 pending=1、success=2、fail=3、未发布/下架=-1 与历史已发布状态 0 的语义。同制品按队列串行、任务去重，并在启动恢复 pending。
+- **跨存储无统一事务**：文件、数据库、OCI、市场及 Kubernetes 操作可能部分成功。修改前明确阶段、失败返回和补偿方式；不能把尽力恢复说成原子回滚。版本下架还会选择前一已发布版本并重新发布。
+- **安装 info 多模式**：`Formula.Info` 区分身份/token、普通安装/升级、`runtime_context` 和 `full_manifest`。订单可能切换目标制品或限定版本；运行上下文不是安装授权结果，完整导入响应不能按普通响应裁剪。预检、ticket 与订单核销中的域名、应用标识、升级/重装信息必须一致。
+- **文件与附件协议**：manifest/file 与 share-file 分开，后者禁止 manifest；Depot 空内容表示删除。复用路径规范化和范围校验。上传返回的 `file://` 是逻辑引用；一次性下载映射命中即删除，重试可能需要重新获取 info。
+- **集群配置有真实副作用**：Registry 存储设置会更新 ConfigMap 并触发 Deployment rollout，可能更新 CronJob；部署规则在 push 事件中按 tag 匹配并 Patch 容器镜像。不能把这些接口当作普通配置保存或隔离验证入口。
+
+## UI 核心逻辑摘要
+
+- **启动与身份**：`main.js` 支持 Wujie/独立挂载；`App.vue` 通过宿主 access_token 登录 OIDC，再获取当前用户并经 router-view props 传递。`user-mixin.js` 只控制展示，不能替代后端权限。
+- **请求统一入口**：复用 `utils/index.js`、`request-base.js`、`request-auth.js`、`panel-token.js`。区分宿主 access_token、本地 `X-Zpk-Token` 和代理用 `X-W7Panel-Token`；跨来源请求保留 token 发送限制。过期登录共用进行中的 Promise，原请求仅重试一次，登录请求禁止递归刷新。
+- **错误传播需核对**：当前 Axios 对部分 408/429/422 分支返回 undefined，页面的部分 publish catch 仅提示不重新抛错；不能假设所有异常都会 reject，或 Promise resolve 就代表业务成功。改动时追踪调用方 then/catch 与跳转、成功提示。
+- **编辑器三层状态**：`respo-edit.vue` 管文件树、主子应用和持久化；`files-manifest.vue` 组合 `components/manifest/*.js` 管表单。流程为 YAML → json → form → apply/serialize → json → YAML → complete 事件。新增字段同时核对初始化、watch、类型切换、提交及重新加载；保留 `_initializing` 与保存快照，避免初始化误改和未保存内容丢失。
+- **提交顺序**：表单校验 → 同步类型依赖 → 保存类型设置/分类 → 清理并序列化 manifest → 父页面写文件 → 按路径继续编辑或发布。传统应用还要确保工具子应用存在。基础信息弹框依次保存 BaseInfo、readme、分类、可选图标，均不是单次事务。
+- **类型与局部编辑**：切换类型经确认后清理旧类型专属配置；网关插件 once=true，传统/系统镜像 once=false。`pureManifest` 避免写制品级设置；`startParamsOnly` 克隆原 manifest 后仅更新启动参数，不能用默认表单覆盖导入字段。
+- **子应用导入**：后端按选定版本下载完整 manifest 与来源隔离附件；前端 `utils/child-app-import.js` 先保存全部子文件并检查 allSettled 结果，再写根依赖，失败时尽力恢复旧文件和组件状态。保留 required/from/version、order、更新检查 token 和主应用未保存保护。
+- **菜单配置**：`respo-editfront.vue` / `files-manifestfront.vue` 把角色、菜单、后端地址/端口、代理参数与 frontend props 转为 bindings；`getMenu` 按 iframe/internal/external/网关插件分流。端口候选来自主子 manifest；`${system.*}` 等占位符留给运行时注入，不替换为当前浏览器值。
+- **上传与异步清理**：`files-upload.vue` 计算全文件 MD5，按 1 MiB 顺序上传，多分片后另发 finish；当前 abort 为空实现。保留响应嵌套和后端分片参数。新增异步逻辑检查过期响应、timer、事件监听和 object URL 的清理。
 
 ## 开发规范
 
@@ -25,7 +55,7 @@
 - 在边界校验输入与远程响应，注意上下文、网络超时和失败恢复；不能把外部调用失败当作成功，也不能随意扩大兼容性降级范围。
 - 修改 `*.gen.go` 前先核对数据库结构、`database/table.yaml` 与 accessor，优先使用项目既有生成流程，不进行无关的手工格式化或重构。
 - 数据库逻辑兼顾 MySQL 和 SQLite 以及现有数据库切换 / 禁写保护，不未经授权运行迁移命令或操作工作目录中的真实数据库。
-- 前端复用既有组件、Vuex / utils 和请求方式；不为局部功能改用 Vite、TypeScript 或另一套 UI 库。
+- 前端复用既有组件、状态传递、utils 和请求方式；不为局部功能改用 Vite、TypeScript 或另一套 UI 库。
 
 ## respo/info HTML 提示职责与契约
 
@@ -55,7 +85,7 @@
 ## 制品与打包契约
 
 - 变更 manifest、应用类型、依赖、PVC、生命周期或 Chart 生成前，阅读 `APPLICATION_HELM_PACKAGING.md` 中相关章节；涉及 Sidecar 时同时阅读 `HELM_SIDECAR.md`。实现与文档矛盾时先说明，不擅自新增协议字段。
-- 应用类型包括 `docker`、`app-plugin`、`tradition`、`helm`、`system-image`；按现有分流与存储边界处理，不能套用单一打包路径。
+- 应用类型包括 `docker`、`app-plugin`、`tradition`、`helm`、`system-image` 和独立的 `gateway-plugin`。打包优先级为网关插件 → 存在 Helm 输入配置 → 应用插件 → 传统应用 → 通用 Workload，不能只凭 type 推断。`SidecarApp` 常量不代表支持任意 sidecar manifest；按实际分流与存储边界处理。
 - `application.order` 原样写入 MicroApp 的 `w7.cc/order` 标签，主应用为 0，子应用按列表排序为 1...n，市场 MicroApp 为 9999；不根据 `platform.depends` 重写顺序。
 - 市场绑定遵循 README：无 Binding 时返回原 Helm 包；有 Binding 时按原包状态及 Bindings 内容缓存动态包。市场域名进入 `backend_config[role=zpk-market].backend_url`，菜单 `do` 保持路由语义。
 - 市场菜单使用已有 MicroApp 字段及 founder 可见性；网关 WasmPlugin 与配置 MicroApp 使用相同 `w7.cc/group-name` 标签归组，不恢复已废弃的关联注解。
@@ -65,6 +95,8 @@
 - 路径、压缩包解压、远程下载和附件操作要验证目标范围，防止路径穿越与同名来源覆盖；保留已有权限和签名校验。
 
 ## 验证命令
+
+- 完整测试矩阵、Helm 渲染验证要求和已知静态检查问题见 `TESTING.md`；新增测试工作流覆盖三个 Go 模块与 UI 请求单测。
 
 先跑受影响包的测试，再根据修改范围扩大；以下 Go 命令从对应模块根目录运行。
 

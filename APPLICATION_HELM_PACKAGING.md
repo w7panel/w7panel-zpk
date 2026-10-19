@@ -13,7 +13,7 @@
 | 原生应用 | `docker` | 通用工作负载生成器 | Deployment/StatefulSet/DaemonSet、Service、Ingress、Job | 外部 PVC、StatefulSet claim template、emptyDir 或 hostPath |
 | 应用插件 | `app-plugin` | 应用插件专用 Job 打包器 | Helm hook Job，可选 MicroApp/Site；没有自己的常驻 Workload | 复用所选传统应用的 `site-storage` PVC |
 | 传统应用 | `tradition` | 通用工作负载生成器 + 传统应用增强 | Workload、Service、Ingress、代码/NGINX Job、可选 NGINX 子 Chart | 安装方传入的 `PVC_NAME`，主要挂载为 `site-storage` |
-| Helm/K8sYaml 应用 | `helm` | 解包并改写用户 Chart，或把 YAML 写入 templates | 完全由用户 Chart/YAML 决定，ZPK 可追加子 Chart、MicroApp、Site、sidecar | 完全由用户 Chart/YAML 决定 |
+| Helm/K8sYaml 应用 | `helm` | `helm_helmapp.go`：解包并改写用户 Chart，或把 YAML 写入 templates | 完全由用户 Chart/YAML 决定，ZPK 可追加子 Chart、MicroApp、Site、sidecar | 完全由用户 Chart/YAML 决定 |
 | 系统镜像 | `system-image` | `helm_systemimageapp.go`，复用通用工作负载生成器 | Sysbox Deployment、Service、Job | 安装方传入的 `PVC_NAME`，挂载到 `/system-rootfs` |
 
 最重要的边界：
@@ -476,6 +476,8 @@ tradition-tool 支持安装后切换网关：直接修改工具自身的镜像�
 - 未开启系统层还原时，还会通过注解把容器系统层映射到该持久卷中的 `www/server/<release-name>/<应用标识>-<版本>/system` 逻辑路径。
 
 ## 8. Helm/K8sYaml 应用（`helm`）
+
+该流程在 `helm_helmapp.go` 中维护，由 `packHelmApp` 顺序执行用户 Chart/YAML 处理和 Sidecar host 配置。来源下载、解包、values 路径解析及合并、附加 YAML、共享存储亲和性合并均在该文件中；`helm_pack.go` 保留入口分流和公共收尾。是否进入此流程仍由 `platform.helm` 配置判断，保持现有优先级。
 
 ### 8.1 三种输入组合
 

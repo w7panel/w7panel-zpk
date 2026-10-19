@@ -850,7 +850,7 @@ helm template <release> <generated-chart-dir> -f <install-values.yaml>
 | Helm 仓库下载 | `app/respo/logic/helm/helm_repository.go` |
 | tgz 安全解包/打包 | `common/function/helm.go` |
 | 依赖订单查询与 releaseName | `app/respo/logic/zpkmarket/dependency_release.go`、`app/respo/logic/formula/formula_dependency_release_name.go`、`app/respo/logic/formula/formula_dependency_start_params.go` |
-| 云端商品发布与 DevCenter NotApp 导入 | `app/respo/logic/goods/publish.go`、`app/respo/logic/goods/notapp_import.go` |
+| 云端商品发布与 DevCenter NotApp 导入 | `app/respo/logic/zpkmarket/goods/publish.go`、`app/respo/logic/zpkmarket/cloudimport/notapp.go` |
 | ZPK Market 订单授权 | `app/respo/logic/zpkmarket/order.go` |
 | 制品安装票据 | `app/respo/logic/formula/ticket.go` |
 | 远程子应用导入 | `app/respo/logic/formula/formula_child_app_import.go`、`ui/src/utils/child-app-import.js` |

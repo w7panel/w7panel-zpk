@@ -8,7 +8,7 @@ import (
 
 	"github.com/hashicorp/go-version"
 	formulalogic "github.com/w7panel/w7panel-zpk/app/respo/logic/formula"
-	goodslogic "github.com/w7panel/w7panel-zpk/app/respo/logic/goods"
+	goodslogic "github.com/w7panel/w7panel-zpk/app/respo/logic/zpkmarket/goods"
 	"github.com/w7panel/w7panel-zpk/common/dao"
 	"github.com/w7panel/w7panel-zpk/common/entity"
 	"github.com/w7panel/w7panel-zpk/common/service/w7/devcenter"

@@ -2,7 +2,7 @@ package controller
 
 import (
 	"github.com/gin-gonic/gin"
-	goodslogic "github.com/w7panel/w7panel-zpk/app/respo/logic/goods"
+	"github.com/w7panel/w7panel-zpk/app/respo/logic/zpkmarket/cloudimport"
 	logic2 "github.com/w7panel/w7panel-zpk/common/logic"
 	"github.com/w7panel/w7panel-zpk/common/service/w7"
 	"github.com/w7panel/w7panel-zpk/common/service/w7/devcenter"
@@ -46,7 +46,7 @@ func (c CloudApp) UnPackNotApp(ctx *gin.Context) {
 		return
 	}
 
-	err := goodslogic.ImportNotAppToFormula(params.Id, logic2.User{}.GetUser(ctx), logic2.User{}.GetConsoleUid(ctx))
+	err := cloudimport.ImportNotAppToFormula(params.Id, logic2.User{}.GetUser(ctx), logic2.User{}.GetConsoleUid(ctx))
 	if err != nil {
 		c.JsonResponseWithServerError(ctx, err)
 		return

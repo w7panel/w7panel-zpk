@@ -19,7 +19,7 @@
 - 主 Go 模块为 `github.com/w7panel/w7panel-zpk`，Go 版本见 `go.mod`（当前 1.25.0），使用 Gin、Rangine、GORM、OCI / ORAS、Helm 和 Kubernetes SDK。
 - `main.go`：配置、数据库切换保护、SDK 和 provider 初始化；`app/respo/`：制品管理；`app/registry/`：仓库接口与权限；`app/system/`：用户、OIDC、存储和数据库管理。
 - 各模块的 `provider.go` 注册路由 / 命令，`http/controller/` 处理输入和响应，`logic/` 实现业务。
-- `app/respo/logic/formula/`：制品 manifest、版本、附件、依赖和安装 ticket；`logic/helm/`：Chart 生成和动态打包；`logic/goods/`：商品发布；`logic/zpkmarket/`：市场订单及运行配置。
+- `app/respo/logic/formula/`：制品 manifest、版本、附件、依赖和安装 ticket；`logic/helm/`：Chart 生成和动态打包；`logic/zpkmarket/`：市场订单及运行配置，子包 `goods/` 负责商品发布，`cloudimport/` 负责云端应用导入。
 - `common/service/`：W7 SDK、OCI、registry 和本地 / S3 附件存储；`common/entity/`、`common/dao/` 为模型及生成查询，`common/accessor/` 为字段类型；`database/table.yaml` 为生成配置。
 - `cli/` 与 `tradition-plugin/` 各有独立 `go.mod`，需分别测试；CLI 通过本地 replace 引用主模块。根目录的测试不会自动覆盖两个子模块。
 - `ui/` 是 Vue 3、Vue Router、Arco Design、JavaScript / Vue CLI 前端；实际状态主要通过组件 data/computed/watch、props、事件与 utils 管理。虽声明 Vuex 依赖，目前 `ui/src` 未见 store 使用，不假定已有统一状态仓库；根 `package.json` 不是业务前端。

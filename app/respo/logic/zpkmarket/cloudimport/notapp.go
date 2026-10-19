@@ -1,4 +1,4 @@
-package goods
+package cloudimport
 
 import (
 	"context"

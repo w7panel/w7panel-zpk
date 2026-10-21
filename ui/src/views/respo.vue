@@ -241,8 +241,9 @@ export default {
     },
     installEvent(data) {
       if (Number(data.goods_id) > 0) {
-        // 仅明确返回零授权费用时按免费制品提示，兼容未返回费用的旧服务端。
-        if (data.install_service_fee !== null && data.install_service_fee !== undefined &&
+        const approved = this.getAuditStatus(data) === 4;
+        // 仅审核通过且明确返回零授权费用时提示直接安装；未通过审核统一引导至「我的发布」。
+        if (approved && data.install_service_fee !== null && data.install_service_fee !== undefined &&
           String(data.install_service_fee).trim() !== '' && Number(data.install_service_fee) === 0) {
           modalAlert({
             title: '安装提示',
@@ -254,7 +255,6 @@ export default {
           });
           return;
         }
-        const approved = this.getAuditStatus(data) === 4;
         const purchaseUrl = approved
           ? 'https://zm.w7.com/#/site-detail/' + Number(data.goods_id)
           : 'https://zm.w7.com/#/user-center/published';

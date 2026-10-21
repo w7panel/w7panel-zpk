@@ -149,7 +149,7 @@
 import myAxios from '@/utils';
 import dfimg from '@/assets/img/dfimg.png';
 import w7Identifie from "@/components/w7-identifie.vue";
-import { messageError, messageSuccess, messageWarning } from '@/utils/ui-feedback';
+import { alert as modalAlert, confirm as modalConfirm, messageError, messageSuccess, messageWarning } from '@/utils/ui-feedback';
 import emitWujieEvent from '@/utils/wujie-event';
 import { IconPlus, IconSearch, IconCopy, IconExclamationCircleFill } from '@arco-design/web-vue/es/icon';
 
@@ -240,6 +240,32 @@ export default {
       })
     },
     installEvent(data) {
+      if (Number(data.goods_id) > 0) {
+        // 仅明确返回零授权费用时按免费制品提示，兼容未返回费用的旧服务端。
+        if (data.install_service_fee !== null && data.install_service_fee !== undefined &&
+          String(data.install_service_fee).trim() !== '' && Number(data.install_service_fee) === 0) {
+          modalAlert({
+            title: '请通过面板制品市场安装',
+            content: '请到面板的「制品市场」中查找并安装。',
+            confirmButtonText: '知道了',
+          });
+          return;
+        }
+        const approved = this.getAuditStatus(data) === 4;
+        const purchaseUrl = approved
+          ? 'https://zm.w7.com/#/site-detail/' + Number(data.goods_id)
+          : 'https://zm.w7.com/#/user-center/published';
+        modalConfirm({
+          title: '请通过制品市场购买安装',
+          content: approved
+            ? '该制品已发布到制品市场，请先前往制品市场购买，再到面板的「制品市场」入口，在「已购买」列表中安装。'
+            : '该制品尚未审核通过，请先前往制品市场个人中心的「我的发布」列表免费购买，再到面板的「制品市场」入口，在「已购买」列表中安装。',
+          confirmButtonText: approved ? '去制品市场购买' : '去我的发布',
+          cancelButtonText: '取消',
+          onOk: () => window.open(purchaseUrl, '_blank', 'noopener,noreferrer'),
+        });
+        return;
+      }
       let url = this.webUrl + '/respo/info/' + data.identifie;
       emitWujieEvent('toStoreInstall', encodeURIComponent(url))
     },

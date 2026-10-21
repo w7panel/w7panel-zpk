@@ -566,6 +566,7 @@ func (c Formula) List(ctx *gin.Context) {
 		Annotation           map[string]interface{} `yaml:"annotation" json:"annotation"`
 		InstallUsersAvatar   []string               `json:"install_users_avatar"`
 		GoodsId              int32                  `json:"goods_id"`
+		InstallServiceFee    float64                `json:"install_service_fee"`
 	}
 
 	var user *entity.RegistryUser
@@ -675,6 +676,7 @@ func (c Formula) List(ctx *gin.Context) {
 					RemoteFormulaInfoURL: "",
 					Annotation:           formula.Manifest.Application.Annotation,
 					GoodsId:              item.GoodsID,
+					InstallServiceFee:    item.InstallServiceFee,
 				}
 				result = append(result, resultItem)
 			}

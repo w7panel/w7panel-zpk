@@ -312,6 +312,12 @@ export default {
 	padding: 28px 30px 28px;
 }
 
+/* 安装提示沿用市场的简洁弹框间距，避免叠加普通表单弹框的留白。 */
+.arco-modal.respo-install-notice .arco-modal-header,
+.arco-modal.respo-install-notice .arco-modal-body {
+	padding: 0;
+}
+
 .arco-modal .arco-modal-close-btn {
 	position: absolute !important;
 	top: 16px !important;

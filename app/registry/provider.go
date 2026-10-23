@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/w7panel/w7panel-zpk/app/registry/command"
 	"github.com/w7panel/w7panel-zpk/app/registry/http/controller"
 	"github.com/w7panel/w7panel-zpk/app/registry/logic"
 	respologic "github.com/w7panel/w7panel-zpk/app/system/logic"
@@ -16,6 +17,7 @@ import (
 	logic2 "github.com/w7panel/w7panel-zpk/common/logic"
 	"github.com/w7panel/w7panel-zpk/common/middleware"
 	"github.com/w7panel/w7panel-zpk/common/types/registry"
+	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/console"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	httpserver "github.com/we7coreteam/w7-rangine-go/v2/src/http/server"
 )
@@ -219,7 +221,9 @@ func (provider *Provider) syncRegistryUserPermissions() error {
 	return dao.Q.RegistryUserPermission.CreateInBatches(repositoryPermissions, 100)
 }
 
-func (p Provider) Register(httpServer *httpserver.Server) {
+func (p Provider) Register(httpServer *httpserver.Server, console console.Console) {
+	console.RegisterCommand(new(command.Migrate))
+
 	p.initDb()
 
 	p.registerRoutes(httpServer)

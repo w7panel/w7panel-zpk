@@ -80,7 +80,7 @@ func main() {
 
 	// 注册业务 provider，此模块中需要使用 http server 和 console
 	new(respo.Provider).Register(httpServer, app.GetConsole())
-	new(registry2.Provider).Register(httpServer)
+	new(registry2.Provider).Register(httpServer, app.GetConsole())
 	new(system.Provider).Register(httpServer)
 
 	app.RunConsole()

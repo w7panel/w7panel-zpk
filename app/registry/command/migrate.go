@@ -31,6 +31,7 @@ func (m Migrate) Configure(cmd *cobra.Command) {
 	f.Bool("dry-run", false, "仅枚举源仓库并解析 digest，不写目标")
 	f.Int("attempts", 3, "每项最多尝试次数")
 	f.Int("concurrency", 3, "单项图复制的并发数；始终复制全部平台")
+	f.Int("workers", 3, "同时迁移的镜像 tag 数；设为 1 可串行迁移")
 	f.Duration("item-timeout", 2*time.Hour, "每次单项尝试的超时")
 	f.String("report", "registry-migration-"+time.Now().Format("20060102-150405.000000000")+".jsonl", "报告路径，拒绝覆盖已有文件")
 	_ = cmd.MarkFlagRequired("source")
@@ -65,6 +66,10 @@ func (Migrate) run(cmd *cobra.Command, _ []string) (returnErr error) {
 	dryRun, _ := f.GetBool("dry-run")
 	attempts, _ := f.GetInt("attempts")
 	concurrency, _ := f.GetInt("concurrency")
+	workers, _ := f.GetInt("workers")
+	if workers < 1 {
+		return fmt.Errorf("--workers 必须大于 0")
+	}
 	timeout, _ := f.GetDuration("item-timeout")
 	path, _ := f.GetString("report")
 	report, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
@@ -79,7 +84,7 @@ func (Migrate) run(cmd *cobra.Command, _ []string) (returnErr error) {
 	fmt.Fprintln(cmd.OutOrStdout(), "迁移报告："+path)
 	return logic.MigrateRegistry(cmd.Context(), logic.MigrationOptions{
 		Source: migrationEndpoint(cmd, "source", "SOURCE_REGISTRY"), Destination: migrationEndpoint(cmd, "destination", "DESTINATION_REGISTRY"),
-		DryRun: dryRun, Attempts: attempts, Concurrency: concurrency, ItemTimeout: timeout,
+		DryRun: dryRun, Attempts: attempts, Concurrency: concurrency, Workers: workers, ItemTimeout: timeout,
 		Report: report, Progress: cmd.OutOrStdout(),
 	})
 }

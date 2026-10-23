@@ -12,8 +12,11 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
+
+	"golang.org/x/sync/errgroup"
 
 	"oras.land/oras-go/v2"
 	"oras.land/oras-go/v2/registry/remote"
@@ -31,6 +34,7 @@ type MigrationOptions struct {
 	Source, Destination   MigrationEndpoint
 	DryRun                bool
 	Attempts, Concurrency int
+	Workers               int
 	ItemTimeout           time.Duration
 	Report                io.Writer
 	Progress              io.Writer
@@ -125,8 +129,11 @@ func copyMigrationTag(ctx context.Context, src oras.ReadOnlyGraphTarget, dst ora
 // MigrateRegistry migrates every visible tagged graph. Untagged, unreachable
 // manifests cannot be discovered through the standard catalog/tags APIs.
 func MigrateRegistry(ctx context.Context, options MigrationOptions) error {
-	if options.Attempts < 1 || options.Concurrency < 1 || options.ItemTimeout <= 0 {
-		return errors.New("重试次数、并发数和单项超时必须大于 0")
+	if options.Workers == 0 {
+		options.Workers = 3
+	}
+	if options.Attempts < 1 || options.Concurrency < 1 || options.Workers < 1 || options.ItemTimeout <= 0 {
+		return errors.New("重试次数、镜像并发数、层并发数和单项超时必须大于 0")
 	}
 	if strings.EqualFold(strings.TrimSpace(options.Source.Address), strings.TrimSpace(options.Destination.Address)) {
 		return errors.New("源和目标仓库地址必须不同")
@@ -167,6 +174,11 @@ func MigrateRegistry(ctx context.Context, options MigrationOptions) error {
 	sort.Strings(names)
 	fmt.Fprintf(options.Progress, "发现 %d 个可见仓库；请确认账号具备全量 catalog/读取权限。\n", len(names))
 	failed, succeeded := 0, 0
+	type migrationTask struct {
+		source, target *remote.Repository
+		name, tag      string
+	}
+	var tasks []migrationTask
 	for _, name := range names {
 		if ctx.Err() != nil {
 			return ctx.Err()
@@ -203,26 +215,41 @@ func MigrateRegistry(ctx context.Context, options MigrationOptions) error {
 		}
 		sort.Strings(ordered)
 		for _, tag := range ordered {
-			if ctx.Err() != nil {
-				return ctx.Err()
+			tasks = append(tasks, migrationTask{source: source, target: target, name: name, tag: tag})
+		}
+	}
+	var outputMu sync.Mutex
+	group, workerCtx := errgroup.WithContext(ctx)
+	group.SetLimit(options.Workers)
+	for _, task := range tasks {
+		if workerCtx.Err() != nil {
+			break
+		}
+		group.Go(func() error {
+			if workerCtx.Err() != nil {
+				return workerCtx.Err()
 			}
-			fmt.Fprintf(options.Progress, "处理 %s:%s（全部平台）\n", name, tag)
-			record := migrationRecord{Repository: name, Tag: tag, Status: "planned"}
-			err = migrationRetry(ctx, options.Attempts, options.ItemTimeout, func(ctx context.Context) error {
-				desc, err := source.Resolve(ctx, tag)
+			outputMu.Lock()
+			fmt.Fprintf(options.Progress, "处理 %s:%s（全部平台）\n", task.name, task.tag)
+			outputMu.Unlock()
+			record := migrationRecord{Repository: task.name, Tag: task.tag, Status: "planned"}
+			err := migrationRetry(workerCtx, options.Attempts, options.ItemTimeout, func(ctx context.Context) error {
+				desc, err := task.source.Resolve(ctx, task.tag)
 				if err == nil {
 					record.Digest = desc.Digest.String()
 				}
 				return err
 			})
 			if err == nil && !options.DryRun {
-				err = migrationRetry(ctx, options.Attempts, options.ItemTimeout, func(ctx context.Context) error {
-					return copyMigrationTag(ctx, source, target, record.Digest, tag, options.Concurrency)
+				err = migrationRetry(workerCtx, options.Attempts, options.ItemTimeout, func(ctx context.Context) error {
+					return copyMigrationTag(ctx, task.source, task.target, record.Digest, task.tag, options.Concurrency)
 				})
 				if err == nil {
 					record.Status = "success"
 				}
 			}
+			outputMu.Lock()
+			defer outputMu.Unlock()
 			if err != nil {
 				failed++
 				record.Status = "failed"
@@ -233,8 +260,15 @@ func MigrateRegistry(ctx context.Context, options MigrationOptions) error {
 			if err := encoder.Encode(record); err != nil {
 				return fmt.Errorf("写入报告失败: %w", err)
 			}
-			fmt.Fprintf(options.Progress, "%s %s:%s %s\n", record.Status, name, tag, record.Digest)
-		}
+			fmt.Fprintf(options.Progress, "%s %s:%s %s\n", record.Status, task.name, task.tag, record.Digest)
+			return nil
+		})
+	}
+	if err := group.Wait(); err != nil {
+		return err
+	}
+	if ctx.Err() != nil {
+		return ctx.Err()
 	}
 	fmt.Fprintf(options.Progress, "完成：成功/计划 %d，失败 %d\n", succeeded, failed)
 	if failed > 0 {

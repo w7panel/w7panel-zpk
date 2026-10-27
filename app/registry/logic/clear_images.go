@@ -15,9 +15,11 @@ import (
 	"github.com/w7panel/w7panel-zpk/common/entity"
 	commonlogic "github.com/w7panel/w7panel-zpk/common/logic"
 	"gorm.io/gorm"
+	"oras.land/oras-go/v2/errdef"
 	"oras.land/oras-go/v2/registry"
 	"oras.land/oras-go/v2/registry/remote"
 	"oras.land/oras-go/v2/registry/remote/auth"
+	"oras.land/oras-go/v2/registry/remote/errcode"
 )
 
 type ClearImagesOptions struct {
@@ -52,6 +54,7 @@ func ClearImages(ctx context.Context, options ClearImagesOptions) error {
 }
 
 func clearImages(ctx context.Context, r *remote.Registry, options ClearImagesOptions) error {
+	skipped := 0
 	var names []string
 	err := func() error {
 		requestCtx, cancel := context.WithTimeout(ctx, options.Timeout)
@@ -86,6 +89,11 @@ func clearImages(ctx context.Context, r *remote.Registry, options ClearImagesOpt
 		err = repo.Tags(requestCtx, "", func(page []string) error { tags = append(tags, page...); return nil })
 		cancel()
 		if err != nil {
+			if clearImagesNotFound(err) {
+				skipped++
+				fmt.Fprintf(options.Progress, "跳过不存在的镜像：%s\n", name)
+				continue
+			}
 			return fmt.Errorf("列出 %s 的 tag 失败: %w", name, err)
 		}
 		sort.Strings(tags)
@@ -95,6 +103,11 @@ func clearImages(ctx context.Context, r *remote.Registry, options ClearImagesOpt
 			desc, err := repo.Resolve(requestCtx, tag)
 			cancel()
 			if err != nil {
+				if clearImagesNotFound(err) {
+					skipped++
+					fmt.Fprintf(options.Progress, "跳过不存在的 tag：%s:%s\n", name, tag)
+					continue
+				}
 				return fmt.Errorf("解析 %s:%s 失败: %w", name, tag, err)
 			}
 			tagCount++
@@ -123,18 +136,24 @@ func clearImages(ctx context.Context, r *remote.Registry, options ClearImagesOpt
 		}
 		requestCtx = auth.AppendRepositoryScope(requestCtx, registry.Reference{Registry: r.Reference.Registry, Repository: item.name}, auth.ActionPull, auth.ActionDelete)
 		req, err := http.NewRequestWithContext(requestCtx, http.MethodDelete, scheme+"://"+r.Reference.Registry+"/v2/"+item.name+"/manifests/"+item.descriptor.Digest.String(), nil)
+		missing := false
 		if err == nil {
 			var resp *http.Response
 			resp, err = r.Client.Do(req)
 			if err == nil {
 				resp.Body.Close()
-				if resp.StatusCode != http.StatusAccepted {
+				if resp.StatusCode == http.StatusNotFound {
+					missing = true
+				} else if resp.StatusCode != http.StatusAccepted {
 					err = fmt.Errorf("Registry 返回 HTTP %d", resp.StatusCode)
 				}
 			}
 		}
 		cancel()
-		if err != nil {
+		if missing || clearImagesNotFound(err) {
+			skipped++
+			fmt.Fprintf(options.Progress, "跳过不存在的 manifest：%s@%s\n", item.name, item.descriptor.Digest)
+		} else if err != nil {
 			failed++
 			fmt.Fprintf(options.Progress, "删除失败 %s@%s: %v\n", item.name, item.descriptor.Digest, err)
 		} else {
@@ -142,11 +161,19 @@ func clearImages(ctx context.Context, r *remote.Registry, options ClearImagesOpt
 			fmt.Fprintf(options.Progress, "已删除 %s@%s\n", item.name, item.descriptor.Digest)
 		}
 	}
-	fmt.Fprintf(options.Progress, "完成：manifest 删除成功 %d，失败 %d。\n", deleted, failed)
+	fmt.Fprintf(options.Progress, "完成：manifest 删除成功 %d，失败 %d，不存在跳过 %d 项。\n", deleted, failed, skipped)
 	if failed > 0 {
 		return fmt.Errorf("%d 个 manifest 删除失败，已成功的删除不会回滚", failed)
 	}
 	return nil
+}
+
+func clearImagesNotFound(err error) bool {
+	if errors.Is(err, errdef.ErrNotFound) {
+		return true
+	}
+	var response *errcode.ErrorResponse
+	return errors.As(err, &response) && response.StatusCode == http.StatusNotFound
 }
 
 // ClearImagesAndDatabase cleans the configured ZPK database only after all

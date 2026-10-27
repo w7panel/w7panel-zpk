@@ -223,6 +223,7 @@ func (provider *Provider) syncRegistryUserPermissions() error {
 
 func (p Provider) Register(httpServer *httpserver.Server, console console.Console) {
 	console.RegisterCommand(new(command.Migrate))
+	console.RegisterCommand(new(command.ClearImages))
 
 	p.initDb()
 

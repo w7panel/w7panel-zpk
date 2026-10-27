@@ -87,3 +87,30 @@ HTML 由 ZPK 生成并转义动态文案，按市场的 Hash 路由生成购买/
 购买、开通/升级/续费 VIP、查看订单及前往原面板卸载的跳转入口统一使用蓝底白字按钮外观、文字居中且无下划线；链接保留原有新窗口跳转行为。
 
 安装冲突底栏：“前往原面板卸载”使用蓝底白字按钮，“强制清除并安装”使用红底白字危险按钮，按钮之间保持 16px 间距，空间不足时换行。
+
+## 清空镜像
+
+服务端命令 `registry:clear-images` 直接访问指定 Registry，删除指定 namespace
+路径下所有可见镜像的全部 tag，包含子路径；`team` 不会匹配 `team-other`。
+账号需具有 catalog、读取和删除权限，Registry 需开启删除支持。
+
+```sh
+# 密码也可以通过 --password 指定；环境变量可避免进入命令行参数。
+export REGISTRY_USERNAME='admin'
+read -rs 'REGISTRY_PASSWORD?Registry password: '
+export REGISTRY_PASSWORD
+./server registry:clear-images --registry 192.168.1.10:5000 --http --namespace team --dry-run
+# 确认预览范围后，去掉 --dry-run 执行删除。
+./server registry:clear-images --registry 192.168.1.10:5000 --http --namespace team
+unset REGISTRY_PASSWORD
+```
+
+HTTPS 默认验证证书，自签名证书可用 `--ca /path/to/ca.pem`；
+账号可用 `--username` 指定。`--timeout` 默认为 `1m`，用于单次请求（含分页枚举）。
+沿用镜像版本列表的删除语义：tag 先解析为 digest，再删除 manifest，
+同一 manifest 的多个 tag 会一起删除。远程删除全部成功后，在数据库事务中删除指定 namespace（含子路径）的 namespace、镜像记录及关联 tag、部署规则、部署日志和权限；namespace 和镜像沿用现有软删除约定，默认 namespace 禁止删除。不主动清理 blob，
+磁盘空间回收仍由 Registry GC 负责。枚举或解析失败时不开始删除，
+删除阶段失败会继续处理其他项并返回错误，已成功删除的内容不会回滚。
+`--dry-run` 同时列出数据库清理范围，不写入数据库。远程删除失败时不清理数据库；数据库事务失败时回滚数据库修改，但无法恢复已删除的远程 tag，可重试命令。
+数据库为当前启动配置连接的 ZPK 数据库，必须与指定内网 Registry 对应。仅能处理账号可见的 tag，执行期间应停止对目标 namespace 的推送。
+该命令仍经过服务端正常启动初始化流程，请使用合适的本地配置，避免误操作本地数据库。

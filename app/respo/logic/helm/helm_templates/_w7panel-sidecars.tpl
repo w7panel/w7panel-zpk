@@ -180,7 +180,7 @@ instead of special-casing a particular annotation key.
 {{- define "w7panel.sidecars.resources" -}}
 {{- $root := . -}}
 {{- $artifactConfig := $root.Values.w7panelArtifact | default dict -}}
-{{- if not (get $artifactConfig "sharedSidecarResources") -}}
+{{- $sharedResources := get $artifactConfig "sharedSidecarResources" | default false -}}
 {{- $artifactServiceAccountTemplate := get $artifactConfig "serviceAccountName" | default "" -}}
 {{- $artifactServiceAccountName := "" -}}
 {{- if $artifactServiceAccountTemplate -}}
@@ -196,12 +196,27 @@ instead of special-casing a particular annotation key.
   {{- with $template -}}
     {{- $rendered := include . $context | trim -}}
     {{- if $rendered -}}
-      {{- $resources = append $resources $rendered -}}
+      {{- if $sharedResources -}}
+        {{/* Shared objects are owned by the parent, but an independent Pod needs its own bindings. */}}
+        {{- if not $artifactServiceAccountName -}}
+          {{- fail "shared sidecar resources require w7panelArtifact.serviceAccountName" -}}
+        {{- end -}}
+        {{- range $document := regexSplit "(?m)^---[ \t]*$" $rendered -1 -}}
+          {{- $object := fromYaml $document -}}
+          {{- if or (eq $object.kind "RoleBinding") (eq $object.kind "ClusterRoleBinding") -}}
+            {{- $suffix := printf "%s/%s" $root.Release.Namespace $artifactServiceAccountName | sha256sum | trunc 12 -}}
+            {{- $_ := set $object.metadata "name" (printf "%s-%s" ($object.metadata.name | trunc 50 | trimSuffix "-") $suffix) -}}
+            {{- $_ := set $object "subjects" (list (dict "kind" "ServiceAccount" "name" $artifactServiceAccountName "namespace" $root.Release.Namespace)) -}}
+            {{- $resources = append $resources (toYaml $object) -}}
+          {{- end -}}
+        {{- end -}}
+      {{- else -}}
+        {{- $resources = append $resources $rendered -}}
+      {{- end -}}
     {{- end -}}
   {{- end -}}
 {{- end -}}
 {{- if $resources -}}
 {{ join "\n---\n" $resources }}
-{{- end -}}
 {{- end -}}
 {{- end -}}

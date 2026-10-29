@@ -114,3 +114,5 @@ HTTPS 默认验证证书，自签名证书可用 `--ca /path/to/ca.pem`；
 `--dry-run` 同时列出数据库清理范围，不写入数据库。远程删除失败时不清理数据库；数据库事务失败时回滚数据库修改，但无法恢复已删除的远程 tag，可重试命令。
 数据库为当前启动配置连接的 ZPK 数据库，必须与指定内网 Registry 对应。仅能处理账号可见的 tag，执行期间应停止对目标 namespace 的推送。
 该命令仍经过服务端正常启动初始化流程，请使用合适的本地配置，避免误操作本地数据库。
+
+共享 sidecar 资源时，w7panelArtifact.serviceAccountName 指定当前 Pod 账号；子应用只生成独立 RoleBinding/ClusterRoleBinding，引用父应用共享角色，不重复创建 Service 或角色。父子应用须使用相同的共享角色名称。

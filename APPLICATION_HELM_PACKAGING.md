@@ -263,7 +263,7 @@ Job 默认 `backoffLimit: 2`、完成 60 秒后清理。安装前/删除后的 J
 - internal/external/iframe 后端地址、端口；
 - proxy headers/query 和 frontend props。
 
-`${VALUE_NAME}` 会在打包时转为 `{{ .Values.VALUE_NAME }}`；`${system.xxx}` 保持原样。子应用的 MicroApp 名称使用子 Chart fullname，根应用使用 release name。
+`${VALUE_NAME}` 会在打包时转为 `{{ .Values.VALUE_NAME }}`；`${system.xxx}` 保持原样。子应用的 MicroApp 名称使用子 Chart fullname，根应用使用 release name。角色的 `frontend_props.url` 使用同一个 MicroApp 资源名生成 `/panel-api/v1/microapp/<metadata.name>/proxy`；`frontend_props.group` 仍使用父级 release name。子应用不会借用父应用的后端代理。修改后须重新生成制品包并升级安装，已有包不会自动改变。
 
 动态 MicroApp 子 Chart 可以声明展示协议：`metadata.labels["w7.cc/presentation-key"]` 表示能力类型，`metadata.annotations["w7.cc/presentation-mode"]` 表示同一能力按 `singleton` 只展示一个或按 `multiple` 展示多个。ZPK Market 动态 MicroApp 使用 `presentation-key=zpk-market`、`presentation-mode=singleton`；应用插件也生成该 MicroApp，由面板沿用 AppGroup 依赖关系聚合，并按现有 MicroApp 显示顺序只展示第一个市场入口。
 

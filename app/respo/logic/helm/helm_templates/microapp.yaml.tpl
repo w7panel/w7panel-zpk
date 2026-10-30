@@ -82,7 +82,7 @@ spec:
             {{ $fkey }}: {{ tpl $fvalue $ }}
             {{- end }}
             group: {{ $releaseName }}
-            url: /panel-api/v1/microapp/{{ $releaseName }}/proxy
+            url: /panel-api/v1/microapp/__MICROAPP_RESOURCE_NAME__/proxy
         {{- end }}
   bindings:
     {{- range .Values.bindings }}

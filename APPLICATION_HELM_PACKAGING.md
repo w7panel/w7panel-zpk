@@ -862,3 +862,7 @@ helm template <release> <generated-chart-dir> -f <install-values.yaml>
 | info/helm_url/install_formulas | `app/respo/http/controller/formula.go` |
 | ZPK 自身部署和 PVC | `charts/templates/deployment.yaml`、`charts/templates/pvc.yaml` |
 | Registry 存储切换 | `app/system/logic/registry_storage.go`、`charts/charts/registry/` |
+
+### 2026-10-30 原生应用网关域名启动参数
+
+原生应用仅在域名配置中存在有效路径与后端端口的规则时自动维护 `DOMAIN_URL=%DOMAIN_URL%`。删除全部规则或全部配置页签后，自动参数会在保存和重新加载时移除；空页签不算网关规则。自定义的 `DOMAIN_URL` 普通值会保留；传统应用及应用插件的固定域名参数沿用各自规则。只编辑来源制品启动参数的模式不自动增删来源字段。

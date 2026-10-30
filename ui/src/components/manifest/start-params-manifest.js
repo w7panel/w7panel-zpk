@@ -15,6 +15,10 @@ const isDerivedDependencyReleaseStartParam = item => Boolean(
 );
 
 const cloneManifestValue = value => JSON.parse(JSON.stringify(value));
+const domainStartParam = () => ({
+    mark: 'domain', name: 'DOMAIN_URL', title: '域名', required: true,
+    values_text: '%DOMAIN_URL%', module_name: '',
+});
 
 export function startParamsFormDefaults() {
     return {
@@ -92,8 +96,14 @@ export const startParamsManifestWatch = {
         ]);
     },
     'form.domain'(value) {
+        if (this.initializingStartParamsOnly || this.option?.startParamsOnly) return;
+        if (this.form.type === 'docker') {
+            this.syncIngressDomainStartParams();
+            this.getStart();
+            return;
+        }
         this.checkStartParams(value, 'domain', [
-            { mark: 'domain', name: 'DOMAIN_URL', title: '域名', required: true, values_text: '%DOMAIN_URL%', module_name: '' },
+            domainStartParam(),
         ]);
     },
 };
@@ -145,9 +155,26 @@ export const startParamsManifestMethods = {
             this.form.startParams = this.systemImageStartParams();
         } else if (this.form.type == 'docker') {
             this.syncDockerBuiltInStartParams();
+            this.syncIngressDomainStartParams();
+        }
+    },
+    syncIngressDomainStartParams() {
+        if (this.form.type !== 'docker') return;
+        const enabled = (this.form.ingress || []).some(item =>
+            this.formatIngressRoutes(item.routes || []).length > 0);
+        this.form.domain = enabled;
+        this.disabledDomainStartParams = enabled;
+        if (enabled) {
+            if (!this.form.startParams.some(item => item.name === 'DOMAIN_URL')) {
+                this.form.startParams.push(domainStartParam());
+            }
+        } else {
+            this.form.startParams = this.form.startParams.filter(item => !this.isDomainStartParam(item));
         }
     },
     initStartParams(platform = {}) {
+        this.form.domain = false;
+        this.disabledDomainStartParams = false;
         this.form.startParams = JSON.parse(JSON.stringify(platform.startParams || []))
             .filter(item => item?.mark !== 'environment-release'
                 && !isDerivedDependencyReleaseStartParam(item));
@@ -164,12 +191,13 @@ export const startParamsManifestMethods = {
         this.syncApplicationBuiltInStartParams();
         this.markStartParamsForEditor(this.form.startParams).forEach(item => {
             if (item.mark == 'mysql8' || item.mark == 'mysql5') this.form[item.mark] = true;
-            if (item.mark == 'domain') this.form.domain = true;
+            if (item.mark == 'domain' && this.form.type !== 'docker') this.form.domain = true;
             if (item.mark == 'redis') this.form.redis = true;
             if (item.mark == 'mongodb6') this.form.mongodb6 = true;
             if (item.mark == 'storage') this.form.storage = true;
         });
-        if (this.form.type != 'helm' && this.form.type != 'app-plugin' && this.form.ingress?.length) {
+        if (this.form.type != 'helm' && this.form.type != 'app-plugin'
+            && (this.form.ingress || []).some(item => this.formatIngressRoutes(item.routes || []).length)) {
             this.form.domain = true;
             this.disabledDomainStartParams = true;
         }
@@ -232,7 +260,7 @@ export const startParamsManifestMethods = {
                 const next = params[index + 1];
                 if (next?.name == 'MYSQL_DATABASE' && !next.module_name) next.mark = item.mark;
             }
-            if (item.name == 'DOMAIN_URL') item.mark = 'domain';
+            if (this.isDomainStartParam(item)) item.mark = 'domain';
             if (item.module_name == 'w7_redis') item.mark = 'redis';
             if (item.module_name == 'w7_mongodb') item.mark = 'mongodb6';
             if (['global.cluster.storageRWmode', 'global.cluster.storageSize', 'global.cluster.storageClassName'].includes(item.name)) {

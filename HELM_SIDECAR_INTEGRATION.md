@@ -384,3 +384,5 @@ helm template demo ./final-app.tgz --namespace demo-ns \
 | Job 主任务结束后仍不完成 | 是否误把普通 sidecar 放在 Job 的 `containers` 中 |
 
 完整协议和实现边界见 [Helm Sidecar 集成约定](HELM_SIDECAR.md)。
+
+- 导入现成 Helm Chart 时，ZPK 在根制品开启注册站点时，为每个主/子 Chart 统一设置 podAnnotations["w7.cc/inject-root-ca"]="true"，保留其他 Pod 注解；Chart 需通过 w7panel.podAnnotations helper 渲染 Pod 注解。子应用继承根制品注册站点开关；CA 注入不依赖 sidecar 名称或资源共享方式。

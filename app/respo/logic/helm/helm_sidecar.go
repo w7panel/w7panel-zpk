@@ -160,7 +160,7 @@ func (*HelmPack) generateSidecarResourcesTemplate(templatesDir string) error {
 // helpers read each sidecar's contract directly from the child Chart metadata
 // at render time.
 func (hc *HelmPack) configureHelmSidecarHost(chartDir string) error {
-	if len(hc.Sidecars) == 0 {
+	if len(hc.Sidecars) == 0 && !shouldGenerateRegisterSite(hc.Manifest) {
 		return nil
 	}
 
@@ -177,6 +177,23 @@ func (hc *HelmPack) configureHelmSidecarHost(chartDir string) error {
 	}
 
 	values["w7panelSidecars"] = sidecarChartReferences(hc.Sidecars)
+	// Site registration enables CA injection for imported main and child charts,
+	// just as it does for generated workloads. This does not depend on a sidecar name.
+	if shouldGenerateRegisterSite(hc.Manifest) {
+		annotations, _ := values["podAnnotations"].(map[string]interface{})
+		if annotations == nil {
+			annotations = make(map[string]interface{})
+		}
+		annotations["w7.cc/inject-root-ca"] = "true"
+		values["podAnnotations"] = annotations
+		// The shared helper merges application annotations after podAnnotations.
+		// Keep a chart's existing copy consistent with the site setting.
+		if applicationAnnotations, ok := values["annotations"].(map[string]interface{}); ok {
+			if _, exists := applicationAnnotations["w7.cc/inject-root-ca"]; exists {
+				applicationAnnotations["w7.cc/inject-root-ca"] = "true"
+			}
+		}
+	}
 	artifactConfig, _ := values["w7panelArtifact"].(map[string]interface{})
 	if artifactConfig == nil {
 		artifactConfig = make(map[string]interface{})

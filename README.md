@@ -88,6 +88,14 @@ HTML 由 ZPK 生成并转义动态文案，按市场的 Hash 路由生成购买/
 
 安装冲突底栏：“前往原面板卸载”使用蓝底白字按钮，“强制清除并安装”使用红底白字危险按钮，按钮之间保持 16px 间距，空间不足时换行。
 
+## 仓库与 tag 批量删除
+
+仓库列表支持多选删除，页面等待全部请求完成。删除仓库时，先删除远程全部 tag 对应的 manifest，全部成功后再删除本地仓库、tag 和仓库权限记录；远程部分成功不会回滚，失败保留仓库供重试。
+
+版本列表通过 `POST /zpk/v2/api/repository/tags/batch-del` 一次提交 `{"id": 12, "tags": ["v1", "latest"]}`，沿用登录校验及仓库所有者 / 管理员权限。`tags` 必须为非空数组，最多 1000 项；返回 `data.deleted_tags` 和 `data.failed_tags`（每项包含 `tag`、`error`），部分失败也返回逐项结果，不能只凭 HTTP 成功认定全部删除成功。旧的单 tag 删除接口保留，删除失败现在会返回错误。
+
+远程解析与删除各最多并发 4 个请求，删除前按 manifest digest 去重。保持 Registry 的 manifest 删除语义：同一 digest 的其他 tag 也可能同时消失；删除 manifest 不代表 blob 已完成垃圾回收。内部 `deleteRepositoryTags` 的 `tags=nil` 表示全删，显式空数组不删除，批量接口不会把空列表当作全删。
+
 ## 清空镜像
 
 服务端命令 `registry:clear-images` 直接访问指定 Registry，删除指定 namespace

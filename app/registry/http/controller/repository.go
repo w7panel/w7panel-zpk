@@ -308,14 +308,38 @@ func (c Repository) DelTag(ctx *gin.Context) {
 		return
 	}
 
-	repositoryName := logic2.BuildRepositoryName(curRepository.Name, curRepository.Namespace)
-	registryClient := logic2.GetDefaultRegistryClient()
-	err := registryClient.DeleteManifest(repositoryName, params.Tag)
+	result, err := (logic.Repository{}).DeleteTags(ctx.Request.Context(), curRepository, []string{params.Tag})
 	if err != nil {
-		slog.Error("删除 tag 失败", "err", err, "repository", repositoryName, "tag", params.Tag)
+		c.JsonResponseWithServerError(ctx, err)
+		return
 	}
-
+	if len(result.FailedTags) > 0 {
+		c.JsonResponseWithServerError(ctx, errors.New(result.FailedTags[0].Error))
+		return
+	}
 	c.JsonSuccessResponse(ctx)
+}
+
+func (c Repository) BatchDelTags(ctx *gin.Context) {
+	type ParamsValidate struct {
+		Id   int      `json:"id" binding:"required,min=1"`
+		Tags []string `json:"tags" binding:"required,min=1,max=1000,dive,required"`
+	}
+	params := ParamsValidate{}
+	if !c.Validate(ctx, &params) {
+		return
+	}
+	curRepository, _ := (logic.Repository{}).GetByIdWithUser(params.Id, logic2.User{}.GetUser(ctx))
+	if curRepository == nil {
+		c.JsonResponseWithServerError(ctx, errors.New("repository 不存在"))
+		return
+	}
+	result, err := (logic.Repository{}).DeleteTags(ctx.Request.Context(), curRepository, params.Tags)
+	if err != nil {
+		c.JsonResponseWithServerError(ctx, err)
+		return
+	}
+	c.JsonResponseWithoutError(ctx, result)
 }
 
 func (c Repository) Edit(ctx *gin.Context) {
@@ -403,14 +427,7 @@ func (c Repository) Delete(ctx *gin.Context) {
 		return
 	}
 
-	err := dao.Q.Transaction(func(tx *dao.Query) error {
-		_, err := tx.RegistryRepository.Delete(curRepository)
-		if err != nil {
-			return err
-		}
-		resourceValue := logic2.BuildRepositoryName(curRepository.Name, curRepository.Namespace)
-		return logic.Permission{}.DelPermissionByResource(tx, resourceValue, logic.PermissionResourceTypeRepository)
-	})
+	err := (logic.Repository{}).Delete(ctx.Request.Context(), curRepository)
 	if err != nil {
 		c.JsonResponseWithServerError(ctx, err)
 		return

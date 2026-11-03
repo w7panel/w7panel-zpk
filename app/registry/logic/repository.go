@@ -40,7 +40,7 @@ type Repository struct {
 
 var repositoryPushLocks sync.Map
 
-func lockRepositoryPush(repository string) func() {
+func lockRepositoryOperation(repository string) func() {
 	lock, _ := repositoryPushLocks.LoadOrStore(repository, &sync.Mutex{})
 	mu := lock.(*sync.Mutex)
 	mu.Lock()
@@ -114,7 +114,7 @@ func (l Repository) OnRepositoryPushedCreate(payload registry.RegistryRepository
 		return
 	}
 
-	unlock := lockRepositoryPush(payload.Event.Target.Repository)
+	unlock := lockRepositoryOperation(payload.Event.Target.Repository)
 	defer unlock()
 
 	repositoryName, namespace := logic.ParseRepositoryNameAndNamespace(payload.Event.Target.Repository)

@@ -827,30 +827,32 @@ export default {
 
             this.batchDeleting = true;
             let deletedCount = 0;
-            let failedCount = 0;
             try {
-                for (const tag of tags) {
-                    try {
-                        await myAxios.post("/v2/api/repository/tags/del", {
-                            id: parseInt(this.$route.params.id),
-                            tag,
-                        }, { dontalert: true });
-                        deletedCount++;
-                    } catch {
-                        failedCount++;
-                    }
+                const res = await myAxios.post("/v2/api/repository/tags/batch-del", {
+                    id: parseInt(this.$route.params.id),
+                    tags,
+                }, { timeout: 0 });
+                const result = res?.data?.data;
+                if (!Array.isArray(result?.deleted_tags) || !Array.isArray(result?.failed_tags)) {
+                    messageError('未获取到删除结果，请刷新列表确认');
+                    return;
                 }
-
+                deletedCount = result.deleted_tags.length;
                 if (deletedCount > 0) {
                     messageSuccess(`已删除 ${deletedCount} 个版本`);
                 }
-                if (failedCount > 0) {
-                    messageError(`${failedCount} 个版本删除失败`);
+                if (result.failed_tags.length > 0) {
+                    messageError(`${result.failed_tags.length} 个版本删除失败，请重试`);
                 }
-                this.selectedTagKeys = [];
-                await this.reloadTagsAfterDelete(deletedCount);
+            } catch {
+                // The request layer displays the error; refresh partial remote changes.
             } finally {
-                this.batchDeleting = false;
+                try {
+                    this.selectedTagKeys = [];
+                    await this.reloadTagsAfterDelete(deletedCount);
+                } finally {
+                    this.batchDeleting = false;
+                }
             }
         },
         reloadTagsAfterDelete(deletedCount) {
@@ -948,6 +950,11 @@ export default {
                 })
                 this.tags = data
                 this.tagPage.total = res.data.data?.total;
+                const lastPage = Math.max(1, Math.ceil(this.tagPage.total / this.tagPage.pageSize));
+                if (this.tagPage.page > lastPage) {
+                    this.tagPage.page = lastPage;
+                    return this.getVersion();
+                }
             }).finally(() => { this.loading = false; });
         },
 

@@ -5,19 +5,27 @@
         <div class="bg-white bg-padding pb-24" style="border-top:1px solid #EEEEEE;">
           <div class="zpk-page-toolbar">
             <div class="zpk-toolbar-left">
-              <a-button type="primary" @click="add">
+              <a-button type="primary" :disabled="batchDeleting" @click="add">
                 <template #icon><icon-plus /></template>
                 新建镜像
               </a-button>
+              <a-popconfirm :content="`确认删除选中的 ${selectedRepositoryKeys.length} 个仓库及其全部 tag 吗？删除后无法恢复。`"
+                type="warning" position="bl" ok-text="确定" cancel-text="取消" content-class="zpk-delete-popconfirm"
+                :ok-button-props="{ status: 'danger', loading: batchDeleting }"
+                :cancel-button-props="{ type: 'secondary', disabled: batchDeleting }" @ok="batchDelRepositories">
+                <a-button status="danger" :disabled="!selectedRepositoryKeys.length" :loading="batchDeleting">批量删除</a-button>
+              </a-popconfirm>
+              <span v-if="selectedRepositoryKeys.length">已选择 {{ selectedRepositoryKeys.length }} 项</span>
+              <span v-if="batchDeleting">正在删除 {{ deleteProgress }} / {{ deleteTotal }}，请等待删除完成</span>
             </div>
             <div class="zpk-toolbar-right registry-filter-group">
               <span>命名空间：</span>
-              <a-select v-model="activeNamespace" class="registry-filter-select" @change="changeActiveNamespace">
+              <a-select  :disabled="batchDeleting" v-model="activeNamespace" class="registry-filter-select" @change="changeActiveNamespace">
                 <a-option :value="-1" label="所有命名空间" />
                 <a-option v-for="item in namespace" :key="item.id" :label="item.name" :value="item.name" />
               </a-select>
               <span>二级命名空间：</span>
-              <a-select v-model="subNamespace" class="registry-filter-select" @change="getData(1)">
+              <a-select :disabled="batchDeleting" v-model="subNamespace" class="registry-filter-select" @change="getData(1)">
                 <a-option :value="-1" label="所有命名空间" />
                 <a-option v-for="item in subNamespaceData" :key="item" :label="item" :value="item" />
               </a-select>
@@ -33,7 +41,9 @@
                 @click="serverdomain.intranet_domain ? onekeyCopy(serverdomain.intranet_domain) : null">{{ serverdomain.intranet_domain || '' }}</span>
             </div>
           </a-alert>
-          <a-table :data="tableData" :pagination="false" class="mt-20 table-header" row-key="id">
+          <a-table :data="tableData" :pagination="false" class="mt-20 table-header" row-key="id"
+            :loading="batchDeleting" v-model:selected-keys="selectedRepositoryKeys"
+            :row-selection="{ type: 'checkbox', showCheckedAll: true, onlyCurrent: true }">
             <template #columns>
               <a-table-column title="名称" data-index="name" :width="320">
                 <template #cell="{ record }">
@@ -69,12 +79,12 @@
               <a-table-column align="left" title="操作" :width="300">
                 <template #cell="{ record }">
                   <template v-if="hasAccess(record.user_id)">
-                    <a-button type="text" @click="edit(record)" style="padding-left: 0">修改</a-button>
-                    <a-popconfirm content="确认要删除吗" type="warning" ok-text="确定" cancel-text="取消"
+                    <a-button type="text" :disabled="batchDeleting" @click="edit(record)" style="padding-left: 0">修改</a-button>
+                    <a-popconfirm content="确认删除该仓库及其全部 tag 吗？删除后无法恢复。" type="warning" ok-text="确定" cancel-text="取消"
                       content-class="zpk-delete-popconfirm"
                       :ok-button-props="{ status: 'danger' }" :cancel-button-props="{ type: 'secondary' }"
                       @ok="del(record)">
-                      <a-button type="text" status="danger">删除</a-button>
+                      <a-button type="text" status="danger" :disabled="batchDeleting">删除</a-button>
                     </a-popconfirm>
                   </template>
                   <a-button type="text" @click="shortcut(record)">快捷指令</a-button>
@@ -83,7 +93,7 @@
             </template>
           </a-table>
           <div class="mt-20 df jc-e">
-            <a-pagination v-model:current="page" v-model:page-size="paginate" :total="list.length"
+            <a-pagination v-model:current="page" v-model:page-size="paginate" :total="list.length" :disabled="batchDeleting"
               :page-size-options="[10, 20, 30, 40]" show-page-size
               @page-size-change="handlePageSizeChange" @change="getData" />
           </div>
@@ -177,7 +187,7 @@
 
 <script>
 import myAxios from "@/utils";
-import { messageSuccess } from "@/utils/ui-feedback";
+import { messageSuccess, messageError } from "@/utils/ui-feedback";
 import userMixin from "@/utils/user-mixin";
 import Access from '@/views/access.vue';
 import ArcoIcon from "@/components/arco-icon.vue";
@@ -194,6 +204,10 @@ export default {
   mixins: [userMixin],
   data() {
     return {
+      selectedRepositoryKeys: [],
+      batchDeleting: false,
+      deleteProgress: 0,
+      deleteTotal: 0,
       accessDialogShow: false,
       formVisibleType3: false,
       visibleTypeMap: {
@@ -236,6 +250,7 @@ export default {
   computed: {
     tableData() {
       return this.list.slice((this.page - 1) * this.paginate, this.page * this.paginate)
+        .map(row => ({ ...row, disabled: !this.hasAccess(row.user_id) || this.batchDeleting }))
     },
   },
   created() {
@@ -291,17 +306,19 @@ export default {
       });
     },
     getData(p, notChangePage) {
+      this.selectedRepositoryKeys = [];
       if (!notChangePage) {
         this.page = p
       }
       if (p === 1) {
-        myAxios.post("/v2/api/repository/list", {
+        return myAxios.post("/v2/api/repository/list", {
           namespace: this.activeNamespace !== -1 ? this.activeNamespace : '',
           sub_namespace: this.subNamespace !== -1 ? this.subNamespace : '',
         }).then(res => {
           let data = res.data?.data?.list ?? [];
           this.list = data;
-          this.last_page = Math.ceil(data.length / this.paginate);
+          this.last_page = Math.max(1, Math.ceil(data.length / this.paginate));
+          this.page = Math.min(this.page, this.last_page);
         });
       }
     },
@@ -348,11 +365,39 @@ export default {
       this.visible = true
     },
     del(row) {
-      return myAxios.post("/v2/api/repository/del", { id: row.id }).then(res => {
+      return myAxios.post("/v2/api/repository/del", { id: row.id }, { timeout: 0 }).then(res => {
         if (!res) { return }
         messageSuccess('删除成功')
-        this.getData(1, true);
+        return this.getData(1, true);
       });
+    },
+    async batchDelRepositories() {
+      if (this.batchDeleting) { return; }
+      const ids = this.selectedRepositoryKeys.filter(id =>
+        this.list.some(row => row.id === id && this.hasAccess(row.user_id)));
+      if (!ids.length) { return; }
+      this.batchDeleting = true;
+      this.deleteTotal = ids.length;
+      this.deleteProgress = 0;
+      let deleted = 0;
+      let failed = 0;
+      try {
+        for (const id of ids) {
+          try {
+            const res = await myAxios.post('/v2/api/repository/del', { id }, { dontalert: true, timeout: 0 });
+            if (!res) { throw new Error('删除未成功'); }
+            deleted++;
+          } catch {
+            failed++;
+          }
+          this.deleteProgress++;
+        }
+        if (deleted) { messageSuccess(`已删除 ${deleted} 个仓库及其全部 tag`); }
+        if (failed) { messageError(`${failed} 个仓库删除失败，部分 tag 可能已删除，请重试`); }
+        await this.getData(1, true);
+      } finally {
+        this.batchDeleting = false;
+      }
     },
     goDetail(row) {
       this.$router.push({ name: 'zpk-registry-detail', params: { id: row.id } });

@@ -50,6 +50,7 @@ func (p Provider) registerRoutes(httpServer *httpserver.Server) {
 		api.POST("/repository/del", controller.Repository{}.Delete)
 		api.POST("/repository/tags/list", controller.Repository{}.Tags)
 		api.POST("/repository/tags/del", controller.Repository{}.DelTag)
+		api.POST("/repository/tags/batch-del", controller.Repository{}.BatchDelTags)
 
 		api.Any("/repository/deploy_rule/k8s/proxy/*path", controller.Deploy{}.K8sProxy)
 		api.POST("/repository/deploy_rule/k8s/namespaces", controller.Deploy{}.GetK8sNamespace)

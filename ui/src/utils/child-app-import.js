@@ -20,10 +20,10 @@ export function childImportRepositoryURL(tab) {
         : '/respo/selectable/list';
 }
 
-export function normalizeChildImportList(list = [], repositoryBaseURL = '') {
+export function normalizeChildImportList(list = [], repositoryBaseURL = '', installOnlyOnce = true) {
     const sourceRepositoryURL = String(repositoryBaseURL || '').trim().replace(/\/+$/, '');
     return (Array.isArray(list) ? list : [])
-        .filter(item => item?.identifie && item?.install_only_once)
+        .filter(item => item?.identifie && (!installOnlyOnce || item.install_only_once))
         .map(item => ({
             ...item,
             name: item.name || item.identifie,
@@ -31,9 +31,9 @@ export function normalizeChildImportList(list = [], repositoryBaseURL = '') {
         }));
 }
 
-export function fetchChildImportList(client, tab, params = {}) {
+export function fetchChildImportList(client, tab, params = {}, installOnlyOnce = true) {
     return client.get(childImportRepositoryURL(tab), {
-        params,
+        params: { ...params, install_only_once: installOnlyOnce },
         dontalert: true,
     }).then(response => {
         const data = response?.data?.data || {};
@@ -41,7 +41,7 @@ export function fetchChildImportList(client, tab, params = {}) {
         // the repository's public URL returned by the repository itself.
         const repositoryBaseURL = data.webUrl || childImportRepositoryBaseURL(tab);
         return {
-            list: normalizeChildImportList(data.list || [], repositoryBaseURL),
+            list: normalizeChildImportList(data.list || [], repositoryBaseURL, installOnlyOnce),
             total: Number(data.total || 0),
             page: Number(data.page || params.page || 1),
             limit: Number(data.limit || params.limit || 0),
@@ -82,7 +82,7 @@ export function fetchChildImportListFromSource(client, source, params = {}) {
         return Promise.reject(new Error('子应用来源地址无效'));
     }
     return client.get(url, {
-        params,
+        params: { ...params, install_only_once: false },
         dontalert: true,
         _skipZpkAuth: true,
     }).then(response => (Array.isArray(response?.data?.data?.list)

@@ -99,7 +99,7 @@
         </a-spin>
 
         <depend-picker v-model:visible="importPicker.show" title="导入子应用" action-text="导入"
-            :action-loading="importPicker.importing" @select="importChild" @close="closeImportDepend" />
+            :install-only-once="false" :action-loading="importPicker.importing" @select="importChild" @close="closeImportDepend" />
     </div>
 </template>
 

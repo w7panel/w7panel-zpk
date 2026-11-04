@@ -69,6 +69,10 @@ export default {
             type: String,
             default: '选择',
         },
+        installOnlyOnce: {
+            type: Boolean,
+            default: true,
+        },
         actionLoading: {
             type: Boolean,
             default: false,
@@ -128,7 +132,7 @@ export default {
                 page: this.page,
                 limit: this.pageSize,
                 keyword: this.keyword,
-            }).then(result => {
+            }, this.installOnlyOnce).then(result => {
                 if (loadToken !== this.loadToken) return;
                 this.lists[tab] = result;
             }).catch(() => {

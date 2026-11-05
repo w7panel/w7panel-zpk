@@ -387,7 +387,6 @@
                                             style="margin-bottom:18px;">
                                             <div class="df df-c" style="align-items:flex-start;">
                                                 <a-switch v-model="form.traditionNginxGateway"
-                                                    :disabled="traditionNginxGatewayChanging"
                                                     @change="toggleTraditionNginxGateway" />
                                                 <span class="c-99 mt-6">开启后会使用网关服务对外提供访问，并将请求转发至后端服务。</span>
                                                 <span class="c-99 mt-6">常用于 PHP-FPM FastCGI 等无法直接提供 HTTP 服务的场景；若后端可直接提供 HTTP 服务，则无需启用。</span>
@@ -679,7 +678,7 @@
 
                     <div class="bg-white pb-24 mt-20 df ai-c manifest-submit-section">
                         <a-button v-if="option.pureManifest" :loading="submiting" type="primary" @click="submit(otherData)">确定提交</a-button>
-                        <a-button v-else :loading="submiting" :disabled="traditionNginxGatewayChanging" type="primary" @click="submit()">确定提交</a-button>
+                        <a-button v-else :loading="submiting" type="primary" @click="submit()">确定提交</a-button>
                     </div>
                 </a-form>
             </div>
@@ -899,7 +898,7 @@ import {
 } from '@/components/manifest/manifest-yaml';
 
 export default {
-    emits: ['writefile', 'tradition-nginx-gateway-change', 'category-sync'],
+    emits: ['writefile', 'category-sync'],
     props: [
         'data',
         'submiting',

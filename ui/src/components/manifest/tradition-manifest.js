@@ -391,7 +391,6 @@ export function traditionFormDefaults() {
 
 export function traditionManifestState() {
     return {
-        traditionNginxGatewayChanging: false,
         nginxTemplatePlaceholders,
         nginxTemplateExample,
         nginxTemplateExampleVisible: false,
@@ -620,36 +619,26 @@ export const traditionManifestMethods = {
         });
     },
     toggleTraditionNginxGateway(value) {
-        if (this.form.type != 'tradition' || this.option?.pureManifest
-            || this.traditionNginxGatewayChanging) {
-            return;
-        }
+        if (this.form.type != 'tradition' || this.option?.pureManifest) return;
         const enabled = Boolean(value);
-        const previous = !enabled;
-        this.form.traditionNginxGateway = previous;
-        const finish = success => {
-            this.traditionNginxGatewayChanging = false;
-            this.form.traditionNginxGateway = success ? enabled : previous;
+        const apply = () => {
+            this.form.traditionNginxGateway = enabled;
+            if (!enabled) this.form.traditionNginxVhostTemplate = '';
             this.syncTraditionGatewayStartParam();
             this.syncTraditionIngress();
-        };
-        const request = () => {
-            this.traditionNginxGatewayChanging = true;
-            this.$emit('tradition-nginx-gateway-change', { enabled, finish });
+            this.changeForm();
         };
         if (enabled) {
-            request();
+            apply();
             return;
         }
+        this.form.traditionNginxGateway = true;
         confirm({
             title: '关闭网关服务',
-            content: '关闭后将停止使用网关服务，是否继续？',
+            content: '提交配置后将停止使用网关服务，是否继续？',
             confirmButtonText: '关闭',
             cancelButtonText: '取消',
-            onOk: request,
-            onCancel: () => {
-                this.form.traditionNginxGateway = previous;
-            },
+            onOk: apply,
         });
     },
     validateTraditionImageTemplate(value, callback) {
@@ -806,7 +795,7 @@ export const traditionManifestMethods = {
         };
     },
     syncTraditionDependency() {
-        if (this.form.type != 'tradition' || this.traditionNginxGatewayChanging) return;
+        if (this.form.type != 'tradition') return;
         const existing = [...(this.form.dependsIn || []), ...(this.form.depends || [])]
             .find(item => isTraditionAppDependency(item));
         const dependency = {

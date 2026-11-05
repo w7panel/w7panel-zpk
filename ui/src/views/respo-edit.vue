@@ -83,7 +83,6 @@
                     :option="{ edit: true, imginstall: true, mainapp: true, app_ports: this.app_ports }"
                     :identifie="identifie" :info="formulaInfo" @addfile="addfileInside" @complete="complete"
                     @category-sync="updateFormulaCategories"
-                    @tradition-nginx-gateway-change="handleTraditionNginxGatewayChange"
                     @structure="structure"></files-manifest>
                 <files-manifest v-for="(item, index) in depends" :key="item.identifie" :ref="'depends' + index"
                     v-show="dependsIndex == index" :data="depends[index].manifest"
@@ -469,33 +468,6 @@ export default {
         },
         closeImportDepend() {
             this.importPicker.show = false;
-        },
-        async handleTraditionNginxGatewayChange({ enabled, finish } = {}) {
-            const done = typeof finish == 'function' ? finish : () => { };
-            const changeGateway = async () => {
-                try {
-                    await this.ensureTraditionToolDependency();
-                    done(true);
-                    await this.$refs.form?.saveFormulaTypeSetting?.();
-                    await this.persistTraditionManifest();
-                    messageSuccess(enabled ? 'NGINX 网关已开启' : 'NGINX 网关已关闭');
-                } catch (error) {
-                    done(false);
-                    messageError(error?.response?.data?.error || error?.message || (enabled
-                        ? '开启 NGINX 网关失败'
-                        : '关闭 NGINX 网关失败'));
-                }
-            };
-            const rootRef = this.$refs.form;
-            if (rootRef?.hasUnsavedChanges?.()) {
-                rootRef.submit(
-                    { stop: true },
-                    changeGateway,
-                    () => done(false),
-                );
-                return;
-            }
-            await changeGateway();
         },
         async importChild(record, tab = 'local') {
             if (!record?.identifie || this.importPicker.importing

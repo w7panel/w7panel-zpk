@@ -16,6 +16,7 @@ import (
 	logic2 "github.com/w7panel/w7panel-zpk/common/logic"
 	"github.com/w7panel/w7panel-zpk/common/service/w7"
 	"github.com/w7panel/w7panel-zpk/common/service/w7/devcenter"
+	"github.com/w7panel/w7panel-zpk/common/service/w7/ip"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 )
 
@@ -318,4 +319,52 @@ func (c FormulaGoods) GetGoodsAuditStatus(ctx *gin.Context) {
 	}
 
 	c.JsonResponseWithoutError(ctx, gin.H{"audit_status": goodsInfo.AuditStatus})
+}
+
+// GetGoodsAuditStatusList loads optional market metadata independently of the formula list.
+func (c FormulaGoods) GetGoodsAuditStatusList(ctx *gin.Context) {
+	params := struct {
+		Identifies []string `json:"identifies" binding:"required,min=1,max=100,dive,required"`
+	}{}
+	if !c.Validate(ctx, &params) {
+		return
+	}
+	user := logic2.User{}.GetUser(ctx)
+	if user == nil {
+		c.JsonResponseWithError(ctx, errors.New("请先登录"), 401)
+		return
+	}
+	query := dao.Q.Formula.Where(dao.Q.Formula.Name.In(params.Identifies...))
+	if !(logic2.User{}).IsAdminUser(user) {
+		query = query.Where(dao.Q.Formula.UserID.Eq(user.ID))
+	}
+	formulas, err := query.Find()
+	if err != nil {
+		c.JsonResponseWithError(ctx, err, 500)
+		return
+	}
+	ids := make([]int, 0, len(formulas))
+	for _, formula := range formulas {
+		if formula.GoodsID > 0 && !slices.Contains(ids, int(formula.GoodsID)) {
+			ids = append(ids, int(formula.GoodsID))
+		}
+	}
+	type auditInfo struct {
+		AuditStatus int    `json:"audit_status"`
+		AuditRemark string `json:"audit_remark"`
+	}
+	result := make(map[int]auditInfo)
+	if len(ids) > 0 {
+		goods, err := w7.IpGoodsSdk.GoodsBatchList(ip.GoodsBatchListReq{GoodsIds: ids})
+		if err != nil {
+			c.JsonResponseWithError(ctx, err, 500)
+			return
+		}
+		for _, item := range goods {
+			if slices.Contains(ids, item.Id) {
+				result[item.Id] = auditInfo{AuditStatus: item.AuditStatus, AuditRemark: item.AuditMessage}
+			}
+		}
+	}
+	c.JsonResponseWithoutError(ctx, result)
 }

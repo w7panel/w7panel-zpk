@@ -20,7 +20,6 @@ import (
 	logic2 "github.com/w7panel/w7panel-zpk/common/logic"
 	"github.com/w7panel/w7panel-zpk/common/service/w7"
 	"github.com/w7panel/w7panel-zpk/common/service/w7/devcenter"
-	"github.com/w7panel/w7panel-zpk/common/service/w7/ip"
 	zpk_market "github.com/w7panel/w7panel-zpk/common/service/w7/zpk-market"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/core/err_handler"
@@ -692,46 +691,10 @@ func (c Formula) List(ctx *gin.Context) {
 	}
 
 	formulaList, total, _ := query.FindByPage((params.Page-1)*params.Limit, params.Limit)
-	goodsMap := make(map[int]ip.GoodsListItem)
-	if params.Owner && formulaList != nil {
-		goodsIds := make([]int, 0)
-		goodsIdExists := make(map[int]struct{})
-		for _, item := range formulaList {
-			goodsId := int(item.GoodsID)
-			if goodsId <= 0 {
-				continue
-			}
-			if _, ok := goodsIdExists[goodsId]; ok {
-				continue
-			}
-			goodsIds = append(goodsIds, goodsId)
-			goodsIdExists[goodsId] = struct{}{}
-		}
-		if len(goodsIds) > 0 {
-			goodsList, err := w7.IpGoodsSdk.GoodsBatchList(ip.GoodsBatchListReq{
-				GoodsIds: goodsIds,
-			})
-			if err != nil {
-				c.JsonResponseWithError(ctx, err, 500)
-				return
-			}
-			for _, item := range goodsList {
-				if item.Id > 0 {
-					goodsMap[item.Id] = item
-				}
-			}
-		}
-	}
 	if formulaList != nil {
 		for _, item := range formulaList {
 			formula, err := depotLogin.GetFormula(item.Name, "", user)
 			if err == nil {
-				auditStatus := int32(0)
-				auditMessage := ""
-				if goodsInfo, ok := goodsMap[int(item.GoodsID)]; ok {
-					auditStatus = int32(goodsInfo.AuditStatus)
-					auditMessage = goodsInfo.AuditMessage
-				}
 				resultItem := ResultNode{
 					Name:                 item.Title,
 					Description:          formula.Manifest.Application.Description,
@@ -741,8 +704,8 @@ func (c Formula) List(ctx *gin.Context) {
 					Version:              item.Version,
 					Status:               item.Status,
 					InstallOnlyOnce:      formula.Manifest.Application.InstallOnlyOnce,
-					AuditStatus:          auditStatus,
-					AuditRemark:          auditMessage,
+					AuditStatus:          0,
+					AuditRemark:          "",
 					RemoteFormulaInfoURL: "",
 					Annotation:           formula.Manifest.Application.Annotation,
 					GoodsId:              item.GoodsID,

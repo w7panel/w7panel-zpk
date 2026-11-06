@@ -39,7 +39,7 @@ func (self Category) Save(ctx *gin.Context) {
 		return
 	}
 
-	if _, err := (logic.Category{}).SaveFormulaCategory(formula.ID, params.Name); err != nil {
+	if _, err := (logic.Category{}).SaveLocalFormulaCategory(formula.ID, params.Name); err != nil {
 		self.JsonResponseWithServerError(ctx, err)
 		return
 	}

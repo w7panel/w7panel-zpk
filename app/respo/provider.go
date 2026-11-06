@@ -124,6 +124,7 @@ func (provider *Provider) Register(httpServer *http_server.Server, console conso
 		group.Match([]string{"POST", "OPTIONS"}, "/goods/set-service-fee", middleware.DenyDomainReq{}.Process, middleware.Auth{}.Process, controller.FormulaGoods{}.SetServiceFee)
 		group.Match([]string{"POST", "OPTIONS"}, "/goods/cross-upgrade-formulas", middleware.DenyDomainReq{}.Process, middleware.Auth{}.Process, controller.FormulaGoods{}.GetCrossUpgradeFormulaCandidates)
 		group.Match([]string{"POST", "OPTIONS"}, "/goods/set-cross-upgrade-formulas", middleware.DenyDomainReq{}.Process, middleware.Auth{}.Process, controller.FormulaGoods{}.SetCrossUpgradeFormulas)
+		group.Match([]string{"POST", "OPTIONS"}, "/goods/audit-status-list", middleware.DenyDomainReq{}.Process, middleware.Auth{}.Process, middleware.ConsoleUser{CanSkip: true}.Process, controller.FormulaGoods{}.GetGoodsAuditStatusList)
 		group.Match([]string{"POST", "OPTIONS"}, "/goods/audit-status", middleware.DenyDomainReq{}.Process, middleware.Auth{}.Process, middleware.ConsoleUser{}.Process, controller.FormulaGoods{}.GetGoodsAuditStatus)
 		group.Match([]string{"POST", "OPTIONS"}, "/goods/labels", middleware.Auth{}.Process, middleware.ConsoleUser{}.Process, controller.FormulaGoods{}.GetGoodsLabels)
 		//从云端同步应用

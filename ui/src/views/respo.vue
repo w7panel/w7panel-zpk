@@ -157,6 +157,7 @@ export default {
   name: 'respo-index',
   data() {
     return {
+      listRequestId: 0,
       starShowIndex: -1,
       paginate: 10,
       dfimg: dfimg,
@@ -320,10 +321,28 @@ export default {
       let icon = /^(https?:)?\/\//.test(url) ? url : (url ? base + url : dfimg);
       return icon
     },
+    loadGoodsAuditStatus(list, requestId) {
+      const identifies = list.filter(item => Number(item.goods_id) > 0).map(item => item.identifie);
+      if (!identifies.length) return;
+      myAxios.post('/respo/goods/audit-status-list', { identifies }).then(res => {
+        if (requestId !== this.listRequestId) return;
+        const goods = res?.data?.data || {};
+        list.forEach(item => {
+          const info = goods[item.goods_id];
+          if (info) {
+            item.audit_status = info.audit_status;
+            item.audit_remark = info.audit_remark;
+          }
+        });
+      }).catch(() => {
+        // Market metadata is optional; keep the loaded formula list usable.
+      });
+    },
     getData(page) {
       if (page) {
         this.page = page;
       }
+      const requestId = ++this.listRequestId;
       this.loading = true;
       myAxios.get('/respo/list?status=1&status=2&status=99', {
         params: {
@@ -334,13 +353,16 @@ export default {
           owner: true,
         },
       }).then(res => {
+        if (requestId !== this.listRequestId) return;
         this.webUrl = res.data?.data?.webUrl;
         this.list = res.data?.data?.list || [];
         this.list.map(i => {
           i.name = i.name || i.identifie;
         })
         this.total = res.data?.data?.total || 0;
+        this.loadGoodsAuditStatus(this.list, requestId);
       }).finally(() => {
+        if (requestId !== this.listRequestId) return;
         this.loading = false;
       });
     },

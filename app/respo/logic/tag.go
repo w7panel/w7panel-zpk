@@ -40,7 +40,18 @@ func (l Category) SaveFormulaCategory(formulaID int32, name string) (*entity.Tag
 		return nil, errors.New("分类不存在")
 	}
 
+	return l.SaveLocalFormulaCategory(formulaID, name)
+}
+
+// SaveLocalFormulaCategory saves a category without querying the market.
+func (l Category) SaveLocalFormulaCategory(formulaID int32, name string) (*entity.Tag, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		_, err := dao.Q.TagFormula.Where(dao.Q.TagFormula.FormulaID.Eq(formulaID)).Delete()
+		return nil, err
+	}
 	var selected *entity.Tag
+	var err error
 	err = dao.Q.Transaction(func(tx *dao.Query) error {
 		selected, err = tx.Tag.Where(tx.Tag.Name.Eq(name)).First()
 		if errors.Is(err, gorm.ErrRecordNotFound) {

@@ -1,6 +1,6 @@
 # Helm Chart 接入 Sidecar 示例
 
-本文面向上传或导入 Helm 包的 Chart 作者，以 `w7panel-cloudnoauth` 为例，说明如何调整自己的 Chart。示例按当前 ZPK 实现编写，最后核对日期：2026-10-12。
+本文面向上传或导入 Helm 包的 Chart 作者，以 `w7panel-cloudnoauth` 为例，说明如何调整自己的 Chart。示例按当前 ZPK 实现编写，最后核对日期：2026-11-06。
 
 ## 1. 平台和 Chart 各负责什么
 
@@ -12,7 +12,39 @@
 2. 通过 `w7panelArtifact.serviceAccountName` 声明 Pod 实际使用的账号，账号仍由原 Chart 或安装方创建。
 3. 包含主子应用时，让需要代理的 Pod 使用根 sidecar Binding 授权的账号，或自行补齐其他账号的权限。
 
-当前共享资源的两个 Binding 都只绑定一个账号，平台尚未实现按多个宿主账号自动授权。`w7panelArtifact.serviceAccountName` 是授权声明，不会改变 Pod 的 `serviceAccountName`，也不会创建账号。
+每个 Binding 只绑定一个账号；共享子应用显式声明账号时会生成该账号的额外 Binding。平台不会自动发现任意 Pod 使用的账号。`w7panelArtifact.serviceAccountName` 是授权声明，不会改变 Pod 的 `serviceAccountName`，也不会创建账号。
+
+
+### 主子应用接入与账号特别说明
+
+> **凡实际使用 Sidecar 的用户 Helm Chart，无论主应用还是子应用，都建议显式配置 `w7panelArtifact.serviceAccountName`，并与 Pod / Job 实际使用的账号保持一致，包括使用 `default` 的情况。** 此字段仅向 Sidecar 资源模板声明授权对象，不会创建 ServiceAccount，也不会修改 Pod 的账号。账号仍由 Chart 或安装方创建。
+
+```yaml
+w7panelArtifact:
+  # 使用当前宿主 Chart 的实际账号 helper；主、子 Chart 各自填写。
+  serviceAccountName: '{{ include "your-chart.serviceAccountName" . }}'
+```
+
+模板字符串在当前宿主 Chart 上下文执行；Helm 子应用应引用自己的 helper，也可以填写实际账号的固定名称。不要把 Helm 表达式直接填入不支持 `tpl` 的 `serviceAccount.name`。
+
+| 主应用 / 子应用 | Sidecar 接入及账号要求 |
+| --- | --- |
+| 生成型主应用 / 生成型子应用 | 跟随根制品创建站点开关，自动配置代理插槽及账号声明；默认共用根账号，未开启集群权限时用 `default`。局部覆盖账号后仍需核对账号存在及权限。 |
+| 生成型主应用 / Helm 子应用 | 子 Chart 自行接入 Pod / Job 插槽，并显式声明实际账号；使用根账号时关闭重复创建，使用其他账号时保证该账号存在。 |
+| Helm 主应用 / 生成型子应用 | 主 Chart 自行接入插槽、创建或引用账号并声明账号；根账号不会自动传给生成型子应用，必要时在最终安装 values 中显式设置子应用的 `serviceAccount.name`。 |
+| Helm 主应用 / Helm 子应用 | 各自接入插槽并声明各自实际账号；共用账号时明确由谁创建，使用不同账号时分别保证账号存在及授权。 |
+
+“Helm 应用”指实际进入用户 Chart / YAML 打包分支的应用；生成型 Chart 指由 ZPK 生成工作负载模板的应用。所有 ZPK 子应用跟随根制品的创建站点开关；仅把 library 打入包不会自动改写用户 Helm Chart 的 Pod。
+
+资源输出规则：
+
+- 根 Chart 输出完整 Sidecar resources；未声明账号时仍会求值，实际账号回退行为由 Sidecar 自己的模板决定，不能假定一定匹配业务 Pod。
+- 共享子应用有有效账号时，仅追加 RoleBinding / ClusterRoleBinding，并改写名称和 subjects；Service、Role、ClusterRole 等共享资源由根 Chart 输出。
+- 共享子应用账号缺失或求值为空时，跳过 resources 模板求值及输出，不报错，也不关闭容器插槽。若仍使用代理，须自行保证权限，否则可能运行时报 403。
+- 不使用 Sidecar 的 Helm 工具子应用（例如未调用代理插槽的 `w7-traditiontool`）无需为了打包而补账号声明。
+- 主子应用必须使用一致的共享资源名称和连接配置，避免子代理引用不存在的 Service 或角色。
+
+**当前多子应用限制：** 额外 Binding 的名称后缀仅按 namespace 和账号生成；多个共享子应用使用相同账号且原始 Binding 名相同时，仍可能生成重复 Binding。显式声明账号不能解决此重名问题，发布前须检查最终渲染结果中的资源标识唯一性。
 
 ## 2. 最小 Chart 示例
 
@@ -105,7 +137,7 @@ lifecycleJob:
 
 实际 Chart 可以继续使用已有的账号命名 helper，只需让 Pod 和 `w7panelArtifact.serviceAccountName` 调用同一个 helper。
 
-根 CA 注解要落在 `spec.template.metadata.annotations`，不能只写在 Deployment 顶层。当前 Helm 打包分支不会把 manifest 的根 CA 注解自动写入用户 Chart 的 values，不能仅依赖制品中的开关。集群还需具备根 CA 注入、cert-manager CSI 和对应 ClusterIssuer，业务进程需信任注入后的 CA。
+根 CA 注解要落在 `spec.template.metadata.annotations`，不能只写在 Deployment 顶层。当前 Helm 打包分支会在创建站点时向用户 Chart values 写入根 CA 注解，但 Chart 模板仍须把这些 values 渲染到 Pod，不能仅依赖制品中的开关。集群还需具备根 CA 注入、cert-manager CSI 和对应 ClusterIssuer，业务进程需信任注入后的 CA。
 
 ### templates/_w7panel-sidecars.tpl
 
@@ -137,7 +169,7 @@ metadata:
 {{- include "w7panel.sidecars.resources" . }}
 ```
 
-ZPK 会补齐同名入口。自己的 Chart 携带时只保留这一处调用，避免另建文件重复输出共享 Service/RBAC。内嵌 ZPK 子应用由打包器设置 `sharedSidecarResources=true`，其入口不输出共享资源。
+ZPK 会补齐同名入口。自己的 Chart 携带时只保留这一处调用，避免另建文件重复输出共享 Service/RBAC。内嵌 ZPK 子应用由打包器设置 `sharedSidecarResources=true`，其入口不重复输出 Service、Role 等共享资源；有账号时仅输出额外 Binding，无账号时不输出 resources。
 
 ### templates/deployment.yaml
 
@@ -367,7 +399,7 @@ helm template demo ./final-app.tgz --namespace demo-ns \
 - Pod 有 `w7.cc/inject-root-ca: "true"` 和正确的 `w7.cc/group-name`。
 - Job 的代理在 `initContainers`，带 `restartPolicy: Always`。
 - 所有需要代理的 Pod/Job 的账号与共享两个 Binding 的 subject 一致；非 `default` 账号已由根 Chart 创建或由安装方提供。
-- 整个制品只有一份共享 sidecar Service、Role、RoleBinding、ClusterRole、ClusterRoleBinding；业务自己的 RBAC 可以同时存在。
+- 整个制品只有一份共享 sidecar Service、Role、ClusterRole；子应用可以追加账号 Binding。检查所有资源的 kind、namespace、name 组合唯一，尤其多个子应用共用账号时。
 - 关闭创建站点时，最终包不注入 cloudnoauth，也不因本示例条件额外开启根 CA 注解。
 
 ## 5. 常见问题

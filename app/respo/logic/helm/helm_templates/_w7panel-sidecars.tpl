@@ -187,6 +187,7 @@ instead of special-casing a particular annotation key.
   {{- $artifactServiceAccountName = tpl (toString $artifactServiceAccountTemplate) $root | trim -}}
 {{- end -}}
 {{- $resources := list -}}
+{{- if or (not $sharedResources) $artifactServiceAccountName -}}
 {{- range $sidecar := ($root.Values.w7panelSidecars | default list) -}}
   {{- $context := deepCopy (index $root.Subcharts $sidecar.chart) -}}
   {{- if $artifactServiceAccountName -}}
@@ -198,9 +199,6 @@ instead of special-casing a particular annotation key.
     {{- if $rendered -}}
       {{- if $sharedResources -}}
         {{/* Shared objects are owned by the parent, but an independent Pod needs its own bindings. */}}
-        {{- if not $artifactServiceAccountName -}}
-          {{- fail "shared sidecar resources require w7panelArtifact.serviceAccountName" -}}
-        {{- end -}}
         {{- range $document := regexSplit "(?m)^---[ \t]*$" $rendered -1 -}}
           {{- $object := fromYaml $document -}}
           {{- if or (eq $object.kind "RoleBinding") (eq $object.kind "ClusterRoleBinding") -}}
@@ -215,6 +213,7 @@ instead of special-casing a particular annotation key.
       {{- end -}}
     {{- end -}}
   {{- end -}}
+{{- end -}}
 {{- end -}}
 {{- if $resources -}}
 {{ join "\n---\n" $resources }}

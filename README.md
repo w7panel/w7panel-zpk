@@ -6,6 +6,8 @@ openssl req -new -x509 -key registry-key.pem -out registry-cert.pem -days 365 -s
 
 上传或导入 Helm 包时，Chart 作者需主动接入 sidecar 模板插槽并声明实际运行账号，参考 [Helm Chart 接入 Sidecar 示例](HELM_SIDECAR_INTEGRATION.md)。完整打包协议见 [Helm Sidecar 集成约定](HELM_SIDECAR.md)。
 
+> **实际使用 Sidecar 的用户 Helm Chart，无论主应用还是子应用，均建议显式声明 `w7panelArtifact.serviceAccountName`，且与 Pod / Job 实际账号一致。** 此字段不创建账号、不修改 Pod 账号；生成型 Chart 自动配置。共享子应用未声明账号时跳过资源输出，但不会关闭代理容器。主子应用组合及当前多子应用 Binding 重名限制见 [接入与账号特别说明](HELM_SIDECAR_INTEGRATION.md#主子应用接入与账号特别说明)。
+
 ## 修改制品为环境应用分类和原生应用类型
 
 在 ZPK 服务所在环境中执行（`server` 为服务端可执行文件，不是独立上传 CLI）：

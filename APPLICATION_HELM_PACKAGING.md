@@ -866,3 +866,7 @@ helm template <release> <generated-chart-dir> -f <install-values.yaml>
 ### 2026-10-30 原生应用网关域名启动参数
 
 原生应用仅在域名配置中存在有效路径与后端端口的规则时自动维护 `DOMAIN_URL=%DOMAIN_URL%`。删除全部规则或全部配置页签后，自动参数会在保存和重新加载时移除；空页签不算网关规则。自定义的 `DOMAIN_URL` 普通值会保留；传统应用及应用插件的固定域名参数沿用各自规则。只编辑来源制品启动参数的模式不自动增删来源字段。
+
+共享 Sidecar 子宿主（`w7panelArtifact.sharedSidecarResources=true`）未提供账号或 `serviceAccountName` 求值为空时，跳过资源模板求值，不输出任何 resources，避免与根 Chart 重复创建同名资源；提供有效账号时仅输出 RoleBinding / ClusterRoleBinding，并改写绑定名称及 subjects 为该账号。根 Chart 的资源输出保持原行为。此行为不关闭容器插槽，实际使用代理的子应用仍需保证账号权限。
+
+实际使用 Sidecar 的用户 Helm 主、子应用均建议显式声明与 Pod / Job 一致的 `w7panelArtifact.serviceAccountName`；生成型 Chart 自动配置。四类主子组合的责任边界、示例和当前多子应用同账号 Binding 重名限制见 [主子应用接入与账号特别说明](HELM_SIDECAR_INTEGRATION.md#主子应用接入与账号特别说明)。

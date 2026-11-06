@@ -206,6 +206,8 @@ w7panelSidecars:
 
 对于用户提供的 Helm Chart，只要存在自动 sidecar，`configureHelmSidecarHost` 会覆盖整个 `w7panelSidecars` key，而不是与用户原有列表合并。宿主若已有手工 sidecar 配置，需要在打包结果中重点检查这一项。
 
+> **特别说明：实际使用 Sidecar 的用户 Helm 主应用和子应用均建议显式声明 `w7panelArtifact.serviceAccountName`，与 Pod / Job 的实际账号一致。** 生成型 Chart 自动配置；不使用代理的 Helm 子应用无需补填。完整组合说明和多子应用 Binding 重名限制见 [主子应用接入与账号特别说明](HELM_SIDECAR_INTEGRATION.md#主子应用接入与账号特别说明)。
+
 ### 6.1 制品运行身份传递约定
 
 Sidecar 复用应用原来的 ServiceAccount。根应用和子应用均为生成型 Chart 时，未开启根制品 `clusterPrivileges` 默认使用 namespace 的 `default`；开启时沿用主应用的 `common.serviceAccountName` 命名，通常是 `<Release.Name>-<主Chart名>`。子应用通过 Helm 继承已有的 `global.name`，默认跟随主应用账号名；账号及原有的 ClusterRole、Binding、token Secret 只由生成型根 Chart 创建一份。没有新增专用账号或全局身份配置。
@@ -234,7 +236,7 @@ w7panelArtifact:
 
 同时将其生成型子应用的 `serviceAccount.name` 配置为该账号。Helm 根 Chart 不会自动把账号传给子应用；开启集群权限时尤其需要避免子应用引用未创建的默认账号。Helm 子 Chart 的 Pod 和账号创建开关也由作者自行调整。仓库自身 `charts/` 的部署账号仍由 `zpk.serviceAccountName` 管理。
 
-当前仍是单账号授权，尚未实现按多个宿主账号自动建立 Binding。多个代理 Pod 使用不同账号时，需统一实际账号或由 Chart 自行维护额外授权，不能仅靠设置 `global.name` 或声明根账号解决。具体操作见 [主子应用账号配置示例](HELM_SIDECAR_INTEGRATION.md#3-包含主子应用时如何配置账号)。
+每个宿主仅声明一个账号；共享子应用显式声明账号时可追加该账号的 Binding，但不会自动发现一个 Chart 内多个 Pod 的不同账号。多个账号仍需分别配置或由 Chart 自行维护授权，不能仅靠设置 `global.name` 或声明根账号解决。具体操作见 [主子应用账号配置示例](HELM_SIDECAR_INTEGRATION.md#3-包含主子应用时如何配置账号)。
 
 共享资源使用根 Sidecar 的命名和配置。子宿主不要单独覆盖 `fullnameOverride`、`sidecar.upstream.serviceName` 等共享资源名称；覆盖时必须在所有宿主保持一致。
 
@@ -414,3 +416,5 @@ helm template test-release <host-chart> --debug
 | 生成型 Workload 插槽 | `app/respo/logic/helm/helm_templates/workload.yaml.tpl` |
 | ZPK 自身部署 Chart | `charts/templates/_w7panel-sidecars.tpl`、`charts/templates/deployment.yaml` |
 | 五类应用总览 | `APPLICATION_HELM_PACKAGING.md` |
+
+共享 Sidecar 子宿主（`w7panelArtifact.sharedSidecarResources=true`）未提供账号或 `serviceAccountName` 求值为空时，跳过资源模板求值，不输出任何 resources，避免与根 Chart 重复创建同名资源；提供有效账号时仅输出 RoleBinding / ClusterRoleBinding，并改写绑定名称及 subjects 为该账号。根 Chart 的资源输出保持原行为。此行为不关闭容器插槽，实际使用代理的子应用仍需保证账号权限。

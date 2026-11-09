@@ -392,16 +392,18 @@
                                                 <span class="c-99 mt-6">常用于 PHP-FPM FastCGI 等无法直接提供 HTTP 服务的场景；若后端可直接提供 HTTP 服务，则无需启用。</span>
                                             </div>
                                         </a-form-item>
-                                        <a-form-item v-if="form.traditionNginxGateway" label="NGINX 模板"
+                                        <a-form-item label="NGINX 模板"
                                             field="traditionNginxVhostTemplate" style="margin-bottom:0;">
                                             <div class="nginx-template-field">
                                                 <div class="nginx-template-input">
                                                     <a-textarea v-model="form.traditionNginxVhostTemplate"
+                                                        :disabled="!form.traditionNginxGateway"
                                                         class="nginx-template-textarea"
                                                         :auto-size="{minRows:10, maxRows:20}"
                                                         :spellcheck="false" placeholder="请输入 NGINX vhost 模板"
                                                         style="width:500px;" />
                                                     <a-button size="mini" type="text"
+                                                        :disabled="!form.traditionNginxGateway"
                                                         class="nginx-template-example-entry"
                                                         @click="nginxTemplateExampleVisible = true">
                                                         查看完整示例

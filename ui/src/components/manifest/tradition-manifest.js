@@ -394,6 +394,7 @@ export function traditionManifestState() {
         nginxTemplatePlaceholders,
         nginxTemplateExample,
         nginxTemplateExampleVisible: false,
+        traditionNginxVhostTemplateBackup: '',
         traditionPluginList: [],
         traditionPluginListLoading: false,
         traditionPluginListError: '',
@@ -622,8 +623,15 @@ export const traditionManifestMethods = {
         if (this.form.type != 'tradition' || this.option?.pureManifest) return;
         const enabled = Boolean(value);
         const apply = () => {
+            if (enabled) {
+                this.form.traditionNginxVhostTemplate = this.traditionNginxVhostTemplateBackup
+                    || this.form.traditionNginxVhostTemplate;
+                this.traditionNginxVhostTemplateBackup = '';
+            } else {
+                this.traditionNginxVhostTemplateBackup = this.form.traditionNginxVhostTemplate;
+                this.form.traditionNginxVhostTemplate = '';
+            }
             this.form.traditionNginxGateway = enabled;
-            if (!enabled) this.form.traditionNginxVhostTemplate = '';
             this.syncTraditionGatewayStartParam();
             this.syncTraditionIngress();
             this.changeForm();
@@ -756,6 +764,7 @@ export const traditionManifestMethods = {
         return ingress;
     },
     applyTraditionAnnotationForm(annotation = {}) {
+        this.traditionNginxVhostTemplateBackup = '';
         const hasGatewayAnnotation = Object.prototype.hasOwnProperty.call(
             annotation || {}, traditionAnnotationKeys.nginxGateway,
         );

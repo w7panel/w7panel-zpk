@@ -453,6 +453,8 @@ rm -rf -- "$plugin_install_path"
 
 开启 NGINX 网关时，编辑器给 `w7-traditiontool` 设置隐藏启动参数 `gatewayEnabled=true`，并把传统应用 Ingress 后端改为工具子应用及其实际端口。关闭网关时显式设置 `gatewayEnabled=false`，不删除工具依赖。
 
+编辑器关闭网关时模板框显示为空并禁用编辑，原内容仅在当前编辑会话中临时备份，未保存前重新开启可恢复。手动保存关闭状态时，manifest 中的模板仍清空，再次打开无需恢复。切换开关只更新编辑状态，仍需手动保存。
+
 tradition-tool 支持安装后切换网关：直接修改工具自身的镜像、启动命令和端口等容器配置，并在工具 Deployment 的 `w7.cc/tradition-runtime-config` 标记需要保留的 image、imagePullPolicy、command、args、ports、env，以及 `servicePorts: true`。不再在主应用上存储 `gatewayEnabled` 运行开关，也不通过 `w7.cc/tradition-runtime-workload` 关联主 Deployment。工具 Chart 默认开启自己的 `preserveRuntimeConfig`，升级时只读取同名工具 Deployment/Service 的标记与实际配置，保留已修改字段及 Service 类型/端口；空字段保持清空，不复制 nodePort 等集群分配字段，资源限制和挂载等未标记字段仍随新版 Chart。没有标记时按本次发布默认生成，工具的 `gatewayEnabled` values 只负责默认容器选择。页面依据工具实际容器配置显示状态。Ingress 转发在主应用已开启 `preserveRuntimeConfig` 的前提下使用 4.4 节的通用保留注解：工具将应用与工具两个来源 Service 映射到本次选定的目标，并与实际后端同时更新；关闭时使用应用当前 Service 端口。根 Chart 的通用 Ingress 模板只读取该映射，不识别网关开关或传统应用类型。
 
 配套能力统一由 tradition-tool 自身的 Chart 声明：工具 Deployment 的 `w7.cc/tradition-gateway` 提供自身 Service 名称和实际保留的 HTTP 端口，`w7.cc/tradition-gateway-containers` 提供开启和关闭两份容器配置，供 UI 复用镜像、启动脚本和挂载。主应用通过现有 AppGroup 定位，直连端口查询实际 Service，仅 Service 返回 404 时视为不存在，其他查询错误阻止操作。ZPK 的通用 Workload 模板不输出工具能力注解，也不增加 `traditionGateway` values 或工具依赖判断。它们是工具 Chart 输出的 Kubernetes 注解，不增加 manifest 输入字段。UI 需要新版工具 Chart 才启用开关，旧版运行中的 nginx 仍可编辑配置；完整升级保留需要更新工具 Chart/UI，并使用已支持通用 Ingress 后端保留机制的应用 Chart。

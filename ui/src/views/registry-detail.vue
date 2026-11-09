@@ -211,12 +211,12 @@
                 <a-form-item label="" style="margin-bottom:10px;">
                     <a-radio-group v-model="buildForm.selectType" style="margin-bottom:0;"
                         @change="changeBuildFormType">
-                        <a-radio :value="1">当前集群</a-radio>
+                        <a-radio v-if="isFounder" :value="1">当前集群</a-radio>
                         <a-radio :value="2">第三方集群</a-radio>
                     </a-radio-group>
                 </a-form-item>
 
-                <div v-if="buildForm.selectType == 1">
+                <div v-if="isFounder && buildForm.selectType == 1">
                     <a-form-item label="选择应用" field="k8s_container_name_arr">
                         <div class="df df-c" style="flex:1;">
                             <a-select v-model="buildForm.ccApp" placeholder="请选择应用" size="large" style="width:600px;"
@@ -313,7 +313,9 @@
                             <a-tag v-for="(tag, index) in buildForm.repository_tag_arr" :key="index" class="tag"
                                 closable @close="deleteTag(index)">{{ tag }}</a-tag>
                             <div class="input fc">
-                                <input type="text" placeholder="请输入匹配规则" v-model="buildForm.taginput"
+                                <input type="text"
+                                    :placeholder="buildForm.match_type == 2 ? '例如 ^v[0-9]+$，匹配 v1、v20' : '例如 release-，匹配 release-1.0'"
+                                    v-model="buildForm.taginput"
                                     @keydown.enter="addTag" @blur="addTag" />
                             </div>
                         </div>
@@ -325,7 +327,7 @@
                         <a-tag v-for="(tag, index) in buildForm.repository_tag_arr" :key="index" class="tag" closable
                             @close="deleteTag(index)">{{ tag }}</a-tag>
                         <div class="input fc">
-                            <input type="text" placeholder="请输入" v-model="buildForm.taginput" @keydown.enter="addTag"
+                            <input type="text" placeholder="例如 latest、v1.0，回车添加" v-model="buildForm.taginput" @keydown.enter="addTag"
                                 @blur="addTag" />
                         </div>
                     </div>
@@ -554,11 +556,13 @@ export default {
             this.changeTreeContainer(data);
         },
 
-        upfile(file) {
-            var file = file.target.files[0];
+        upfile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
             const reader = new FileReader();
             reader.onload = () => {
                 this.buildForm.k8s_config = reader.result;
+                this.buildForm.getNamespace();
             };
             reader.readAsText(file);
         },
@@ -566,7 +570,12 @@ export default {
             this.buildForm.treeData = []
 
             this.buildForm.getAppgroups = () => {
-                myAxios.get('/v2/api/repository/deploy_rule/k8s/proxy/apis/appgroup.w7.cc/v1alpha1/namespaces/default/appgroups').then(res => {
+                if (!this.isFounder) {
+                    this.buildForm.appgroups = {};
+                    this.buildForm.selectType = 2;
+                    return;
+                }
+                myAxios.get('/v2/api/repository/deploy_rule/k8s/proxy/apis/w7panel.w7.com/v1alpha1/namespaces/default/appgroups').then(res => {
                     let list = res?.data?.items || [];
                     let kvlist = {};
                     list = list.filter(i => !i?.metadata?.labels?.['w7.cc/parent']).map(i => {

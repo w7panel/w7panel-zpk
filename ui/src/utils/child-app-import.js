@@ -333,9 +333,25 @@ export async function removeImportedChildren(client, {
     if (!importedIdentifies.size) {
         return { existingFiles: [], orderedFiles: {}, rootManifest: jsyaml.dump(clonePersistedRootManifest(rootRef)) };
     }
+    // Read a fresh snapshot for deletion and compensation instead of trusting the editor cache.
+    const filesResponse = await client.post('/respo/manifest/path-tree', {
+        identifie: rootIdentifie,
+        version: versionId,
+    });
+    const currentFiles = filesResponse?.data?.data?.list;
+    if (!currentFiles || typeof currentFiles !== 'object' || Array.isArray(currentFiles)) {
+        throw new Error('读取子应用文件列表失败，请重试');
+    }
+    list = currentFiles;
     const existingFiles = [...importedIdentifies]
-        .map(identifie => importedChildFilePath(identifie))
-        .filter(file => Object.prototype.hasOwnProperty.call(list || {}, file));
+        .map(identifie => importedChildFilePath(identifie));
+    const writeFile = async (params) => {
+        const response = await client.post('/respo/manifest/file', params);
+        if (!response || response.status !== 200) {
+            throw new Error('保存或删除子应用文件失败，请重试');
+        }
+        return response;
+    };
     const previousJSON = clonePersistedRootManifest(rootRef);
 
     if (rootRef.removeChildDependencies) {
@@ -391,20 +407,20 @@ export async function removeImportedChildren(client, {
             .map(filename => [filename, list?.[filename] ?? '']),
     );
     try {
-        await client.post('/respo/manifest/file', {
+        await writeFile({
             identifie: rootIdentifie,
             filename: 'manifest.yaml',
             content: rootManifest,
             version: versionId,
         });
         const fileWrites = await Promise.allSettled([
-            ...Object.entries(orderedFiles).map(([filename, content]) => client.post('/respo/manifest/file', {
+            ...Object.entries(orderedFiles).map(([filename, content]) => writeFile({
                 identifie: rootIdentifie,
                 filename,
                 content,
                 version: versionId,
             })),
-            ...existingFiles.map(filename => client.post('/respo/manifest/file', {
+            ...existingFiles.map(filename => writeFile({
                 identifie: rootIdentifie,
                 filename,
                 content: '',

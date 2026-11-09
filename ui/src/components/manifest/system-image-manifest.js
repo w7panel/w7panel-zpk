@@ -79,10 +79,8 @@ export function withSystemImageRuntime(
     } else {
         delete mainContainer.command;
     }
-    mainContainer.volumeMounts = [{
-        name: systemImageRootfsVolumeName,
-        mountPath: '/system-rootfs',
-    }];
+    // Sysbox uses the Pod volume directly; do not expose its writable layer inside the container.
+    delete mainContainer.volumeMounts;
 
     nextPlatform['container-v2'] = containers;
     nextPlatform.workload = { ...(nextPlatform.workload || {}), type: 'Deployment' };

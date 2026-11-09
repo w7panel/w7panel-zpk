@@ -14,7 +14,7 @@
 | 应用插件 | `app-plugin` | 应用插件专用 Job 打包器 | Helm hook Job，可选 MicroApp/Site；没有自己的常驻 Workload | 复用所选传统应用的 `site-storage` PVC |
 | 传统应用 | `tradition` | 通用工作负载生成器 + 传统应用增强 | Workload、Service、Ingress、代码/NGINX Job、可选 NGINX 子 Chart | 安装方传入的 `PVC_NAME`，主要挂载为 `site-storage` |
 | Helm/K8sYaml 应用 | `helm` | `helm_helmapp.go`：解包并改写用户 Chart，或把 YAML 写入 templates | 完全由用户 Chart/YAML 决定，ZPK 可追加子 Chart、MicroApp、Site、sidecar | 完全由用户 Chart/YAML 决定 |
-| 系统镜像 | `system-image` | `helm_systemimageapp.go`，复用通用工作负载生成器 | Sysbox Deployment、Service、Job | 安装方传入的 `PVC_NAME`，挂载到 `/system-rootfs` |
+| 系统镜像 | `system-image` | `helm_systemimageapp.go`，复用通用工作负载生成器 | Sysbox Deployment、Service、Job | 安装方传入的 `PVC_NAME`，仅供 Sysbox 持久化系统层 |
 
 最重要的边界：
 
@@ -552,7 +552,7 @@ UI 会强制：
 - `runtimeClassName: sysbox-runc`；
 - `hostUsers: false`；
 - volume `system-rootfs`；
-- 第一个容器挂载 `/system-rootfs`；
+- 不默认将 rootfs PVC 挂载到主容器内，避免用户直接修改 upper 层文件；
 - `sysbox/rootfs-rw-layer` 注解中的 `name` 与主容器名一致，path 为 `system-rootfs/<release-name>/<应用标识>-${IMAGE_VERSION}/system`；
 - 增加外部必选依赖 `w7panel-sysbox`。
 
@@ -566,7 +566,7 @@ UI 会强制：
 
 - `system-rootfs` 是 PVC volume，但 claimName 为空，最终取 `.Values.PVC_NAME`。
 - Chart 不生成 `kind: PersistentVolumeClaim`；安装方必须创建/选择 PVC。
-- `/system-rootfs` 和 `sysbox/rootfs-rw-layer` annotation 共同让 Sysbox/平台侧持久化系统层。
+- Pod 保留 PVC volume，由 `sysbox/rootfs-rw-layer` annotation 指定持久化系统层；主容器不默认挂载 `/system-rootfs`。旧 manifest 在编辑器重新保存后会移除原默认挂载；已发布版本和运行中的应用不会自动更新。
 - 系统版本、存储大小、存储类、读写模式被暴露为安装参数；由于本 Chart 不创建 PVC，实际 PVC 规格最终由安装端创建/选择逻辑决定。
 
 ## 10. 依赖模型统一说明
@@ -780,7 +780,7 @@ sidecar 框架本身不创建、分配或回收固定存储，也没有独立的
 | 应用插件 | 传统应用/安装方 | 从传统应用依赖注入 `PVC_NAME` | 代码 `nginx-web-dir/<domain>`；状态 `tradition-plugin-dir/<domain>` | 只清目录，不删 PVC |
 | 传统应用 | 安装方 | `PVC_NAME` | 代码 `nginx-web-dir/<domain>`；插件状态 `tradition-plugin-dir/<domain>` | 卸载代码 Job 只清空当前域名目录 |
 | Helm 应用 | 用户 Chart | 用户 values | 用户定义 | 用户 Chart 定义 |
-| 系统镜像 | 安装方 | `PVC_NAME` | `/system-rootfs` 和 `system-rootfs/<release-name>/<应用标识>-${IMAGE_VERSION}/system` | Chart 不创建 PVC |
+| 系统镜像 | 安装方 | `PVC_NAME` | 仅由 Sysbox 使用 `system-rootfs/<release-name>/<应用标识>-${IMAGE_VERSION}/system`，不默认挂载到容器内 | Chart 不创建 PVC |
 
 ### 11.2 ZPK 服务自身存储
 

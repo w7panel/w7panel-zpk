@@ -16,7 +16,7 @@ rules:
   - apiGroups: [ "batch" ]
     resources: [ "cronjobs" ]
     verbs: [ "get", "list", "watch", "create", "update", "patch", "delete" ]
-  - apiGroups: [ "appgroup.w7.cc" ]    # 替换为您的 API 组
-    resources: [ "appgroups", "appgroups/status" ]  # 根据实际需要添加子资源
-    verbs: [ "get", "list", "watch", "create", "update", "patch", "delete" ] # 按需调整权限
+  - apiGroups: [ "w7panel.w7.com" ]
+    resources: [ "appgroups" ]
+    verbs: [ "get", "list", "watch" ]
 {{- end }}

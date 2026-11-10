@@ -21,7 +21,6 @@ metadata:
     {{- end }}
     title: {{ .Values.app.title | quote }}
     w7.cc.app/title: {{ .Values.app.title | quote }}
-    w7.cc/create-svc: 'false'
     w7.cc/group-name: {{ .Release.Name }}
 spec:
   {{- if not .Values.workload.isDaemonSet }}

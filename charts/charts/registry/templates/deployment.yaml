@@ -7,7 +7,6 @@ metadata:
   annotations:
     title: 制品库-镜像仓储
     w7.cc.app/title: 制品库-镜像仓储
-    w7.cc/create-svc: 'false'
 spec:
   {{- if not .Values.autoscaling.enabled }}
   replicas: {{ .Values.replicaCount }}

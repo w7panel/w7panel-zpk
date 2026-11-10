@@ -341,6 +341,7 @@ func (c Formula) Info(ctx *gin.Context) {
 		Title       string               `json:"title"`
 		Required    bool                 `json:"required"`
 		StartParams []logic2.StartParams `json:"start_params"`
+		Ports       []v1.ContainerPort   `json:"ports"`
 		Volumes     []v1.Volume          `json:"volumes"`
 	}
 	installFormulas := make([]FormulaInstallInfo, 0)
@@ -370,6 +371,7 @@ func (c Formula) Info(ctx *gin.Context) {
 				Title:       item.Application.Name,
 				Required:    index == 0 || formulaRequiredMap[item.Application.Identifie],
 				StartParams: startParams,
+				Ports:       installFormulaPorts(item.Platform),
 				Volumes:     volumes,
 			})
 		}
@@ -942,4 +944,16 @@ func selectableListPageBounds(page, limit, total int) (int, int) {
 		end = total
 	}
 	return start, end
+}
+
+// installFormulaPorts keeps each application's service ports in manifest order.
+func installFormulaPorts(platform logic2.Platform) []v1.ContainerPort {
+	ports := make([]v1.ContainerPort, 0)
+	for _, container := range platform.ContainerV2s {
+		if container.IsInitContainer {
+			continue
+		}
+		ports = append(ports, container.Ports...)
+	}
+	return ports
 }

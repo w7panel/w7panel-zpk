@@ -128,3 +128,7 @@ HTTPS 默认验证证书，自签名证书可用 `--ca /path/to/ca.pem`；
 共享 sidecar 资源时，w7panelArtifact.serviceAccountName 指定当前 Pod 账号；子应用只生成独立 RoleBinding/ClusterRoleBinding，引用父应用共享角色，不重复创建 Service 或角色。父子应用须使用相同的共享角色名称。
 
 子应用导入支持 `once=true` 与 `once=false`，保留来源 manifest 的安装次数设置。候选接口 `/respo/selectable/list` 默认只返回单次安装应用（外部安装依赖规则不变）；子应用导入与更新检查通过 `install_only_once=false` 查询全部候选。远程仓库也需升级此接口，旧版仓库仍会过滤非单次安装应用。
+
+### 2026-11-10 安装摘要端口
+
+普通安装 info 的 `install_formulas[].ports` 返回各应用 `container-v2` 中普通容器的端口列表，字段结构为 Kubernetes ContainerPort，跳过初始化容器，按声明顺序排列；无端口返回空数组。面板可据此解析对应子应用的 `%PORT%`，不需要新增 manifest 请求。

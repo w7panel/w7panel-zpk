@@ -240,7 +240,13 @@ func (c Deploy) AddRule(ctx *gin.Context) {
 		return
 	}
 
-	err := dao.Q.RegistryRepositoryDeployRule.Create(&entity.RegistryRepositoryDeployRule{
+	encryptedConfig, err := logic.Deploy{}.EncryptK8sConfig(params.K8sConfig)
+	if err != nil {
+		c.JsonResponseWithServerError(ctx, err)
+		return
+	}
+
+	err = dao.Q.RegistryRepositoryDeployRule.Create(&entity.RegistryRepositoryDeployRule{
 		RepositoryID:      int32(params.RepositoryId),
 		DeployType:        int32(params.DeployType),
 		MatchType:         int32(params.MatchType),
@@ -249,7 +255,7 @@ func (c Deploy) AddRule(ctx *gin.Context) {
 		K8sAppName:        params.K8sAppName,
 		K8sContainerName:  params.K8sContainerName,
 		TagName:           params.RepositoryTag,
-		K8sConfig:         params.K8sConfig,
+		K8sConfig:         encryptedConfig,
 	})
 	if err != nil {
 		c.JsonResponseWithServerError(ctx, err)
@@ -287,7 +293,13 @@ func (c Deploy) EditRule(ctx *gin.Context) {
 		return
 	}
 
-	_, err = dao.Q.RegistryRepositoryDeployRule.Where(dao.Q.RegistryRepositoryDeployRule.ID.Eq(int32(params.Id))).Updates(entity.RegistryRepositoryDeployRule{
+	encryptedConfig, err := logic.Deploy{}.EncryptK8sConfig(params.K8sConfig)
+	if err != nil {
+		c.JsonResponseWithServerError(ctx, err)
+		return
+	}
+
+	_, err = dao.Q.RegistryRepositoryDeployRule.Where(dao.Q.RegistryRepositoryDeployRule.ID.Eq(int32(params.Id))).Select(dao.Q.RegistryRepositoryDeployRule.RepositoryID, dao.Q.RegistryRepositoryDeployRule.DeployType, dao.Q.RegistryRepositoryDeployRule.MatchType, dao.Q.RegistryRepositoryDeployRule.K8sNamespace, dao.Q.RegistryRepositoryDeployRule.K8sControllerType, dao.Q.RegistryRepositoryDeployRule.K8sAppName, dao.Q.RegistryRepositoryDeployRule.K8sContainerName, dao.Q.RegistryRepositoryDeployRule.TagName, dao.Q.RegistryRepositoryDeployRule.K8sConfig).Updates(entity.RegistryRepositoryDeployRule{
 		RepositoryID:      int32(params.RepositoryId),
 		DeployType:        int32(params.DeployType),
 		MatchType:         int32(params.MatchType),
@@ -296,7 +308,7 @@ func (c Deploy) EditRule(ctx *gin.Context) {
 		K8sAppName:        params.K8sAppName,
 		K8sContainerName:  params.K8sContainerName,
 		TagName:           params.RepositoryTag,
-		K8sConfig:         params.K8sConfig,
+		K8sConfig:         encryptedConfig,
 	})
 	if err != nil {
 		c.JsonResponseWithServerError(ctx, err)
@@ -315,6 +327,11 @@ func (c Deploy) QueryRule(ctx *gin.Context) {
 	}
 
 	info, err := c.getRuleWithRepository(ctx, params.Id)
+	if err != nil {
+		c.JsonResponseWithServerError(ctx, err)
+		return
+	}
+	info.K8sConfig, err = logic.Deploy{}.DecryptK8sConfig(info.K8sConfig)
 	if err != nil {
 		c.JsonResponseWithServerError(ctx, err)
 		return
@@ -369,10 +386,21 @@ func (c Deploy) ListRule(ctx *gin.Context) {
 		return
 	}
 
-	list, _ := dao.Q.RegistryRepositoryDeployRule.
+	list, err := dao.Q.RegistryRepositoryDeployRule.
 		Where(dao.Q.RegistryRepositoryDeployRule.RepositoryID.Eq(int32(params.RepositoryId))).
 		Order(dao.Q.RegistryRepositoryDeployRule.ID.Desc()).
 		Find()
+	if err != nil {
+		c.JsonResponseWithServerError(ctx, err)
+		return
+	}
+	for _, rule := range list {
+		rule.K8sConfig, err = logic.Deploy{}.DecryptK8sConfig(rule.K8sConfig)
+		if err != nil {
+			c.JsonResponseWithServerError(ctx, err)
+			return
+		}
+	}
 	c.JsonResponseWithoutError(ctx, map[string]interface{}{"list": list})
 }
 

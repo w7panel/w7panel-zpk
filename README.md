@@ -2,6 +2,12 @@
 openssl genpkey -algorithm RSA -out registry-key.pem -pkeyopt rsa_keygen_bits:4096
 openssl req -new -x509 -key registry-key.pem -out registry-cert.pem -days 365 -subj "/CN=registry.w7.com"
 
+## 镜像自动部署凭据
+
+第三方集群的 KUBECONFIG 在新建、编辑部署规则时使用系统现有 AES 方法加密后保存，密钥沿用 `MD5(setting.secret)`，密文以 `aes:` 标识。历史明文规则仍可读取和执行，再次保存后转为密文；空配置仍表示当前集群。此改动不批量改写已有数据。
+
+列表和详情接口保持原有配置内容及编辑方式，按权限校验后解密返回。带标识的密文解密失败时明确报错，不回退为明文或当前集群。备份、恢复和多实例部署需保持相同的 `setting.secret`；修改该值后，已有密文需要使用原密钥恢复或重新填写配置。已有密文不支持直接回退到不识别该格式的旧版本服务。
+
 ## Helm Sidecar 接入
 
 上传或导入 Helm 包时，Chart 作者需主动接入 sidecar 模板插槽并声明实际运行账号，参考 [Helm Chart 接入 Sidecar 示例](HELM_SIDECAR_INTEGRATION.md)。完整打包协议见 [Helm Sidecar 集成约定](HELM_SIDECAR.md)。

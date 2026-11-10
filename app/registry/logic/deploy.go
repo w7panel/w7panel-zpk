@@ -97,59 +97,61 @@ func (l Deploy) deployK8sApp(rule *entity.RegistryRepositoryDeployRule, imgName 
 		log += fmt.Sprintf("get k8s client error: %v\n", err)
 	}
 
-	ctx := context.Background()
-	containers := strings.Split(rule.K8sContainerName, ",")
-	for _, container := range containers {
-		if rule.K8sControllerType == K8sControllerTypeDaemonsets {
-			patch := []byte(`{"spec":{"template":{"spec":{"containers":[{"name":"` + container + `","image":"` + imgName + `"}]}}}}`)
-			result, err := clientSet.AppsV1().DaemonSets(rule.K8sNamespace).Patch(
-				ctx,
-				rule.K8sAppName,
-				k8sTypes.StrategicMergePatchType,
-				patch,
-				metav1.PatchOptions{},
-			)
-			if err != nil {
-				log += fmt.Sprintf("patch daemonsets container %s image err: %v \n", container, err)
-			} else {
-				statusContent, _ := json.Marshal(result.Status)
-				log += fmt.Sprintf("patch daemonsets container %s image success, status: %s \n", container, string(statusContent))
+	if err == nil {
+		ctx := context.Background()
+		containers := strings.Split(rule.K8sContainerName, ",")
+		for _, container := range containers {
+			if rule.K8sControllerType == K8sControllerTypeDaemonsets {
+				patch := []byte(`{"spec":{"template":{"spec":{"containers":[{"name":"` + container + `","image":"` + imgName + `"}]}}}}`)
+				result, err := clientSet.AppsV1().DaemonSets(rule.K8sNamespace).Patch(
+					ctx,
+					rule.K8sAppName,
+					k8sTypes.StrategicMergePatchType,
+					patch,
+					metav1.PatchOptions{},
+				)
+				if err != nil {
+					log += fmt.Sprintf("patch daemonsets container %s image err: %v \n", container, err)
+				} else {
+					statusContent, _ := json.Marshal(result.Status)
+					log += fmt.Sprintf("patch daemonsets container %s image success, status: %s \n", container, string(statusContent))
+				}
+			}
+			if rule.K8sControllerType == K8sControllerTypeDeployments {
+				patch := []byte(`{"spec":{"template":{"spec":{"containers":[{"name":"` + container + `","image":"` + imgName + `"}]}}}}`)
+				result, err := clientSet.AppsV1().Deployments(rule.K8sNamespace).Patch(
+					ctx,
+					rule.K8sAppName,
+					k8sTypes.StrategicMergePatchType,
+					patch,
+					metav1.PatchOptions{},
+				)
+				if err != nil {
+					log += fmt.Sprintf("patch deployments container %s image err: %v \n", container, err)
+				} else {
+					statusContent, _ := json.Marshal(result.Status)
+					log += fmt.Sprintf("patch deployments container %s image success, status: %s \n", container, string(statusContent))
+				}
+			}
+			if rule.K8sControllerType == K8sControllerTypeStatefulSet {
+				patch := []byte(`{"spec":{"template":{"spec":{"containers":[{"name":"` + container + `","image":"` + imgName + `"}]}}}}`)
+				result, err := clientSet.AppsV1().StatefulSets(rule.K8sNamespace).Patch(
+					ctx,
+					rule.K8sAppName,
+					k8sTypes.StrategicMergePatchType,
+					patch,
+					metav1.PatchOptions{},
+				)
+				if err != nil {
+					log += fmt.Sprintf("patch statefulsets container %s image err: %v \n", container, err)
+				} else {
+					statusContent, _ := json.Marshal(result.Status)
+					log += fmt.Sprintf("patch statefulsets container %s image success, status: %s \n", container, string(statusContent))
+				}
 			}
 		}
-		if rule.K8sControllerType == K8sControllerTypeDeployments {
-			patch := []byte(`{"spec":{"template":{"spec":{"containers":[{"name":"` + container + `","image":"` + imgName + `"}]}}}}`)
-			result, err := clientSet.AppsV1().Deployments(rule.K8sNamespace).Patch(
-				ctx,
-				rule.K8sAppName,
-				k8sTypes.StrategicMergePatchType,
-				patch,
-				metav1.PatchOptions{},
-			)
-			if err != nil {
-				log += fmt.Sprintf("patch deployments container %s image err: %v \n", container, err)
-			} else {
-				statusContent, _ := json.Marshal(result.Status)
-				log += fmt.Sprintf("patch deployments container %s image success, status: %s \n", container, string(statusContent))
-			}
-		}
-		if rule.K8sControllerType == K8sControllerTypeStatefulSet {
-			patch := []byte(`{"spec":{"template":{"spec":{"containers":[{"name":"` + container + `","image":"` + imgName + `"}]}}}}`)
-			result, err := clientSet.AppsV1().StatefulSets(rule.K8sNamespace).Patch(
-				ctx,
-				rule.K8sAppName,
-				k8sTypes.StrategicMergePatchType,
-				patch,
-				metav1.PatchOptions{},
-			)
-			if err != nil {
-				log += fmt.Sprintf("patch statefulsets container %s image err: %v \n", container, err)
-			} else {
-				statusContent, _ := json.Marshal(result.Status)
-				log += fmt.Sprintf("patch statefulsets container %s image success, status: %s \n", container, string(statusContent))
-			}
-		}
-	}
 
+	}
 	err = dao.Q.Transaction(func(tx *dao.Query) error {
 		curTime := time.Now()
 		_, err = tx.RegistryRepositoryDeployRule.Where(tx.RegistryRepositoryDeployRule.ID.Eq(rule.ID)).Updates(entity.RegistryRepositoryDeployRule{
@@ -167,13 +169,16 @@ func (l Deploy) deployK8sApp(rule *entity.RegistryRepositoryDeployRule, imgName 
 		return err
 	})
 	if err != nil {
-		slog.Error("add registry repository deploy rule log err", "rule", rule, "image", imgName, "err", err)
+		slog.Error("add registry repository deploy rule log err", "rule_id", rule.ID, "image", imgName, "err", err)
 	}
 }
 
 func (l Deploy) MakeK8sConfig(k8sConfig string) (*rest.Config, error) {
+	k8sConfig, err := l.DecryptK8sConfig(k8sConfig)
+	if err != nil {
+		return nil, err
+	}
 	var config *rest.Config
-	var err error
 	if k8sConfig != "" {
 		config, err = clientcmd.RESTConfigFromKubeConfig([]byte(k8sConfig))
 		if err != nil {

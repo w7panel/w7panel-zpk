@@ -432,14 +432,15 @@ rm -rf -- "$plugin_install_path"
 
 因此传统应用既可以只是一个语言/runtime 服务，也可以自带初始站点代码。
 
-### 7.3 系统重启还原与 Sysbox
+### 7.3 rootfs 持久化与 Sysbox
 
-`w7.cc/system-reboot-restore` 控制传统应用容器是否在重启后还原系统层：
+传统应用统一启用 rootfs 持久化，不提供系统重启还原开关，也不按语言区分：
 
-- 开启还原：移除传统应用使用的 Sysbox RuntimeClass、`hostUsers` 和 `sysbox/rootfs-rw-layer` 注解。
-- 关闭还原：使用 `runtimeClassName: sysbox-runc-lite`，不设置 `hostUsers`，写入 rootfs 持久化注解；注解中的 `name` 与主容器名一致，持久化路径按 `<应用标识>-${IMAGE_VERSION}` 隔离，并自动增加外部 `w7panel-sysbox` 必选依赖。
+- 编辑器自动使用 `runtimeClassName: sysbox-runc-lite`，不设置 `hostUsers`，写入 `sysbox/rootfs-rw-layer` 注解。
+- 注解中的 `name` 与主容器名一致，复用 `site-storage` PVC，路径为 `www/server/${RELEASE_NAME}/<应用标识>-${IMAGE_VERSION}/system`，并自动增加外部 `w7panel-sysbox` 必选依赖。
+- 旧 `w7.cc/system-reboot-restore` 注解不再作为配置输入，编辑器重新保存时移除，统一生成持久化配置。
 
-界面默认值为开启；语言切换时 PHP 默认关闭，其他语言默认开启，最终以保存值为准。
+打包器继续使用 manifest 中已保存的运行时与存储配置。已发布 Chart 和运行中的应用不会自动变化，需重新保存并发布；安装方仍需提供 PVC 和 Sysbox 运行环境。
 
 ### 7.4 可选 NGINX 网关
 

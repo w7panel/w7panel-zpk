@@ -312,8 +312,7 @@
                                         <a-form-item label="应用语言" field="traditionImageLanguage" required
                                             style="margin-bottom:18px;">
                                             <a-select v-model="form.traditionImageLanguage" size="large"
-                                                style="width:500px;" placeholder="请选择应用语言" allow-search
-                                                @change="changeTraditionLanguage">
+                                                style="width:500px;" placeholder="请选择应用语言" allow-search>
                                                 <a-option v-for="option in traditionLanguageOptions"
                                                     :key="option.value" :value="option.value" :label="option.label">
                                                     {{ option.label }}
@@ -336,13 +335,6 @@
                                                     style="width:500px;" placeholder="输入版本后按回车，例如 8.1"
                                                     allow-clear unique-value @change="syncTraditionVersionConfig" />
                                                 <span class="c-99 mt-6">每次输入一个语言版本并按回车，可添加多个版本，例如 7.4、8.1。</span>
-                                            </div>
-                                        </a-form-item>
-                                        <a-form-item label="系统重启还原" style="margin-bottom:18px;">
-                                            <div class="df df-c" style="align-items:flex-start;">
-                                                <a-switch v-model="form.traditionSystemRebootRestore"
-                                                    @change="syncTraditionRuntimeConfig" />
-                                                <span class="c-99 mt-6">关闭后使用持久存储保留容器系统层。</span>
                                             </div>
                                         </a-form-item>
                                         <a-form-item label="应用插件" style="margin-bottom:18px;">

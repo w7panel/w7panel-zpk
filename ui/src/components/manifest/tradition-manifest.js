@@ -144,31 +144,13 @@ export function traditionAppRootfsAnnotation(
 export function withTraditionAppSysbox(
     platform = {},
     sourceAnnotations = {},
-    restoreOverride,
     applicationIdentifie = '',
 ) {
     const nextPlatform = { ...(platform || {}) };
     const annotations = { ...(sourceAnnotations || {}) };
-    let restore = restoreOverride;
-    if (restore === undefined) {
-        restore = true;
-        const value = annotations[traditionSystemRebootRestoreAnnotation];
-        if (value !== undefined) {
-            restore = typeof value === 'boolean'
-                ? value
-                : String(value).trim().toLowerCase() !== 'false';
-        }
-    }
-
+    delete annotations[traditionSystemRebootRestoreAnnotation];
     delete annotations[traditionSysboxRootfsAnnotation];
     delete nextPlatform.hostUsers;
-    if (restore) {
-        if (nextPlatform.runtimeClassName === traditionSysboxRuntimeClassName) {
-            delete nextPlatform.runtimeClassName;
-        }
-        return { platform: nextPlatform, annotations };
-    }
-
     nextPlatform.runtimeClassName = traditionSysboxRuntimeClassName;
     const containers = nextPlatform['container-v2'] || [];
     const container = containers[0];
@@ -382,7 +364,6 @@ export function traditionFormDefaults() {
         traditionImageLanguage: '',
         traditionImageTemplate: '',
         traditionImageVersion: [],
-        traditionSystemRebootRestore: true,
         traditionNginxGateway: false,
         traditionNginxVhostTemplate: '',
         traditionPlugins: [],
@@ -737,7 +718,6 @@ export const traditionManifestMethods = {
         const result = withTraditionAppSysbox(
             this.json.platform,
             this.json.application?.annotation || {},
-            Boolean(this.form.traditionSystemRebootRestore),
             this.json.application?.identifie || this.form.identifie,
         );
         this.json.platform = result.platform;
@@ -776,18 +756,11 @@ export const traditionManifestMethods = {
         this.form.traditionImageTemplate = String(annotation[traditionAnnotationKeys.imageTemplate] || '');
         this.form.traditionImageVersion = this.normalizeApplicationVersions(annotation[traditionAnnotationKeys.imageVersion]);
         this.form.traditionNginxVhostTemplate = String(annotation[traditionAnnotationKeys.nginxVhostTemplate] || '');
-        const restoreValue = annotation[traditionAnnotationKeys.systemRebootRestore];
-        this.form.traditionSystemRebootRestore = restoreValue === undefined || restoreValue === null || restoreValue === ''
-            ? String(this.form.traditionImageLanguage || '').toLowerCase() != 'php'
-            : String(restoreValue).toLowerCase() == 'true';
         if (this.form.type == 'tradition') {
             this.ensureTraditionContainerDefaults();
             this.form.startParams = this.traditionStartParams();
             this.applyTraditionRebootRestoreConfig();
         }
-    },
-    changeTraditionLanguage(value) {
-        this.form.traditionSystemRebootRestore = String(value || '').toLowerCase() != 'php';
     },
     getTraditionAnnotations() {
         const versions = this.normalizeApplicationVersions(this.form.traditionImageVersion);
@@ -800,7 +773,6 @@ export const traditionManifestMethods = {
                 ? String(this.form.traditionNginxVhostTemplate || '')
                 : '',
             [traditionAnnotationKeys.nginxGateway]: String(Boolean(this.form.traditionNginxGateway)),
-            [traditionAnnotationKeys.systemRebootRestore]: String(Boolean(this.form.traditionSystemRebootRestore)),
         };
     },
     syncTraditionDependency() {

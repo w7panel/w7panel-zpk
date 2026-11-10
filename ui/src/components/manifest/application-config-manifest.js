@@ -182,7 +182,7 @@ export const applicationConfigManifestMethods = {
                 ? ''
                 : '系统镜像主容器名称不能为空';
         }
-        if (this.form.type == 'tradition' && !this.form.traditionSystemRebootRestore) {
+        if (this.form.type == 'tradition') {
             const containerName = this.json?.platform?.['container-v2']
                 ?.find(item => !item?.isInitContainer)?.name;
             return String(containerName || '').trim()

@@ -51,8 +51,7 @@ tmp_zip="$tmp_dir/application.zip"
 package_dir="$tmp_dir/package"
 policy_file="$tmp_dir/policy.json"
 mkdir -p "$package_dir"
-wget -q -O "$tmp_zip" "$code_package_url"
-unzip -oq "$tmp_zip" -d "$package_dir"
+` + codePackageDownloadShell + `
 unzip -oq "$tmp_zip" -d "$code_install_path"
 echo -n "$policy_base64" | base64 -d > "$policy_file"
 w7-tradition-plugin app update \

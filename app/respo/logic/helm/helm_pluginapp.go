@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	pluginInstallerImage        = "zpk.w7.cc/public/tradition-plugin:v1.0.3"
+	pluginInstallerImage        = "zpk.w7.cc/public/tradition-plugin:v1.0.4"
 	pluginInstallerDataMount    = "/var/lib/w7-tradition-plugin"
 	pluginCodeInstallJobTitle   = "安装应用插件代码"
 	pluginCodeUninstallJobTitle = "卸载应用插件代码"
@@ -39,8 +39,7 @@ tmp_zip="$tmp_dir/plugin.zip"
 package_dir="$tmp_dir/package"
 policy_file="$tmp_dir/policy.json"
 mkdir -p "$package_dir"
-wget -q -O "$tmp_zip" "$code_package_url"
-unzip -oq "$tmp_zip" -d "$package_dir"
+` + codePackageDownloadShell + `
 echo -n "$policy_base64" | base64 -d > "$policy_file"
 result="$(w7-tradition-plugin plugin install \
   --plugin-state-dir "$plugin_state_dir" \

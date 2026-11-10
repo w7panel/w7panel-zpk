@@ -19,8 +19,10 @@ RUN CGO_ENABLED=0 GOOS="${TARGETOS}" GOARCH="${TARGETARCH}" \
 
 FROM alpine:3.22
 
-# Alpine 自带生命周期脚本所需的 BusyBox wget/unzip 和 CA 证书；构建时显式校验，避免运行时才发现缺失。
-RUN command -v wget >/dev/null \
+# 优先使用 curl 下载代码包；保留 BusyBox wget 以兼容旧版安装脚本。
+RUN apk add --no-cache curl ca-certificates \
+    && command -v curl >/dev/null \
+    && command -v wget >/dev/null \
     && command -v unzip >/dev/null \
     && test -s /etc/ssl/certs/ca-certificates.crt
 

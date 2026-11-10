@@ -219,3 +219,41 @@ instead of special-casing a particular annotation key.
 {{ join "\n---\n" $resources }}
 {{- end -}}
 {{- end -}}
+
+{{/* Collect shared child bindings in deterministic order; only the root emits them. */}}
+{{- define "w7panel.sidecars.resourceTree" -}}
+{{- $resources := list (include "w7panel.sidecars.resources" .) -}}
+{{- range $name := (keys .Subcharts | sortAlpha) -}}
+  {{- $child := index $.Subcharts $name -}}
+  {{- if (get ($child.Values.w7panelArtifact | default dict) "sharedSidecarResources") -}}
+    {{- $resources = append $resources (include "w7panel.sidecars.resourceTree" $child) -}}
+  {{- end -}}
+{{- end -}}
+{{- join "\n---\n" $resources -}}
+{{- end -}}
+
+{{- define "w7panel.sidecars.uniqueResources" -}}
+{{- if not (get (.Values.w7panelArtifact | default dict) "sharedSidecarResources") -}}
+  {{- $seen := dict -}}
+  {{- $resources := list -}}
+  {{- range $document := regexSplit "(?m)^---[ \t]*$" (include "w7panel.sidecars.resourceTree" .) -1 -}}
+    {{- if ($document | trim) -}}
+      {{- $object := fromYaml $document -}}
+      {{- $emit := true -}}
+      {{- if and (eq $object.apiVersion "rbac.authorization.k8s.io/v1") (or (eq $object.kind "RoleBinding") (eq $object.kind "ClusterRoleBinding")) -}}
+        {{/* Root bindings win; names are irrelevant when the authorization is identical. */}}
+        {{- $key := toJson (list $object.kind ($object.metadata.namespace | default $.Release.Namespace) $object.roleRef $object.subjects) -}}
+        {{- if hasKey $seen $key -}}
+          {{- $emit = false -}}
+        {{- else -}}
+          {{- $_ := set $seen $key true -}}
+        {{- end -}}
+      {{- end -}}
+      {{- if $emit -}}
+        {{- $resources = append $resources ($document | trim) -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+  {{- join "\n---\n" $resources -}}
+{{- end -}}
+{{- end -}}

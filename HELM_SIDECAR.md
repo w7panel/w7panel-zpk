@@ -418,3 +418,7 @@ helm template test-release <host-chart> --debug
 | 五类应用总览 | `APPLICATION_HELM_PACKAGING.md` |
 
 共享 Sidecar 子宿主（`w7panelArtifact.sharedSidecarResources=true`）未提供账号或 `serviceAccountName` 求值为空时，跳过资源模板求值，不输出任何 resources，避免与根 Chart 重复创建同名资源；提供有效账号时仅输出 RoleBinding / ClusterRoleBinding，并改写绑定名称及 subjects 为该账号。根 Chart 的资源输出保持原行为。此行为不关闭容器插槽，实际使用代理的子应用仍需保证账号权限。
+
+### 共享 Binding 输出去重
+
+ZPK 注入的 `w7panel-sidecar-resources.yaml` 由根 Chart 统一收集共享子应用的资源片段，按 Binding 的 kind、namespace、roleRef 和 subjects 去重，优先保留根绑定。共用账号的相同授权只生成一次，独立账号保留自己的绑定。子应用入口不独立输出资源，Pod/Job 插槽保持不变。此规则需要重新打包制品才会应用，不修改已有安装包。

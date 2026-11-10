@@ -1,1 +1,1 @@
-{{- include "w7panel.sidecars.resources" . }}
+{{- include "w7panel.sidecars.uniqueResources" . }}

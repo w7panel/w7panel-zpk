@@ -44,7 +44,7 @@ w7panelArtifact:
 - 不使用 Sidecar 的 Helm 工具子应用（例如未调用代理插槽的 `w7-traditiontool`）无需为了打包而补账号声明。
 - 主子应用必须使用一致的共享资源名称和连接配置，避免子代理引用不存在的 Service 或角色。
 
-**当前多子应用限制：** 额外 Binding 的名称后缀仅按 namespace 和账号生成；多个共享子应用使用相同账号且原始 Binding 名相同时，仍可能生成重复 Binding。显式声明账号不能解决此重名问题，发布前须检查最终渲染结果中的资源标识唯一性。
+**共享 Binding 去重：** ZPK 注入的资源入口由根 Chart 统一收集共享子应用的 Binding，按 kind、namespace、roleRef 和 subjects 去重，优先保留根 Binding。同账号的相同授权只输出一次，不同账号保留各自绑定。子应用入口不再独立输出资源；容器与卷插槽不受影响。发布前仍须检查自定义资源的标识唯一性。
 
 ## 2. 最小 Chart 示例
 

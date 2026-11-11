@@ -44,6 +44,7 @@ export function startParamsManifestState() {
             show: false,
             item: null,
             value: '',
+            type: 'text', unit: '', options: [],
         },
         disabledDomainStartParams: false,
     };
@@ -226,7 +227,9 @@ export const startParamsManifestMethods = {
         const params = (this.form.startParams || []).filter(item => item?.mark !== 'environment-release'
             && !isDerivedDependencyReleaseStartParam(item));
         const startParams = params.filter(item => item.name).map(item => ({
-            type: 'text',
+            type: item.type || 'text',
+            options: item.options || [],
+            unit: item.unit || '',
             name: item.name,
             title: item.title,
             required: item.required,
@@ -255,6 +258,13 @@ export const startParamsManifestMethods = {
     },
     markStartParamsForEditor(params = []) {
         params.forEach((item, index) => {
+            // TODO: 临时兼容旧制品用 | 分隔候选项，下个版本移除。
+            if (!Array.isArray(item.options) && (!item.type || ['text', 'select'].includes(item.type)) && /^([^|]+\|)+[^|]+$/.test(item.values_text || '')) {
+                item.options = item.values_text.split('|');
+                item.values_text = item.options[0];
+                item.type = 'select';
+            }
+            item.options = item.options || [];
             if (item.module_name == 'w7_mysql' || item.module_name == 'w7_mysql5') {
                 item.mark = item.module_name == 'w7_mysql' ? 'mysql8' : 'mysql5';
                 const next = params[index + 1];
@@ -293,7 +303,9 @@ export const startParamsManifestMethods = {
                 description: match[5] || '',
                 required: match[6] == '1',
                 module_name: match[7] || '',
-                type: 'text',
+                type: this.form.startParams.find(p => p.name === match[1])?.type || 'text',
+                options: this.form.startParams.find(p => p.name === match[1])?.options || [],
+                unit: this.form.startParams.find(p => p.name === match[1])?.unit || '',
             };
             if (!this.isFixedStartParam(item)) params.push(item);
         });
@@ -310,10 +322,24 @@ export const startParamsManifestMethods = {
         this.spDesc.show = true;
         this.spDesc.item = item;
         this.spDesc.value = item.description || '';
+        this.spDesc.type = item.type || 'text';
+        this.spDesc.unit = item.unit || '';
+        this.spDesc.options = [...(item.options || [])];
     },
     submitSpDesc() {
         if (this.spDesc.item) {
-            this.spDesc.item.description = this.spDesc.value || '';
+            const options = this.spDesc.options.map(v => v.trim());
+            if (['select', 'multiselect'].includes(this.spDesc.type) && (!options.length || options.some(v => !v || (this.spDesc.type === 'multiselect' && v.includes(','))) || new Set(options).size !== options.length)) {
+                this.$message.error('请配置不重复的非空选项，多选选项值不能包含逗号');
+                return;
+            }
+            const item = this.spDesc.item;
+            item.description = this.spDesc.value || '';
+            item.type = this.spDesc.type;
+            item.unit = this.spDesc.unit;
+            item.options = ['select', 'multiselect'].includes(item.type) ? options : [];
+            if (item.type === 'select' && !options.includes(item.values_text)) item.values_text = '';
+            if (item.type === 'multiselect') item.values_text = (item.values_text || '').split(',').filter(v => options.includes(v)).join(',');
             this.getStart();
         }
         this.spDesc.show = false;

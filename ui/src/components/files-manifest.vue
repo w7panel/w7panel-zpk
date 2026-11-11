@@ -591,9 +591,14 @@
                                         </manifest-config-table-column>
                                         <manifest-config-table-column data-index="values_text" title="默认值">
                                             <template #cell="{ record }">
-                                                <a-input v-model="record.values_text" @change="getStart"
-                                                    :disabled="computedSpDisabled(record)" :spellcheck="false"
-                                                    placeholder="配置默认值"></a-input>
+                                                <a-select v-if="['select', 'multiselect'].includes(record.type)"
+                                                    :model-value="record.type === 'multiselect' ? (record.values_text ? record.values_text.split(',') : []) : record.values_text"
+                                                    :multiple="record.type === 'multiselect'" :disabled="computedSpDisabled(record)" allow-clear
+                                                    @update:model-value="value => { record.values_text = Array.isArray(value) ? value.join(',') : (value || ''); getStart(); }">
+                                                    <a-option v-for="opt in record.options" :key="opt" :value="opt">{{ opt }}</a-option>
+                                                </a-select>
+                                                <a-textarea v-else-if="record.type === 'textarea'" v-model="record.values_text" @change="getStart" :disabled="computedSpDisabled(record)" />
+                                                <a-input v-else v-model="record.values_text" @change="getStart" :disabled="computedSpDisabled(record)" placeholder="配置默认值" />
                                             </template>
                                         </manifest-config-table-column>
                                         <manifest-config-table-column data-index="module_name" title="依赖系统组件标识">
@@ -605,7 +610,7 @@
                                         </manifest-config-table-column>
                                         <manifest-config-table-column title="操作" width="100px">
                                             <template #cell="{ record, index }">
-                                                <span v-if="!isFixedStartParam(record)" class="c-blue cursor handle" @click="openSpDesc(record)">编辑描述</span>
+                                                <span v-if="!isFixedStartParam(record)" class="c-blue cursor handle" @click="openSpDesc(record)">高级设置</span>
                                                 <span v-if="!isFixedStartParam(record)" class="c-blue cursor handle"
                                                     @click="form.startParams.splice(index, 1); getStart();">删除</span>
                                             </template>
@@ -747,8 +752,26 @@
             </div>
         </a-modal>
 
-        <a-modal v-model:visible="spDesc.show" title="描述" :width="520" modal-class="envdialog">
-            <a-input v-model="spDesc.value" placeholder="请编辑描述" />
+        <a-modal v-model:visible="spDesc.show" title="高级设置" :width="600" modal-class="envdialog">
+            <a-form :model="spDesc" layout="vertical">
+                <a-form-item label="输入类型">
+                    <a-select v-model="spDesc.type">
+                        <a-option value="text">文本</a-option><a-option value="textarea">多行文本</a-option>
+                        <a-option value="select">单选器</a-option><a-option value="multiselect">多选器</a-option>
+                    </a-select>
+                </a-form-item>
+                <a-form-item v-if="['select', 'multiselect'].includes(spDesc.type)" label="选项配置">
+                    <div style="width:100%">
+                        <div v-for="(opt, index) in spDesc.options" :key="index" class="df mb-10">
+                            <a-input v-model="spDesc.options[index]" placeholder="选项值" />
+                            <a-button @click="spDesc.options.splice(index, 1)">删除</a-button>
+                        </div>
+                        <a-button @click="spDesc.options.push('')">添加选项</a-button>
+                    </div>
+                </a-form-item>
+                <a-form-item label="单位"><a-input v-model="spDesc.unit" placeholder="可不填，仅用于展示" /></a-form-item>
+                <a-form-item label="说明"><a-textarea v-model="spDesc.value" placeholder="显示在表单下方" /></a-form-item>
+            </a-form>
             <template #footer>
                 <a-button @click="spDesc.show = false">取消</a-button>
                 <a-button type="primary" @click="submitSpDesc">确定</a-button>

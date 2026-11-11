@@ -21,7 +21,7 @@ export function withSystemImageStartParams(startParams = [], versions = []) {
     const customParams = (startParams || [])
         .filter(item => !isSystemImageBuiltInStartParamName(item?.name));
     return [
-        { mark: 'system-image', name: 'IMAGE_VERSION', title: '镜像版本', required: true, values_text: versions.join('|'), module_name: '', description: '选择要安装的镜像版本', type: 'select' },
+        { mark: 'system-image', name: 'IMAGE_VERSION', title: '镜像版本', required: true, options: [...(versions || [])], values_text: versions?.[0] || '', module_name: '', description: '选择要安装的镜像版本', type: 'select' },
         { name: 'PVC_NAME', title: '存储', required: true, values_text: '%PVC_NAME%', module_name: '', description: '安装时选择的 PVC 名称', type: 'text', hidden: false },
         ...customParams,
     ];

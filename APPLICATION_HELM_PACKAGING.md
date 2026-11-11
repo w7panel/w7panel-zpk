@@ -879,3 +879,13 @@ helm template <release> <generated-chart-dir> -f <install-values.yaml>
 ### install_formulas 应用端口（2026-11-10）
 
 `/zpk/respo/info/...` 的 `install_formulas[]` 新增 `ports` 数组，从该项自身 manifest 的 `platform.container-v2` 聚合普通容器端口，跳过初始化容器，保留容器及端口声明顺序。示例：`{"name":"demo-worker","ports":[{"name":"http","containerPort":9573,"protocol":"TCP"}]}`。无端口为 `[]`；旧客户端忽略此新增字段，新面板需配套接收端口以避免复制主应用端口。启动参数和加载流程不变。
+
+### 2026-11-11 启动参数高级设置
+
+`platform.startParams` 的 `type` 支持 `text`、`textarea`、`select`、`multiselect`。选择器通过独立的 `options: [a, b]` 配置候选值，`values_text` 只保存实际默认值：单选为 `a`，多选为 `a,b`，未选中为空字符串。多选候选值不得包含英文逗号；选项不为空且不重复。`unit` 为可选展示单位，`description` 为表单下方说明，均不拼进实际参数值。
+
+安装表单内部及提交给 server 的多选值保持逗号拼接字符串，多行文本保留换行。Helm 默认 values 和最终容器 / Job env 使用该字符串；server 对经过 Helm strvals 的值统一转义逗号、反斜杠、花括号，并对命令行值使用 shell 安全引用，不按表单类型增加安装分支。
+
+临时兼容：缺少 `options` 的旧参数若默认值为 `a|b|c`，按历史单选器显示、默认选中第一项；新参数显式使用 `options: []` 可保留文本中的字面 `|`。ZPK 读取/编辑与面板安装分支均标记 TODO，下个版本移除此兼容。旧版本 server 不会透传新增字段，须配套更新 server 与面板 UI；现有未使用新字段的参数仍可按旧方式安装。
+
+系统镜像与传统应用自动维护的 `IMAGE_VERSION` 参数同样使用独立 `options` 保存全部可选版本，`values_text` 只保存列表首项（无版本时为空字符串）。新保存的内置版本参数不再生成 `|` 拼接值；单个版本也保留单项 `options`，供安装端单选器正常展示。

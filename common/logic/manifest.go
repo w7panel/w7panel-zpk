@@ -190,15 +190,17 @@ type Shell struct {
 }
 
 type StartParams struct {
-	Name        string `yaml:"name" json:"name"`
-	Title       string `yaml:"title" json:"title"`
-	Description string `yaml:"description" json:"description"`
-	Mark        string `yaml:"mark" json:"mark"`
-	Required    bool   `yaml:"required" json:"required"`
-	Type        string `yaml:"type" json:"type"`
-	ValuesText  string `yaml:"values_text" json:"values_text"`
-	ModuleName  string `yaml:"module_name" json:"module_name"`
-	Hidden      bool   `yaml:"hidden,omitempty" json:"hidden,omitempty"`
+	Options     []string `yaml:"options" json:"options"`
+	Unit        string   `yaml:"unit,omitempty" json:"unit,omitempty"`
+	Name        string   `yaml:"name" json:"name"`
+	Title       string   `yaml:"title" json:"title"`
+	Description string   `yaml:"description" json:"description"`
+	Mark        string   `yaml:"mark" json:"mark"`
+	Required    bool     `yaml:"required" json:"required"`
+	Type        string   `yaml:"type" json:"type"`
+	ValuesText  string   `yaml:"values_text" json:"values_text"`
+	ModuleName  string   `yaml:"module_name" json:"module_name"`
+	Hidden      bool     `yaml:"hidden,omitempty" json:"hidden,omitempty"`
 }
 
 type Container struct {
@@ -426,6 +428,24 @@ func GetManifestV2(manifest Manifest) Manifest {
 
 	if len(manifest.Platform.StartParams) == 0 {
 		manifest.Platform.StartParams = manifest.Platform.Container.StartParams
+	}
+
+	for i := range manifest.Platform.StartParams {
+		param := &manifest.Platform.StartParams[i]
+		if param.Options == nil && (param.Type == "" || param.Type == "text" || param.Type == "select") && strings.Contains(param.ValuesText, "|") {
+			parts := strings.Split(param.ValuesText, "|")
+			valid := true
+			for _, part := range parts {
+				if part == "" {
+					valid = false
+				}
+			}
+			if valid {
+				param.Type = "select"
+				param.Options = parts
+				param.ValuesText = parts[0]
+			}
+		}
 	}
 	//兼容面板
 	manifest.Platform.Container.StartParams = manifest.Platform.StartParams

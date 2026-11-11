@@ -44,7 +44,7 @@ export function startParamsManifestState() {
             show: false,
             item: null,
             value: '',
-            type: 'text', unit: '', options: [],
+            type: 'text', unit: '', options: [], values_text: '',
         },
         disabledDomainStartParams: false,
     };
@@ -325,6 +325,7 @@ export const startParamsManifestMethods = {
         this.spDesc.type = item.type || 'text';
         this.spDesc.unit = item.unit || '';
         this.spDesc.options = [...(item.options || [])];
+        this.spDesc.values_text = item.values_text ?? '';
     },
     submitSpDesc() {
         if (this.spDesc.item) {
@@ -333,7 +334,14 @@ export const startParamsManifestMethods = {
                 this.$message.error('请配置不重复的非空选项，多选选项值不能包含逗号');
                 return;
             }
-            const item = this.spDesc.item;
+            // Initialization can replace row objects while the dialog is open.
+            const item = this.form.startParams.find(param => param === this.spDesc.item)
+                || (this.spDesc.item.name && this.form.startParams.find(param => param.name === this.spDesc.item.name));
+            if (!item) {
+                this.$message.error('启动参数已变更，请重新打开高级设置');
+                return;
+            }
+            item.values_text = this.spDesc.values_text ?? '';
             item.description = this.spDesc.value || '';
             item.type = this.spDesc.type;
             item.unit = this.spDesc.unit;

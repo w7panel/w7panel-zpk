@@ -753,7 +753,7 @@
         </a-modal>
 
         <a-modal v-model:visible="spDesc.show" title="高级设置" :width="600" modal-class="envdialog">
-            <a-form :model="spDesc" layout="vertical">
+            <a-form :model="spDesc" layout="vertical" class="start-param-advanced-form">
                 <a-form-item label="输入类型">
                     <a-select v-model="spDesc.type">
                         <a-option value="text">文本</a-option><a-option value="textarea">多行文本</a-option>
@@ -761,13 +761,33 @@
                     </a-select>
                 </a-form-item>
                 <a-form-item v-if="['select', 'multiselect'].includes(spDesc.type)" label="选项配置">
-                    <div style="width:100%">
-                        <div v-for="(opt, index) in spDesc.options" :key="index" class="df mb-10">
-                            <a-input v-model="spDesc.options[index]" placeholder="选项值" />
-                            <a-button @click="spDesc.options.splice(index, 1)">删除</a-button>
-                        </div>
-                        <a-button @click="spDesc.options.push('')">添加选项</a-button>
+                    <div class="start-param-options-editor">
+                        <manifest-config-table class="start-param-options-table" :rows="spDesc.options"
+                            add-text="添加选项" @add="spDesc.options.push('')">
+                            <template #columns>
+                                <manifest-config-table-column title="选项值">
+                                    <template #cell="{ index }">
+                                        <a-input v-model="spDesc.options[index]" placeholder="请输入选项值" />
+                                    </template>
+                                </manifest-config-table-column>
+                                <manifest-config-table-column title="操作" width="80px">
+                                    <template #cell="{ index }">
+                                        <span class="c-blue cursor handle" @click="spDesc.options.splice(index, 1)">删除</span>
+                                    </template>
+                                </manifest-config-table-column>
+                            </template>
+                        </manifest-config-table>
                     </div>
+                </a-form-item>
+                <a-form-item label="默认值">
+                    <a-select v-if="['select', 'multiselect'].includes(spDesc.type)"
+                        :model-value="spDesc.type === 'multiselect' ? (spDesc.values_text ? spDesc.values_text.split(',') : []) : spDesc.values_text"
+                        :multiple="spDesc.type === 'multiselect'" allow-clear placeholder="请选择默认值"
+                        @update:model-value="value => { spDesc.values_text = Array.isArray(value) ? value.join(',') : (value ?? ''); }">
+                        <a-option v-for="opt in spDesc.options.filter(value => value.trim())" :key="opt" :value="opt">{{ opt }}</a-option>
+                    </a-select>
+                    <a-textarea v-else-if="spDesc.type === 'textarea'" v-model="spDesc.values_text" placeholder="请输入默认值" />
+                    <a-input v-else v-model="spDesc.values_text" placeholder="请输入默认值" />
                 </a-form-item>
                 <a-form-item label="单位"><a-input v-model="spDesc.unit" placeholder="可不填，仅用于展示" /></a-form-item>
                 <a-form-item label="说明"><a-textarea v-model="spDesc.value" placeholder="显示在表单下方" /></a-form-item>
@@ -2009,4 +2029,28 @@ export default {
     min-width: 0;
 }
 
+</style>
+
+<style scoped>
+.start-param-advanced-form :deep(.arco-form-item) {
+    margin-bottom: 24px;
+}
+
+.start-param-advanced-form :deep(.arco-form-item-label-col) {
+    margin-bottom: 8px;
+}
+
+.start-param-options-editor {
+    width: 100%;
+    padding-top: 4px;
+}
+
+.start-param-options-table :deep(.table) {
+    border-collapse: separate;
+    border-spacing: 0 10px;
+}
+
+.start-param-options-table :deep(.table td) {
+    padding: 10px 12px;
+}
 </style>

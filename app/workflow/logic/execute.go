@@ -94,10 +94,8 @@ func (l *Executor) Dispatch() error {
 			return
 		}
 		query := dao.Q.RegistryRepositoryDeployRuleMatchLog
-		if err != nil {
-			if _, e := query.Where(query.WorkflowRunID.Eq(run.WorkflowRunID), query.WorkflowTaskKey.Neq(""), query.ExecutionStatus.Eq("running")).UpdateSimple(query.UpdatedAt.Value(time.Now()), query.ExecutionStatus.Value("unknown"), query.FailureReason.Value("流程执行失败，未能确认本任务的执行结果，请查看流程日志"), query.K8sLog.Value(message)); e != nil {
-				slog.Error("save unresolved workflow tasks", "run", run.WorkflowRunID, "error", e)
-			}
+		if _, e := query.Where(query.WorkflowRunID.Eq(run.WorkflowRunID), query.WorkflowTaskKey.Neq(""), query.ExecutionStatus.Eq("running")).UpdateSimple(query.UpdatedAt.Value(time.Now()), query.ExecutionStatus.Value("unknown"), query.FailureReason.Value("流程已结束，未能确认本任务的执行结果，请查看任务日志")); e != nil {
+			slog.Error("save unresolved workflow tasks", "run", run.WorkflowRunID, "error", e)
 		}
 		if _, e := query.Where(query.WorkflowRunID.Eq(run.WorkflowRunID), query.WorkflowTaskKey.Eq(""), query.ExecutionStatus.Eq("running")).UpdateSimple(query.UpdatedAt.Value(time.Now()), query.ExecutionStatus.Value(status), query.FailureReason.Value(message), query.K8sLog.Value("Helm 执行实例 wf-"+run.WorkflowRunID+": "+status+" "+message)); e != nil {
 			slog.Error("save workflow result", "run", run.WorkflowRunID, "error", e)

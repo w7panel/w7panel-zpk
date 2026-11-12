@@ -138,7 +138,7 @@
                     </a-spin>
                 </a-tab-pane>
                 <a-tab-pane key="build" title="镜像自动任务" v-if="hasAccess(data.user_id)">
-                    <image-tasks v-if="data.id" :key="data.id" :repository-id="Number(data.id)" />
+                    <image-tasks v-if="data.id" :key="data.id" :repository-id="Number(data.id)" :user-info="userInfo" />
                 </a-tab-pane>
             </a-tabs>
         </div>

@@ -57,14 +57,30 @@
                     <a-form-item label="目标 tag 后缀"><a-input v-model="form.tag_suffix" placeholder="例如 -cloudinit；留空覆盖原 tag" /></a-form-item>
                 </template>
                 <template v-else>
-                    <a-form-item label="目标集群 KUBECONFIG"><a-textarea v-model="form.k8s_config" @blur="loadTargets('namespaces')" :auto-size="{ minRows: 4, maxRows: 8 }" placeholder="管理员可留空使用当前集群；其他用户请填写目标集群配置" /></a-form-item>
-                    <a-form-item label="目标命名空间"><a-select v-model="form.k8s_namespace" allow-create :loading="loadingTargets" @popup-visible-change="visible => visible && loadTargets('namespaces')" @change="loadTargets('apps')"><a-option v-for="namespace in namespaces" :key="namespace" :value="namespace" /></a-select></a-form-item>
-                    <a-form-item label="应用类型"><a-select v-model="form.k8s_controller_type" @change="loadTargets('apps')"><a-option value="deployments">无状态应用</a-option><a-option value="statefulsets">有状态应用</a-option><a-option value="daemonsets">守护进程应用</a-option></a-select></a-form-item>
-                    <a-form-item label="应用名称"><a-select v-model="form.k8s_app_name" allow-create :loading="loadingTargets" @popup-visible-change="visible => visible && loadTargets('apps')" @change="loadTargets('app-containers')"><a-option v-for="app in apps" :key="app" :value="app" /></a-select></a-form-item>
-                    <a-form-item label="容器名称"><a-select v-model="containerNames" multiple allow-create :loading="loadingTargets" @popup-visible-change="visible => visible && loadTargets('app-containers')"><a-option v-for="container in containers" :key="container" :value="container" /></a-select></a-form-item>
+                    <a-form-item label="目标集群">
+                        <a-radio-group v-model="targetCluster" @change="changeCluster">
+                            <a-radio v-if="isFounder" value="current">当前集群</a-radio>
+                            <a-radio value="remote">第三方集群</a-radio>
+                        </a-radio-group>
+                    </a-form-item>
+                    <a-form-item v-if="targetCluster === 'remote'" label="KUBECONFIG">
+                        <div class="workflow-kubeconfig">
+                            <a-textarea v-model="form.k8s_config" @input="changeKubeconfig" @blur="loadTargets('namespaces')" :auto-size="{ minRows: 8, maxRows: 8 }" placeholder="请输入 config 或导入配置文件" />
+                            <div class="mt-10 df jc-e">
+                                <div class="workflow-config-import">
+                                    <a-button type="primary" :loading="importingConfig" :disabled="saving">导入</a-button>
+                                    <input type="file" aria-label="导入 KUBECONFIG" :disabled="saving || importingConfig" @change="importKubeconfig" />
+                                </div>
+                            </div>
+                        </div>
+                    </a-form-item>
+                    <a-form-item label="目标命名空间"><a-select v-model="form.k8s_namespace" allow-create :loading="loadingTargets" @popup-visible-change="visible => visible && loadTargets('namespaces')" @change="changeTarget('apps')"><a-option v-for="namespace in namespaces" :key="namespace" :value="namespace" :label="namespace" /></a-select></a-form-item>
+                    <a-form-item label="应用类型"><a-select v-model="form.k8s_controller_type" @change="changeTarget('apps')"><a-option value="deployments">无状态应用</a-option><a-option value="statefulsets">有状态应用</a-option><a-option value="daemonsets">守护进程应用</a-option></a-select></a-form-item>
+                    <a-form-item label="应用名称"><a-select v-model="form.k8s_app_name" allow-create :loading="loadingTargets" @popup-visible-change="visible => visible && loadTargets('apps')" @change="changeTarget('app-containers')"><a-option v-for="app in apps" :key="app" :value="app" :label="app" /></a-select></a-form-item>
+                    <a-form-item label="容器名称"><a-select v-model="containerNames" multiple allow-create :loading="loadingTargets" @popup-visible-change="visible => visible && loadTargets('app-containers')"><a-option v-for="container in containers" :key="container" :value="container" :label="container" /></a-select></a-form-item>
                 </template>
             </a-form>
-            <div class="dialog-footer"><a-button :disabled="saving" @click="visible = false">取消</a-button><a-button type="primary" :loading="saving" @click="applyTask">保存</a-button></div>
+            <div class="dialog-footer"><a-button :disabled="saving" @click="visible = false">取消</a-button><a-button type="primary" :loading="saving" :disabled="importingConfig" @click="applyTask">保存</a-button></div>
         </a-modal>
         <a-modal v-model:visible="logsVisible" title="本轮流程日志" :width="900" :footer="false" @close="closeLogs">
             <a-space wrap>
@@ -81,16 +97,19 @@
 
 <script>
 import myAxios from '@/utils';
+import userMixin from '@/utils/user-mixin';
 import { messageError, messageSuccess } from '@/utils/ui-feedback';
 
 const taskDefaults = () => ({ id: '', name: '', stage: 1, action: 'build', deploy_type: 1, match_type: 1, tag_name: '', source: 'original', source_task: '', dockerfile: '', tag_suffix: '', k8s_config: '', k8s_namespace: 'default', k8s_controller_type: 'deployments', k8s_app_name: '', k8s_container_name: '' });
 
 export default {
+    mixins: [userMixin],
     props: { repositoryId: { type: Number, required: true } },
     data() {
         return {
             config: { namespace: 'default', tasks: [] }, loading: false, saving: false, loaded: false,
             namespaces: [], apps: [], containers: [], loadingTargets: false, targetSequence: 0,
+            targetCluster: 'remote', targetLoaded: {}, targetRequest: '', importingConfig: false,
             visible: false, editing: false, form: taskDefaults(), timing: 'first', runs: [], loadingRuns: false,
             runsVisible: false, runsTask: null, runSequence: 0,
             logsVisible: false, logs: '', loadingLogs: false, disposed: false, logSequence: 0,
@@ -241,12 +260,14 @@ export default {
             return mode === 'with' ? `和“${name}”一起执行` : `在“${name}”所在组成功后执行`;
         },
         editTask(task) {
-            this.targetSequence++; this.namespaces = []; this.apps = []; this.containers = []; this.loadingTargets = false; this.editing = !!task;
+            this.resetTargets('cluster'); this.editing = !!task;
             this.form = task ? { ...task } : { ...taskDefaults(), id: `task-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}` };
+            this.targetCluster = this.isFounder && !this.form.k8s_config ? 'current' : 'remote';
             this.timing = task ? this.taskTiming(task) : 'first'; this.visible = true;
         },
         async applyTask() {
-            if (this.saving || this.loading) return;
+            if (this.saving || this.loading || this.importingConfig) return;
+            if (this.form.action === 'deploy' && this.targetCluster === 'remote' && !this.form.k8s_config.trim()) { messageError('请填写或导入目标集群 KUBECONFIG'); return; }
             if (!this.form.name.trim() || !this.form.tag_name.trim()) { messageError('请填写任务名称和版本匹配条件'); return; }
             if (!this.executionStage || this.executionStage > 1000) { messageError('请选择有效的执行时机'); return; }
             if (this.form.source === 'task' && !this.timingSourceTask) { messageError('当前执行时机没有可用的构建镜像，请选择原始镜像'); return; }
@@ -273,23 +294,68 @@ export default {
                 return false;
             } finally { if (!this.disposed) this.saving = false; }
         },
+        resetTargets(scope) {
+            this.targetSequence++; this.loadingTargets = false; this.targetRequest = ''; this.importingConfig = false;
+            if (scope === 'cluster') { this.namespaces = []; this.targetLoaded = {}; }
+            if (scope !== 'app-containers') { this.apps = []; delete this.targetLoaded.apps; }
+            this.containers = []; delete this.targetLoaded['app-containers'];
+        },
+        changeKubeconfig() {
+            this.resetTargets('cluster');
+            this.form.k8s_namespace = 'default'; this.form.k8s_app_name = ''; this.form.k8s_container_name = '';
+        },
+        changeCluster() {
+            this.form.k8s_config = '';
+            this.resetTargets('cluster');
+            this.form.k8s_namespace = 'default'; this.form.k8s_app_name = ''; this.form.k8s_container_name = '';
+            if (this.targetCluster === 'current') this.loadTargets('namespaces');
+        },
+        changeTarget(action) {
+            this.resetTargets(action);
+            if (action === 'apps') this.form.k8s_app_name = '';
+            this.form.k8s_container_name = '';
+            this.loadTargets(action);
+        },
+        async importKubeconfig(event) {
+            const input = event.target, file = input.files?.[0];
+            if (!file || this.saving) return;
+            const sequence = ++this.targetSequence;
+            this.loadingTargets = false; this.targetRequest = ''; this.importingConfig = true;
+            try {
+                const content = await file.text();
+                if (this.disposed || !this.visible || sequence !== this.targetSequence || this.targetCluster !== 'remote') return;
+                this.form.k8s_config = content;
+                this.resetTargets('cluster');
+                this.form.k8s_namespace = 'default'; this.form.k8s_app_name = ''; this.form.k8s_container_name = '';
+                await this.loadTargets('namespaces');
+            } catch (error) { if (!this.disposed && sequence === this.targetSequence) messageError('读取 KUBECONFIG 文件失败，请重试'); }
+            finally {
+                input.value = '';
+                if (!this.disposed && sequence === this.targetSequence) this.importingConfig = false;
+            }
+        },
         async loadTargets(action) {
+            if (this.importingConfig || (this.targetCluster === 'remote' && !this.form.k8s_config.trim())) return;
             if (action !== 'namespaces' && !this.form.k8s_namespace) return;
             if (action === 'app-containers' && !this.form.k8s_app_name) return;
+            const params = {
+                k8s_config: this.form.k8s_config, k8s_namespace: this.form.k8s_namespace,
+                k8s_controller_type: this.form.k8s_controller_type, k8s_app_name: this.form.k8s_app_name,
+            };
+            const requestKey = JSON.stringify([action, params.k8s_config, ...(action === 'namespaces' ? [] : [params.k8s_namespace, params.k8s_controller_type]), ...(action === 'app-containers' ? [params.k8s_app_name] : [])]);
+            if (this.targetLoaded[action] === requestKey || this.targetRequest === requestKey) return;
             const sequence = ++this.targetSequence;
-            this.loadingTargets = true;
+            this.targetRequest = requestKey; this.loadingTargets = true;
             try {
-                const response = await myAxios.post(`/v2/api/repository/deploy_rule/k8s/${action}`, {
-                    k8s_config: this.form.k8s_config, k8s_namespace: this.form.k8s_namespace,
-                    k8s_controller_type: this.form.k8s_controller_type, k8s_app_name: this.form.k8s_app_name,
-                });
+                const response = await myAxios.post(`/v2/api/repository/deploy_rule/k8s/${action}`, params);
                 if (!response?.data?.data || response.data.error) throw new Error('读取部署目标失败');
                 if (!this.disposed && sequence === this.targetSequence) {
                     const key = { namespaces: 'namespaces', apps: 'apps', 'app-containers': 'containers' }[action];
                     this[key] = response.data.data.list || [];
+                    this.targetLoaded[action] = requestKey;
                 }
             } catch (error) { if (!this.disposed && sequence === this.targetSequence) messageError(error?.response?.data?.error || error.message || '读取部署目标失败'); }
-            finally { if (!this.disposed && sequence === this.targetSequence) this.loadingTargets = false; }
+            finally { if (!this.disposed && sequence === this.targetSequence) { this.loadingTargets = false; this.targetRequest = ''; } }
         },
         showLogs(run) {
             this.stopLogRequest(); this.logRun = { run_id: run.run_id }; this.logsVisible = true; this.logs = '';
@@ -326,6 +392,9 @@ export default {
 </script>
 
 <style scoped>
+.workflow-kubeconfig { width: 100%; }
+.workflow-config-import { position: relative; }
+.workflow-config-import input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
 .workflow-toolbar { margin-bottom: 16px; }
 .workflow-logs { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 60vh; overflow: auto; }
 </style>

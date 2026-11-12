@@ -52,7 +52,7 @@ Helm 包根文件由 `helm_templates/Chart.yaml.tpl` 和 `values.yaml.tpl` 在�
 
 实际执行使用当前集群 ServiceAccount，不读取开发机器的 kubeconfig。执行命名空间固定为 `default`，不提供环境变量或页面配置；服务 Helm Chart 将工作流 Role 和 RoleBinding 创建在 `default`，绑定 ZPK 所在命名空间的 ServiceAccount。
 
-服务 Chart 的 `workflow.enabled` 控制执行器及相关权限，`workflow.buildImage` / `workflow.deployImage` 可指定执行镜像。构建 Job 不使用宿主 Docker socket。工作流的 Job、ConfigMap、ServiceAccount、Role、RoleBinding 以及认证 Secret 均由模板定义，执行端只准备本轮 values 并调用 Helm。镜像令牌通过 `values.registryToken` 传入，模板生成仓库认证 Secret，挂载至构建容器 `/kaniko/.docker`；目标集群 KUBECONFIG 通过 `values.kubeconfigs[任务ID]` 传入，模板生成集群 Secret，挂载至部署容器 `/target/config`。两类 Secret 随 release 一起清理，后端不再单独创建或删除；可复用的模板包不包含凭证。本轮凭证随 values 和 Secret manifest 保存在执行期间的 Helm release 中。配置摘要包含模板契约版本，之前试用的旧格式配置需重新保存任务配置。
+服务 Chart 的 `workflow.enabled` 控制执行器及相关权限，`workflow.buildImage` / `workflow.deployImage` 可指定执行镜像。部署镜像默认使用 `registry.cdn.w7.cc/alpine/k8s:1.33.0`，包含 `/bin/sh` 和 kubectl；自定义部署镜像也需同时提供这两者。旧服务的 `WORKFLOW_DEPLOY_IMAGE` 或 Helm `workflow.deployImage` 若仍指向无 shell 的镜像，需更新后重新触发。构建 Job 不使用宿主 Docker socket。工作流的 Job、ConfigMap、ServiceAccount、Role、RoleBinding 以及认证 Secret 均由模板定义，执行端只准备本轮 values 并调用 Helm。镜像令牌通过 `values.registryToken` 传入，模板生成仓库认证 Secret，挂载至构建容器 `/kaniko/.docker`；目标集群 KUBECONFIG 通过 `values.kubeconfigs[任务ID]` 传入，模板生成集群 Secret，挂载至部署容器 `/target/config`。两类 Secret 随 release 一起清理，后端不再单独创建或删除；可复用的模板包不包含凭证。本轮凭证随 values 和 Secret manifest 保存在执行期间的 Helm release 中。配置摘要包含模板契约版本，之前试用的旧格式配置需重新保存任务配置。
 
 当前集群部署仅管理员可以配置；其他用户必须提供目标集群 KUBECONFIG。目标集群配置只接受内嵌证书、Token 等，不执行外部认证程序，也不引用本地凭证文件。任务 ServiceAccount 仅获结果 ConfigMap 读取/更新权限，以及管理员明确配置的目标工作负载读取/更新权限。
 
@@ -73,7 +73,7 @@ SQLite、MySQL 非 debug 启动沿用项目初始化规则，以增量方式添�
 
 均传入 `repository_id`；保存额外传 `config`，日志额外传 `run_id`。仓库模块注入所属用户校验及签名令牌生成方法。旧 `deploy_rule` 路由保留，控制器已迁入本模块；旧模型与表名保持兼容。
 
-任务列表每行提供“执行记录”入口，弹窗显示该任务历史，不再在页面底部展示仓库执行记录。“流程日志”使用记录的 `run_id`，显示同一轮所有串联、并行任务的日志。参照面板安装日志提供 50、100、200、500、1000、2000 行选择，以及“跟踪”开关。本模块沿用共享 JSON 请求入口，跟踪模式每次请求完成 3 秒后更新一次快照，并自动滚动；关闭跟踪后只读取一次。切换行数、关闭弹窗或组件卸载会取消旧请求并清理定时器，错误时暂停跟踪。
+任务列表每行提供“执行记录”入口，弹窗显示该任务历史，不再在页面底部展示仓库执行记录。“任务日志”使用记录的 `run_id` 和 `task_id`，只显示当前任务在该轮的日志。列表显示任务 ID，执行记录显示流程 ID；日志窗口采用黑底终端和顶部控制栏，支持全屏。参照面板安装日志提供 50、100、200、500、1000、2000 行选择，以及“跟踪”开关。本模块沿用共享 JSON 请求入口，跟踪模式每次请求完成 3 秒后更新一次快照，并自动滚动；关闭跟踪后只读取一次。切换行数、关闭弹窗或组件卸载会取消旧请求并清理定时器，错误时暂停跟踪。
 
 Pod 尚在时按选择的行数读取，每个容器最多显示 1 MiB，达到上限时明确提示。Pod 已清理后的历史归档仍是每个容器末尾 100 行、最多 16 KiB；归档响应明确标记并停止跟踪，选择更多行不会恢复已丢弃日志。此功能不是全量日志存储。
 
@@ -87,3 +87,5 @@ go build ./...
 ```
 
 模块测试使用临时 SQLite 和实际 `helm template`，覆盖阶段并行、指定来源、输出冲突、旧规则/日志兼容、快照、事件去重及内部/外部推送识别。不连接真实集群；尚未进行真实 Kaniko 构建及集群安装验证。
+
+任务结果以容器退出状态为准，并用 Helm 已完成的 hook 结果保留前面执行组的成功状态。仅确认未启动的任务标记 skipped；无法采集或确认的结果标记 unknown，不把采集失败当作跳过。流程失败不覆盖已确认的任务成功结果。

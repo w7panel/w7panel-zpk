@@ -91,6 +91,10 @@ func (c Workflow) Logs(ctx *gin.Context) {
 	if !c.authorize(ctx, &params) {
 		return
 	}
+	if params.TaskID == "" {
+		c.JsonResponseWithServerError(ctx, errors.New("请选择要查看日志的任务"))
+		return
+	}
 	run, err := (workflow.Workflow{}).Status(params.RepositoryID, params.RunID)
 	if err != nil {
 		c.JsonResponseWithServerError(ctx, err)
@@ -101,10 +105,10 @@ func (c Workflow) Logs(ctx *gin.Context) {
 	if params.TailLines == 0 {
 		params.TailLines = 100
 	}
-	logs, err := (workflow.Workflow{}).Logs(requestCtx, run, params.TailLines)
+	logs, err := (workflow.Workflow{}).Logs(requestCtx, run, params.TailLines, params.TaskID)
 	if err != nil {
 		c.JsonResponseWithServerError(ctx, err)
 		return
 	}
-	c.JsonResponseWithoutError(ctx, gin.H{"log": logs.Log, "archived": logs.Archived, "truncated": logs.Truncated, "status": run.ExecutionStatus})
+	c.JsonResponseWithoutError(ctx, gin.H{"log": logs.Log, "archived": logs.Archived, "truncated": logs.Truncated, "status": logs.Status})
 }

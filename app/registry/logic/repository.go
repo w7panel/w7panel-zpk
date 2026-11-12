@@ -40,12 +40,8 @@ type Repository struct {
 }
 
 func (l Repository) SetRebuilt(id int32, tag string, rebuilt bool) error {
-	db, err := facade.GetDbFactory().Channel("default")
-	if err != nil {
-		return err
-	}
-	query := dao.Use(db).RegistryRepositoryTag
-	_, err = query.Where(query.RepositoryID.Eq(id), query.Name.Eq(tag)).Update(query.IsRebuilt, rebuilt)
+	query := dao.Q.RegistryRepositoryTag
+	_, err := query.Where(query.RepositoryID.Eq(id), query.Name.Eq(tag)).Update(query.IsRebuilt, rebuilt)
 	return err
 }
 

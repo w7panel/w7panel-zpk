@@ -17,5 +17,5 @@ kubeconfigs: {}
 registryToken: ""
 
 buildImage: ccr.ccs.tencentyun.com/afan-public/kaniko:w7console-new5-26
-deployImage: registry.k8s.io/kubectl:v1.33.0
+deployImage: registry.cdn.w7.cc/alpine/k8s:1.33.0
 deadlineSeconds: 1800

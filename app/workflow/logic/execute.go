@@ -12,6 +12,7 @@ import (
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
+	"helm.sh/helm/v3/pkg/release"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -58,17 +59,13 @@ func (l *Executor) Dispatch() error {
 			<-l.slots
 		}
 	}()
-	db, err := l.GetDB()
-	if err != nil {
+	if err := l.ExpireInterrupted(); err != nil {
 		return err
 	}
-	if err = l.ExpireInterrupted(db); err != nil {
-		return err
-	}
-	if err := l.cleanupRunCharts(db); err != nil {
+	if err := l.cleanupRunCharts(); err != nil {
 		slog.Error("cleanup workflow charts", "error", err)
 	}
-	run, err := l.claimRun(db)
+	run, err := l.claimRun()
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil
 	}
@@ -96,10 +93,10 @@ func (l *Executor) Dispatch() error {
 		if e := l.writable(); e != nil {
 			return
 		}
-		query := dao.Use(db).RegistryRepositoryDeployRuleMatchLog
+		query := dao.Q.RegistryRepositoryDeployRuleMatchLog
 		if err != nil {
-			if _, e := query.Where(query.WorkflowRunID.Eq(run.WorkflowRunID), query.WorkflowTaskKey.Neq(""), query.ExecutionStatus.Eq("running")).UpdateSimple(query.UpdatedAt.Value(time.Now()), query.ExecutionStatus.Value("skipped"), query.K8sLog.Value(message)); e != nil {
-				slog.Error("save skipped workflow tasks", "run", run.WorkflowRunID, "error", e)
+			if _, e := query.Where(query.WorkflowRunID.Eq(run.WorkflowRunID), query.WorkflowTaskKey.Neq(""), query.ExecutionStatus.Eq("running")).UpdateSimple(query.UpdatedAt.Value(time.Now()), query.ExecutionStatus.Value("unknown"), query.FailureReason.Value("流程执行失败，未能确认本任务的执行结果，请查看流程日志"), query.K8sLog.Value(message)); e != nil {
+				slog.Error("save unresolved workflow tasks", "run", run.WorkflowRunID, "error", e)
 			}
 		}
 		if _, e := query.Where(query.WorkflowRunID.Eq(run.WorkflowRunID), query.WorkflowTaskKey.Eq(""), query.ExecutionStatus.Eq("running")).UpdateSimple(query.UpdatedAt.Value(time.Now()), query.ExecutionStatus.Value(status), query.FailureReason.Value(message), query.K8sLog.Value("Helm 执行实例 wf-"+run.WorkflowRunID+": "+status+" "+message)); e != nil {
@@ -123,11 +120,7 @@ func (l *Executor) Execute(ctx context.Context, run entity.RegistryRepositoryDep
 	if image.Reference == "" || image.Repository == "" || image.Host == "" {
 		return errors.New("执行记录缺少源镜像信息，请重新触发")
 	}
-	db, err := l.GetDB()
-	if err != nil {
-		return err
-	}
-	selected, err := l.selectedTasks(db.WithContext(ctx), run)
+	selected, err := l.selectedTasks(ctx, run)
 	if err != nil {
 		return err
 	}
@@ -160,14 +153,16 @@ func (l *Executor) Execute(ctx context.Context, run entity.RegistryRepositoryDep
 			values[pair.key] = image
 		}
 	}
-	return (Helm{}).Install(ctx, run, config, values, func(client kubernetes.Interface) { l.persistTaskResults(client, run) })
+	return (Helm{}).Install(ctx, run, config, values, func(client kubernetes.Interface, installed *release.Release) error {
+		return l.persistTaskResults(client, run, installed)
+	})
 }
 
-func (l *Executor) claimRun(db *gorm.DB) (entity.RegistryRepositoryDeployRuleMatchLog, error) {
+func (l *Executor) claimRun() (entity.RegistryRepositoryDeployRuleMatchLog, error) {
 	var run entity.RegistryRepositoryDeployRuleMatchLog
 	// Claim at most one active run per repository using workflow records only.
-	err := db.Transaction(func(tx *gorm.DB) error {
-		query := dao.Use(tx).RegistryRepositoryDeployRuleMatchLog
+	err := dao.Q.Transaction(func(tx *dao.Query) error {
+		query := tx.RegistryRepositoryDeployRuleMatchLog
 		pending, err := query.Where(query.ExecutionStatus.Eq("pending"), query.WorkflowTaskKey.Eq(""), query.Columns(query.RepositoryID).NotIn(query.Select(query.RepositoryID).Where(query.ExecutionStatus.Eq("running")))).Order(query.CreatedAt, query.ID).Limit(1).Find()
 		if err != nil {
 			return err

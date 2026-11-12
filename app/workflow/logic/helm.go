@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"github.com/w7panel/w7panel-zpk/common/entity"
 	"helm.sh/helm/v3/pkg/action"
+	"helm.sh/helm/v3/pkg/release"
 	"helm.sh/helm/v3/pkg/storage/driver"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -416,7 +417,7 @@ func (h Helm) writeTemplateFile(rootDir, name, templateName string) error {
 }
 
 // Install owns the release lifecycle; collect runs before Helm removes its resources.
-func (h Helm) Install(ctx context.Context, run entity.RegistryRepositoryDeployRuleMatchLog, config Config, values map[string]interface{}, collect func(kubernetes.Interface)) error {
+func (h Helm) Install(ctx context.Context, run entity.RegistryRepositoryDeployRuleMatchLog, config Config, values map[string]interface{}, collect func(kubernetes.Interface, *release.Release) error) error {
 	// Use the service account, never the operator's local kubeconfig.
 	restConfig, err := rest.InClusterConfig()
 	if err != nil {
@@ -446,8 +447,13 @@ func (h Helm) Install(ctx context.Context, run entity.RegistryRepositoryDeployRu
 	if err != nil {
 		return err
 	}
+	var installed *release.Release
 	if collect != nil {
-		defer collect(client)
+		defer func() {
+			if err := collect(client, installed); err != nil {
+				slog.Error("collect workflow task results", "run", run.WorkflowRunID, "error", err)
+			}
+		}()
 	}
 
 	chartPath, err := h.RunChartPath(run.RepositoryID, run.WorkflowRunID)
@@ -467,7 +473,7 @@ func (h Helm) Install(ctx context.Context, run entity.RegistryRepositoryDeployRu
 	install.Timeout = 2 * time.Hour
 	install.Wait = true
 	install.WaitForJobs = true
-	_, err = install.RunWithContext(ctx, chart, values)
+	installed, err = install.RunWithContext(ctx, chart, values)
 	if err != nil && ctx.Err() != nil {
 		cleanupCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()

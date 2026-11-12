@@ -6,13 +6,13 @@
         <a-spin :loading="loading" style="width:100%">
             <a-table :data="orderedTasks" :pagination="false" row-key="id">
                 <template #columns>
-                    <a-table-column title="执行时机" :width="240">
-                        <template #cell="{ record }">{{ timingLabel(record) }}</template>
-                    </a-table-column>
-                    <a-table-column title="任务" data-index="name" />
+                    <a-table-column title="任务"><template #cell="{ record }"><div>{{ record.name }}</div><div class="workflow-task-id">{{ record.id }}</div></template></a-table-column>
                     <a-table-column title="执行动作"><template #cell="{ record }">{{ actionLabels[record.action] }}</template></a-table-column>
                     <a-table-column title="触发条件"><template #cell="{ record }">{{ record.deploy_type === 1 ? '更新版本' : '新增版本' }}：{{ record.tag_name }}</template></a-table-column>
                     <a-table-column title="镜像来源"><template #cell="{ record }">{{ sourceLabel(record) }}</template></a-table-column>
+                    <a-table-column title="执行时机" :width="240">
+                        <template #cell="{ record }">{{ timingLabel(record) }}</template>
+                    </a-table-column>
                     <a-table-column title="操作" :width="240">
                         <template #cell="{ record }">
                             <a-button type="text" @click="editTask(record)" :disabled="saving || loading">修改</a-button>
@@ -27,14 +27,15 @@
         </a-spin>
         <a-modal v-model:visible="runsVisible" :title="`${runsTask?.name || ''} · 执行记录`" :width="900" :footer="false" @close="closeRuns">
         <a-button :loading="loadingRuns" @click="loadRuns">刷新执行记录</a-button>
-        <p class="c-99">显示此任务最近 50 次执行；“流程日志”可查看同一轮流程中所有串联、并行任务的日志。</p>
+        <p class="c-99">任务 ID：{{ runsTask?.id }}。显示此任务最近 50 次执行；点击“任务日志”查看该任务在本轮流程中的日志。</p>
         <a-table :data="runs" :loading="loadingRuns" :pagination="false" row-key="id">
             <template #columns>
+                <a-table-column title="流程 ID" :width="150"><template #cell="{ record }"><a-tooltip :content="record.run_id"><span class="workflow-run-id">{{ record.run_id?.slice(0, 12) }}</span></a-tooltip></template></a-table-column>
                 <a-table-column title="版本" data-index="tag" />
                 <a-table-column title="任务状态"><template #cell="{ record }"><a-tag :color="statusColors[record.status]">{{ statusLabels[record.status] || record.status }}</a-tag></template></a-table-column>
                 <a-table-column title="触发时间"><template #cell="{ record }">{{ new Date(record.created_at).toLocaleString() }}</template></a-table-column>
-                <a-table-column title="说明"><template #cell="{ record }">{{ record.error || (record.status === 'failed' ? '任务执行失败，请查看流程日志' : record.status === 'skipped' ? '前序任务失败或本任务未启动' : '') }}</template></a-table-column>
-                <a-table-column title="操作"><template #cell="{ record }"><a-button type="text" @click="showLogs(record)">流程日志</a-button></template></a-table-column>
+                <a-table-column title="说明"><template #cell="{ record }">{{ record.error || (record.status === 'failed' ? '任务执行失败，请查看任务日志' : record.status === 'skipped' ? '本任务未执行，请查看任务日志' : record.status === 'unknown' ? '执行结果未能确认，请查看任务日志' : '') }}</template></a-table-column>
+                <a-table-column title="操作"><template #cell="{ record }"><a-button type="text" @click="showLogs(record)">任务日志</a-button></template></a-table-column>
             </template>
         </a-table>
         </a-modal>
@@ -82,15 +83,30 @@
             </a-form>
             <div class="dialog-footer"><a-button :disabled="saving" @click="visible = false">取消</a-button><a-button type="primary" :loading="saving" :disabled="importingConfig" @click="applyTask">保存</a-button></div>
         </a-modal>
-        <a-modal v-model:visible="logsVisible" title="本轮流程日志" :width="900" :footer="false" @close="closeLogs">
-            <a-space wrap>
-                <span>日志行数：</span><a-select v-model="logTailLines" style="width:110px" @change="reloadLogs"><a-option v-for="count in [50, 100, 200, 500, 1000, 2000]" :key="count" :value="count">{{ count }} 行</a-option></a-select>
-                <span>跟踪：</span><a-switch v-model="logFollow" :disabled="logArchived" @change="reloadLogs" />
-                <a-button :loading="loadingLogs" @click="reloadLogs">刷新</a-button>
-            </a-space>
-            <p class="c-99">{{ logArchived ? 'Pod 已清理，当前显示保存的历史片段（末尾 100 行、最多 16 KiB），无法继续跟踪或恢复更多行。' : logFollow ? '每 3 秒更新本轮所有任务日志，自动滚动到底部。' : '当前为所选行数的日志快照。' }}</p>
-            <p v-if="logTruncated" class="c-99">部分容器达到 1 MiB 显示上限，请减少日志行数。</p>
-            <a-spin :loading="loadingLogs && !logs"><pre ref="workflowLogs" class="workflow-logs">{{ logs }}</pre></a-spin>
+        <a-modal v-model:visible="logsVisible" :width="1100" :fullscreen="logsFullscreen" :footer="false" :closable="false" class="workflow-log-modal" @open="openLogTerminal" @close="closeLogs">
+            <template #title>
+                <div class="workflow-log-title">
+                    <span>{{ logRun?.name || '任务' }} · 日志</span>
+                    <a-space class="workflow-log-actions">
+                        <a-button type="text" aria-label="切换日志全屏" @click="logsFullscreen = !logsFullscreen; fitLogTerminal()"><icon-fullscreen-exit v-if="logsFullscreen" /><icon-fullscreen v-else /></a-button>
+                        <a-button type="text" aria-label="关闭任务日志" @click="closeLogs"><icon-close /></a-button>
+                    </a-space>
+                </div>
+            </template>
+            <div class="workflow-log-content">
+                <div class="workflow-log-summary"><span>流程 ID：<span class="workflow-run-id">{{ logRun?.run_id }}</span></span><a-tag :color="statusColors[logStatus]">{{ statusLabels[logStatus] || logStatus }}</a-tag></div>
+                <div class="workflow-log-toolbar">
+                    <a-space wrap>
+                        <span>是否跟踪：</span><a-switch v-model="logFollow" :disabled="logArchived" @change="reloadLogs" />
+                        <span class="workflow-run-id">任务 ID：{{ logRun?.task_id }}</span>
+                        <span>条数：</span><a-select v-model="logTailLines" style="width:100px" @change="reloadLogs"><a-option v-for="count in [50, 100, 200, 500, 1000, 2000]" :key="count" :value="count">{{ count }} 条</a-option></a-select>
+                        <a-button :loading="loadingLogs" @click="reloadLogs">刷新</a-button>
+                    </a-space>
+                </div>
+                <p v-if="logArchived" class="c-99">Pod 已清理，当前显示保存的历史片段（每个容器末尾 100 行、最多 16 KiB），无法恢复更多行。</p>
+                <p v-if="logTruncated" class="c-99">部分容器达到 1 MiB 显示上限，请减少日志行数。</p>
+                <a-spin :loading="loadingLogs && !logs" class="workflow-log-terminal-wrap"><div ref="workflowTerminal" class="workflow-log-terminal" :style="{ height: logsFullscreen ? 'calc(100vh - 220px)' : '480px' }"></div></a-spin>
+            </div>
         </a-modal>
     </div>
 </template>
@@ -98,12 +114,18 @@
 <script>
 import myAxios from '@/utils';
 import userMixin from '@/utils/user-mixin';
+import { markRaw } from 'vue';
+import { Terminal } from '@xterm/xterm';
+import { FitAddon } from '@xterm/addon-fit';
+import '@xterm/xterm/css/xterm.css';
+import { IconFullscreen, IconFullscreenExit, IconClose } from '@arco-design/web-vue/es/icon';
 import { messageError, messageSuccess } from '@/utils/ui-feedback';
 
 const taskDefaults = () => ({ id: '', name: '', stage: 1, action: 'build', deploy_type: 1, match_type: 1, tag_name: '', source: 'original', source_task: '', dockerfile: '', tag_suffix: '', k8s_config: '', k8s_namespace: 'default', k8s_controller_type: 'deployments', k8s_app_name: '', k8s_container_name: '' });
 
 export default {
     mixins: [userMixin],
+    components: { IconFullscreen, IconFullscreenExit, IconClose },
     props: { repositoryId: { type: Number, required: true } },
     data() {
         return {
@@ -112,12 +134,13 @@ export default {
             targetCluster: 'remote', targetLoaded: {}, targetRequest: '', importingConfig: false,
             visible: false, editing: false, form: taskDefaults(), timing: 'first', runs: [], loadingRuns: false,
             runsVisible: false, runsTask: null, runSequence: 0,
+            logsFullscreen: false, logStatus: '', logTerminal: null, logFit: null,
             logsVisible: false, logs: '', loadingLogs: false, disposed: false, logSequence: 0,
             logTailLines: 100, logFollow: true, logArchived: false, logTruncated: false,
             logRun: null, logTimer: null, logController: null,
             actionLabels: { build: '镜像重构', deploy: '部署应用' },
-            statusLabels: { pending: '排队中', running: '执行中', succeeded: '成功', failed: '失败', skipped: '已跳过' },
-            statusColors: { pending: 'gray', running: 'blue', succeeded: 'green', failed: 'red', skipped: 'gray' },
+            statusLabels: { pending: '排队中', running: '执行中', succeeded: '成功', failed: '失败', skipped: '已跳过', unknown: '状态未知' },
+            statusColors: { pending: 'gray', running: 'blue', succeeded: 'green', failed: 'red', skipped: 'gray', unknown: 'orange' },
         };
     },
     computed: {
@@ -234,7 +257,7 @@ export default {
             this.logSequence++; clearTimeout(this.logTimer); this.logTimer = null;
             this.logController?.abort(); this.logController = null;
         },
-        closeLogs() { this.stopLogRequest(); this.loadingLogs = false; this.logsVisible = false; this.logs = ''; this.logRun = null; },
+        closeLogs() { this.stopLogRequest(); this.loadingLogs = false; this.logsVisible = false; this.logs = ''; this.logRun = null; this.logTerminal?.dispose(); this.logTerminal = null; this.logFit = null; },
         async loadRuns() {
             if (!this.runsTask || !this.runsVisible) return;
             const sequence = ++this.runSequence;
@@ -358,9 +381,25 @@ export default {
             finally { if (!this.disposed && sequence === this.targetSequence) { this.loadingTargets = false; this.targetRequest = ''; } }
         },
         showLogs(run) {
-            this.stopLogRequest(); this.logRun = { run_id: run.run_id }; this.logsVisible = true; this.logs = '';
+            this.stopLogRequest(); this.logRun = { run_id: run.run_id, task_id: run.task_id || this.runsTask?.id || '', name: this.runsTask?.name || '' }; this.logsVisible = true; this.logs = ''; this.logStatus = run.status || '';
             this.logArchived = false; this.logTruncated = false; this.logFollow = true;
             return this.reloadLogs();
+        },
+        openLogTerminal() {
+            if (!this.$refs.workflowTerminal || this.logTerminal) return;
+            this.logTerminal = markRaw(new Terminal({ disableStdin: true, convertEol: true, fontSize: 13, lineHeight: 1.4, scrollback: 30000, theme: { background: '#000000', foreground: '#e5e5e5' } }));
+            this.logFit = markRaw(new FitAddon());
+            this.logTerminal.loadAddon(this.logFit); this.logTerminal.open(this.$refs.workflowTerminal);
+            this.renderLogTerminal();
+        },
+        fitLogTerminal() { this.$nextTick(() => { this.logFit?.fit(); }); },
+        renderLogTerminal() {
+            this.$nextTick(() => {
+                if (!this.logsVisible || !this.logTerminal) return;
+                this.logTerminal.reset();
+                this.logFit?.fit();
+                this.logTerminal.write(this.logs, () => { if (this.logFollow) this.logTerminal?.scrollToBottom(); });
+            });
         },
         reloadLogs() {
             this.stopLogRequest();
@@ -372,11 +411,10 @@ export default {
             const controller = new AbortController(); this.logController = controller; this.loadingLogs = true;
             let succeeded = false;
             try {
-                const data = await this.request('logs', { run_id: this.logRun.run_id, tail_lines: this.logTailLines }, { signal: controller.signal, dontalert: true });
+                const data = await this.request('logs', { run_id: this.logRun.run_id, task_id: this.logRun.task_id, tail_lines: this.logTailLines }, { signal: controller.signal, dontalert: true });
                 if (this.disposed || sequence !== this.logSequence) return;
-                this.logs = data.log; this.logArchived = !!data.archived; this.logTruncated = !!data.truncated;
+                this.logs = data.log; this.logStatus = data.status || this.logStatus; this.renderLogTerminal(); this.logArchived = !!data.archived; this.logTruncated = !!data.truncated;
                 if (this.logArchived) this.logFollow = false;
-                if (this.logFollow) this.$nextTick(() => { if (sequence === this.logSequence && this.$refs.workflowLogs) this.$refs.workflowLogs.scrollTop = this.$refs.workflowLogs.scrollHeight; });
                 succeeded = true;
             } catch (error) {
                 if (!this.disposed && sequence === this.logSequence && !controller.signal.aborted) { this.logFollow = false; messageError(error?.response?.data?.error || error.message || '读取日志失败，请刷新重试'); }
@@ -396,5 +434,13 @@ export default {
 .workflow-config-import { position: relative; }
 .workflow-config-import input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
 .workflow-toolbar { margin-bottom: 16px; }
-.workflow-logs { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 60vh; overflow: auto; }
+.workflow-task-id { color: var(--color-text-3); font-size: 12px; margin-top: 4px; overflow-wrap: anywhere; }
+.workflow-run-id { font-family: ui-monospace, monospace; }
+.workflow-log-title { position: relative; width: 100%; min-height: 32px; display: flex; align-items: center; justify-content: center; }
+.workflow-log-actions { position: absolute; right: 0; }
+.workflow-log-summary { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; overflow-wrap: anywhere; }
+.workflow-log-toolbar { margin-bottom: 12px; }
+.workflow-log-terminal-wrap { display: block; width: 100%; }
+.workflow-log-terminal { background: #000; padding: 10px; box-sizing: border-box; width: 100%; overflow: hidden; border: 1px solid var(--color-neutral-3); }
+.workflow-log-terminal :deep(.xterm) { height: 100%; }
 </style>

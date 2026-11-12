@@ -14,14 +14,18 @@ import (
 	"github.com/w7panel/w7panel-zpk/common/function"
 	commonlogic "github.com/w7panel/w7panel-zpk/common/logic"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
+	"gorm.io/gen"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
+	"helm.sh/helm/v3/pkg/release"
 	"io"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"log/slog"
+	"sigs.k8s.io/yaml"
 	"strings"
 	"time"
 )
@@ -37,9 +41,6 @@ type Workflow struct {
 	commonlogic.Logic
 }
 
-func (l Workflow) GetDB() (*gorm.DB, error) {
-	return facade.GetDbFactory().Channel("default")
-}
 func (l Workflow) writable() error {
 	if systemlogic.ShouldBlockWrites(facade.GetConfig()) {
 		return errors.New("数据库切换期间禁止执行工作流")
@@ -54,9 +55,9 @@ func (l Workflow) crypt(content string, encrypt bool) (string, error) {
 	return function.AesDecrypt(content, key)
 }
 
-func (l Workflow) readConfig(db *gorm.DB, repositoryID int32) (Config, []entity.RegistryRepositoryDeployRule, error) {
+func (l Workflow) readConfig(q *dao.Query, repositoryID int32) (Config, []entity.RegistryRepositoryDeployRule, error) {
 	var rules []entity.RegistryRepositoryDeployRule
-	query := dao.Use(db).RegistryRepositoryDeployRule
+	query := q.RegistryRepositoryDeployRule
 	if err := query.Where(query.RepositoryID.Eq(repositoryID)).Order(query.ID).Scan(&rules); err != nil {
 		return Config{}, nil, err
 	}
@@ -92,11 +93,7 @@ func (l Workflow) readConfig(db *gorm.DB, repositoryID int32) (Config, []entity.
 	return config, rules, nil
 }
 func (l Workflow) Get(repositoryID int32) (Config, error) {
-	db, err := l.GetDB()
-	if err != nil {
-		return Config{}, err
-	}
-	config, _, err := l.readConfig(db, repositoryID)
+	config, _, err := l.readConfig(dao.Q, repositoryID)
 	return config, err
 }
 
@@ -134,11 +131,7 @@ func (l Workflow) Save(repositoryID int32, config Config) error {
 	if err := config.Validate(); err != nil {
 		return err
 	}
-	db, err := l.GetDB()
-	if err != nil {
-		return err
-	}
-	return db.Transaction(func(tx *gorm.DB) error {
+	return dao.Q.Transaction(func(tx *dao.Query) error {
 		_, rules, err := l.readConfig(tx, repositoryID)
 		if err != nil {
 			return err
@@ -160,12 +153,12 @@ func (l Workflow) Save(repositoryID int32, config Config) error {
 
 			existing := old[task.ID]
 			row := entity.RegistryRepositoryDeployRule{ID: existing.ID, RepositoryID: repositoryID, DeployType: int32(task.DeployType), MatchType: int32(task.MatchType), TagName: task.TagName, K8sConfig: kubeConfig, K8sNamespace: task.K8sNamespace, K8sControllerType: task.K8sControllerType, K8sAppName: task.K8sAppName, K8sContainerName: task.K8sContainerName, CreatedAt: existing.CreatedAt, LatestTriggerAt: existing.LatestTriggerAt, WorkflowTaskKey: task.ID, TaskName: task.Name, ExecutionOrder: int32(task.Stage), TaskAction: task.Action, ImageSource: task.Source, SourceBuildTaskKey: task.SourceTask, DockerfileInstructions: task.Dockerfile, OutputTagSuffix: task.TagSuffix}
-			if err := tx.Save(&row).Error; err != nil {
+			if err := tx.RegistryRepositoryDeployRule.Save(&row); err != nil {
 				return err
 			}
 			kept = append(kept, row.ID)
 		}
-		ruleQuery := dao.Use(tx).RegistryRepositoryDeployRule
+		ruleQuery := tx.RegistryRepositoryDeployRule
 		query := ruleQuery.Where(ruleQuery.RepositoryID.Eq(repositoryID))
 		if len(kept) > 0 {
 			query = query.Where(ruleQuery.ID.NotIn(kept...))
@@ -178,21 +171,17 @@ func (l Workflow) Save(repositoryID int32, config Config) error {
 	})
 }
 func (l Workflow) Runs(repositoryID int32, taskID string) ([]entity.RegistryRepositoryDeployRuleMatchLog, error) {
-	db, err := l.GetDB()
-	if err != nil {
-		return nil, err
-	}
 	runs := []entity.RegistryRepositoryDeployRuleMatchLog{}
-	query := dao.Use(db).RegistryRepositoryDeployRuleMatchLog
-	err = query.Where(query.RepositoryID.Eq(repositoryID), query.WorkflowTaskKey.Eq(taskID), query.WorkflowRunID.IsNotNull()).Order(query.CreatedAt.Desc(), query.ID.Desc()).Limit(50).Scan(&runs)
+	query := dao.Q.RegistryRepositoryDeployRuleMatchLog
+	err := query.Where(query.RepositoryID.Eq(repositoryID), query.WorkflowTaskKey.Eq(taskID), query.WorkflowRunID.IsNotNull()).Order(query.CreatedAt.Desc(), query.ID.Desc()).Limit(50).Scan(&runs)
 	return runs, err
 }
 
 // selectedTasks derives the trigger's task selection from its immutable task records.
-func (l Workflow) selectedTasks(db *gorm.DB, run entity.RegistryRepositoryDeployRuleMatchLog) (map[string]bool, error) {
+func (l Workflow) selectedTasks(ctx context.Context, run entity.RegistryRepositoryDeployRuleMatchLog) (map[string]bool, error) {
 	var ids []string
-	query := dao.Use(db).RegistryRepositoryDeployRuleMatchLog
-	if err := query.Where(query.RepositoryID.Eq(run.RepositoryID), query.WorkflowRunID.Eq(run.WorkflowRunID), query.WorkflowTaskKey.Neq("")).Pluck(query.WorkflowTaskKey, &ids); err != nil {
+	query := dao.Q.RegistryRepositoryDeployRuleMatchLog
+	if err := query.WithContext(ctx).Where(query.RepositoryID.Eq(run.RepositoryID), query.WorkflowRunID.Eq(run.WorkflowRunID), query.WorkflowTaskKey.Neq("")).Pluck(query.WorkflowTaskKey, &ids); err != nil {
 		return nil, err
 	}
 	selected := make(map[string]bool, len(ids))
@@ -208,14 +197,10 @@ func (l Workflow) ObservePush(repositoryID int32, repository, tag, digest, actor
 	if err := l.writable(); err != nil {
 		return false, err
 	}
-	db, err := l.GetDB()
-	if err != nil {
-		return false, err
-	}
 	runID, taskID, _ := strings.Cut(strings.TrimPrefix(actor, ActorPrefix), "--")
 	internal := false
 	if strings.HasPrefix(actor, ActorPrefix) && workflowRunIDPattern.MatchString(runID) {
-		query := dao.Use(db).RegistryRepositoryDeployRuleMatchLog
+		query := dao.Q.RegistryRepositoryDeployRuleMatchLog
 		run, err := query.Where(query.WorkflowRunID.Eq(runID), query.WorkflowTaskKey.Eq(""), query.RepositoryID.Eq(repositoryID), query.TriggerRepository.Eq(repository)).First()
 		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 			return false, err
@@ -225,7 +210,7 @@ func (l Workflow) ObservePush(repositoryID int32, repository, tag, digest, actor
 			if err != nil {
 				return false, err
 			}
-			selected, err := l.selectedTasks(db, *run)
+			selected, err := l.selectedTasks(context.Background(), *run)
 			if err != nil {
 				return false, err
 			}
@@ -243,14 +228,14 @@ func (l Workflow) ObservePush(repositoryID int32, repository, tag, digest, actor
 			}
 		}
 	}
-	return internal, l.recordPush(db, repositoryID, tag, digest, runID, taskID, internal)
+	return internal, l.recordPush(repositoryID, tag, digest, runID, taskID, internal)
 }
 
-func (l Workflow) recordPush(db *gorm.DB, repositoryID int32, tag, digest, runID, taskID string, internal bool) error {
+func (l Workflow) recordPush(repositoryID int32, tag, digest, runID, taskID string, internal bool) error {
 	if !internal || taskID == "" {
 		return nil
 	}
-	query := dao.Use(db).RegistryRepositoryDeployRuleMatchLog
+	query := dao.Q.RegistryRepositoryDeployRuleMatchLog
 	_, err := query.Where(query.WorkflowRunID.Eq(runID), query.WorkflowTaskKey.Eq(taskID), query.RepositoryID.Eq(repositoryID)).UpdateSimple(query.UpdatedAt.Value(time.Now()), query.BuildOutputTag.Value(tag), query.BuildOutputDigest.Value(digest))
 	return err
 }
@@ -260,17 +245,13 @@ func (l Workflow) Trigger(repositoryID int32, repository, tag, digest, eventID s
 	if err := l.writable(); err != nil {
 		return err
 	}
-	db, err := l.GetDB()
-	if err != nil {
-		return err
-	}
-	return db.Transaction(func(tx *gorm.DB) error {
+	return dao.Q.Transaction(func(tx *dao.Query) error {
 		return l.enqueue(tx, repositoryID, repository, tag, digest, eventID, eventType, image, registryToken)
 	})
 }
 
-func (l Workflow) enqueue(db *gorm.DB, repositoryID int32, repository, tag, digest, eventID string, eventType int, image ImageContext, registryToken string) error {
-	config, rules, err := l.readConfig(db, repositoryID)
+func (l Workflow) enqueue(tx *dao.Query, repositoryID int32, repository, tag, digest, eventID string, eventType int, image ImageContext, registryToken string) error {
+	config, rules, err := l.readConfig(tx, repositoryID)
 	if err != nil {
 		return err
 	}
@@ -319,9 +300,9 @@ func (l Workflow) enqueue(db *gorm.DB, repositoryID int32, repository, tag, dige
 		run.ExecutionStatus = "failed"
 		run.FailureReason = selectErr.Error()
 	}
-	result := db.Clauses(clause.OnConflict{DoNothing: true}).Create(&run)
-	if result.Error != nil {
-		return result.Error
+	result := tx.RegistryRepositoryDeployRuleMatchLog.Clauses(clause.OnConflict{DoNothing: true}).WithResult(func(q gen.Dao) { err = q.Create(&run) })
+	if err != nil {
+		return err
 	}
 	if result.RowsAffected == 0 {
 		return nil
@@ -336,10 +317,10 @@ func (l Workflow) enqueue(db *gorm.DB, repositoryID int32, repository, tag, dige
 			continue
 		}
 		log := entity.RegistryRepositoryDeployRuleMatchLog{WorkflowRunID: id, WorkflowTaskKey: rule.WorkflowTaskKey, RuleID: rule.ID, RepositoryID: repositoryID, ImageName: run.ImageName, ExecutionStatus: run.ExecutionStatus, K8sLog: "Helm 执行实例 wf-" + id, TriggerTag: tag, TriggerDigest: digest}
-		if err := db.Create(&log).Error; err != nil {
+		if err := tx.RegistryRepositoryDeployRuleMatchLog.Create(&log); err != nil {
 			return err
 		}
-		query := dao.Use(db).RegistryRepositoryDeployRule
+		query := tx.RegistryRepositoryDeployRule
 		if _, err := query.Where(query.ID.Eq(rule.ID)).Update(query.LatestTriggerAt, time.Now()); err != nil {
 			return err
 		}
@@ -354,31 +335,27 @@ func validDigest(value string) bool {
 	return err == nil
 }
 func (l Workflow) Status(repositoryID int32, id string) (entity.RegistryRepositoryDeployRuleMatchLog, error) {
-	db, err := l.GetDB()
-	if err != nil {
-		return entity.RegistryRepositoryDeployRuleMatchLog{}, err
-	}
-	query := dao.Use(db).RegistryRepositoryDeployRuleMatchLog
+	query := dao.Q.RegistryRepositoryDeployRuleMatchLog
 	run, err := query.Where(query.WorkflowRunID.Eq(id), query.WorkflowTaskKey.Eq(""), query.RepositoryID.Eq(repositoryID)).First()
 	if err != nil {
 		return entity.RegistryRepositoryDeployRuleMatchLog{}, err
 	}
 	return *run, nil
 }
-func (l Workflow) ExpireInterrupted(db *gorm.DB) error {
-	query := dao.Use(db).RegistryRepositoryDeployRuleMatchLog
+func (l Workflow) ExpireInterrupted() error {
+	query := dao.Q.RegistryRepositoryDeployRuleMatchLog
 	_, err := query.Where(query.ExecutionStatus.Eq("running"), query.UpdatedAt.Lt(time.Now().Add(-3*time.Hour))).UpdateSimple(query.UpdatedAt.Value(time.Now()), query.ExecutionStatus.Value("failed"), query.FailureReason.Value("执行中断或超过最大执行时间，请检查集群资源后重新触发"))
 	return err
 }
 
 // cleanupRunCharts retries terminal cleanup and removes abandoned files only after a grace period.
 // Pending/running records are never removed, including while another replica executes them.
-func (l Workflow) cleanupRunCharts(db *gorm.DB) error {
+func (l Workflow) cleanupRunCharts() error {
 	files, err := (Helm{}).runCharts()
 	if err != nil {
 		return err
 	}
-	query := dao.Use(db).RegistryRepositoryDeployRuleMatchLog
+	query := dao.Q.RegistryRepositoryDeployRuleMatchLog
 	for _, file := range files {
 		run, err := query.Select(query.ExecutionStatus).Where(query.RepositoryID.Eq(file.RepositoryID), query.WorkflowRunID.Eq(file.RunID), query.WorkflowTaskKey.Eq("")).First()
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -399,11 +376,7 @@ func (l Workflow) cleanupRunCharts(db *gorm.DB) error {
 
 // LegacyWritable prevents old mutation endpoints from invalidating a cached workflow.
 func (l Workflow) LegacyWritable(repositoryID int32) error {
-	db, err := l.GetDB()
-	if err != nil {
-		return err
-	}
-	query := dao.Use(db).RegistryRepositoryDeployRule
+	query := dao.Q.RegistryRepositoryDeployRule
 	count, err := query.Where(query.RepositoryID.Eq(repositoryID), query.WorkflowTaskKey.Neq("")).Count()
 	if err != nil {
 		return err
@@ -416,11 +389,12 @@ func (l Workflow) LegacyWritable(repositoryID int32) error {
 
 type LogResult struct {
 	Log       string
+	Status    string
 	Archived  bool
 	Truncated bool
 }
 
-func (l Workflow) Logs(ctx context.Context, run entity.RegistryRepositoryDeployRuleMatchLog, tailLines int64) (LogResult, error) {
+func (l Workflow) Logs(ctx context.Context, run entity.RegistryRepositoryDeployRuleMatchLog, tailLines int64, taskID string) (LogResult, error) {
 	if tailLines < 1 || tailLines > 2000 {
 		return LogResult{}, errors.New("日志行数必须在 1 到 2000 之间")
 	}
@@ -432,96 +406,131 @@ func (l Workflow) Logs(ctx context.Context, run entity.RegistryRepositoryDeployR
 	if err != nil {
 		return LogResult{}, err
 	}
-	return l.readLogs(ctx, client, run, tailLines)
+	return l.readLogs(ctx, client, run, tailLines, taskID)
 }
 
-func (l Workflow) readLogs(ctx context.Context, client kubernetes.Interface, run entity.RegistryRepositoryDeployRuleMatchLog, tailLines int64) (LogResult, error) {
+func (l Workflow) readLogs(ctx context.Context, client kubernetes.Interface, run entity.RegistryRepositoryDeployRuleMatchLog, tailLines int64, taskID string) (LogResult, error) {
+	query := dao.Q.RegistryRepositoryDeployRuleMatchLog
+	record, err := query.WithContext(ctx).Where(query.RepositoryID.Eq(run.RepositoryID), query.WorkflowRunID.Eq(run.WorkflowRunID), query.WorkflowTaskKey.Eq(taskID)).First()
+	if err != nil {
+		return LogResult{}, err
+	}
 	pods, err := client.CoreV1().Pods(executionNamespace).List(ctx, metav1.ListOptions{LabelSelector: "w7.cc/workflow-run=wf-" + run.WorkflowRunID})
 	if err != nil {
 		return LogResult{}, err
 	}
-	var result strings.Builder
-	response := LogResult{}
+	response := LogResult{Status: record.ExecutionStatus, Archived: run.ExecutionStatus != "pending" && run.ExecutionStatus != "running"}
+	var content strings.Builder
 	limit := int64(1024 * 1024)
+	found := false
 	for _, pod := range pods.Items {
 		for _, container := range pod.Spec.Containers {
-			fmt.Fprintf(&result, "%s / %s (%s)\n", pod.Name, container.Name, pod.Status.Phase)
+			if container.Name != taskID {
+				continue
+			}
+			found = true
+			response.Archived = false
+			fmt.Fprintf(&content, "Pod: %s / %s\n", pod.Name, container.Name)
+			for _, state := range pod.Status.ContainerStatuses {
+				if state.Name != container.Name {
+					continue
+				}
+				switch {
+				case state.State.Terminated != nil:
+					terminated := state.State.Terminated
+					response.Status = "failed"
+					if terminated.ExitCode == 0 {
+						response.Status = "succeeded"
+					}
+					fmt.Fprintf(&content, "退出码: %d · %s\n%s\n", terminated.ExitCode, terminated.Reason, terminated.Message)
+				case state.State.Waiting != nil:
+					fmt.Fprintf(&content, "%s: %s\n", state.State.Waiting.Reason, state.State.Waiting.Message)
+				}
+			}
 			stream, err := client.CoreV1().Pods(executionNamespace).GetLogs(pod.Name, &corev1.PodLogOptions{Container: container.Name, TailLines: &tailLines, LimitBytes: &limit}).Stream(ctx)
 			if err != nil {
 				if ctx.Err() != nil {
 					return LogResult{}, ctx.Err()
 				}
-				result.WriteString("日志暂不可用\n")
+				fmt.Fprintf(&content, "日志暂不可用：%s\n", err)
 				continue
 			}
-			count, copyErr := io.Copy(&result, io.LimitReader(stream, limit))
+			count, copyErr := io.Copy(&content, io.LimitReader(stream, limit))
 			stream.Close()
 			if copyErr != nil {
 				return LogResult{}, copyErr
 			}
 			if count >= limit {
 				response.Truncated = true
-				result.WriteString("\n[该容器日志达到 1 MiB 显示上限]\n")
+				content.WriteString("\n[该容器日志达到 1 MiB 显示上限]\n")
 			}
-			result.WriteString("\n")
+			content.WriteString("\n")
 		}
 	}
-	if result.Len() == 0 {
-		response.Archived = run.ExecutionStatus != "pending" && run.ExecutionStatus != "running"
-		db, err := l.GetDB()
-		if err != nil {
-			return LogResult{}, err
+	if !found {
+		lines := strings.Split(strings.TrimRight(record.K8sLog, "\n"), "\n")
+		if int64(len(lines)) > tailLines {
+			lines = lines[len(lines)-int(tailLines):]
 		}
-		var logs []entity.RegistryRepositoryDeployRuleMatchLog
-		query := dao.Use(db).RegistryRepositoryDeployRuleMatchLog
-		if err := query.WithContext(ctx).Where(query.RepositoryID.Eq(run.RepositoryID), query.WorkflowRunID.Eq(run.WorkflowRunID), query.WorkflowTaskKey.Neq("")).Order(query.ID).Scan(&logs); err != nil {
-			return LogResult{}, err
+		content.WriteString(strings.Join(lines, "\n"))
+		if content.Len() == 0 {
+			content.WriteString(record.FailureReason)
 		}
-		for _, log := range logs {
-			lines := strings.Split(strings.TrimRight(log.K8sLog, "\n"), "\n")
-			if int64(len(lines)) > tailLines {
-				lines = lines[len(lines)-int(tailLines):]
-			}
-			fmt.Fprintf(&result, "%s (%s)\n%s\n", log.WorkflowTaskKey, log.ExecutionStatus, strings.Join(lines, "\n"))
-		}
-		if result.Len() == 0 {
-			result.WriteString("暂无任务日志")
+		if content.Len() == 0 {
+			content.WriteString("暂无任务日志")
 		}
 	}
-	response.Log = result.String()
+	response.Log = content.String()
 	return response, nil
 }
 
 // persistTaskResults runs before ordinary release resources are removed. It keeps
 // bounded logs and distinguishes completed, failed and never-started tasks.
-func (l *Executor) persistTaskResults(client kubernetes.Interface, run entity.RegistryRepositoryDeployRuleMatchLog) {
+func (l *Executor) persistTaskResults(client kubernetes.Interface, run entity.RegistryRepositoryDeployRuleMatchLog, installed *release.Release) error {
 	if err := l.writable(); err != nil {
-		return
-	}
-	db, err := l.GetDB()
-	if err != nil {
-		slog.Error("save workflow task results", "error", err)
-		return
+		return err
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	pods, err := client.CoreV1().Pods(executionNamespace).List(ctx, metav1.ListOptions{LabelSelector: "w7.cc/workflow-run=wf-" + run.WorkflowRunID})
-	if err != nil {
-		slog.Error("read workflow task results", "error", err)
-		return
-	}
+	pods, podErr := client.CoreV1().Pods(executionNamespace).List(ctx, metav1.ListOptions{LabelSelector: "w7.cc/workflow-run=wf-" + run.WorkflowRunID})
 	config, err := l.decodeConfig(run.EncryptedConfigSnapshot)
 	if err != nil {
 		slog.Error("read workflow result configuration", "error", err)
-		return
+		return err
 	}
 	tasks := map[string]Task{}
 	for _, task := range config.Tasks {
 		tasks[task.ID] = task
 	}
-	type taskResult struct{ status, log, digest string }
+	type taskResult struct{ status, log, digest, reason string }
 	results := map[string]taskResult{}
+	// Helm records completed hooks before moving on to the next execution group.
+	// Keep those results even when completed Pods have disappeared or cannot be listed.
+	if installed != nil {
+		for _, hook := range installed.Hooks {
+			if hook.Kind != "Job" || hook.LastRun.Phase == release.HookPhaseUnknown || hook.LastRun.Phase == "" {
+				continue
+			}
+			var job batchv1.Job
+			if err := yaml.Unmarshal([]byte(hook.Manifest), &job); err != nil {
+				return err
+			}
+			for _, container := range job.Spec.Template.Spec.Containers {
+				result := taskResult{status: "unknown", reason: "执行组已启动，但未获取到该任务的容器结果"}
+				if hook.LastRun.Phase == release.HookPhaseSucceeded {
+					result.status = "succeeded"
+					result.reason = ""
+				}
+				if previous, ok := results[container.Name]; !ok || previous.status != "succeeded" {
+					results[container.Name] = result
+				}
+			}
+		}
+	}
 	tail, limit := int64(100), int64(16384)
+	if pods == nil {
+		pods = &corev1.PodList{}
+	}
 	for _, pod := range pods.Items {
 		for _, container := range pod.Spec.Containers {
 			result := taskResult{status: "failed", log: fmt.Sprintf("%s / %s\n", pod.Name, container.Name)}
@@ -531,12 +540,19 @@ func (l *Executor) persistTaskResults(client kubernetes.Interface, run entity.Re
 						result.status = "succeeded"
 					}
 					result.log += fmt.Sprintf("退出码: %d\n", state.State.Terminated.ExitCode)
+					if result.status == "failed" {
+						result.reason = fmt.Sprintf("%s：%s（退出码 %d）", state.State.Terminated.Reason, state.State.Terminated.Message, state.State.Terminated.ExitCode)
+					}
 					if tasks[container.Name].Action == ActionBuild {
 						_, digest, found := strings.Cut(strings.TrimSpace(state.State.Terminated.Message), "@")
 						if found && validDigest(digest) {
 							result.digest = digest
 						}
 					}
+				}
+				if state.Name == container.Name && state.State.Waiting != nil {
+					result.reason = state.State.Waiting.Reason + ": " + state.State.Waiting.Message
+					result.log += result.reason + "\n"
 				}
 			}
 			stream, err := client.CoreV1().Pods(executionNamespace).GetLogs(pod.Name, &corev1.PodLogOptions{Container: container.Name, TailLines: &tail, LimitBytes: &limit}).Stream(ctx)
@@ -547,28 +563,38 @@ func (l *Executor) persistTaskResults(client kubernetes.Interface, run entity.Re
 					result.log += string(content)
 				}
 			}
-			results[container.Name] = result
+			if previous, ok := results[container.Name]; !ok || previous.status != "succeeded" || result.status == "succeeded" {
+				results[container.Name] = result
+			}
 		}
 	}
 	var logs []entity.RegistryRepositoryDeployRuleMatchLog
-	query := dao.Use(db).RegistryRepositoryDeployRuleMatchLog
+	query := dao.Q.RegistryRepositoryDeployRuleMatchLog
 	if err := query.Where(query.WorkflowRunID.Eq(run.WorkflowRunID), query.WorkflowTaskKey.Neq("")).Scan(&logs); err != nil {
 		slog.Error("read workflow task logs", "error", err)
-		return
+		return err
 	}
 	for _, log := range logs {
 		result, ok := results[log.WorkflowTaskKey]
+		if !ok && (log.ExecutionStatus == "succeeded" || log.ExecutionStatus == "failed") {
+			continue
+		}
 		if !ok {
-			result = taskResult{status: "skipped", log: "前置阶段失败或执行未启动，本任务未执行"}
+			if podErr != nil {
+				result = taskResult{status: "unknown", reason: "未能读取容器状态：" + podErr.Error()}
+			} else {
+				result = taskResult{status: "skipped", reason: "前置执行组失败或流程未启动，本任务未执行"}
+			}
 		}
 		outputTag, outputDigest := log.BuildOutputTag, log.BuildOutputDigest
 		if result.digest != "" {
 			outputTag, outputDigest = run.TriggerTag+tasks[log.WorkflowTaskKey].TagSuffix, result.digest
 		}
-		if _, err := query.Where(query.ID.Eq(log.ID)).UpdateSimple(query.UpdatedAt.Value(time.Now()), query.ExecutionStatus.Value(result.status), query.K8sLog.Value(strings.TrimSpace(result.log)), query.BuildOutputTag.Value(outputTag), query.BuildOutputDigest.Value(outputDigest)); err != nil {
-			slog.Error("save workflow task result", "error", err)
+		if _, err := query.Where(query.ID.Eq(log.ID)).UpdateSimple(query.UpdatedAt.Value(time.Now()), query.ExecutionStatus.Value(result.status), query.FailureReason.Value(result.reason), query.K8sLog.Value(strings.TrimSpace(result.log)), query.BuildOutputTag.Value(outputTag), query.BuildOutputDigest.Value(outputDigest)); err != nil {
+			return err
 		}
 	}
+	return podErr
 }
 
 // OnImagePushed receives the source image and task credentials, then queues execution.

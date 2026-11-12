@@ -10,6 +10,7 @@ import (
 	"github.com/w7panel/w7panel-zpk/app/registry/http/controller"
 	"github.com/w7panel/w7panel-zpk/app/registry/logic"
 	respologic "github.com/w7panel/w7panel-zpk/app/system/logic"
+	workflowmodule "github.com/w7panel/w7panel-zpk/app/workflow"
 	"github.com/w7panel/w7panel-zpk/common/accessor"
 	"github.com/w7panel/w7panel-zpk/common/dao"
 	"github.com/w7panel/w7panel-zpk/common/entity"
@@ -51,17 +52,6 @@ func (p Provider) registerRoutes(httpServer *httpserver.Server) {
 		api.POST("/repository/tags/list", controller.Repository{}.Tags)
 		api.POST("/repository/tags/del", controller.Repository{}.DelTag)
 		api.POST("/repository/tags/batch-del", controller.Repository{}.BatchDelTags)
-
-		api.Any("/repository/deploy_rule/k8s/proxy/*path", controller.Deploy{}.K8sProxy)
-		api.POST("/repository/deploy_rule/k8s/namespaces", controller.Deploy{}.GetK8sNamespace)
-		api.POST("/repository/deploy_rule/k8s/apps", controller.Deploy{}.GetK8sApps)
-		api.POST("/repository/deploy_rule/k8s/app-containers", controller.Deploy{}.GetK8sAppContainers)
-		api.POST("/repository/deploy_rule/add", controller.Deploy{}.AddRule)
-		api.POST("/repository/deploy_rule/info", controller.Deploy{}.QueryRule)
-		api.POST("/repository/deploy_rule/list", controller.Deploy{}.ListRule)
-		api.POST("/repository/deploy_rule/edit", controller.Deploy{}.EditRule)
-		api.POST("/repository/deploy_rule/del", controller.Deploy{}.DelRule)
-		api.POST("/repository/deploy_rule/deploy-log", controller.Deploy{}.RuleDeployLog)
 
 		api.GET("/registry/info", controller.Info{}.RegistryInfo)
 	})
@@ -127,7 +117,7 @@ func (p Provider) initDefaultNamespace() {
 
 func (p Provider) initDb() {
 	runEnvType := facade.GetConfig().GetString("app.env")
-	if runEnvType != "debug" && respologic.CurrentDBMode(facade.GetConfig()) != respologic.DBModeMySQL {
+	if runEnvType != "debug" && !respologic.ShouldBlockWrites(facade.GetConfig()) {
 		db, err := facade.GetDbFactory().Channel("default")
 		if err != nil {
 			panic(err)
@@ -141,9 +131,7 @@ func (p Provider) initDb() {
 			&entity.RegistryRepository{},
 			&entity.RegistryNamespace{},
 			&entity.RegistryUserPermission{},
-			&entity.RegistryRepositoryDeployRule{},
 			&entity.RegistryRepositoryTag{},
-			&entity.RegistryRepositoryDeployRuleMatchLog{},
 		)
 		db.Config.DisableForeignKeyConstraintWhenMigrating = disableFK
 		if err != nil {
@@ -235,4 +223,8 @@ func (p Provider) Register(httpServer *httpserver.Server, console console.Consol
 
 	p.initDefaultNamespace()
 	p.initSuperAdmin()
+	workflowmodule.Provider{}.Register(httpServer, func(ctx *gin.Context, repositoryID int32) error {
+		_, err := (logic.Repository{}).GetByIdWithUser(int(repositoryID), logic2.User{}.GetUser(ctx))
+		return err
+	})
 }

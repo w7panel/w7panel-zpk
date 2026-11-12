@@ -12,18 +12,26 @@ const TableNameRegistryRepositoryDeployRule = "ims_registry_repository_deploy_ru
 
 // RegistryRepositoryDeployRule mapped from table <ims_registry_repository_deploy_rule>
 type RegistryRepositoryDeployRule struct {
-	ID                int32      `gorm:"column:id;primaryKey;autoIncrement:true" json:"id"`
-	RepositoryID      int32      `gorm:"column:repository_id;not null" json:"repository_id"`
-	DeployType        int32      `gorm:"column:deploy_type;not null;default:1" json:"deploy_type"`
-	MatchType         int32      `gorm:"column:match_type;not null" json:"match_type"`
-	TagName           string     `gorm:"column:tag_name;not null" json:"tag_name"`
-	K8sConfig         string     `gorm:"column:k8s_config" json:"k8s_config"`
-	K8sNamespace      string     `gorm:"column:k8s_namespace;not null" json:"k8s_namespace"`
-	K8sControllerType string     `gorm:"column:k8s_controller_type;not null" json:"k8s_controller_type"`
-	K8sAppName        string     `gorm:"column:k8s_app_name;not null" json:"k8s_app_name"`
-	K8sContainerName  string     `gorm:"column:k8s_container_name;not null" json:"k8s_container_name"`
-	CreatedAt         time.Time  `gorm:"column:created_at;not null;default:CURRENT_TIMESTAMP" json:"created_at"`
-	LatestTriggerAt   *time.Time `gorm:"column:latest_trigger_at" json:"latest_trigger_at"`
+	ID                     int32      `gorm:"column:id;primaryKey;autoIncrement:true" json:"id"`
+	RepositoryID           int32      `gorm:"column:repository_id;not null" json:"repository_id"`
+	DeployType             int32      `gorm:"column:deploy_type;not null;default:1" json:"deploy_type"`
+	MatchType              int32      `gorm:"column:match_type;not null" json:"match_type"`
+	TagName                string     `gorm:"column:tag_name;not null" json:"tag_name"`
+	K8sConfig              string     `gorm:"column:k8s_config" json:"k8s_config"`
+	K8sNamespace           string     `gorm:"column:k8s_namespace;not null" json:"k8s_namespace"`
+	K8sControllerType      string     `gorm:"column:k8s_controller_type;not null" json:"k8s_controller_type"`
+	K8sAppName             string     `gorm:"column:k8s_app_name;not null" json:"k8s_app_name"`
+	K8sContainerName       string     `gorm:"column:k8s_container_name;not null" json:"k8s_container_name"`
+	CreatedAt              time.Time  `gorm:"column:created_at;not null;default:CURRENT_TIMESTAMP" json:"created_at"`
+	LatestTriggerAt        *time.Time `gorm:"column:latest_trigger_at" json:"latest_trigger_at"`
+	WorkflowTaskKey        string     `gorm:"column:workflow_task_key;size:40" json:"task_key"`           // 工作流任务稳定标识，供镜像来源和执行记录引用
+	ExecutionOrder         int32      `gorm:"column:execution_order;default:1" json:"stage"`              // 执行分组顺序，数字小的先执行，同值并行
+	TaskAction             string     `gorm:"column:task_action;size:20;default:deploy" json:"action"`    // 任务动作：deploy 部署应用，build 镜像重构
+	ImageSource            string     `gorm:"column:image_source;size:20;default:original" json:"source"` // 镜像来源：original 本轮触发镜像，task 指定构建任务产物
+	SourceBuildTaskKey     string     `gorm:"column:source_build_task_key;size:40" json:"source_task"`    // 来源构建任务的稳定标识，仅 image_source=task 时使用
+	DockerfileInstructions string     `gorm:"column:dockerfile_instructions;type:text" json:"dockerfile"` // 镜像重构追加的 Dockerfile 指令，不包含系统生成的 FROM
+	OutputTagSuffix        string     `gorm:"column:output_tag_suffix;size:100" json:"tag_suffix"`        // 输出 tag 相对本轮触发 tag 的后缀，空值覆盖原 tag
+	TaskName               string     `gorm:"column:task_name;size:120" json:"name"`                      // 任务展示名称，改名不改变任务稳定标识
 }
 
 // TableName RegistryRepositoryDeployRule's table name

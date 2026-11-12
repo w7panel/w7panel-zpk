@@ -138,3 +138,11 @@ HTTPS 默认验证证书，自签名证书可用 `--ca /path/to/ca.pem`；
 ### 2026-11-10 安装摘要端口
 
 普通安装 info 的 `install_formulas[].ports` 返回各应用 `container-v2` 中普通容器的端口列表，字段结构为 Kubernetes ContainerPort，跳过初始化容器，按声明顺序排列；无端口返回空数组。面板可据此解析对应子应用的 `%PORT%`，不需要新增 manifest 请求。
+
+## 镜像自动任务
+
+镜像仓库支持按上传事件执行多阶段部署与镜像重构任务。工作流业务统一位于 `app/workflow`，使用嵌入式 Helm 模板和保存时生成的 Helm 包，复用既有规则表、规则日志表；entity 和 DAO 仍由 `common` 统一维护。配置、部署权限、数据库字段升级及验证方法见 [镜像自动任务模块说明](app/workflow/README.md)。
+
+## 数据库结构自动补齐
+
+非 debug 环境启动时，respo、registry 和 workflow Provider 对 SQLite、MySQL 均执行各自的结构补齐，不再跳过 MySQL。数据库切换禁写期间跳过自动结构变更；结构处理失败会阻止正常启动。此行为沿用各模块已有迁移方式，不需要额外执行迁移命令。

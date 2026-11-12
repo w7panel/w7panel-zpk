@@ -231,6 +231,11 @@ func (c Repository) Tags(ctx *gin.Context) {
 	repositoryName := logic2.BuildRepositoryName(curRepository.Name, curRepository.Namespace)
 	registryClient := logic2.GetDefaultRegistryClient()
 	tags, _ := registryClient.ListTags(repositoryName)
+	rebuiltImages, imageErr := (logic.Repository{}).RebuiltImages(curRepository.ID)
+	if imageErr != nil {
+		c.JsonResponseWithServerError(ctx, imageErr)
+		return
+	}
 	tagInfos := make([]logic.TagInfo, 0)
 	totalCount := 0
 	if tags != nil {
@@ -271,6 +276,7 @@ func (c Repository) Tags(ctx *gin.Context) {
 				tagInfo.UpdatedAt = tagUpdateTimeMap[tag].Format(time.RFC3339)
 			}
 			tagInfos = append(tagInfos, logic.TagInfo{
+				Rebuilt:        rebuiltImages[tag],
 				RepositoryName: curRepository.Name,
 				TagName:        tagInfo.TagName,
 				Manifest:       manifest,

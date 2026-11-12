@@ -16,6 +16,7 @@ type RegistryRepositoryTag struct {
 	RepositoryID int32      `gorm:"column:repository_id;not null" json:"repository_id"`
 	Name         string     `gorm:"column:name;not null" json:"name"`
 	CrearedAt    time.Time  `gorm:"column:creared_at;not null;default:CURRENT_TIMESTAMP" json:"creared_at"`
+	IsRebuilt    bool       `gorm:"column:is_rebuilt;not null;default:false" json:"is_rebuilt"` // 当前 tag 是否为工作流重构产物，外部上传后清除
 	LatestPushAt *time.Time `gorm:"column:latest_push_at" json:"latest_push_at"`
 }
 

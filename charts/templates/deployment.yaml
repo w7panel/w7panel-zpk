@@ -72,6 +72,12 @@ spec:
               value: /home/zpk/cert/registry-cert.pem
             - name: WEBHOOK_TOKEN
               value: {{ .Values.global.WEBHOOK_TOKEN }}
+            - name: WORKFLOW_ENABLED
+              value: {{ .Values.workflow.enabled | quote }}
+            - name: WORKFLOW_BUILD_IMAGE
+              value: {{ .Values.workflow.buildImage | quote }}
+            - name: WORKFLOW_DEPLOY_IMAGE
+              value: {{ .Values.workflow.deployImage | quote }}
             - name: DEPOT_LOCAL_BASE_DIR
               value: /home/zpk-storage
             - name: DEPOT_MARKET_DOMAIN

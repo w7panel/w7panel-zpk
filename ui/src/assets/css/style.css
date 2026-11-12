@@ -736,3 +736,8 @@ a,
     background: #e5e6eb !important;
     border-color: transparent !important;
 }
+
+.zpk-delete-popconfirm .arco-btn-primary.arco-btn-status-danger {
+    background-color: rgb(var(--danger-6));
+    border-color: transparent;
+}

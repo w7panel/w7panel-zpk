@@ -12,11 +12,23 @@ const TableNameRegistryRepositoryDeployRuleMatchLog = "ims_registry_repository_d
 
 // RegistryRepositoryDeployRuleMatchLog mapped from table <ims_registry_repository_deploy_rule_match_log>
 type RegistryRepositoryDeployRuleMatchLog struct {
-	ID        int32     `gorm:"column:id;primaryKey;autoIncrement:true" json:"id"`
-	RuleID    int32     `gorm:"column:rule_id;not null" json:"rule_id"`
-	ImageName string    `gorm:"column:image_name;not null" json:"image_name"`
-	K8sLog    string    `gorm:"column:k8s_log" json:"k8s_log"`
-	CreatedAt time.Time `gorm:"column:created_at;not null;default:CURRENT_TIMESTAMP" json:"created_at"`
+	ID                      int32     `gorm:"column:id;primaryKey;autoIncrement:true" json:"id"`
+	RuleID                  int32     `gorm:"column:rule_id;not null" json:"rule_id"`
+	ImageName               string    `gorm:"column:image_name;not null" json:"image_name"`
+	K8sLog                  string    `gorm:"column:k8s_log" json:"k8s_log"`
+	CreatedAt               time.Time `gorm:"column:created_at;not null;default:CURRENT_TIMESTAMP" json:"created_at"`
+	BuildOutputTag          string    `gorm:"column:build_output_tag;size:128;index" json:"output_tag"`                                            // 构建任务实际推送的镜像 tag
+	BuildOutputDigest       string    `gorm:"column:build_output_digest;size:80" json:"output_digest"`                                             // 构建任务推送产物的 sha256 digest
+	WorkflowRunID           string    `gorm:"column:workflow_run_id;size:40;uniqueIndex:workflow_run_task,priority:1;default:null" json:"run_id"`  // 本轮流程唯一标识，关联汇总记录及全部任务记录，旧日志为 NULL
+	WorkflowTaskKey         string    `gorm:"column:workflow_task_key;size:40;uniqueIndex:workflow_run_task,priority:2;default:''" json:"task_id"` // 对应规则的工作流任务标识，空值表示整轮流程汇总记录
+	RepositoryID            int32     `gorm:"column:repository_id;index" json:"repository_id"`
+	TriggerRepository       string    `gorm:"column:trigger_repository;size:255" json:"repository"`    // 本轮触发镜像仓库名快照，不含 registry 域名
+	TriggerTag              string    `gorm:"column:trigger_tag;size:128" json:"tag"`                  // 本轮触发事件的原始镜像 tag
+	TriggerDigest           string    `gorm:"column:trigger_digest;size:80" json:"digest"`             // 本轮触发原镜像的 sha256 digest，不是构建输出 digest
+	ExecutionStatus         string    `gorm:"column:execution_status;index;size:20" json:"status"`     // 执行状态：pending 排队，running 执行中，succeeded 成功，failed 失败，skipped 跳过
+	FailureReason           string    `gorm:"column:failure_reason;type:text" json:"error"`            // 执行失败或中断原因，不保存完整任务日志
+	EncryptedConfigSnapshot string    `gorm:"column:encrypted_config_snapshot;type:longtext" json:"-"` // 本轮加密任务配置快照，仅汇总记录保存，执行不受后续编辑影响
+	UpdatedAt               time.Time `gorm:"column:updated_at" json:"updated_at"`
 }
 
 // TableName RegistryRepositoryDeployRuleMatchLog's table name

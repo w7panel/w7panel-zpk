@@ -12,6 +12,7 @@ metadata:
     w7.cc/group-name: {{ $root.Release.Name }}
     w7.cc/job-source: appgroup
   annotations:
+    w7.cc/title: {{ $job.title | default $job.name | quote }}
   {{- if ne $job.type "custom" }}
     helm.sh/hook: {{ $job.type }}
     helm.sh/hook-weight: "{{ $job.weight }}"

@@ -110,3 +110,9 @@ global:
     rotateNonce: "20260509"
     commonName: registry.w7.com
     validDays: 36500
+
+# Temporary Jobs used by image automatic tasks.
+workflow:
+  enabled: true
+  buildImage: ccr.ccs.tencentyun.com/afan-public/kaniko:w7console-new5-26
+  deployImage: registry.k8s.io/kubectl:v1.33.0

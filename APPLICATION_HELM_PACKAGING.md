@@ -220,6 +220,8 @@ OCI repository 名为：
 
 ### 4.5 Shell 生命周期
 
+生成的脚本 Job 使用 `metadata.annotations["w7.cc/title"]` 保存脚本标题（`platform.shells[].title`），未填写标题时使用生成的任务名称；标题支持中文，通过 YAML 字符串转义保存。该规则同时适用于系统生成的包任务和手动触发脚本。
+
 `platform.shells[].type` 到 Helm hook 的映射：
 
 | manifest type | Helm hook | weight |

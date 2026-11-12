@@ -31,6 +31,7 @@ func newRegistryRepositoryTag(db *gorm.DB, opts ...gen.DOOption) registryReposit
 	_registryRepositoryTag.RepositoryID = field.NewInt32(tableName, "repository_id")
 	_registryRepositoryTag.Name = field.NewString(tableName, "name")
 	_registryRepositoryTag.CrearedAt = field.NewTime(tableName, "creared_at")
+	_registryRepositoryTag.IsRebuilt = field.NewBool(tableName, "is_rebuilt")
 	_registryRepositoryTag.LatestPushAt = field.NewTime(tableName, "latest_push_at")
 
 	_registryRepositoryTag.fillFieldMap()
@@ -46,6 +47,7 @@ type registryRepositoryTag struct {
 	RepositoryID field.Int32
 	Name         field.String
 	CrearedAt    field.Time
+	IsRebuilt    field.Bool
 	LatestPushAt field.Time
 
 	fieldMap map[string]field.Expr
@@ -67,6 +69,7 @@ func (r *registryRepositoryTag) updateTableName(table string) *registryRepositor
 	r.RepositoryID = field.NewInt32(table, "repository_id")
 	r.Name = field.NewString(table, "name")
 	r.CrearedAt = field.NewTime(table, "creared_at")
+	r.IsRebuilt = field.NewBool(table, "is_rebuilt")
 	r.LatestPushAt = field.NewTime(table, "latest_push_at")
 
 	r.fillFieldMap()
@@ -84,11 +87,12 @@ func (r *registryRepositoryTag) GetFieldByName(fieldName string) (field.OrderExp
 }
 
 func (r *registryRepositoryTag) fillFieldMap() {
-	r.fieldMap = make(map[string]field.Expr, 5)
+	r.fieldMap = make(map[string]field.Expr, 6)
 	r.fieldMap["id"] = r.ID
 	r.fieldMap["repository_id"] = r.RepositoryID
 	r.fieldMap["name"] = r.Name
 	r.fieldMap["creared_at"] = r.CrearedAt
+	r.fieldMap["is_rebuilt"] = r.IsRebuilt
 	r.fieldMap["latest_push_at"] = r.LatestPushAt
 }
 

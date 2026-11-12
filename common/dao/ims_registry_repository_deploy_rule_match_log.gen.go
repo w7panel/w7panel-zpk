@@ -32,6 +32,18 @@ func newRegistryRepositoryDeployRuleMatchLog(db *gorm.DB, opts ...gen.DOOption) 
 	_registryRepositoryDeployRuleMatchLog.ImageName = field.NewString(tableName, "image_name")
 	_registryRepositoryDeployRuleMatchLog.K8sLog = field.NewString(tableName, "k8s_log")
 	_registryRepositoryDeployRuleMatchLog.CreatedAt = field.NewTime(tableName, "created_at")
+	_registryRepositoryDeployRuleMatchLog.BuildOutputTag = field.NewString(tableName, "build_output_tag")
+	_registryRepositoryDeployRuleMatchLog.BuildOutputDigest = field.NewString(tableName, "build_output_digest")
+	_registryRepositoryDeployRuleMatchLog.WorkflowRunID = field.NewString(tableName, "workflow_run_id")
+	_registryRepositoryDeployRuleMatchLog.WorkflowTaskKey = field.NewString(tableName, "workflow_task_key")
+	_registryRepositoryDeployRuleMatchLog.RepositoryID = field.NewInt32(tableName, "repository_id")
+	_registryRepositoryDeployRuleMatchLog.TriggerRepository = field.NewString(tableName, "trigger_repository")
+	_registryRepositoryDeployRuleMatchLog.TriggerTag = field.NewString(tableName, "trigger_tag")
+	_registryRepositoryDeployRuleMatchLog.TriggerDigest = field.NewString(tableName, "trigger_digest")
+	_registryRepositoryDeployRuleMatchLog.ExecutionStatus = field.NewString(tableName, "execution_status")
+	_registryRepositoryDeployRuleMatchLog.FailureReason = field.NewString(tableName, "failure_reason")
+	_registryRepositoryDeployRuleMatchLog.EncryptedConfigSnapshot = field.NewString(tableName, "encrypted_config_snapshot")
+	_registryRepositoryDeployRuleMatchLog.UpdatedAt = field.NewTime(tableName, "updated_at")
 
 	_registryRepositoryDeployRuleMatchLog.fillFieldMap()
 
@@ -41,12 +53,24 @@ func newRegistryRepositoryDeployRuleMatchLog(db *gorm.DB, opts ...gen.DOOption) 
 type registryRepositoryDeployRuleMatchLog struct {
 	registryRepositoryDeployRuleMatchLogDo
 
-	ALL       field.Asterisk
-	ID        field.Int32
-	RuleID    field.Int32
-	ImageName field.String
-	K8sLog    field.String
-	CreatedAt field.Time
+	ALL                     field.Asterisk
+	ID                      field.Int32
+	RuleID                  field.Int32
+	ImageName               field.String
+	K8sLog                  field.String
+	CreatedAt               field.Time
+	BuildOutputTag          field.String
+	BuildOutputDigest       field.String
+	WorkflowRunID           field.String
+	WorkflowTaskKey         field.String
+	RepositoryID            field.Int32
+	TriggerRepository       field.String
+	TriggerTag              field.String
+	TriggerDigest           field.String
+	ExecutionStatus         field.String
+	FailureReason           field.String
+	EncryptedConfigSnapshot field.String
+	UpdatedAt               field.Time
 
 	fieldMap map[string]field.Expr
 }
@@ -68,6 +92,18 @@ func (r *registryRepositoryDeployRuleMatchLog) updateTableName(table string) *re
 	r.ImageName = field.NewString(table, "image_name")
 	r.K8sLog = field.NewString(table, "k8s_log")
 	r.CreatedAt = field.NewTime(table, "created_at")
+	r.BuildOutputTag = field.NewString(table, "build_output_tag")
+	r.BuildOutputDigest = field.NewString(table, "build_output_digest")
+	r.WorkflowRunID = field.NewString(table, "workflow_run_id")
+	r.WorkflowTaskKey = field.NewString(table, "workflow_task_key")
+	r.RepositoryID = field.NewInt32(table, "repository_id")
+	r.TriggerRepository = field.NewString(table, "trigger_repository")
+	r.TriggerTag = field.NewString(table, "trigger_tag")
+	r.TriggerDigest = field.NewString(table, "trigger_digest")
+	r.ExecutionStatus = field.NewString(table, "execution_status")
+	r.FailureReason = field.NewString(table, "failure_reason")
+	r.EncryptedConfigSnapshot = field.NewString(table, "encrypted_config_snapshot")
+	r.UpdatedAt = field.NewTime(table, "updated_at")
 
 	r.fillFieldMap()
 
@@ -84,12 +120,24 @@ func (r *registryRepositoryDeployRuleMatchLog) GetFieldByName(fieldName string) 
 }
 
 func (r *registryRepositoryDeployRuleMatchLog) fillFieldMap() {
-	r.fieldMap = make(map[string]field.Expr, 5)
+	r.fieldMap = make(map[string]field.Expr, 17)
 	r.fieldMap["id"] = r.ID
 	r.fieldMap["rule_id"] = r.RuleID
 	r.fieldMap["image_name"] = r.ImageName
 	r.fieldMap["k8s_log"] = r.K8sLog
 	r.fieldMap["created_at"] = r.CreatedAt
+	r.fieldMap["build_output_tag"] = r.BuildOutputTag
+	r.fieldMap["build_output_digest"] = r.BuildOutputDigest
+	r.fieldMap["workflow_run_id"] = r.WorkflowRunID
+	r.fieldMap["workflow_task_key"] = r.WorkflowTaskKey
+	r.fieldMap["repository_id"] = r.RepositoryID
+	r.fieldMap["trigger_repository"] = r.TriggerRepository
+	r.fieldMap["trigger_tag"] = r.TriggerTag
+	r.fieldMap["trigger_digest"] = r.TriggerDigest
+	r.fieldMap["execution_status"] = r.ExecutionStatus
+	r.fieldMap["failure_reason"] = r.FailureReason
+	r.fieldMap["encrypted_config_snapshot"] = r.EncryptedConfigSnapshot
+	r.fieldMap["updated_at"] = r.UpdatedAt
 }
 
 func (r registryRepositoryDeployRuleMatchLog) clone(db *gorm.DB) registryRepositoryDeployRuleMatchLog {

@@ -52,6 +52,7 @@ relation:
       action:
         type: PermissionActionOption
   - table: registry_repository
+  # Workflow owns rule/log behavior; persisted models and DAO remain in common.
   - table: registry_repository_deploy_rule
   - table: registry_repository_tag
   - table: registry_repository_deploy_rule_match_log

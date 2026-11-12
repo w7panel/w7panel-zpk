@@ -39,6 +39,14 @@ func newRegistryRepositoryDeployRule(db *gorm.DB, opts ...gen.DOOption) registry
 	_registryRepositoryDeployRule.K8sContainerName = field.NewString(tableName, "k8s_container_name")
 	_registryRepositoryDeployRule.CreatedAt = field.NewTime(tableName, "created_at")
 	_registryRepositoryDeployRule.LatestTriggerAt = field.NewTime(tableName, "latest_trigger_at")
+	_registryRepositoryDeployRule.WorkflowTaskKey = field.NewString(tableName, "workflow_task_key")
+	_registryRepositoryDeployRule.ExecutionOrder = field.NewInt32(tableName, "execution_order")
+	_registryRepositoryDeployRule.TaskAction = field.NewString(tableName, "task_action")
+	_registryRepositoryDeployRule.ImageSource = field.NewString(tableName, "image_source")
+	_registryRepositoryDeployRule.SourceBuildTaskKey = field.NewString(tableName, "source_build_task_key")
+	_registryRepositoryDeployRule.DockerfileInstructions = field.NewString(tableName, "dockerfile_instructions")
+	_registryRepositoryDeployRule.OutputTagSuffix = field.NewString(tableName, "output_tag_suffix")
+	_registryRepositoryDeployRule.TaskName = field.NewString(tableName, "task_name")
 
 	_registryRepositoryDeployRule.fillFieldMap()
 
@@ -48,19 +56,27 @@ func newRegistryRepositoryDeployRule(db *gorm.DB, opts ...gen.DOOption) registry
 type registryRepositoryDeployRule struct {
 	registryRepositoryDeployRuleDo
 
-	ALL               field.Asterisk
-	ID                field.Int32
-	RepositoryID      field.Int32
-	DeployType        field.Int32
-	MatchType         field.Int32
-	TagName           field.String
-	K8sConfig         field.String
-	K8sNamespace      field.String
-	K8sControllerType field.String
-	K8sAppName        field.String
-	K8sContainerName  field.String
-	CreatedAt         field.Time
-	LatestTriggerAt   field.Time
+	ALL                    field.Asterisk
+	ID                     field.Int32
+	RepositoryID           field.Int32
+	DeployType             field.Int32
+	MatchType              field.Int32
+	TagName                field.String
+	K8sConfig              field.String
+	K8sNamespace           field.String
+	K8sControllerType      field.String
+	K8sAppName             field.String
+	K8sContainerName       field.String
+	CreatedAt              field.Time
+	LatestTriggerAt        field.Time
+	WorkflowTaskKey        field.String
+	ExecutionOrder         field.Int32
+	TaskAction             field.String
+	ImageSource            field.String
+	SourceBuildTaskKey     field.String
+	DockerfileInstructions field.String
+	OutputTagSuffix        field.String
+	TaskName               field.String
 
 	fieldMap map[string]field.Expr
 }
@@ -89,6 +105,14 @@ func (r *registryRepositoryDeployRule) updateTableName(table string) *registryRe
 	r.K8sContainerName = field.NewString(table, "k8s_container_name")
 	r.CreatedAt = field.NewTime(table, "created_at")
 	r.LatestTriggerAt = field.NewTime(table, "latest_trigger_at")
+	r.WorkflowTaskKey = field.NewString(table, "workflow_task_key")
+	r.ExecutionOrder = field.NewInt32(table, "execution_order")
+	r.TaskAction = field.NewString(table, "task_action")
+	r.ImageSource = field.NewString(table, "image_source")
+	r.SourceBuildTaskKey = field.NewString(table, "source_build_task_key")
+	r.DockerfileInstructions = field.NewString(table, "dockerfile_instructions")
+	r.OutputTagSuffix = field.NewString(table, "output_tag_suffix")
+	r.TaskName = field.NewString(table, "task_name")
 
 	r.fillFieldMap()
 
@@ -105,7 +129,7 @@ func (r *registryRepositoryDeployRule) GetFieldByName(fieldName string) (field.O
 }
 
 func (r *registryRepositoryDeployRule) fillFieldMap() {
-	r.fieldMap = make(map[string]field.Expr, 12)
+	r.fieldMap = make(map[string]field.Expr, 20)
 	r.fieldMap["id"] = r.ID
 	r.fieldMap["repository_id"] = r.RepositoryID
 	r.fieldMap["deploy_type"] = r.DeployType
@@ -118,6 +142,14 @@ func (r *registryRepositoryDeployRule) fillFieldMap() {
 	r.fieldMap["k8s_container_name"] = r.K8sContainerName
 	r.fieldMap["created_at"] = r.CreatedAt
 	r.fieldMap["latest_trigger_at"] = r.LatestTriggerAt
+	r.fieldMap["workflow_task_key"] = r.WorkflowTaskKey
+	r.fieldMap["execution_order"] = r.ExecutionOrder
+	r.fieldMap["task_action"] = r.TaskAction
+	r.fieldMap["image_source"] = r.ImageSource
+	r.fieldMap["source_build_task_key"] = r.SourceBuildTaskKey
+	r.fieldMap["dockerfile_instructions"] = r.DockerfileInstructions
+	r.fieldMap["output_tag_suffix"] = r.OutputTagSuffix
+	r.fieldMap["task_name"] = r.TaskName
 }
 
 func (r registryRepositoryDeployRule) clone(db *gorm.DB) registryRepositoryDeployRule {

@@ -23,6 +23,7 @@ import (
 )
 
 type TagInfo struct {
+	Rebuilt        bool
 	RepositoryName string
 	TagName        string
 	Digest         string
@@ -36,6 +37,16 @@ type TagInfo struct {
 
 type Repository struct {
 	logic.Logic
+}
+
+func (l Repository) SetRebuilt(id int32, tag string, rebuilt bool) error {
+	db, err := facade.GetDbFactory().Channel("default")
+	if err != nil {
+		return err
+	}
+	query := dao.Use(db).RegistryRepositoryTag
+	_, err = query.Where(query.RepositoryID.Eq(id), query.Name.Eq(tag)).Update(query.IsRebuilt, rebuilt)
+	return err
 }
 
 var repositoryPushLocks sync.Map
@@ -320,4 +331,18 @@ func (l Repository) GetRepositoryTagInfo(repositoryName string, tag string, mani
 		UpdatedAt: updatedAt,
 		Size:      size,
 	}, nil
+}
+
+// RebuiltImages returns the current rebuild state of image versions in a repository.
+func (l Repository) RebuiltImages(repositoryID int32) (map[string]bool, error) {
+	query := dao.Q.RegistryRepositoryTag
+	tags, err := query.Where(query.RepositoryID.Eq(repositoryID), query.IsRebuilt.Is(true)).Find()
+	if err != nil {
+		return nil, err
+	}
+	result := make(map[string]bool, len(tags))
+	for _, tag := range tags {
+		result[tag.Name] = true
+	}
+	return result, nil
 }

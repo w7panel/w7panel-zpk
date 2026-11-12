@@ -39,6 +39,7 @@
                                 <template #cell="{ record }">
                                     <a-popover position="bl" content-class="registry-version-popover">
                                         <span class="c-blue cursor">{{ record.TagName }}</span>
+                                        <a-tag v-if="record.Rebuilt" color="purple" size="small" class="ml-10">重构</a-tag>
                                         <template #content>
                                             <a-form :model="record" label-align="left" :label-col-props="{ span: 6, flex: '0 0 160px' }"
                                                 :wrapper-col-props="{ span: 18, flex: '1' }" class="registry-detail-form">
@@ -136,46 +137,8 @@
                         </a-form>
                     </a-spin>
                 </a-tab-pane>
-                <a-tab-pane key="build" title="镜像部署" v-if="hasAccess(data.user_id)">
-                    <div class="zpk-toolbar-left">
-                        <a-button type="primary" @click="openBuildForm()">
-                            <template #icon><icon-plus /></template>
-                            新增自动部署任务
-                        </a-button>
-                    </div>
-                    <a-table :loading="loading" :data="builds" class="mt-20 table-header" style="width: 100%"
-                        :pagination="false" row-key="id">
-                        <template #columns>
-                            <a-table-column title="应用">
-                                <template #cell="{ record }">
-                                    <span class="c-blue cursor" @click="showLog(record)">{{ record.k8s_app_name }}</span>
-                                </template>
-                            </a-table-column>
-
-                            <a-table-column title="触发方式">
-                                <template #cell="{ record }">{{ record.deploy_type_txt }}</template>
-                            </a-table-column>
-                            <a-table-column title="上次执行时间">
-                                <template #cell="{ record }">{{ record.lastrun }}</template>
-                            </a-table-column>
-                            <a-table-column title="创建时间">
-                                <template #cell="{ record }">{{ record.created }}</template>
-                            </a-table-column>
-
-                            <a-table-column title="操作">
-                                <template #cell="{ record }">
-                                    <a-button type="text" @click="getBuildDetail(record)">详情</a-button>
-                                    <a-button type="text" @click="openBuildForm(record)">修改</a-button>
-                                    <a-popconfirm content="确认要删除吗" type="warning" ok-text="确定"
-                                        cancel-text="取消" content-class="zpk-delete-popconfirm"
-                                        :ok-button-props="{ status: 'danger' }"
-                                        :cancel-button-props="{ type: 'secondary' }" @ok="delBuild(record)">
-                                        <a-button type="text">删除</a-button>
-                                    </a-popconfirm>
-                                </template>
-                            </a-table-column>
-                        </template>
-                    </a-table>
+                <a-tab-pane key="build" title="镜像自动任务" v-if="hasAccess(data.user_id)">
+                    <image-tasks v-if="data.id" :key="data.id" :repository-id="Number(data.id)" />
                 </a-tab-pane>
             </a-tabs>
         </div>
@@ -384,16 +347,17 @@ import myAxios from "@/utils";
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
+import ImageTasks from '@/components/workflow/image-tasks.vue';
 import userMixin from "@/utils/user-mixin";
 import { messageError, messageSuccess } from "@/utils/ui-feedback";
-import { IconArrowLeft, IconCopy, IconEdit, IconPlus } from '@arco-design/web-vue/es/icon';
+import { IconArrowLeft, IconCopy, IconEdit } from '@arco-design/web-vue/es/icon';
 
 export default {
     components: {
+        ImageTasks,
         IconArrowLeft,
         IconCopy,
         IconEdit,
-        IconPlus,
     },
     data() {
         return {

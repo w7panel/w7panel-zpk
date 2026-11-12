@@ -107,7 +107,15 @@ CREATE TABLE `ims_registry_repository_deploy_rule` (
                                                        `k8s_app_name` varchar(255) NOT NULL,
                                                        `k8s_container_name` varchar(255) NOT NULL,
                                                        `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                                                       `latest_trigger_at` datetime DEFAULT NULL
+                                                       `latest_trigger_at` datetime DEFAULT NULL,
+ `workflow_task_key` varchar(40) DEFAULT NULL COMMENT '工作流任务稳定标识，供镜像来源和执行记录引用',
+ `execution_order` int DEFAULT 1 COMMENT '执行分组顺序，数字小的先执行，同值并行',
+ `task_action` varchar(20) DEFAULT 'deploy' COMMENT '任务动作：deploy 部署应用，build 镜像重构',
+ `image_source` varchar(20) DEFAULT 'original' COMMENT '镜像来源：original 本轮触发镜像，task 指定构建任务产物',
+ `source_build_task_key` varchar(40) DEFAULT NULL COMMENT '来源构建任务的稳定标识，仅 image_source=task 时使用',
+ `dockerfile_instructions` text COMMENT '镜像重构追加的 Dockerfile 指令，不包含系统生成的 FROM',
+ `output_tag_suffix` varchar(100) DEFAULT NULL COMMENT '输出 tag 相对本轮触发 tag 的后缀，空值覆盖原 tag',
+ `task_name` varchar(120) DEFAULT NULL COMMENT '任务展示名称，改名不改变任务稳定标识'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
@@ -121,7 +129,23 @@ CREATE TABLE `ims_registry_repository_deploy_rule_match_log` (
                                                                  `rule_id` int NOT NULL DEFAULT '0',
                                                                  `image_name` varchar(255) NOT NULL,
                                                                  `k8s_log` text,
-                                                                 `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP
+                                                                 `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ `workflow_run_id` varchar(40) DEFAULT NULL COMMENT '本轮流程唯一标识，关联汇总记录及全部任务记录，旧日志为 NULL',
+ `workflow_task_key` varchar(40) DEFAULT '' COMMENT '对应规则的工作流任务标识，空值表示整轮流程汇总记录',
+ `repository_id` int DEFAULT NULL,
+ `trigger_repository` varchar(255) DEFAULT NULL COMMENT '本轮触发镜像仓库名快照，不含 registry 域名',
+ `trigger_tag` varchar(128) DEFAULT NULL COMMENT '本轮触发事件的原始镜像 tag',
+ `trigger_digest` varchar(80) DEFAULT NULL COMMENT '本轮触发原镜像的 sha256 digest，不是构建输出 digest',
+ `execution_status` varchar(20) DEFAULT NULL COMMENT '执行状态：pending 排队，running 执行中，succeeded 成功，failed 失败，skipped 跳过',
+ `failure_reason` text COMMENT '执行失败或中断原因，不保存完整任务日志',
+ `encrypted_config_snapshot` longtext COMMENT '本轮加密任务配置快照，仅汇总记录保存，执行不受后续编辑影响',
+ `updated_at` datetime DEFAULT NULL,
+ `build_output_tag` varchar(128) DEFAULT NULL COMMENT '构建任务实际推送的镜像 tag',
+ `build_output_digest` varchar(80) DEFAULT NULL COMMENT '构建任务推送产物的 sha256 digest',
+ UNIQUE KEY `workflow_run_task` (`workflow_run_id`, `workflow_task_key`),
+ KEY `idx_workflow_repository` (`repository_id`),
+ KEY `idx_workflow_status` (`execution_status`),
+ KEY `idx_workflow_output_tag` (`build_output_tag`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
@@ -135,7 +159,8 @@ CREATE TABLE `ims_registry_repository_tag` (
                                                `repository_id` int NOT NULL DEFAULT '0',
                                                `name` varchar(255) NOT NULL,
                                                `creared_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                                               `latest_push_at` datetime DEFAULT NULL
+                                               `latest_push_at` datetime DEFAULT NULL,
+ `is_rebuilt` tinyint(1) NOT NULL DEFAULT 0 COMMENT '当前 tag 是否为工作流重构产物，外部上传后清除'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------

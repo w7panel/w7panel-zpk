@@ -23,7 +23,7 @@ type Provider struct {
 
 func (provider *Provider) initDb() {
 	runEnvType := facade.GetConfig().GetString("app.env")
-	if runEnvType != "debug" && logic2.CurrentDBMode(facade.GetConfig()) != logic2.DBModeMySQL {
+	if runEnvType != "debug" && !logic2.ShouldBlockWrites(facade.GetConfig()) {
 		db, err := facade.GetDbFactory().Channel("default")
 		if err != nil {
 			panic(err)

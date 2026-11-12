@@ -19,4 +19,9 @@ rules:
   - apiGroups: [ "w7panel.w7.com" ]
     resources: [ "appgroups" ]
     verbs: [ "get", "list", "watch" ]
+{{- if .Values.workflow.enabled }}
+  - apiGroups: [ "rbac.authorization.k8s.io" ]
+    resources: [ "roles", "rolebindings" ]
+    verbs: [ "get", "list", "watch", "create", "update", "patch", "delete" ]
+{{- end }}
 {{- end }}

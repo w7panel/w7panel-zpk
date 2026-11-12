@@ -45,16 +45,28 @@ data:
   deploy.sh: |
     #!/bin/sh
     set -eu
+    current_cluster_kubectl() {
+      service_account=/var/run/secrets/kubernetes.io/serviceaccount
+      [ -r "$service_account/token" ] && [ -r "$service_account/ca.crt" ] || { echo "无法读取当前集群 ServiceAccount 凭证" >&2; return 1; }
+      api_host="${KUBERNETES_SERVICE_HOST:?未提供当前集群 API 地址}"
+      case "$api_host" in *:*) api_host="[$api_host]";; esac
+      kubectl --kubeconfig=/dev/null \
+        --server="https://${api_host}:${KUBERNETES_SERVICE_PORT_HTTPS:-443}" \
+        --certificate-authority="$service_account/ca.crt" \
+        --token="$(cat "$service_account/token")" --request-timeout=60s "$@"
+    }
     image="$ORIGINAL_IMAGE"
     if [ "$SOURCE_TYPE" = task ]; then
-      image=$(kubectl -n "$RUN_NAMESPACE" get configmap "$RESULTS_NAME" -o "jsonpath={.data.${SOURCE_TASK}}")
+      image=$(current_cluster_kubectl -n "$RUN_NAMESPACE" get configmap "$RESULTS_NAME" -o "jsonpath={.data.${SOURCE_TASK}}")
       [ -n "$image" ] || { echo "来源任务没有构建结果" >&2; exit 1; }
     fi
-    if [ -f /target/config ]; then export KUBECONFIG=/target/config; fi
     set --
     previous_ifs="$IFS"
     IFS=,
     for container in $TARGET_CONTAINERS; do set -- "$@" "$container=$image"; done
     IFS="$previous_ifs"
-    kubectl --request-timeout=60s -n "$TARGET_NAMESPACE" set image "$TARGET_KIND/$TARGET_NAME" "$@"
-
+    if [ -f /target/config ]; then
+      kubectl --kubeconfig=/target/config --request-timeout=60s -n "$TARGET_NAMESPACE" set image "$TARGET_KIND/$TARGET_NAME" "$@"
+    else
+      current_cluster_kubectl -n "$TARGET_NAMESPACE" set image "$TARGET_KIND/$TARGET_NAME" "$@"
+    fi

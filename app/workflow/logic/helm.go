@@ -134,7 +134,7 @@ func (h Helm) configDigest(config Config) (string, error) {
 	content, err := json.Marshal(struct {
 		Version string `json:"version"`
 		Tasks   []Task `json:"tasks"`
-	}{Version: "workflow-values-credentials-v4", Tasks: tasks})
+	}{Version: "workflow-explicit-cluster-auth-v5", Tasks: tasks})
 	if err != nil {
 		return "", err
 	}

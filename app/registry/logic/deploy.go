@@ -42,43 +42,43 @@ func (Deploy) OnRepositoryPushed(payload registry.RegistryRepositoryWebHookPayLo
 	if tag.LatestPushAt != nil && !tag.LatestPushAt.IsZero() {
 		eventType = K8sDeployWhenTagUpdate
 	}
-	owner := Repository{}
-	host := strings.TrimRight(facade.GetConfig().GetString("registry_cli.default.external_domain"), "/")
-	imageRepository := host + "/" + payload.Event.Target.Repository
-	nativeURL, _ := url.Parse(facade.GetConfig().GetString("registry_cli.default.url"))
-	image := workflow.ImageContext{
+	repositoryLogic := Repository{}
+	registryHost := strings.TrimRight(facade.GetConfig().GetString("registry_cli.default.external_domain"), "/")
+	imageRepository := registryHost + "/" + payload.Event.Target.Repository
+	registryURL, _ := url.Parse(facade.GetConfig().GetString("registry_cli.default.url"))
+	sourceImage := workflow.ImageContext{
 		Reference:  imageRepository + "@" + payload.Event.Target.Digest,
-		Repository: imageRepository, Host: host,
-		PlainHTTP: nativeURL != nil && nativeURL.Scheme == "http",
+		Repository: imageRepository, Host: registryHost,
+		PlainHTTP: registryURL != nil && registryURL.Scheme == "http",
 	}
 	event := workflow.ImagePushed{
 		RepositoryID: repository.ID, Repository: payload.Event.Target.Repository,
 		Tag: payload.Event.Target.Tag, Digest: payload.Event.Target.Digest,
-		Actor: payload.Event.Actor.Name, EventID: payload.Event.ID, EventType: int(eventType), Image: image,
+		Actor: payload.Event.Actor.Name, EventID: payload.Event.ID, EventType: int(eventType), Image: sourceImage,
 	}
 	runID, err := event.RunID()
 	if err != nil {
 		slog.Error("identify image workflow", "error", err)
 		return
 	}
-	event.RegistryToken, err = (Permission{}).CreateToken(&entity.RegistryUser{Username: workflow.ActorPrefix + runID}, []registry.PermissionScope{{Type: "repository", Name: event.Repository, Actions: []string{"pull", "push"}}})
+	event.RegistryToken, err = (Permission{}).CreateToken(&entity.RegistryUser{Username: workflow.WorkflowBuildActorPrefix + runID}, []registry.PermissionScope{{Type: "repository", Name: event.Repository, Actions: []string{"pull", "push"}}})
 	if err != nil {
 		slog.Error("create workflow registry token", "error", err)
 		return
 	}
-	helper := workflow.Workflow{}
+	workflowLogic := workflow.Workflow{}
 	// OnImagePushed enqueues work; Helm execution happens in the background executor.
-	result, err := helper.OnImagePushed(event)
+	pushResult, err := workflowLogic.OnImagePushed(event)
 	if err != nil {
 		slog.Error("process workflow image push", "error", err)
 		return
 	}
-	if err := owner.SetRebuilt(repository.ID, event.Tag, result.Rebuilt); err != nil {
+	if err := repositoryLogic.SetRebuilt(repository.ID, event.Tag, pushResult.Rebuilt); err != nil {
 		slog.Error("record rebuilt image", "error", err)
 		return
 	}
-	if !result.Rebuilt {
-		(workflow.Deploy{}).DeployLegacy(repository.ID, payload.Event.Target.Tag, image.Reference, int(eventType))
+	if !pushResult.Rebuilt {
+		(workflow.Deploy{}).DeployLegacy(repository.ID, payload.Event.Target.Tag, sourceImage.Reference, int(eventType))
 	}
 }
 

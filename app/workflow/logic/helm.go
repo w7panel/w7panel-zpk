@@ -82,23 +82,23 @@ func (h Helm) GenerateChart(config Config) ([]byte, error) {
 			return nil, err
 		}
 	}
-	result, err := loader.LoadDir(rootDir)
+	workflowChart, err := loader.LoadDir(rootDir)
 	if err != nil {
 		return nil, err
 	}
-	digest, err := h.configDigest(config)
+	configDigest, err := h.configDigest(config)
 	if err != nil {
 		return nil, err
 	}
-	if result.Metadata.Annotations == nil {
-		result.Metadata.Annotations = map[string]string{}
+	if workflowChart.Metadata.Annotations == nil {
+		workflowChart.Metadata.Annotations = map[string]string{}
 	}
-	result.Metadata.Annotations[workflowConfigAnnotation] = digest
-	archive, err := chartutil.Save(result, directory)
+	workflowChart.Metadata.Annotations[workflowConfigAnnotation] = configDigest
+	chartArchivePath, err := chartutil.Save(workflowChart, directory)
 	if err != nil {
 		return nil, err
 	}
-	return os.ReadFile(archive)
+	return os.ReadFile(chartArchivePath)
 }
 
 // ChartPath is stable for a repository; only saving configuration replaces this file.
@@ -157,8 +157,8 @@ func (h Helm) SaveChart(repositoryID int32, config Config) (string, error) {
 }
 
 // writeChart atomically publishes a complete file. Run packages must never be overwritten.
-func (h Helm) writeChart(relative string, content []byte, replace bool) error {
-	filename, err := h.chartFilePath(relative)
+func (h Helm) writeChart(relativeChartPath string, content []byte, replaceExisting bool) error {
+	filename, err := h.chartFilePath(relativeChartPath)
 	if err != nil {
 		return err
 	}
@@ -182,7 +182,7 @@ func (h Helm) writeChart(relative string, content []byte, replace bool) error {
 	if err := file.Close(); err != nil {
 		return err
 	}
-	if replace {
+	if replaceExisting {
 		return os.Rename(temporary, filename)
 	}
 	return os.Link(temporary, filename)
@@ -190,53 +190,53 @@ func (h Helm) writeChart(relative string, content []byte, replace bool) error {
 
 // PinChart copies the saved package, without regenerating it, before enqueuing a run.
 func (h Helm) PinChart(repositoryID int32, runID string, config Config) error {
-	runPath, err := h.RunChartPath(repositoryID, runID)
+	runChartPath, err := h.RunChartPath(repositoryID, runID)
 	if err != nil {
 		return err
 	}
-	if pinned, err := h.LoadChart(runPath); err == nil {
-		return h.checkChartConfig(pinned, config)
+	if runChart, err := h.LoadChart(runChartPath); err == nil {
+		return h.checkChartConfig(runChart, config)
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
-	current, err := h.ChartPath(repositoryID)
+	currentChartPath, err := h.ChartPath(repositoryID)
 	if err != nil {
 		return err
 	}
-	filename, err := h.chartFilePath(current)
+	currentChartFile, err := h.chartFilePath(currentChartPath)
 	if err != nil {
 		return err
 	}
-	content, err := os.ReadFile(filename)
+	chartArchiveBytes, err := os.ReadFile(currentChartFile)
 	if err != nil {
 		return fmt.Errorf("读取当前工作流 Helm 包，请重新保存任务配置: %w", err)
 	}
-	result, err := loader.LoadArchive(bytes.NewReader(content))
+	workflowChart, err := loader.LoadArchive(bytes.NewReader(chartArchiveBytes))
 	if err != nil {
 		return fmt.Errorf("读取工作流 Helm 包: %w", err)
 	}
-	if err := h.checkChartConfig(result, config); err != nil {
+	if err := h.checkChartConfig(workflowChart, config); err != nil {
 		return err
 	}
-	if err := h.writeChart(runPath, content, false); err != nil {
+	if err := h.writeChart(runChartPath, chartArchiveBytes, false); err != nil {
 		if !errors.Is(err, os.ErrExist) {
 			return err
 		}
-		pinned, err := h.LoadChart(runPath)
+		runChart, err := h.LoadChart(runChartPath)
 		if err != nil {
 			return err
 		}
-		return h.checkChartConfig(pinned, config)
+		return h.checkChartConfig(runChart, config)
 	}
 	return nil
 }
 
-func (h Helm) checkChartConfig(result *chart.Chart, config Config) error {
-	digest, err := h.configDigest(config)
+func (h Helm) checkChartConfig(workflowChart *chart.Chart, config Config) error {
+	expectedConfigDigest, err := h.configDigest(config)
 	if err != nil {
 		return err
 	}
-	if result.Metadata.Annotations[workflowConfigAnnotation] != digest {
+	if workflowChart.Metadata.Annotations[workflowConfigAnnotation] != expectedConfigDigest {
 		return errors.New("工作流 Helm 包与任务配置不一致，请重新保存任务配置")
 	}
 	return nil
@@ -334,11 +334,11 @@ func (h Helm) LoadChart(relative string) (*chart.Chart, error) {
 	if err != nil {
 		return nil, fmt.Errorf("读取工作流 Helm 包: %w", err)
 	}
-	result, err := loader.LoadArchive(bytes.NewReader(content))
+	workflowChart, err := loader.LoadArchive(bytes.NewReader(content))
 	if err != nil {
 		return nil, fmt.Errorf("读取任务 Helm 包: %w", err)
 	}
-	return result, nil
+	return workflowChart, nil
 }
 
 func (h Helm) generateChartYaml(rootDir string) error {
@@ -417,19 +417,19 @@ func (h Helm) writeTemplateFile(rootDir, name, templateName string) error {
 }
 
 // Install owns the release lifecycle; collect runs before Helm removes its resources.
-func (h Helm) Install(ctx context.Context, run entity.RegistryRepositoryDeployRuleMatchLog, config Config, values map[string]interface{}, collect func(kubernetes.Interface, *release.Release) error) error {
+func (h Helm) Install(ctx context.Context, run entity.RegistryRepositoryDeployRuleMatchLog, config Config, values map[string]interface{}, collectTaskResults func(kubernetes.Interface, *release.Release) error) error {
 	// Use the service account, never the operator's local kubeconfig.
 	restConfig, err := rest.InClusterConfig()
 	if err != nil {
 		return err
 	}
-	getter := &clusterGetter{config: restConfig, namespace: executionNamespace}
-	cfg := new(action.Configuration)
-	if err = cfg.Init(getter, executionNamespace, "secret", func(format string, args ...interface{}) { slog.Debug(fmt.Sprintf(format, args...)) }); err != nil {
+	clusterConfigGetter := &clusterGetter{config: restConfig, namespace: executionNamespace}
+	helmConfig := new(action.Configuration)
+	if err = helmConfig.Init(clusterConfigGetter, executionNamespace, "secret", func(format string, args ...interface{}) { slog.Debug(fmt.Sprintf(format, args...)) }); err != nil {
 		return err
 	}
-	name := "wf-" + run.WorkflowRunID
-	if _, err = cfg.Releases.Last(name); err == nil {
+	releaseName := "wf-" + run.WorkflowRunID
+	if _, err = helmConfig.Releases.Last(releaseName); err == nil {
 		return errors.New("执行实例已经存在，拒绝重放")
 	} else if !errors.Is(err, driver.ErrReleaseNotFound) {
 		return err
@@ -437,9 +437,9 @@ func (h Helm) Install(ctx context.Context, run entity.RegistryRepositoryDeployRu
 	// Regular resources and Helm release metadata are transient. Hook Jobs retain
 	// logs for their TTL; execution snapshots remain in the existing log table.
 	defer func() {
-		uninstall := action.NewUninstall(cfg)
+		uninstall := action.NewUninstall(helmConfig)
 		uninstall.Timeout = time.Minute
-		if _, cleanupErr := uninstall.Run(name); cleanupErr != nil && !errors.Is(cleanupErr, driver.ErrReleaseNotFound) {
+		if _, cleanupErr := uninstall.Run(releaseName); cleanupErr != nil && !errors.Is(cleanupErr, driver.ErrReleaseNotFound) {
 			slog.Error("cleanup workflow release", "run", run.WorkflowRunID, "error", cleanupErr)
 		}
 	}()
@@ -447,10 +447,10 @@ func (h Helm) Install(ctx context.Context, run entity.RegistryRepositoryDeployRu
 	if err != nil {
 		return err
 	}
-	var installed *release.Release
-	if collect != nil {
+	var helmRelease *release.Release
+	if collectTaskResults != nil {
 		defer func() {
-			if err := collect(client, installed); err != nil {
+			if err := collectTaskResults(client, helmRelease); err != nil {
 				slog.Error("collect workflow task results", "run", run.WorkflowRunID, "error", err)
 			}
 		}()
@@ -460,24 +460,24 @@ func (h Helm) Install(ctx context.Context, run entity.RegistryRepositoryDeployRu
 	if err != nil {
 		return err
 	}
-	chart, err := h.LoadChart(chartPath)
+	workflowChart, err := h.LoadChart(chartPath)
 	if err != nil {
 		return err
 	}
-	if err := h.checkChartConfig(chart, config); err != nil {
+	if err := h.checkChartConfig(workflowChart, config); err != nil {
 		return err
 	}
-	install := action.NewInstall(cfg)
-	install.ReleaseName = name
+	install := action.NewInstall(helmConfig)
+	install.ReleaseName = releaseName
 	install.Namespace = executionNamespace
 	install.Timeout = 2 * time.Hour
 	install.Wait = true
 	install.WaitForJobs = true
-	installed, err = install.RunWithContext(ctx, chart, values)
+	helmRelease, err = install.RunWithContext(ctx, workflowChart, values)
 	if err != nil && ctx.Err() != nil {
 		cleanupCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		if cleanupErr := client.BatchV1().Jobs(executionNamespace).DeleteCollection(cleanupCtx, metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: "w7.cc/workflow-run=" + name}); cleanupErr != nil {
+		if cleanupErr := client.BatchV1().Jobs(executionNamespace).DeleteCollection(cleanupCtx, metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: "w7.cc/workflow-run=" + releaseName}); cleanupErr != nil {
 			slog.Error("stop timed out workflow", "run", run.WorkflowRunID, "error", cleanupErr)
 		}
 	}

@@ -43,7 +43,7 @@ type Deploy struct {
 }
 
 // DeployLegacy preserves direct deployment for rules not yet converted to workflows.
-func (l Deploy) DeployLegacy(repositoryID int32, tagName, imgName string, eventType int) {
+func (l Deploy) DeployLegacy(repositoryID int32, tagName, imageReference string, eventType int) {
 	// 兼容尚未转换为工作流的旧部署规则，沿用原有 tag 匹配和直接部署逻辑。
 	// 已转换的规则（WorkflowTaskKey 非空）由 Workflow.Trigger 通过 Helm 执行，此处跳过以避免重复部署。
 	deployType := int32(eventType)
@@ -59,33 +59,33 @@ func (l Deploy) DeployLegacy(repositoryID int32, tagName, imgName string, eventT
 		if rule.WorkflowTaskKey != "" {
 			continue
 		}
-		match := false
+		matchesTagRule := false
 		if deployType == K8sDeployWhenTagAdd && rule.MatchType == K8sDeployRuleTagMatchRegular {
-			reNum, err := regexp.Compile(rule.TagName)
+			tagPattern, err := regexp.Compile(rule.TagName)
 			if err != nil {
 				slog.Error("invalid deploy rule regex", "rule", rule.ID, "error", err)
 				continue
 			}
-			numbers := reNum.FindAllString(tagName, 1)
-			match = len(numbers) > 0
+			tagMatches := tagPattern.FindAllString(tagName, 1)
+			matchesTagRule = len(tagMatches) > 0
 		} else if deployType == K8sDeployWhenTagAdd && rule.MatchType == K8sDeployRuleTagMatchPrefix {
-			for _, itemRule := range strings.Split(rule.TagName, ",") {
-				if strings.HasPrefix(tagName, itemRule) {
-					match = true
+			for _, tagPrefix := range strings.Split(rule.TagName, ",") {
+				if strings.HasPrefix(tagName, tagPrefix) {
+					matchesTagRule = true
 					break
 				}
 			}
 		} else {
-			match = slices.Contains(strings.Split(rule.TagName, ","), tagName)
+			matchesTagRule = slices.Contains(strings.Split(rule.TagName, ","), tagName)
 		}
-		if match {
-			l.deployK8sApp(rule, imgName)
+		if matchesTagRule {
+			l.deployK8sApp(rule, imageReference)
 		}
 	}
 }
 
-func (l Deploy) deployK8sApp(rule *entity.RegistryRepositoryDeployRule, imgName string) {
-	log := "prepare patch image: " + imgName + "\n"
+func (l Deploy) deployK8sApp(rule *entity.RegistryRepositoryDeployRule, imageReference string) {
+	log := "prepare patch image: " + imageReference + "\n"
 
 	clientSet, err := l.GetK8sClient(rule.K8sConfig)
 	if err != nil {
@@ -97,7 +97,7 @@ func (l Deploy) deployK8sApp(rule *entity.RegistryRepositoryDeployRule, imgName 
 		defer cancel()
 		cluster := service.Kubernetes{Client: clientSet}
 		for _, container := range strings.Split(rule.K8sContainerName, ",") {
-			status, err := cluster.PatchImage(ctx, rule.K8sNamespace, rule.K8sControllerType, rule.K8sAppName, container, imgName)
+			status, err := cluster.PatchImage(ctx, rule.K8sNamespace, rule.K8sControllerType, rule.K8sAppName, container, imageReference)
 			if err != nil {
 				log += fmt.Sprintf("patch %s container %s image err: %v \n", rule.K8sControllerType, container, err)
 			} else {
@@ -117,13 +117,13 @@ func (l Deploy) deployK8sApp(rule *entity.RegistryRepositoryDeployRule, imgName 
 
 		err = tx.RegistryRepositoryDeployRuleMatchLog.Create(&entity.RegistryRepositoryDeployRuleMatchLog{
 			RuleID:    rule.ID,
-			ImageName: imgName,
+			ImageName: imageReference,
 			K8sLog:    log,
 		})
 		return err
 	})
 	if err != nil {
-		slog.Error("add registry repository deploy rule log err", "rule_id", rule.ID, "image", imgName, "err", err)
+		slog.Error("add registry repository deploy rule log err", "rule_id", rule.ID, "image", imageReference, "err", err)
 	}
 }
 
@@ -212,9 +212,9 @@ func (l Deploy) ValidateK8sConfig(content string) error {
 	return nil
 }
 
-func (l Deploy) Rule(id int32) (*entity.RegistryRepositoryDeployRule, error) {
+func (l Deploy) Rule(ruleID int32) (*entity.RegistryRepositoryDeployRule, error) {
 	query := dao.Q.RegistryRepositoryDeployRule
-	rule, err := query.Where(query.ID.Eq(id)).First()
+	rule, err := query.Where(query.ID.Eq(ruleID)).First()
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, errors.New("该规则不存在")
 	}
@@ -223,7 +223,7 @@ func (l Deploy) Rule(id int32) (*entity.RegistryRepositoryDeployRule, error) {
 
 func (l Deploy) SaveRule(rule entity.RegistryRepositoryDeployRule) error {
 	workflow := Workflow{}
-	if err := workflow.writable(); err != nil {
+	if err := workflow.checkWritesAllowed(); err != nil {
 		return err
 	}
 	if rule.ID != 0 {
@@ -231,11 +231,11 @@ func (l Deploy) SaveRule(rule entity.RegistryRepositoryDeployRule) error {
 		if err != nil {
 			return err
 		}
-		if err := workflow.LegacyWritable(existing.RepositoryID); err != nil {
+		if err := workflow.CheckLegacyRuleWritable(existing.RepositoryID); err != nil {
 			return err
 		}
 	}
-	if err := workflow.LegacyWritable(rule.RepositoryID); err != nil {
+	if err := workflow.CheckLegacyRuleWritable(rule.RepositoryID); err != nil {
 		return err
 	}
 	encrypted, err := l.EncryptK8sConfig(rule.K8sConfig)
@@ -252,21 +252,21 @@ func (l Deploy) SaveRule(rule entity.RegistryRepositoryDeployRule) error {
 }
 
 func (l Deploy) RuleInfo(rule *entity.RegistryRepositoryDeployRule) (*entity.RegistryRepositoryDeployRule, error) {
-	result := *rule
-	config, err := l.DecryptK8sConfig(result.K8sConfig)
+	decryptedRule := *rule
+	kubeconfig, err := l.DecryptK8sConfig(decryptedRule.K8sConfig)
 	if err != nil {
 		return nil, err
 	}
-	result.K8sConfig = config
-	return &result, nil
+	decryptedRule.K8sConfig = kubeconfig
+	return &decryptedRule, nil
 }
 
 func (l Deploy) DeleteRule(rule *entity.RegistryRepositoryDeployRule) error {
 	workflow := Workflow{}
-	if err := workflow.writable(); err != nil {
+	if err := workflow.checkWritesAllowed(); err != nil {
 		return err
 	}
-	if err := workflow.LegacyWritable(rule.RepositoryID); err != nil {
+	if err := workflow.CheckLegacyRuleWritable(rule.RepositoryID); err != nil {
 		return err
 	}
 	return dao.Q.Transaction(func(tx *dao.Query) error {
@@ -294,33 +294,33 @@ func (l Deploy) Rules(repositoryID int32) ([]*entity.RegistryRepositoryDeployRul
 	return rules, nil
 }
 
-func (l Deploy) RuleLogs(id int32, page, pageSize int) ([]*entity.RegistryRepositoryDeployRuleMatchLog, int64, error) {
+func (l Deploy) RuleLogs(ruleID int32, page, pageSize int) ([]*entity.RegistryRepositoryDeployRuleMatchLog, int64, error) {
 	query := dao.Q.RegistryRepositoryDeployRuleMatchLog
-	return query.Where(query.RuleID.Eq(id)).Order(query.ID.Desc()).FindByPage((page-1)*pageSize, pageSize)
+	return query.Where(query.RuleID.Eq(ruleID)).Order(query.ID.Desc()).FindByPage((page-1)*pageSize, pageSize)
 }
 
-func (l Deploy) Namespaces(ctx context.Context, config string) ([]string, error) {
-	client, err := l.GetK8sClient(config)
+func (l Deploy) Namespaces(ctx context.Context, kubeconfig string) ([]string, error) {
+	client, err := l.GetK8sClient(kubeconfig)
 	if err != nil {
 		return nil, err
 	}
 	return (service.Kubernetes{Client: client}).Namespaces(ctx)
 }
 
-func (l Deploy) Applications(ctx context.Context, config, namespace, kind string) ([]string, error) {
-	client, err := l.GetK8sClient(config)
+func (l Deploy) Applications(ctx context.Context, kubeconfig, namespace, controllerType string) ([]string, error) {
+	client, err := l.GetK8sClient(kubeconfig)
 	if err != nil {
 		return nil, err
 	}
-	return (service.Kubernetes{Client: client}).Applications(ctx, namespace, kind)
+	return (service.Kubernetes{Client: client}).Applications(ctx, namespace, controllerType)
 }
 
-func (l Deploy) Containers(ctx context.Context, config, namespace, kind, name string) ([]string, error) {
-	client, err := l.GetK8sClient(config)
+func (l Deploy) Containers(ctx context.Context, kubeconfig, namespace, controllerType, appName string) ([]string, error) {
+	client, err := l.GetK8sClient(kubeconfig)
 	if err != nil {
 		return nil, err
 	}
-	return (service.Kubernetes{Client: client}).Containers(ctx, namespace, kind, name)
+	return (service.Kubernetes{Client: client}).Containers(ctx, namespace, controllerType, appName)
 }
 
 func (l Deploy) Proxy(writer http.ResponseWriter, request *http.Request, path string) error {

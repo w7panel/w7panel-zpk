@@ -92,7 +92,18 @@ type Application struct {
 	Version           string                 `yaml:"version" json:"version"`
 }
 
+const (
+	StorageDevice    = "device"
+	StoragePartition = "partition"
+)
+
+// Storage selects application storage ownership. Omission preserves legacy behavior.
+type Storage struct {
+	Mode string `yaml:"mode" json:"mode"`
+}
+
 type Platform struct {
+	Storage              *Storage                   `yaml:"storage,omitempty" json:"storage,omitempty"`
 	BaseInfo             BaseInfo                   `yaml:"baseInfo" json:"baseInfo"`
 	GatewayPlugin        GatewayPlugin              `yaml:"gatewayPlugin" json:"gatewayPlugin"`
 	Container            Container                  `yaml:"container" json:"container"`
@@ -335,8 +346,11 @@ type IngressRoute struct {
 }
 
 type Ingress struct {
-	Name   string         `yaml:"name" json:"name"`
-	Routes []IngressRoute `yaml:"routes" json:"routes"`
+	Name        string         `yaml:"name" json:"name"`
+	DomainParam string         `yaml:"domainParam,omitempty" json:"domainParam,omitempty"`
+	AutoSSL     bool           `yaml:"autoSSL,omitempty" json:"autoSSL,omitempty"`
+	Required    *bool          `yaml:"required,omitempty" json:"required,omitempty"`
+	Routes      []IngressRoute `yaml:"routes" json:"routes"`
 }
 
 type Depend struct {

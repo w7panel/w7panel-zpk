@@ -554,6 +554,13 @@
                         </div>
                     </div>
 
+                    <div v-if="['docker', 'tradition', 'system-image'].includes(form.type)" class="bg-white com-line mt-20" :inert="Boolean(option?.startParamsOnly)">
+                        <a-form-item class="mt-16" label="存储设置">
+                            <span>{{ json.platform?.storage?.mode === 'device' ? '基于存储设备' : (json.platform?.storage?.mode === 'partition' ? '基于存储分区' : '未设置') }}</span>
+                            <span class="cursor c-blue ml-10" @click="openStorageSettings">编辑</span>
+                        </a-form-item>
+                    </div>
+
                     <div class="bg-white com-line mt-20 manifest-start-params-section">
                         <a-form-item v-if="form.type != 'gateway-plugin'" class="mt-16 manifest-start-param-editor" label="启动参数" field="startParams">
                             <div class="manifest-field-stack">
@@ -566,8 +573,9 @@
                                     </div>
                                     <a-button @click="openSpEdit">批量修改</a-button>
                                 </div>
-                                <manifest-config-table class="mt-10" :rows="form.startParams"
-                                    add-text="添加启动参数"
+                                <manifest-config-table v-for="section in startParamSections()" :key="section.key"
+                                    class="mt-10" :title="section.title" :rows="section.rows"
+                                    :add-text="section.key === 'custom' ? '添加启动参数' : ''"
                                     @add="form.startParams.push({ name: '', title: '', required: true, values_text: '', module_name: '', description: '' })">
                                     <template #columns>
                                         <manifest-config-table-column data-index="name" title="标识">
@@ -610,10 +618,10 @@
                                             </template>
                                         </manifest-config-table-column>
                                         <manifest-config-table-column title="操作" width="100px">
-                                            <template #cell="{ record, index }">
+                                            <template #cell="{ record }">
                                                 <span v-if="!isFixedStartParam(record)" class="c-blue cursor handle" @click="openSpDesc(record)">高级设置</span>
                                                 <span v-if="!isFixedStartParam(record)" class="c-blue cursor handle"
-                                                    @click="form.startParams.splice(index, 1); getStart();">删除</span>
+                                                    @click="removeStartParam(record)">删除</span>
                                             </template>
                                         </manifest-config-table-column>
                                     </template>
@@ -742,6 +750,15 @@
             </div>
         </a-modal>
 
+        <a-modal v-model:visible="storageSettings.show" title="存储设置" :width="620" @ok="saveStorageSettings">
+            <div class="mb-16">此设置作用于应用已有的持久化挂载，挂载目录仍在应用配置中设置；已指定固定 PVC 的挂载不受影响。</div>
+            <a-radio-group v-model="storageSettings.mode" direction="vertical">
+                <a-radio value="device">基于存储设备</a-radio>
+                <div class="ml-24 mb-16">新建应用专用 PVC，单独申请存储容量。安装时选择存储类、容量和读写模式；PVC 不随应用自动删除。独立 PVC 不代表独占物理磁盘。创建后沿用原 PVC，容量调整请在面板存储管理中操作。</div>
+                <a-radio value="partition">基于存储分区</a-radio>
+                <div class="ml-24">使用已创建的 PVC，共享其存储容量，不单独限制目录容量。子路径由应用配置控制，留空时保持为空；已有站点和系统层目录保持不变。</div>
+            </a-radio-group>
+        </a-modal>
         <a-modal v-model:visible="spEdit.show" title="启动参数" :width="700" modal-class="envdialog" :footer="false">
             <span class="c-66">格式：键=值 #标题 : 描述 : 必填(1或0) : 依赖组件标识</span>
             <a-textarea v-model="spEdit.values" class="mt-10" :spellcheck="false"
@@ -1106,6 +1123,7 @@ export default {
                 nextType,
             );
 
+            if (!['docker', 'tradition', 'system-image'].includes(nextType)) delete this.json.platform.storage;
             this.cleanupSystemImageType(previousType, nextType);
             this.cleanupTraditionType(previousType, nextType);
             this.cleanupAppPluginType(previousType, nextType);

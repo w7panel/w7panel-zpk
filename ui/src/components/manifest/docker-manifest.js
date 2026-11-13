@@ -50,6 +50,9 @@ export const dockerManifestMethods = {
         this.json.platform = this.json.platform || {};
         this.json.platform.ingress = (this.form.ingress || []).map(item => ({
             name: item.name,
+            domainParam: item.domainParam,
+            autoSSL: Boolean(item.autoSSL),
+            required: Boolean(item.required),
             routes: this.formatIngressRoutes(item.routes),
         }));
     },

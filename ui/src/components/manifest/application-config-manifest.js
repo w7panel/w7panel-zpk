@@ -52,6 +52,7 @@ export const applicationConfigManifestMethods = {
         };
     },
     openDomainConfig() {
+        this.normalizeIngressDomainGroups();
         this.domainConfig = {
             show: true,
             ingress: JSON.parse(JSON.stringify(this.form.ingress || [])),
@@ -66,6 +67,7 @@ export const applicationConfigManifestMethods = {
     saveDomainConfig() {
         const ingress = JSON.parse(JSON.stringify(this.domainConfig.ingress || []));
         this.form.ingress = ingress;
+        this.normalizeIngressDomainGroups();
         this.checkDomainStartParams(ingress.some(item => this.formatIngressRoutes(item.routes || []).length > 0));
         this.changeForm();
         this.domainConfig.show = false;

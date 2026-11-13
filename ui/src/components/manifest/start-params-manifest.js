@@ -47,6 +47,7 @@ export function startParamsManifestState() {
             type: 'text', unit: '', options: [], values_text: '',
         },
         disabledDomainStartParams: false,
+        storageSettings: { show: false, mode: 'partition' },
     };
 }
 
@@ -158,20 +159,91 @@ export const startParamsManifestMethods = {
             this.syncDockerBuiltInStartParams();
             this.syncIngressDomainStartParams();
         }
+        this.syncStorageModeStartParams();
+        this.syncStorageModePVCReferences();
+    },
+    openStorageSettings() {
+        this.storageSettings.mode = this.json?.platform?.storage?.mode || 'partition';
+        this.storageSettings.show = true;
+    },
+    saveStorageSettings() {
+        if (this.json?.platform?.volumeClaimTemplates?.length) {
+            this.$message.error('已有 StatefulSet 存储声明模板，不能同时配置应用存储模式');
+            return;
+        }
+        this.json.platform = this.json.platform || {};
+        this.json.platform.storage = { mode: this.storageSettings.mode };
+        this.storageSettings.show = false;
+        this.getStart();
+    },
+    syncStorageModePVCReferences() {
+        if (this.option?.startParamsOnly || !['docker', 'tradition', 'system-image'].includes(this.form.type)) return;
+        const platform = this.json?.platform;
+        const mode = platform?.storage?.mode;
+        if (!['device', 'partition'].includes(mode)) return;
+        for (const volume of platform.volumes || []) {
+            const claim = volume.persistentVolumeClaim;
+            if (!claim || !['', '%PVC_NAME%', '{{ .Values.PVC_NAME }}'].includes(String(claim.claimName || '').trim())) continue;
+            claim.claimName = '';
+        }
+
+    },
+    syncStorageModeStartParams() {
+        if (!['docker', 'tradition', 'system-image'].includes(this.form.type)) return;
+        const mode = this.json?.platform?.storage?.mode;
+        if (!mode) return;
+        const names = ['PVC_NAME', 'global.cluster.storageSize', 'global.cluster.storageClassName', 'global.cluster.storageRWmode', 'storage.size', 'storage.className', 'storage.accessMode'];
+        this.form.startParams = this.form.startParams.filter(item => !names.includes(item.name) || item.module_name);
+        const params = mode === 'device' ? [
+            ['storage.size', '存储容量', '%STORAGE_SIZE%'],
+            ['storage.className', '存储类', '%STORAGE_CLASS_NAME%'],
+            ['storage.accessMode', '读写模式', '%STORAGE_RW_MODE%'],
+        ] : [['PVC_NAME', '存储分区', '%PVC_NAME%']];
+        this.form.startParams.push(...params.map(([name, title, values_text]) => ({
+            mark: 'storage', name, title, values_text, required: true, module_name: '', type: 'text',
+        })));
     },
     syncIngressDomainStartParams() {
         if (this.form.type !== 'docker') return;
-        const enabled = (this.form.ingress || []).some(item =>
-            this.formatIngressRoutes(item.routes || []).length > 0);
+        this.normalizeIngressDomainGroups();
+        const groups = (this.form.ingress || []).filter(item => this.formatIngressRoutes(item.routes || []).length > 0);
+        const enabled = groups.length > 0;
         this.form.domain = enabled;
         this.disabledDomainStartParams = enabled;
         if (enabled) {
-            if (!this.form.startParams.some(item => item.name === 'DOMAIN_URL')) {
-                this.form.startParams.push(domainStartParam());
+            const names = new Set(groups.map(item => item.domainParam));
+            this.form.startParams = this.form.startParams.filter(item => !this.isDomainStartParam(item) || names.has(item.name));
+            for (const group of groups) {
+                const existing = this.form.startParams.find(item => item.name === group.domainParam);
+                const param = {
+                    ...domainStartParam(), name: group.domainParam, title: group.name || '域名',
+                    required: group.required, values_text: group.autoSSL ? '%DOMAIN_SSL_URL%' : '%DOMAIN_URL%',
+                };
+                if (!existing) this.form.startParams.push(param);
+                else if (this.isDomainStartParam(existing)) Object.assign(existing, param);
             }
         } else {
             this.form.startParams = this.form.startParams.filter(item => !this.isDomainStartParam(item));
         }
+    },
+    normalizeIngressDomainGroups() {
+        if (this.option?.startParamsOnly || this.form.type !== 'docker') return;
+        const used = new Set([...(this.form.ingress || []).map(item => item.domainParam), ...this.form.startParams.filter(item => !this.isDomainStartParam(item)).map(item => item.name)].filter(Boolean));
+        let next = 2;
+        (this.form.ingress || []).forEach((item, index) => {
+            if (!item.domainParam && this.formatIngressRoutes(item.routes || []).length) {
+                if (!used.has('DOMAIN_URL')) item.domainParam = 'DOMAIN_URL';
+                else {
+                    while (used.has(`DOMAIN_URL_${next}`)) next++;
+                    item.domainParam = `DOMAIN_URL_${next++}`;
+                }
+                used.add(item.domainParam);
+            }
+            if (typeof item.required !== 'boolean') item.required = index === 0;
+            if (typeof item.autoSSL !== 'boolean') {
+                item.autoSSL = this.form.startParams.some(param => param.name === item.domainParam && param.values_text === '%DOMAIN_SSL_URL%');
+            }
+        });
     },
     initStartParams(platform = {}) {
         this.form.domain = false;
@@ -205,7 +277,7 @@ export const startParamsManifestMethods = {
     },
     isDomainStartParam(item) {
         return item?.mark === 'domain'
-            || (item?.name === 'DOMAIN_URL' && ['%DOMAIN_URL%', '%DOMAIN_SSL_URL%'].includes(item?.values_text));
+            || (!item?.module_name && /^DOMAIN_URL(?:_\d+)?$/.test(item?.name || '') && ['%DOMAIN_URL%', '%DOMAIN_SSL_URL%'].includes(item?.values_text));
     },
     isBuiltInStartParam(item) {
         const name = String(item?.name || '').trim();
@@ -215,7 +287,29 @@ export const startParamsManifestMethods = {
         return this.form.type == 'docker' && this.isDockerBuiltInStartParam(name);
     },
     isFixedStartParam(item) {
-        return this.isBuiltInStartParam(item);
+        return this.isBuiltInStartParam(item) || Boolean(this.json?.platform?.storage?.mode && item.mark === 'storage');
+    },
+    startParamSections() {
+        const sections = [
+            { key: 'domain', title: '域名配置', rows: [] },
+            { key: 'storage', title: '存储配置', rows: [] },
+            { key: 'basic', title: '基础配置', rows: [] },
+            { key: 'custom', title: '自定义参数', rows: [] },
+        ];
+        for (const item of this.form.startParams || []) {
+            let section = 'custom';
+            if (this.isDomainStartParam(item)) section = 'domain';
+            else if (item.mark === 'storage' || (item.name === 'PVC_NAME' && this.isBuiltInStartParam(item))) section = 'storage';
+            else if (item.mark || this.isBuiltInStartParam(item)) section = 'basic';
+            sections.find(group => group.key === section).rows.push(item);
+        }
+        return sections.filter(section => section.rows.length || section.key === 'custom');
+    },
+    removeStartParam(item) {
+        const index = this.form.startParams.indexOf(item);
+        if (index < 0) return;
+        this.form.startParams.splice(index, 1);
+        this.getStart();
     },
     computedSpDisabled(item) {
         return this.isFixedStartParam(item)

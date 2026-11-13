@@ -1,14 +1,31 @@
-{{- if .Values.ingress.__INGRESS_NAME__.enabled -}}
+{{- $config := .Values.ingress.__INGRESS_NAME__ -}}
+{{- $group := get (.Values.domainGroups | default dict) ($config.domainParam | default "") | default dict -}}
+{{- $domain := .Values.DOMAIN_URL -}}
+{{- $https := .Values.ingressForceHttps -}}
+{{- if $config.domainParam -}}
+  {{- $domain = $group.host | default "" -}}
+  {{- $https = $group.autoSSL | default false -}}
+{{- end -}}
+{{- if $config.enabled -}}
 {{- $fullName := include "common.fullname" . -}}
+{{- $existing := lookup "networking.k8s.io/v1" "Ingress" .Release.Namespace (print $fullName "-__INGRESS_NAME__") | default dict -}}
+{{- if $config.domainParam -}}
+  {{- if not $domain -}}
+    {{- $domain = printf "pending-%s.invalid" (printf "%s/%s/%s/%s" .Release.Namespace .Release.Name $fullName $config.domainParam | sha256sum | trunc 24) -}}
+  {{- end -}}
+{{- end -}}
+{{- $annotations := deepCopy ($config.annotations | default dict) -}}
+{{- $oldSpec := $existing.spec | default dict -}}
+{{- $existingDomain := "" -}}
+{{- if $oldSpec.rules -}}
+  {{- $existingDomain = (first $oldSpec.rules).host -}}
+  {{- $domain = $existingDomain -}}
+{{- end -}}
+{{- $requireHTTPS := eq (toString (get $annotations "w7.cc/require-https")) "true" -}}
+{{- $https = and (or $https $requireHTTPS) (not (hasSuffix ".invalid" $domain)) -}}
 {{- $appName := .Values.global.name -}}
 {{- $releaseName := .Release.Name -}}
-{{- $domain := .Values.DOMAIN_URL -}}
 {{- $backends := include "common.runtimeIngressBackends" (dict "root" . "name" (print $fullName "-__INGRESS_NAME__")) | fromJson -}}
-{{- if and .Values.ingress.__INGRESS_NAME__.ingressClassName (not (semverCompare ">=1.18-0" .Capabilities.KubeVersion.GitVersion)) }}
-  {{- if not (hasKey .Values.ingress.__INGRESS_NAME__.annotations "kubernetes.io/ingress.class") }}
-  {{- $_ := set .Values.ingress.__INGRESS_NAME__.annotations "kubernetes.io/ingress.class" .Values.ingress.__INGRESS_NAME__.ingressClassName}}
-  {{- end }}
-{{- end }}
 {{- if semverCompare ">=1.19-0" .Capabilities.KubeVersion.GitVersion -}}
 apiVersion: networking.k8s.io/v1
 {{- else if semverCompare ">=1.14-0" .Capabilities.KubeVersion.GitVersion -}}
@@ -25,30 +42,25 @@ metadata:
     w7.cc/group-name: {{ $releaseName }}
     __PARENT_INGRESS_LABEL__
   annotations:
-  {{- $annotations := deepCopy (.Values.ingress.__INGRESS_NAME__.annotations | default dict) }}
   {{- if $backends }}
     {{- $_ := set $annotations "w7.cc/ingress-backends" (toJson $backends) }}
   {{- end }}
   {{- with $annotations }}
     {{- toYaml . | nindent 4 }}
   {{- end }}
-    {{- if .Values.ingressForceHttps }}
-    cert-manager.io/cluster-issuer: w7-letsencrypt-prod
-    cert-manager.io/renew-before: 30m
-    {{- end }}
     kubernetes.io/ingress.class: higress
 spec:
-  {{- if .Values.ingressForceHttps }}
+  {{- if $https }}
   tls:
     - hosts:
-        {{- range .Values.ingress.__INGRESS_NAME__.hosts }}
-        - {{ coalesce .host $domain | quote }}
+        {{- range $config.hosts }}
+        - {{ coalesce $existingDomain .host $domain | quote }}
         {{- end }}
       secretName: {{ $fullName }}-__INGRESS_NAME__-tls-secret
   {{- end }}
   rules:
-    {{- range .Values.ingress.__INGRESS_NAME__.hosts }}
-    - host: {{ coalesce .host $domain | quote }}
+    {{- range $config.hosts }}
+    - host: {{ coalesce $existingDomain .host $domain | quote }}
       http:
         paths:
           {{- range .paths }}

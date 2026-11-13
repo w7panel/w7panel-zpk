@@ -21,8 +21,8 @@
 
 - `platform.depends` 描述安装依赖关系，但真正被内嵌进 `charts/` 的普通子应用来自同一制品下保存的 `*/manifest.yaml`，不是仅凭一条 `depends` 记录即时下载。
 - `type: out` 是单独安装的外部依赖；`type: in` 是随当前包保存/打包的子应用关系。
-- 原生应用、传统应用和系统镜像都可以声明 PVC volume，但通用打包器不会为 Deployment 自动创建 PVC。空 `claimName` 在渲染时取 `.Values.PVC_NAME`。
-- 只有 StatefulSet 的 `platform.volumeClaimTemplates` 会随 Workload 生成 PVC；应用插件不拥有 PVC；Helm 应用是否创建 PVC 取决于用户 Chart。
+- 原生应用、传统应用和系统镜像都可以声明 PVC volume，但未启用独立存储模式时，通用打包器不会为 Deployment 自动创建 PVC。空 `claimName` 在渲染时取 `.Values.PVC_NAME`。
+- 未启用独立存储模式时，只有 StatefulSet 的 `platform.volumeClaimTemplates` 会随 Workload 生成 PVC；应用插件不拥有 PVC；Helm 应用是否创建 PVC 取决于用户 Chart。
 - 前端 zip 不会塞进最终 Helm tgz。Helm 里生成的是 `MicroApp` CR，前端文件仍由 ZPK 的附件下载接口提供。
 - manifest 的 `application.order` 用于声明同组 MicroApp 顺序，生成时原样写入 `metadata.labels["w7.cc/order"]`。主应用为 `0`，子应用在新建、导入或删除后按当前列表重新编号为 `1...n`，ZPK Market 动态 MicroApp 固定为 `9999`；打包过程不使用 `platform.depends` 重新推导顺序。
 
@@ -308,7 +308,7 @@ Job 默认 `backoffLimit: 2`、完成 60 秒后清理。安装前/删除后的 J
 ### 5.4 存储
 
 - `platform.volumes[].persistentVolumeClaim.claimName` 非空：直接使用指定 PVC。
-- claimName 为空：渲染时使用 `.Values.PVC_NAME`，Chart 本身不创建 PVC。
+- claimName 为空：渲染时使用 `.Values.PVC_NAME`，未启用独立存储模式时，Chart 本身不创建 PVC。
 - `emptyDir` 和 `hostPath` 按 Kubernetes volume 原样生成。
 - StatefulSet 的 `volumeClaimTemplates` 会创建逐 Pod PVC，accessModes、storageClassName、storage size 被替换为全局安装 values。
 - `subPath` 为 `%RANDOM_DIR%` 或 `RANDOM_DIR` 时，转换成基于 release/chart/container/volume/mountPath 的稳定 12 位哈希；升级时通过 Helm `lookup` 优先保留现有 Workload 的 subPath。
@@ -896,3 +896,17 @@ helm template <release> <generated-chart-dir> -f <install-values.yaml>
 临时兼容：缺少 `options` 的旧参数若默认值为 `a|b|c`，按历史单选器显示、默认选中第一项；新参数显式使用 `options: []` 可保留文本中的字面 `|`。ZPK 读取/编辑与面板安装分支均标记 TODO，下个版本移除此兼容。旧版本 server 不会透传新增字段，须配套更新 server 与面板 UI；现有未使用新字段的参数仍可按旧方式安装。
 
 系统镜像与传统应用自动维护的 `IMAGE_VERSION` 参数同样使用独立 `options` 保存全部可选版本，`values_text` 只保存列表首项（无版本时为空字符串）。新保存的内置版本参数不再生成 `|` 拼接值；单个版本也保留单项 `options`，供安装端单选器正常展示。
+
+### 2026-11-13 应用存储模式
+
+原生应用、传统应用、系统镜像可显式配置 `platform.storage.mode`，省略时沿用原有存储逻辑。Storage 类型定义在 common/logic/manifest.go，Chart 默认值 storageValues 在 helm_pack.go。仅 `device` 模式写入 PVC 模板；`partition` 只写入模式默认值，未配置或未知模式不启用新增存储逻辑。存储启动参数和 PVC 引用由制品编辑前端维护并保存到 manifest；安装 info 和 Helm 打包读取已保存参数，不重新生成或覆盖参数。非设备模式继续沿用安装 info 的 `PVC_NAME` 补齐逻辑。
+
+- `device`：为应用未指定固定 PVC 的挂载创建一份独立 PVC。安装参数为 `storage.size`（`%STORAGE_SIZE%`）、`storage.className`（`%STORAGE_CLASS_NAME%`）、`storage.accessMode`（`%STORAGE_RW_MODE%`），复用面板的存储设备控件。各子 Chart 使用自己的 storage values，不使用共享 global 参数。独立 PVC 表示独立申请容量，不保证独占底层磁盘。
+- `partition`：安装时通过 `PVC_NAME` 选择已有 PVC，不生成 PVC；挂载子路径沿用 manifest 中的配置，留空时保持为空，不自动补写隔离目录。用户明确配置的路径、subPathExpr、原有随机目录标记以及传统站点、系统层目录保持原规则。
+- 已指定固定 claimName 的 volume 不受影响。配置页面仍阻止已有 StatefulSet `volumeClaimTemplates` 与应用存储模式同时配置；打包后端不增加专门的存储模式校验或挂载转换。
+- 独立 PVC 的稳定名称由 release 和应用标识生成，长名称带哈希避免主子应用冲突。面板通过三个存储设备启动参数占位符识别设备模式，安装信息不额外返回 `storageMode`；安装后继续导出 `PVC_NAME` 给关联应用及工具。
+- PVC 以权重 -100 的 pre-install/pre-upgrade hook 在挂载它的生命周期任务前创建；采用 `helm.sh/resource-policy: keep`，已有同名且归属当前 release 的 PVC 不重建，无 ownerReference 或应用分组标签。创建后由存储管理调整容量；应用自身卸载脚本的清理行为不变。
+- 子路径保持配置原值，不为留空挂载生成随机目录；用户明确配置原有 `%RANDOM_DIR%` 标记时，沿用原有升级保留规则。设备、分区模式下，已有同名 Workload 的同名 volume 继续使用原 PVC，安装配置改变不替换其绑定，也不中止升级。首次安装或新增挂载才采用本次配置；全部受管挂载都沿用其他已有 PVC 时，不创建闲置的独立 PVC。未启用新模式的随机目录仍使用原有算法。
+- 新模式要求配套支持存储设备启动参数的面板后端；旧制品继续兼容。Helm 包、监控插件由原 Chart 管理存储，应用插件跟随目标传统应用。
+
+启用域名组 `autoSSL`（或旧版 `ingressForceHttps`）时，生成的 Ingress 包含当前域名的 TLS Secret 引用、默认 `w7-letsencrypt-prod` 签发器和 `30m` 提前续期，并默认设置 `w7.cc/ssl-redirect`、`higress.io/ssl-redirect` 为 `"true"`。显式配置 `w7.cc/ssl-redirect: "false"` 可关闭跳转，Higress 注解随之同步；自定义签发器保持有效，未启用 SSL 时不添加这些默认设置。

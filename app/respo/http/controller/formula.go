@@ -358,7 +358,10 @@ func (c Formula) Info(ctx *gin.Context) {
 				item.Platform.StartParams,
 				formula.AllManifest,
 			)
-			startParams = ensurePVCNameStartParam(startParams, item.Platform.Volumes)
+			hasStorageDevice := item.Platform.Storage != nil && item.Platform.Storage.Mode == logic2.StorageDevice
+			if !hasStorageDevice {
+				startParams = ensurePVCNameStartParam(startParams, item.Platform.Volumes)
+			}
 			if startParams == nil {
 				startParams = make([]logic2.StartParams, 0)
 			}

@@ -8,7 +8,9 @@
                     <div class="ingress-name-form-item">
                         <span class="ingress-name-label">名称</span>
                         <a-input v-model="item.name" :spellcheck="false" placeholder="请输入名称"
-                            style="width:400px;" @change="emitUpdate"></a-input>
+                            class="ingress-name-input" @change="emitUpdate"></a-input>
+                        <a-checkbox v-model="item.autoSSL" @change="emitUpdate">自动 SSL</a-checkbox>
+                        <a-checkbox v-model="item.required" @change="emitUpdate">必填</a-checkbox>
                     </div>
                     <div @click.stop>
                         <manifest-config-table :rows="item.routes" table-class="ingress-table"
@@ -230,6 +232,8 @@ export default {
             }
             this.modelValue.push({
                 name: name || (wasEmpty ? 'default' : 'web_' + Math.random().toString(36).slice(2, 8)),
+                autoSSL: false,
+                required: wasEmpty,
                 routes: [this.createRoute()],
             });
             this.activeTab = this.modelValue.length - 1;
@@ -259,7 +263,14 @@ export default {
 .ingress-name-form-item {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
     margin-bottom: 20px;
+}
+
+.ingress-name-input {
+    width: 400px;
+    max-width: 100%;
 }
 
 .ingress-name-label {

@@ -179,9 +179,13 @@ Usage:
     {{ $claimName := dig "persistentVolumeClaim" "claimName" "" $vol }}
     {{ $claim := toString $claimName }}
     {{ if eq $claim "" }}
-      {{ $claim = toString (get $root.Values "PVC_NAME") }}
+      {{- if eq (dig "mode" "" ($root.Values.storage | default dict)) "device" -}}
+        {{ $claim = include "common.storageClaimName" $root }}
+      {{- else -}}
+        {{ $claim = toString (get $root.Values "PVC_NAME") }}
+      {{- end -}}
     {{ end }}
-    claimName: {{ tpl $claim $root | quote }}
+    claimName: {{ include "common.resolveStorageClaim" (dict "root" $root "name" $vol.name "claim" (tpl $claim $root)) | quote }}
   {{- else }}
     {{- /* Reconstruct the volume spec without 'name' and 'persistentVolumeClaim' */}}
     {{- $spec := dict }}
@@ -293,4 +297,39 @@ The writer validates Service names and port values; this helper checks only the 
   {{- end -}}
 {{- end -}}
 {{- toJson $backends -}}
+{{- end -}}
+
+{{/* New dedicated claims have a stable name shared by workloads and lifecycle jobs. */}}
+{{- define "common.storageClaimName" -}}
+{{- if .Values.PVC_NAME -}}
+{{- tpl (toString .Values.PVC_NAME) . -}}
+{{- else -}}
+{{- $base := printf "%s-%s" .Release.Name (.Values.app.identify | replace "_" "-" | lower) -}}
+{{- if gt (len $base) 55 -}}
+{{- printf "%s-%s-storage" ($base | trunc 46 | trimSuffix "-") ($base | sha256sum | trunc 8) -}}
+{{- else -}}
+{{- printf "%s-storage" ($base | trimSuffix "-") -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+
+{{/* Existing mounts retain their PVC when installation settings change. */}}
+{{- define "common.resolveStorageClaim" -}}
+{{- $root := .root -}}
+{{- $volumeName := .name -}}
+{{- $claim := .claim -}}
+{{- $storageMode := dig "mode" "" ($root.Values.storage | default dict) -}}
+{{- if or (eq $storageMode "device") (eq $storageMode "partition") -}}
+{{- range $kind := list "Deployment" "StatefulSet" "DaemonSet" -}}
+{{- $existing := lookup "apps/v1" $kind $root.Release.Namespace (include "common.fullname" $root) -}}
+{{- if $existing -}}
+{{- range $volume := $existing.spec.template.spec.volumes -}}
+{{- if and (eq $volume.name $volumeName) $volume.persistentVolumeClaim -}}
+{{- $claim = $volume.persistentVolumeClaim.claimName -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+{{- $claim -}}
 {{- end -}}

@@ -277,6 +277,11 @@ func (hc *HelmPack) generateSubCharts(rootDir string) error {
 }
 
 func (hc *HelmPack) packWorkloadApplication(rootDir, templatesDir string, valuesOptions helmValuesOptions, generateIngress bool, generateTypeTemplates func(string) error) error {
+	if hc.Manifest.Platform.Storage != nil && hc.Manifest.Platform.Storage.Mode == logic2.StorageDevice {
+		if err := writeHelmTemplateFile(templatesDir, "storage.yaml", "storage.yaml.tpl"); err != nil {
+			return err
+		}
+	}
 	if err := hc.generateValuesYaml(rootDir, valuesOptions); err != nil {
 		return err
 	}
@@ -463,6 +468,20 @@ func (hc *HelmPack) defaultHelmValuesOptions() helmValuesOptions {
 	}
 }
 
+func storageValues(platform logic2.Platform) interface{} {
+	if platform.Storage == nil {
+		return nil
+	}
+	switch platform.Storage.Mode {
+	case logic2.StorageDevice:
+		return map[string]interface{}{"mode": logic2.StorageDevice, "size": "1Gi", "className": "", "accessMode": "ReadWriteOnce"}
+	case logic2.StoragePartition:
+		return map[string]interface{}{"mode": logic2.StoragePartition}
+	default:
+		return nil
+	}
+}
+
 func (hc *HelmPack) generateValuesYaml(rootDir string, options helmValuesOptions) error {
 	platform := options.platform
 	if hc.Manifest.Application.Annotation == nil {
@@ -484,6 +503,7 @@ func (hc *HelmPack) generateValuesYaml(rootDir string, options helmValuesOptions
 	}
 	values := map[string]interface{}{
 		"PVC_NAME":   "",
+		"storage":    storageValues(platform),
 		"DOMAIN_URL": "",
 		"app": map[string]interface{}{
 			"title":    appName,
@@ -1219,7 +1239,7 @@ func (hc *HelmPack) getIngressValues(platform logic2.Platform, application logic
 	}
 
 	ingressMap := make(map[string]interface{})
-	for _, ingress := range platform.Ingress {
+	for ingressIndex, ingress := range platform.Ingress {
 		parent := ""
 		for _, route := range ingress.Routes {
 			serviceKey := function.ConvertDigitsToLetters(function.GetMd5(ingress.Name + "-" + route.Path))
@@ -1247,7 +1267,20 @@ func (hc *HelmPack) getIngressValues(platform logic2.Platform, application logic
 				},
 			}
 
-			var ingressAnnotations = make(map[string]interface{})
+			ingressAnnotations := make(map[string]interface{})
+			autoSSL := ingress.AutoSSL
+			if ingress.DomainParam == "" {
+				for _, param := range platform.StartParams {
+					if param.ValuesText == "%DOMAIN_SSL_URL%" {
+						autoSSL = true
+						break
+					}
+				}
+			}
+			if autoSSL {
+				ingressAnnotations["cert-manager.io/cluster-issuer"] = "w7-letsencrypt-prod"
+				ingressAnnotations["cert-manager.io/renew-before"] = "30m"
+			}
 			// 添加更多匹配条件（header、method、query）
 			hc.addIngressMatchAnnotations(ingressAnnotations, route)
 			// 添加重写规则
@@ -1258,12 +1291,32 @@ func (hc *HelmPack) getIngressValues(platform logic2.Platform, application logic
 					ingressAnnotations[key] = val
 				}
 			}
+			if ingress.DomainParam != "" {
+				required := ingressIndex == 0
+				if ingress.Required != nil {
+					required = *ingress.Required
+				}
+				ingressAnnotations["w7.cc/deny-delete"] = strconv.FormatBool(required)
+				ingressAnnotations["w7.cc/require-https"] = strconv.FormatBool(ingress.AutoSSL)
+			}
+			if autoSSL {
+				redirect := ingressAnnotations["w7.cc/ssl-redirect"]
+				if redirect == nil {
+					redirect = ingressAnnotations["higress.io/ssl-redirect"]
+				}
+				if redirect == nil || ingress.AutoSSL {
+					redirect = "true"
+				}
+				ingressAnnotations["w7.cc/ssl-redirect"] = fmt.Sprint(redirect)
+				ingressAnnotations["higress.io/ssl-redirect"] = fmt.Sprint(redirect)
+			}
 
 			hc.IngressNames[serviceKey] = parent
 			if parent == "" {
 				parent = serviceKey
 			}
 			ingressMap[serviceKey] = map[string]interface{}{
+				"domainParam":       ingress.DomainParam,
 				"enabled":           true,
 				"annotations":       ingressAnnotations,
 				"ingressClassName":  "higress",

@@ -14,6 +14,7 @@ const (
 	Docker_App       = "docker"
 	HelmApp          = "helm"
 	GatewayPluginApp = "gateway-plugin"
+	MetricsPluginApp = "metrics-plugin"
 	TraditionApp     = "tradition"
 	SystemImageApp   = "system-image"
 	SidecarApp       = "sidecar"
@@ -461,7 +462,7 @@ func GetManifestV2(manifest Manifest) Manifest {
 	if manifest.Platform.Container.Image == "" && manifest.Source.Url == "" {
 		return manifest
 	}
-	if manifest.Application.Type == PluginApp || manifest.Application.Type == HelmApp {
+	if manifest.Application.Type == PluginApp || manifest.Application.Type == HelmApp || manifest.Application.Type == MetricsPluginApp {
 		return manifest
 	}
 

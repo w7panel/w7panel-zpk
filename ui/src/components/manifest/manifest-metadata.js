@@ -199,6 +199,7 @@ export const manifestMetadataMethods = {
         if (type == 'tradition') return '传统应用';
         if (type == 'system-image') return '系统镜像';
         if (type == 'gateway-plugin') return '网关插件';
+        if (type == 'metrics-plugin') return '监控插件';
         return '';
     },
     async syncFormulaCategory(currentCategories = []) {

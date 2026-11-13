@@ -197,7 +197,7 @@ export const startParamsManifestMethods = {
             if (item.mark == 'mongodb6') this.form.mongodb6 = true;
             if (item.mark == 'storage') this.form.storage = true;
         });
-        if (this.form.type != 'helm' && this.form.type != 'app-plugin'
+        if (!['helm', 'metrics-plugin'].includes(this.form.type) && this.form.type != 'app-plugin'
             && (this.form.ingress || []).some(item => this.formatIngressRoutes(item.routes || []).length)) {
             this.form.domain = true;
             this.disabledDomainStartParams = true;

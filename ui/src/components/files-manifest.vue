@@ -51,6 +51,7 @@
                                         <a-radio value="app-plugin">应用插件</a-radio>
                                         <a-radio value="system-image">系统镜像</a-radio>
                                         <a-radio value="gateway-plugin">网关插件</a-radio>
+                                        <a-radio value="metrics-plugin">监控插件</a-radio>
                                     </a-radio-group>
 
                                     <a-form-item v-if="form.type == 'helm'" class="mt-20" style="margin-bottom:10px;"
@@ -58,7 +59,7 @@
                                         <a-switch v-model="form.helm.useHelm" @change="changeForm"></a-switch>
                                     </a-form-item>
 
-                                    <div v-if="form.type == 'helm' && form.helm.useHelm" class="greybox"
+                                    <div v-if="['helm', 'metrics-plugin'].includes(form.type) && (form.type == 'metrics-plugin' || form.helm.useHelm)" class="greybox"
                                         style="margin-bottom:20px;">
                                         <div class="greybox-title">Helm配置</div>
 
@@ -69,7 +70,7 @@
                                             </a-radio-group>
                                         </a-form-item>
 
-                                        <a-form-item v-if="form.type == 'helm' && form.helm.helmtype == '1'"
+                                        <a-form-item v-if="['helm', 'metrics-plugin'].includes(form.type) && form.helm.helmtype == '1'"
                                             label="helm仓库地址" field="repository" style="margin-bottom:18px;">
                                             <a-input v-model="form.helm.repository" size="large"
                                                 @change="getChartInfo(); changeForm();" style="width:500px;"
@@ -77,7 +78,7 @@
                                             <icon-loading v-if="getChartInfoLoading" class="is-loading fs-24 ml-10" />
                                         </a-form-item>
 
-                                        <a-form-item v-if="form.type == 'helm' && form.helm.helmtype == '1'"
+                                        <a-form-item v-if="['helm', 'metrics-plugin'].includes(form.type) && form.helm.helmtype == '1'"
                                             label="chart名称" field="chartName" style="margin-bottom:18px;">
                                             <a-auto-complete ref="formhelmchartname" v-model="form.helm.chartName"
                                                 :data="helmChartOptions" placeholder="请输入内容" :filter-option="false"
@@ -94,7 +95,7 @@
                                                 style="width:240px;margin-left:20px;"></a-auto-complete>
                                         </a-form-item>
 
-                                        <a-form-item v-if="form.type == 'helm' && form.helm.helmtype == '2'"
+                                        <a-form-item v-if="['helm', 'metrics-plugin'].includes(form.type) && form.helm.helmtype == '2'"
                                             label="Chart包地址" field="chartName2" style="margin-bottom:18px;">
                                             <a-input v-model="form.helm.chartName2" size="large" style="width:500px;"
                                                 @change="changeForm" placeholder="请输入" />
@@ -104,7 +105,7 @@
                                             </files-upload>
                                         </a-form-item>
 
-                                        <a-form-item v-if="form.type == 'helm'" label="安装配置">
+                                        <a-form-item v-if="['helm', 'metrics-plugin'].includes(form.type)" label="安装配置">
                                             <manifest-config-table :rows="form.helm.kv" add-text="添加配置"
                                                 @add="form.helm.kv.push({ name: '', value: '' }); changeForm();">
                                                 <template #columns>
@@ -429,7 +430,7 @@
                                 </a-select>
                             </a-form-item>
                             <a-form-item
-                                v-if="form.type != 'system-image' && form.type != 'gateway-plugin' && (!option || !option.pureManifest && form.type != 'docker' && form.type != 'light' && form.type != 'helm')"
+                                v-if="form.type != 'metrics-plugin' && form.type != 'system-image' && form.type != 'gateway-plugin' && (!option || !option.pureManifest && form.type != 'docker' && form.type != 'light' && !['helm', 'metrics-plugin'].includes(form.type))"
                                 label="代码包">
                                 <div class="df ai-e">
                                     <files-upload @success="uploadSuccess" @testDockerfile="v => zip.hasDockerfile = v">
@@ -487,7 +488,7 @@
                                 </div>
                             </a-form-item>
 
-                            <a-form-item v-if="form.type != 'helm' && form.type != 'light' && form.type != 'gateway-plugin'"
+                            <a-form-item v-if="!['helm', 'metrics-plugin'].includes(form.type) && form.type != 'light' && form.type != 'gateway-plugin'"
                                 label="脚本配置" field="shell" class="mt-16">
                                 <div style="flex:1;">
                                     <manifest-config-table :rows="form.shell" add-text="添加脚本"
@@ -533,7 +534,7 @@
                         </div>
                     </div>
 
-                    <div v-if="form.type != 'helm' && form.type != 'app-plugin' && form.type != 'gateway-plugin' && form.type != 'system-image'" class="bg-white com-line mt-20">
+                    <div v-if="!['helm', 'metrics-plugin'].includes(form.type) && form.type != 'app-plugin' && form.type != 'gateway-plugin' && form.type != 'system-image'" class="bg-white com-line mt-20">
                         <div class="mt-16">
                             <a-form-item label="应用配置">
                                 <div v-if="form.containers && form.containers.length">
@@ -543,7 +544,7 @@
                             </a-form-item>
 
 
-                            <a-form-item v-if="form.type != 'helm' && form.type != 'system-image'" label="域名设置" class="mt-16">
+                            <a-form-item v-if="!['helm', 'metrics-plugin'].includes(form.type) && form.type != 'system-image'" label="域名设置" class="mt-16">
                                 <div v-if="form.ingress && form.ingress.length">
                                     {{ form.ingress.map(item => item.name || '未命名配置').join(', ') }}
                                 </div>
@@ -1183,6 +1184,12 @@ export default {
                     return;
                 }
 
+                if (this.form.type == 'metrics-plugin' && !this.validateMetricsChart()) {
+                    messageWarning('请配置监控插件的 Helm Chart 包');
+                    fail();
+                    return;
+                }
+
                 const sysboxContainerNameError = this.validateSysboxContainerName();
                 if (sysboxContainerNameError) {
                     messageWarning(sysboxContainerNameError);
@@ -1221,7 +1228,7 @@ export default {
                     return;
                 }
 
-                if (this.form.type == 'helm') {
+                if (['helm', 'metrics-plugin'].includes(this.form.type)) {
                     this.cleanupHelmPlatformForSubmit();
                 } else if (this.form.type == 'app-plugin') {
                     delete this.json.platform.volumeClaimTemplates;
@@ -1258,6 +1265,7 @@ export default {
                 tradition: '传统应用',
                 'system-image': '系统镜像',
                 'gateway-plugin': '网关插件',
+                'metrics-plugin': '监控插件',
             };
             this.form.type = previousType;
             confirm({
@@ -1335,7 +1343,7 @@ export default {
                 j.platform.startParams = this.serializeStartParams();
 
                 this.applyHelmPlatform();
-                if (this.form.type != 'helm') {
+                if (!['helm', 'metrics-plugin'].includes(this.form.type)) {
                     this.applyPlatformShells();
                 }
                 if (this.form.type == 'docker') {

@@ -44,7 +44,8 @@
                 <a-form-item v-if="form.deploy_type === 2" label="匹配方式"><a-radio-group v-model="form.match_type"><a-radio :value="1">前缀匹配</a-radio><a-radio :value="2">正则匹配</a-radio></a-radio-group></a-form-item>
                 <a-form-item label="版本名称 / 匹配条件"><a-input v-model="form.tag_name" :placeholder="form.deploy_type === 1 ? '例如 latest,v1.0，多个版本用英文逗号分隔' : '填写前缀（英文逗号分隔）或一个正则表达式'" /></a-form-item>
                 <a-form-item label="执行时机">
-                    <a-select v-model="timing" :options="timingOptions" />
+                    <a-select :model-value="selectedTiming" :options="timingOptions" placeholder="请选择执行时机"
+                        @update:model-value="timing = $event" />
                 </a-form-item>
                 <a-form-item label="执行动作"><a-select v-model="form.action"><a-option value="deploy">部署应用</a-option><a-option value="build">镜像重构</a-option></a-select></a-form-item>
                 <a-form-item label="镜像来源"><a-radio-group v-model="form.source"><a-radio value="original">原始镜像</a-radio><a-radio v-if="timingSourceTask" value="task">指定构建任务的结果</a-radio></a-radio-group></a-form-item>
@@ -162,13 +163,16 @@ export default {
             ])];
             return options.filter(option => !this.imageDependencyError(this.tasksForTiming(option.value)));
         },
+        selectedTiming() {
+            return this.timingOptions.some(option => option.value === this.timing) ? this.timing : undefined;
+        },
         previewTasks() { return this.tasksForTiming(this.timing); },
         timingConflict() { return this.imageDependencyError(this.previewTasks); },
         executionStage() {
             return this.previewTasks.find(task => task.id === this.form.id)?.stage;
         },
         timingDescription() {
-            if (this.timing === 'first') return '';
+            if (!this.timing || this.timing === 'first') return '';
             const [mode, id] = this.timing.split(':');
             const task = this.config.tasks.find(task => task.id === id && this.sameTrigger(task, this.form));
             if (!task) return '请选择执行时机。';
@@ -181,6 +185,7 @@ export default {
         'form.deploy_type'() { this.resetTiming(); },
         'form.match_type'() { this.resetTiming(); },
         'form.tag_name'() { this.resetTiming(); },
+        timingOptions() { this.resetTiming(); },
         timingSourceTask(value) { if (!value) this.form.source = 'original'; },
     },
     mounted() { this.load(); },
@@ -192,11 +197,10 @@ export default {
         },
         sameTrigger(a, b) { return this.triggerKey(a) === this.triggerKey(b); },
         resetTiming() {
-            if (this.timing === 'first') return;
-            const id = this.timing.split(':')[1];
-            if (!this.config.tasks.some(task => task.id === id && this.sameTrigger(task, this.form))) this.timing = 'first';
+            if (this.timing && !this.timingOptions.some(option => option.value === this.timing)) this.timing = undefined;
         },
         sourceForTiming(timing) {
+            if (!timing) return '';
             const original = this.config.tasks.find(task => task.id === this.form.id);
             if (original?.source === 'task' && this.sameTrigger(original, this.form) && timing === this.taskTiming(original)) return original.source_task;
             if (timing === 'first') return '';
@@ -215,7 +219,7 @@ export default {
                 stage = 1;
                 tasks.forEach(task => { if (this.sameTrigger(task, this.form)) task.stage++; });
             } else {
-                const [mode, id] = timing.split(':');
+                const [mode, id] = (timing || '').split(':');
                 const target = tasks.find(task => task.id === id && this.sameTrigger(task, this.form));
                 stage = target ? target.stage + (mode === 'after' ? 1 : 0) : null;
             }
@@ -282,7 +286,9 @@ export default {
             this.resetTargets('cluster'); this.editing = !!task;
             this.form = task ? { ...task } : { ...taskDefaults(), id: `task-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}` };
             this.targetCluster = this.isFounder && !this.form.k8s_config ? 'current' : 'remote';
-            this.timing = task ? this.taskTiming(task) : 'first'; this.visible = true;
+            this.timing = task ? this.taskTiming(task) : 'first';
+            this.resetTiming();
+            this.visible = true;
         },
         async applyTask() {
             if (this.saving || this.loading || this.importingConfig) return;

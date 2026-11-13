@@ -43,9 +43,15 @@ export const helmManifestComputed = {
 
 export const helmManifestMethods = {
     cleanupHelmType(previousType, nextType) {
-        if (previousType == 'helm' && nextType != 'helm') {
+        if (['helm', 'metrics-plugin'].includes(previousType) && !['helm', 'metrics-plugin'].includes(nextType)) {
             delete this.json.platform.helm;
         }
+    },
+    validateMetricsChart() {
+        const helm = this.form.helm;
+        return helm.helmtype == '1'
+            ? Boolean(helm.repository.trim() && helm.chartName.trim())
+            : Boolean(helm.chartName2.trim());
     },
     getChartInfo() {
         this.getChartInfoLoading = true;
@@ -112,7 +118,7 @@ export const helmManifestMethods = {
         if (helm.repository) this.getChartInfo();
     },
     applyHelmPlatform() {
-        if (this.form.type != 'helm') {
+        if (!['helm', 'metrics-plugin'].includes(this.form.type)) {
             delete this.json.platform.helm;
             return;
         }
@@ -145,7 +151,7 @@ export const helmManifestMethods = {
         delete this.json.platform.shells;
     },
     cleanupHelmPlatformForSubmit() {
-        if (this.form.type != 'helm') return;
+        if (!['helm', 'metrics-plugin'].includes(this.form.type)) return;
         delete this.json.platform['container-v2'];
         delete this.json.platform.volumes;
         delete this.json.platform.volumeClaimTemplates;

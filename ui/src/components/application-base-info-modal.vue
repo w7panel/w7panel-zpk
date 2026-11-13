@@ -206,6 +206,7 @@ export default {
             if (this.applicationType == 'tradition') { return '传统应用' }
             if (this.applicationType == 'system-image') { return '系统镜像' }
             if (this.applicationType == 'gateway-plugin') { return '网关插件' }
+            if (this.applicationType == 'metrics-plugin') { return '监控插件' }
             return '';
         },
     },

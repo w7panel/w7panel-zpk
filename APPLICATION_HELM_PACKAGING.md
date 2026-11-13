@@ -14,6 +14,7 @@
 | 应用插件 | `app-plugin` | 应用插件专用 Job 打包器 | Helm hook Job，可选 MicroApp/Site；没有自己的常驻 Workload | 复用所选传统应用的 `site-storage` PVC |
 | 传统应用 | `tradition` | 通用工作负载生成器 + 传统应用增强 | Workload、Service、Ingress、代码/NGINX Job、可选 NGINX 子 Chart | 安装方传入的 `PVC_NAME`，主要挂载为 `site-storage` |
 | Helm/K8sYaml 应用 | `helm` | `helm_helmapp.go`：解包并改写用户 Chart，或把 YAML 写入 templates | 完全由用户 Chart/YAML 决定，ZPK 可追加子 Chart、MicroApp、Site、sidecar | 完全由用户 Chart/YAML 决定 |
+| 监控插件 | `metrics-plugin` | 复用用户 Helm Chart 打包；必须提供 Chart 包，不支持仅凭附加 YAML 发布 | 由用户 Chart 决定，不生成 Higress WasmPlugin | 由用户 Chart 决定 |
 | 系统镜像 | `system-image` | `helm_systemimageapp.go`，复用通用工作负载生成器 | Sysbox Deployment、Service、Job | 安装方传入的 `PVC_NAME`，仅供 Sysbox 持久化系统层 |
 
 最重要的边界：
@@ -148,6 +149,10 @@ OCI repository 名为：
 6. 其余类型，包括 `docker`，走通用 Workload 分支。
 
 读取旧 manifest 时，`environment` 会迁移为 `tradition`。
+
+`metrics-plugin` 在进入打包流程前校验非空 `platform.helm.chartName`，随后复用用户 Helm 包分支；缺少 Chart 时直接报错，不回退到通用 Workload。制品编辑器提供 Helm 仓库（地址、Chart 名称、版本）和下载包地址 / 上传入口，以及已有的安装配置；不显示 Helm 启用开关、独立 YAML 编辑区或普通容器配置。已有 `depend_yamls` 在加载和保存时保留。类型在 `helm` 与 `metrics-plugin` 之间切换保留 Helm 配置，切换到其他类型按现有规则清理。
+
+监控插件描述制品用途，指标采集目标、存储及展示由 Chart 本身配置；本次不新增面板指标接入协议。安装仍使用既有 Helm 包接口；外部客户端如需按新类型分类，需识别 `application.type: metrics-plugin`，本仓库不会自动更新外部客户端。
 
 因此类型和数据应保持一致。例如非 Helm 类型意外残留 `platform.helm` 时，也会优先按用户 Helm 包处理。当前 UI 在切换类型时会清理这类残留字段。
 

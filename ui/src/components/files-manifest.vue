@@ -757,7 +757,7 @@
                 <a-form-item label="输入类型">
                     <a-select v-model="spDesc.type">
                         <a-option value="text">文本</a-option><a-option value="textarea">多行文本</a-option>
-                        <a-option value="select">单选器</a-option><a-option value="multiselect">多选器</a-option>
+                        <a-option value="select">单选</a-option><a-option value="multiselect">多选</a-option>
                     </a-select>
                 </a-form-item>
                 <a-form-item v-if="['select', 'multiselect'].includes(spDesc.type)" label="选项配置">
@@ -777,6 +777,7 @@
                                 </manifest-config-table-column>
                             </template>
                         </manifest-config-table>
+                        <div v-if="spDesc.type === 'multiselect'" class="c-999 mt-6">多选结果会用英文逗号（,）连接为一个字符串写入 env 环境变量。例如选择 read 和 write，最终值为 read,write；未选择时为空字符串。选项值不能包含英文逗号。</div>
                     </div>
                 </a-form-item>
                 <a-form-item label="默认值">
@@ -789,8 +790,8 @@
                     <a-textarea v-else-if="spDesc.type === 'textarea'" v-model="spDesc.values_text" placeholder="请输入默认值" />
                     <a-input v-else v-model="spDesc.values_text" placeholder="请输入默认值" />
                 </a-form-item>
-                <a-form-item label="单位"><a-input v-model="spDesc.unit" placeholder="可不填，仅用于展示" /></a-form-item>
-                <a-form-item label="说明"><a-textarea v-model="spDesc.value" placeholder="显示在表单下方" /></a-form-item>
+                <a-form-item label="单位"><a-input v-model="spDesc.unit" placeholder="仅用于展示" /></a-form-item>
+                <a-form-item label="说明"><a-textarea v-model="spDesc.value" /></a-form-item>
             </a-form>
             <template #footer>
                 <a-button @click="spDesc.show = false">取消</a-button>

@@ -2,14 +2,15 @@
     <div>
         <a-space class="workflow-toolbar">
             <a-button type="primary" @click="editTask()" :disabled="loading || saving || !loaded">新增自动任务</a-button>
+            <a-button @click="openOrder" :disabled="loading || saving || !loaded || !config.tasks.length">调整执行顺序</a-button>
         </a-space>
         <a-spin :loading="loading" style="width:100%">
             <a-table :data="orderedTasks" :pagination="false" row-key="id">
                 <template #columns>
-                    <a-table-column title="任务"><template #cell="{ record }"><div>{{ record.name }}</div><div class="workflow-task-id">{{ record.id }}</div></template></a-table-column>
+                    <a-table-column title="任务"><template #cell="{ record }">{{ record.name }}</template></a-table-column>
                     <a-table-column title="执行动作"><template #cell="{ record }">{{ actionLabels[record.action] }}</template></a-table-column>
                     <a-table-column title="触发条件"><template #cell="{ record }">{{ record.deploy_type === 1 ? '更新版本' : '新增版本' }}：{{ record.tag_name }}</template></a-table-column>
-                    <a-table-column title="镜像来源"><template #cell="{ record }">{{ sourceLabel(record) }}</template></a-table-column>
+                    <a-table-column title="使用镜像"><template #cell="{ record }">{{ sourceLabel(record) }}</template></a-table-column>
                     <a-table-column title="执行时机" :width="240">
                         <template #cell="{ record }">{{ timingLabel(record) }}</template>
                     </a-table-column>
@@ -25,6 +26,23 @@
                 </template>
             </a-table>
         </a-spin>
+        <a-modal v-model:visible="orderVisible" title="调整执行顺序" :width="960" :footer="false" :mask-closable="false" :closable="!saving" :esc-to-close="!saving">
+            <section v-for="group in orderGroups" :key="group.key" class="workflow-order-group">
+                <div class="workflow-order-trigger">{{ triggerLabel(group.tasks[0]) }}</div>
+                <a-table :data="group.tasks" :pagination="false" row-key="id">
+                    <template #columns>
+                        <a-table-column title="任务" data-index="name" />
+                        <a-table-column title="执行时机" :width="230"><template #cell="{ record }">
+                            <a-select :model-value="record.stage" :options="orderStageOptions(group.tasks)" :disabled="saving" @update:model-value="changeOrderStage(record, $event)" />
+                        </template></a-table-column>
+                        <a-table-column title="使用镜像" :width="260"><template #cell="{ record }">
+                            <a-select :model-value="orderSourceValue(record)" :options="orderSourceOptions(record)" placeholder="请选择使用镜像" :disabled="saving" @update:model-value="setOrderSource(record, $event)" />
+                        </template></a-table-column>
+                    </template>
+                </a-table>
+            </section>
+            <a-space class="workflow-order-footer"><a-button @click="orderVisible = false" :disabled="saving">取消</a-button><a-button type="primary" :loading="saving" :disabled="!!orderError" @click="applyOrder">保存</a-button></a-space>
+        </a-modal>
         <a-modal v-model:visible="runsVisible" :title="`${runsTask?.name || ''} · 执行记录`" :width="900" :footer="false" @close="closeRuns">
         <a-table :data="runs" :loading="loadingRuns" :pagination="false" row-key="id">
             <template #columns>
@@ -43,12 +61,7 @@
                 <a-form-item label="触发方式"><a-radio-group v-model="form.deploy_type"><a-radio :value="1">更新版本</a-radio><a-radio :value="2">新增版本</a-radio></a-radio-group></a-form-item>
                 <a-form-item v-if="form.deploy_type === 2" label="匹配方式"><a-radio-group v-model="form.match_type"><a-radio :value="1">前缀匹配</a-radio><a-radio :value="2">正则匹配</a-radio></a-radio-group></a-form-item>
                 <a-form-item label="版本名称 / 匹配条件"><a-input v-model="form.tag_name" :placeholder="form.deploy_type === 1 ? '例如 latest,v1.0，多个版本用英文逗号分隔' : '填写前缀（英文逗号分隔）或一个正则表达式'" /></a-form-item>
-                <a-form-item label="执行时机">
-                    <a-select :model-value="selectedTiming" :options="timingOptions" placeholder="请选择执行时机"
-                        @update:model-value="timing = $event" />
-                </a-form-item>
                 <a-form-item label="执行动作"><a-select v-model="form.action"><a-option value="deploy">部署应用</a-option><a-option value="build">镜像重构</a-option></a-select></a-form-item>
-                <a-form-item label="镜像来源"><a-radio-group v-model="form.source"><a-radio value="original">原始镜像</a-radio><a-radio v-if="timingSourceTask" value="task">指定构建任务的结果</a-radio></a-radio-group></a-form-item>
                 <template v-if="form.action === 'build'">
                     <a-form-item label="Dockerfile 追加指令">
                         <a-textarea v-model="form.dockerfile" :auto-size="{ minRows: 7, maxRows: 15 }" placeholder="例如 RUN apt-get update && apt-get install -y cloud-init" />
@@ -131,7 +144,7 @@ export default {
             config: { namespace: 'default', tasks: [] }, loading: false, saving: false, loaded: false,
             namespaces: [], apps: [], containers: [], loadingTargets: false, targetSequence: 0,
             targetCluster: 'remote', targetLoaded: {}, targetRequest: '', importingConfig: false,
-            visible: false, editing: false, form: taskDefaults(), timing: 'first', runs: [], loadingRuns: false,
+            visible: false, editing: false, form: taskDefaults(), orderVisible: false, orderTasks: [], runs: [], loadingRuns: false,
             runsVisible: false, runsTask: null, runSequence: 0,
             logsFullscreen: false, logStatus: '', logTerminal: null, logFit: null,
             logsVisible: false, logs: '', loadingLogs: false, disposed: false, logSequence: 0,
@@ -156,37 +169,16 @@ export default {
             }
             return [...groups.values()].flatMap(tasks => tasks.sort((a, b) => a.stage - b.stage));
         },
-        timingOptions() {
-            const options = [{ value: 'first', label: '最先执行' }, ...this.orderedTasks.filter(task => task.id !== this.form.id && this.sameTrigger(task, this.form)).flatMap(task => [
-                { value: `after:${task.id}`, label: `在“${task.name}”之后执行` },
-                { value: `with:${task.id}`, label: `和“${task.name}”一起执行` },
-            ])];
-            return options.filter(option => !this.imageDependencyError(this.tasksForTiming(option.value)));
+        orderGroups() {
+            const groups = new Map();
+            for (const task of this.orderTasks) {
+                const key = this.triggerKey(task);
+                if (!groups.has(key)) groups.set(key, { key, tasks: [] });
+                groups.get(key).tasks.push(task);
+            }
+            return [...groups.values()];
         },
-        selectedTiming() {
-            return this.timingOptions.some(option => option.value === this.timing) ? this.timing : undefined;
-        },
-        previewTasks() { return this.tasksForTiming(this.timing); },
-        timingConflict() { return this.imageDependencyError(this.previewTasks); },
-        executionStage() {
-            return this.previewTasks.find(task => task.id === this.form.id)?.stage;
-        },
-        timingDescription() {
-            if (!this.timing || this.timing === 'first') return '';
-            const [mode, id] = this.timing.split(':');
-            const task = this.config.tasks.find(task => task.id === id && this.sameTrigger(task, this.form));
-            if (!task) return '请选择执行时机。';
-            const names = this.config.tasks.filter(item => item.id !== this.form.id && this.sameTrigger(item, this.form) && item.stage === task.stage).map(item => `“${item.name}”`).join('、');
-            return mode === 'after' ? `等待${names}全部成功后执行。` : `与${names}同组并行；后续任务等待整组全部成功。`;
-        },
-        timingSourceTask() { return this.sourceForTiming(this.timing); },
-    },
-    watch: {
-        'form.deploy_type'() { this.resetTiming(); },
-        'form.match_type'() { this.resetTiming(); },
-        'form.tag_name'() { this.resetTiming(); },
-        timingOptions() { this.resetTiming(); },
-        timingSourceTask(value) { if (!value) this.form.source = 'original'; },
+        orderError() { return this.imageDependencyError(this.orderTasks); },
     },
     mounted() { this.load(); },
     beforeUnmount() { this.disposed = true; this.closeLogs(); this.targetSequence++; this.runSequence++; },
@@ -196,43 +188,50 @@ export default {
             return JSON.stringify([type, type === 2 ? Number(task.match_type || 1) : 0, (task.tag_name || '').trim()]);
         },
         sameTrigger(a, b) { return this.triggerKey(a) === this.triggerKey(b); },
-        resetTiming() {
-            if (this.timing && !this.timingOptions.some(option => option.value === this.timing)) this.timing = undefined;
+        triggerLabel(task) {
+            return `${Number(task.deploy_type || 1) === 1 ? '更新版本' : `新增版本 · ${Number(task.match_type || 1) === 1 ? '前缀匹配' : '正则匹配'}`}：${task.tag_name}`;
         },
-        sourceForTiming(timing) {
-            if (!timing) return '';
-            const original = this.config.tasks.find(task => task.id === this.form.id);
-            if (original?.source === 'task' && this.sameTrigger(original, this.form) && timing === this.taskTiming(original)) return original.source_task;
-            if (timing === 'first') return '';
-            const [mode, id] = timing.split(':');
-            const target = this.config.tasks.find(task => task.id === id && task.id !== this.form.id && this.sameTrigger(task, this.form));
-            if (!target) return '';
-            return mode === 'after' && target.action === 'build' ? target.id : target.source === 'task' ? target.source_task : '';
+        openOrder() {
+            if (this.loading || this.saving || !this.loaded) return;
+            this.orderTasks = this.orderedTasks.map(task => ({ ...task }));
+            this.normalizeOrderSources();
+            this.orderVisible = true;
         },
-        tasksForTiming(timing) {
-            const original = this.config.tasks.find(task => task.id === this.form.id);
-            const unchanged = original && this.sameTrigger(original, this.form) && timing === this.taskTiming(original);
-            const tasks = this.config.tasks.filter(task => task.id !== this.form.id).map(task => ({ ...task }));
-            let stage;
-            if (unchanged) stage = original.stage;
-            else if (timing === 'first') {
-                stage = 1;
-                tasks.forEach(task => { if (this.sameTrigger(task, this.form)) task.stage++; });
-            } else {
-                const [mode, id] = (timing || '').split(':');
-                const target = tasks.find(task => task.id === id && this.sameTrigger(task, this.form));
-                stage = target ? target.stage + (mode === 'after' ? 1 : 0) : null;
+        orderStageOptions(tasks) {
+            const stages = [...new Set([...Array.from({ length: tasks.length }, (_, i) => i + 1), ...tasks.map(task => task.stage)])].sort((a, b) => a - b);
+            return stages.map(stage => ({ value: stage, label: stage === 1 ? '第 1 组 · 最先执行' : `第 ${stage} 组` }));
+        },
+        orderSourceOptions(task) {
+            return [{ value: '', label: '原始镜像' }, ...this.orderTasks.filter(source => source.id !== task.id && source.action === 'build' && this.sameTrigger(source, task) && source.stage < task.stage).map(source => ({ value: source.id, label: source.name }))];
+        },
+        orderSourceValue(task) {
+            const value = task.source === 'task' ? task.source_task : '';
+            return this.orderSourceOptions(task).some(option => option.value === value) ? value : undefined;
+        },
+        setOrderSource(task, value) {
+            const selected = this.orderSourceOptions(task).some(option => option.value === value) ? value : '';
+            task.source = selected ? 'task' : 'original'; task.source_task = selected || '';
+        },
+        normalizeOrderSources() {
+            for (const task of this.orderTasks) {
+                if (task.source === 'task' && !this.orderSourceOptions(task).some(option => option.value === task.source_task)) this.setOrderSource(task, '');
             }
-            const task = { ...this.form, stage, source_task: this.form.source === 'task' ? this.sourceForTiming(timing) : '' };
-            const index = this.config.tasks.findIndex(item => item.id === task.id);
-            tasks.splice(index >= 0 ? index : tasks.length, 0, task);
-            return tasks;
         },
-        imageDependencyError(tasks) {
+        changeOrderStage(task, stage) { task.stage = stage; this.normalizeOrderSources(); },
+        async applyOrder() {
+            if (this.saving || this.loading) return;
+            this.normalizeOrderSources();
+            if (this.orderError) { messageError(this.orderError); return; }
+            const tasks = this.config.tasks.map(task => ({ ...this.orderTasks.find(item => item.id === task.id) }));
+            if (await this.save({ ...this.config, tasks }) && !this.disposed) this.orderVisible = false;
+        },
+        imageDependencyError(tasks, sources = tasks) {
             for (const task of tasks) {
                 if (task.source !== 'task') continue;
-                const source = tasks.find(item => item.id === task.source_task && item.action === 'build');
-                if (source && !this.sameTrigger(source, task)) return `“${task.name || '当前任务'}”与来源构建任务的触发条件必须相同`;
+                const source = sources.find(item => item.id === task.source_task && item.action === 'build');
+                if (source && !this.sameTrigger(source, task)) {
+                    return `“${task.name || '当前任务'}”与来源构建任务的触发条件必须相同`;
+                }
                 if (!source || source.stage >= task.stage) return `“${task.name || '当前任务'}”须在来源构建任务“${source?.name || '未选择'}”完成后执行`;
             }
             return '';
@@ -286,18 +285,19 @@ export default {
             this.resetTargets('cluster'); this.editing = !!task;
             this.form = task ? { ...task } : { ...taskDefaults(), id: `task-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}` };
             this.targetCluster = this.isFounder && !this.form.k8s_config ? 'current' : 'remote';
-            this.timing = task ? this.taskTiming(task) : 'first';
-            this.resetTiming();
             this.visible = true;
         },
         async applyTask() {
             if (this.saving || this.loading || this.importingConfig) return;
             if (this.form.action === 'deploy' && this.targetCluster === 'remote' && !this.form.k8s_config.trim()) { messageError('请填写或导入目标集群 KUBECONFIG'); return; }
             if (!this.form.name.trim() || !this.form.tag_name.trim()) { messageError('请填写任务名称和版本匹配条件'); return; }
-            if (!this.executionStage || this.executionStage > 1000) { messageError('请选择有效的执行时机'); return; }
-            if (this.form.source === 'task' && !this.timingSourceTask) { messageError('当前执行时机没有可用的构建镜像，请选择原始镜像'); return; }
-            if (this.timingConflict) { messageError('请选择其他执行时机'); return; }
-            const tasks = this.previewTasks.map(task => task.id === this.form.id && task.action === 'build' ? { ...task, k8s_config: '' } : task);
+            const original = this.config.tasks.find(task => task.id === this.form.id);
+            const candidate = { ...this.form, stage: original?.stage || 1, source: original?.source || 'original', source_task: original?.source_task || '' };
+            if (candidate.action === 'build') candidate.k8s_config = '';
+            const tasks = this.config.tasks.map(task => task.id === candidate.id ? candidate : { ...task });
+            if (!original) tasks.push(candidate);
+            const error = this.imageDependencyError(tasks);
+            if (error) { messageError(`${error}，请先在“调整执行顺序”中修改使用镜像`); return; }
             if (await this.save({ ...this.config, tasks }) && !this.disposed) this.visible = false;
         },
         async removeTask(task) {
@@ -435,8 +435,10 @@ export default {
 .workflow-kubeconfig { width: 100%; }
 .workflow-config-import { position: relative; }
 .workflow-config-import input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+.workflow-order-group { margin-bottom: 20px; }
+.workflow-order-trigger { margin-bottom: 12px; font-weight: 500; }
+.workflow-order-footer { display: flex; justify-content: flex-end; margin-top: 20px; }
 .workflow-toolbar { margin-bottom: 16px; }
-.workflow-task-id { color: var(--color-text-3); font-size: 12px; margin-top: 4px; overflow-wrap: anywhere; }
 .workflow-run-id { font-family: ui-monospace, monospace; }
 .workflow-log-title { position: relative; width: 100%; min-height: 32px; display: flex; align-items: center; justify-content: center; }
 .workflow-log-actions { position: absolute; right: 0; }

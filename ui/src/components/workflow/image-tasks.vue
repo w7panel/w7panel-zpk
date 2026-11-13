@@ -199,7 +199,7 @@ export default {
         },
         orderStageOptions(tasks) {
             const stages = [...new Set([...Array.from({ length: tasks.length }, (_, i) => i + 1), ...tasks.map(task => task.stage)])].sort((a, b) => a - b);
-            return stages.map(stage => ({ value: stage, label: stage === 1 ? '第 1 组 · 最先执行' : `第 ${stage} 组` }));
+            return stages.map(stage => ({ value: stage, label: `第 ${stage} 组` }));
         },
         orderSourceOptions(task) {
             return [{ value: '', label: '原始镜像' }, ...this.orderTasks.filter(source => source.id !== task.id && source.action === 'build' && this.sameTrigger(source, task) && source.stage < task.stage).map(source => ({ value: source.id, label: source.name }))];

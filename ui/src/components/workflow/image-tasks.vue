@@ -26,8 +26,6 @@
             </a-table>
         </a-spin>
         <a-modal v-model:visible="runsVisible" :title="`${runsTask?.name || ''} · 执行记录`" :width="900" :footer="false" @close="closeRuns">
-        <a-button :loading="loadingRuns" @click="loadRuns">刷新执行记录</a-button>
-        <p class="c-99">任务 ID：{{ runsTask?.id }}。显示此任务最近 50 次执行；点击“任务日志”查看该任务在本轮流程中的日志。</p>
         <a-table :data="runs" :loading="loadingRuns" :pagination="false" row-key="id">
             <template #columns>
                 <a-table-column title="流程 ID" :width="150"><template #cell="{ record }"><a-tooltip :content="record.run_id"><span class="workflow-run-id">{{ record.run_id?.slice(0, 12) }}</span></a-tooltip></template></a-table-column>
@@ -47,14 +45,14 @@
                 <a-form-item label="版本名称 / 匹配条件"><a-input v-model="form.tag_name" :placeholder="form.deploy_type === 1 ? '例如 latest,v1.0，多个版本用英文逗号分隔' : '填写前缀（英文逗号分隔）或一个正则表达式'" /></a-form-item>
                 <a-form-item label="执行时机">
                     <a-select v-model="timing" :options="timingOptions" />
-                    <template #extra>仅可选择触发方式、匹配方式和版本条件相同的任务；同组并行，“之后执行”等待整组全部成功。灰色选项会破坏镜像依赖。</template>
                 </a-form-item>
-                <p v-if="timingConflict" style="color:var(--color-danger-6)">{{ timingConflict }}</p>
                 <a-form-item label="执行动作"><a-select v-model="form.action"><a-option value="deploy">部署应用</a-option><a-option value="build">镜像重构</a-option></a-select></a-form-item>
-                <a-form-item label="镜像来源"><a-radio-group v-model="form.source"><a-radio value="original">原始镜像</a-radio><a-radio v-if="timingSourceTask || form.source === 'task'" value="task" :disabled="!timingSourceTask">指定构建任务的结果</a-radio></a-radio-group></a-form-item>
+                <a-form-item label="镜像来源"><a-radio-group v-model="form.source"><a-radio value="original">原始镜像</a-radio><a-radio v-if="timingSourceTask" value="task">指定构建任务的结果</a-radio></a-radio-group></a-form-item>
                 <template v-if="form.action === 'build'">
-                    <a-form-item label="Dockerfile 追加指令"><a-textarea v-model="form.dockerfile" :auto-size="{ minRows: 7, maxRows: 15 }" placeholder="例如 RUN apt-get update && apt-get install -y cloud-init" /></a-form-item>
-                    <p class="c-99">系统自动添加 FROM；支持多条指令，不支持 FROM、ONBUILD、ADD、COPY。</p>
+                    <a-form-item label="Dockerfile 追加指令">
+                        <a-textarea v-model="form.dockerfile" :auto-size="{ minRows: 7, maxRows: 15 }" placeholder="例如 RUN apt-get update && apt-get install -y cloud-init" />
+                        <template #extra>系统自动添加 FROM；支持多条指令，不支持 FROM、ONBUILD、ADD、COPY。</template>
+                    </a-form-item>
                     <a-form-item label="目标 tag 后缀"><a-input v-model="form.tag_suffix" placeholder="例如 -cloudinit；留空覆盖原 tag" /></a-form-item>
                 </template>
                 <template v-else>
@@ -162,10 +160,7 @@ export default {
                 { value: `after:${task.id}`, label: `在“${task.name}”之后执行` },
                 { value: `with:${task.id}`, label: `和“${task.name}”一起执行` },
             ])];
-            return options.map(option => {
-                const reason = this.imageDependencyError(this.tasksForTiming(option.value));
-                return { ...option, disabled: !!reason, label: reason ? `${option.label}（${reason}）` : option.label };
-            });
+            return options.filter(option => !this.imageDependencyError(this.tasksForTiming(option.value)));
         },
         previewTasks() { return this.tasksForTiming(this.timing); },
         timingConflict() { return this.imageDependencyError(this.previewTasks); },
@@ -186,6 +181,7 @@ export default {
         'form.deploy_type'() { this.resetTiming(); },
         'form.match_type'() { this.resetTiming(); },
         'form.tag_name'() { this.resetTiming(); },
+        timingSourceTask(value) { if (!value) this.form.source = 'original'; },
     },
     mounted() { this.load(); },
     beforeUnmount() { this.disposed = true; this.closeLogs(); this.targetSequence++; this.runSequence++; },
@@ -294,7 +290,7 @@ export default {
             if (!this.form.name.trim() || !this.form.tag_name.trim()) { messageError('请填写任务名称和版本匹配条件'); return; }
             if (!this.executionStage || this.executionStage > 1000) { messageError('请选择有效的执行时机'); return; }
             if (this.form.source === 'task' && !this.timingSourceTask) { messageError('当前执行时机没有可用的构建镜像，请选择原始镜像'); return; }
-            if (this.timingConflict) { messageError(this.timingConflict); return; }
+            if (this.timingConflict) { messageError('请选择其他执行时机'); return; }
             const tasks = this.previewTasks.map(task => task.id === this.form.id && task.action === 'build' ? { ...task, k8s_config: '' } : task);
             if (await this.save({ ...this.config, tasks }) && !this.disposed) this.visible = false;
         },

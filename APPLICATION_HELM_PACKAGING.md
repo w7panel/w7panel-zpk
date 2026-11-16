@@ -921,6 +921,8 @@ helm template <release> <generated-chart-dir> -f <install-values.yaml>
 
 ### 2026-11-16 面板单域名兼容归一化
 
+命名域名组未填写域名时，Ingress 使用 `<24位十六进制哈希>.private.cluster.invalid` 占位。哈希仍取命名空间、Release 名称、Chart 完整名称与域名组参数名拼接后的 SHA-256 前 24 位；已有 Ingress 优先沿用当前域名。占位域名继续通过 `.invalid` 后缀识别，不生成 TLS，也不申请自动证书。
+
 面板安装入口将旧单域名适配成内部 `default` 组，复用多域名输入、校验及 DNS 证书授权；每组分别保留域名、SSL 与 DNS 配置。`default` 不作为新的环境变量或 `domainGroups.default` 写入 Helm，旧 Chart 继续使用原域名参数与单值配置。旧安装调用所需的主域名通过主组读取，不将首组数据写回请求的旧单值字段，也不覆盖其他组。该分组只用于安装，不新增安装后的快捷绑定协议。
 
 面板仅向 ZPK Chart 传入域名组参数和旧 Chart 的兼容输入，不复刻路由哈希或 Ingress 名称，不逐条覆盖 `ingress.<哈希>`。Helm 渲染后，面板根据实际 Ingress 的 TLS 补充缺少的证书默认注解，保留 Chart 显式配置的签发器和续期时间。泛域名先在安装入口签发绑定命名空间、Release、域名及签发器的授权，再在渲染后校验并派生为绑定实际 Ingress 名称的 DNS 授权；授权不进入 Chart values。ZPK Chart 只负责路由、TLS 引用及 HTTPS/跳转约束。先更新面板再更新制品库；直接使用 Helm 安装时需自行提供证书签发器配置。

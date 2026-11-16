@@ -208,6 +208,7 @@ OCI repository 名为：
 - 工作负载容器的 `resources` 在打包时主动清空，由安装/调度侧统一设置；Shell Job 的容器资源会保留。
 - 容器镜像未填写时，默认构建目标是 `registry.local.w7.cc/default/<identify>:<version>`。
 - 容器端口生成 ClusterIP Service；声明了 `hostPort` 的端口另生成 LoadBalancer Service，但 Pod 自身的 `hostPort` 会在生成 values 时清零。
+- 生成型 Chart 的普通容器、初始化容器和生命周期 Job 中，直接配置的 `env[].value` 支持 Helm 模板，例如 `value: "{{ .Values.global.panel.panelUrl }}"`（`Values` 首字母大写）；在安装/升级渲染时求值。普通字符串及 `valueFrom` 保持原行为，变量名称不参与模板求值。启动参数的取值方式不变，不递归解析参数值内的模板。此能力需重新打包制品后生效，外部 Chart 仍由其自身模板决定。
 - 启动参数最终作为同名环境变量注入所有容器和 Job。包含点号的参数不会另建顶层 values key，而是引用已有嵌套 values；但当前模板仍会把这个带点名称输出成容器 env `name`，需注意 Kubernetes env 名合法性问题。
 - `writeYAMLFile` 会移除序列化结果中的所有 `%`，因此 `%DOMAIN_URL%` 等占位符进入 Chart 默认值后会变成不带 `%` 的字符串；安装端需要用最终值覆盖它们。
 

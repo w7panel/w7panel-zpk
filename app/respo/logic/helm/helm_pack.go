@@ -1277,10 +1277,6 @@ func (hc *HelmPack) getIngressValues(platform logic2.Platform, application logic
 					}
 				}
 			}
-			if autoSSL {
-				ingressAnnotations["cert-manager.io/cluster-issuer"] = "w7-letsencrypt-prod"
-				ingressAnnotations["cert-manager.io/renew-before"] = "30m"
-			}
 			// 添加更多匹配条件（header、method、query）
 			hc.addIngressMatchAnnotations(ingressAnnotations, route)
 			// 添加重写规则

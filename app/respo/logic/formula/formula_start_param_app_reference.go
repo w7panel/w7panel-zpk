@@ -7,14 +7,35 @@ import (
 	commonlogic "github.com/w7panel/w7panel-zpk/common/logic"
 )
 
-// ResolveStartParamAppReferencesCopy returns resolved start parameters without
-// changing the persisted manifest representation used by editing APIs.
+// ResolveStartParamAppReferencesCopy resolves references and locks values supplied
+// by other applications in this installation, without changing the saved manifest.
 func ResolveStartParamAppReferencesCopy(
 	params []commonlogic.StartParams,
 	manifests []*commonlogic.Manifest,
+	currentIdentifie string,
 ) []commonlogic.StartParams {
 	resolved := append([]commonlogic.StartParams(nil), params...)
 	resolveStartParamModuleNames(resolved, startParamAppIdentifies(manifests))
+	// Match the panel's findConfigModuleForm: external and self references do
+	// not acquire a lock; suffixed dependency configuration does not match either.
+	normalize := func(name string) string {
+		return strings.ReplaceAll(strings.ToLower(strings.TrimSpace(name)), "_", "-")
+	}
+	modules := make(map[string]bool, len(manifests))
+	for _, manifest := range manifests {
+		if manifest == nil {
+			continue
+		}
+		name := normalize(manifest.Application.Identifie)
+		if name != "" && name != normalize(currentIdentifie) {
+			modules[name] = true
+		}
+	}
+	for index := range resolved {
+		if resolved[index].Name != "" && modules[normalize(resolved[index].ModuleName)] {
+			resolved[index].Lock = true
+		}
+	}
 	return resolved
 }
 

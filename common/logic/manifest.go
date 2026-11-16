@@ -213,6 +213,7 @@ type StartParams struct {
 	ValuesText  string   `yaml:"values_text" json:"values_text"`
 	ModuleName  string   `yaml:"module_name" json:"module_name"`
 	Hidden      bool     `yaml:"hidden,omitempty" json:"hidden,omitempty"`
+	Lock        bool     `yaml:"lock,omitempty" json:"lock,omitempty"`
 }
 
 type Container struct {

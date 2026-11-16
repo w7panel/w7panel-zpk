@@ -904,9 +904,25 @@ helm template <release> <generated-chart-dir> -f <install-values.yaml>
 - `device`：为应用未指定固定 PVC 的挂载创建一份独立 PVC。安装参数为 `storage.size`（`%STORAGE_SIZE%`）、`storage.className`（`%STORAGE_CLASS_NAME%`）、`storage.accessMode`（`%STORAGE_RW_MODE%`），复用面板的存储设备控件。各子 Chart 使用自己的 storage values，不使用共享 global 参数。独立 PVC 表示独立申请容量，不保证独占底层磁盘。
 - `partition`：安装时通过 `PVC_NAME` 选择已有 PVC，不生成 PVC；挂载子路径沿用 manifest 中的配置，留空时保持为空，不自动补写隔离目录。用户明确配置的路径、subPathExpr、原有随机目录标记以及传统站点、系统层目录保持原规则。
 - 已指定固定 claimName 的 volume 不受影响。配置页面仍阻止已有 StatefulSet `volumeClaimTemplates` 与应用存储模式同时配置；打包后端不增加专门的存储模式校验或挂载转换。
-- 独立 PVC 的稳定名称由 release 和应用标识生成，长名称带哈希避免主子应用冲突。面板通过三个存储设备启动参数占位符识别设备模式，安装信息不额外返回 `storageMode`；安装后继续导出 `PVC_NAME` 给关联应用及工具。
+- 独立 PVC 的稳定名称由 ZPK Chart 根据 release 和应用标识生成，长名称带哈希避免主子应用冲突。面板通过三个存储设备启动参数占位符识别安装控件，安装信息不额外返回 `storageMode`；面板不重复计算 PVC 名称、不自动补写隐藏 `PVC_NAME`，也不按存储模式强制覆盖 Helm values。应用间的参数引用沿用显式启动参数配置。
 - PVC 以权重 -100 的 pre-install/pre-upgrade hook 在挂载它的生命周期任务前创建；采用 `helm.sh/resource-policy: keep`，已有同名且归属当前 release 的 PVC 不重建，无 ownerReference 或应用分组标签。创建后由存储管理调整容量；应用自身卸载脚本的清理行为不变。
 - 子路径保持配置原值，不为留空挂载生成随机目录；用户明确配置原有 `%RANDOM_DIR%` 标记时，沿用原有升级保留规则。设备、分区模式下，已有同名 Workload 的同名 volume 继续使用原 PVC，安装配置改变不替换其绑定，也不中止升级。首次安装或新增挂载才采用本次配置；全部受管挂载都沿用其他已有 PVC 时，不创建闲置的独立 PVC。未启用新模式的随机目录仍使用原有算法。
 - 新模式要求配套支持存储设备启动参数的面板后端；旧制品继续兼容。Helm 包、监控插件由原 Chart 管理存储，应用插件跟随目标传统应用。
 
-启用域名组 `autoSSL`（或旧版 `ingressForceHttps`）时，生成的 Ingress 包含当前域名的 TLS Secret 引用、默认 `w7-letsencrypt-prod` 签发器和 `30m` 提前续期，并默认设置 `w7.cc/ssl-redirect`、`higress.io/ssl-redirect` 为 `"true"`。显式配置 `w7.cc/ssl-redirect: "false"` 可关闭跳转，Higress 注解随之同步；自定义签发器保持有效，未启用 SSL 时不添加这些默认设置。
+启用域名组 `autoSSL`（或旧版 `ingressForceHttps`）时，ZPK 生成当前域名的 TLS Secret 引用及跳转策略，不再自动写入 `cert-manager.io/cluster-issuer` 和 `cert-manager.io/renew-before`。证书默认签发器与续期时间由面板安装时统一注入，泛域名使用经验证的 DNS 授权签发器。`w7.cc/require-https`、`w7.cc/deny-delete` 与跳转策略仍由制品声明；显式填写的自定义策略注解继续保留。
+
+### 2026-11-16 安装参数锁定
+
+启动参数支持显式配置 `lock: true`，表示安装时显示但禁止用户修改，与 `hidden` 独立。ZPK 在安装响应中按面板原有规则补充锁定：`module_name` 匹配本次安装列表中的另一个应用时，返回 `lock: true`；外部应用引用、自引用和 `w7_mysql.DB_NAME` 等带后缀的依赖配置保留参数原有的 `lock`，未声明时仍可编辑。匹配沿用面板的大小写、首尾空白和下划线规范化方式。ZPK 不更改 `hidden` 和取值规则，不回写源 manifest。面板保留原有引用解析、赋值及锁定代码，兼容旧制品库没有返回 `lock` 的情况；升级时按已安装配置锁定的既有处理也保持不变。
+
+发布分阶段进行：先更新面板，保留原有锁定判断并支持 ZPK 返回的 `lock`；再更新制品库，由 ZPK 声明同批应用引用参数的锁定状态；经过兼容期、确认使用中的制品库已更新后，再移除面板中这部分重复的锁定判断。引用解析、实际赋值和依赖校验仍由面板执行；升级时依赖已安装配置的锁定处理也不属于本次迁移范围。
+
+兼容期内，面板后端的 `normalizeInstallFormulaStartParams` 整体保留原实现，包括 PVC 参数转换、隐藏和锁定行为，不在本次迁移中改写其内部逻辑；待后续统一清理。ZPK 的 lock 声明不能视为该旧方法已被移除。
+
+### 2026-11-16 面板单域名兼容归一化
+
+面板安装入口将旧单域名适配成内部 `default` 组，复用多域名输入、校验及 DNS 证书授权；每组分别保留域名、SSL 与 DNS 配置。`default` 不作为新的环境变量或 `domainGroups.default` 写入 Helm，旧 Chart 继续使用原域名参数与单值配置。旧安装调用所需的主域名通过主组读取，不将首组数据写回请求的旧单值字段，也不覆盖其他组。该分组只用于安装，不新增安装后的快捷绑定协议。
+
+面板仅向 ZPK Chart 传入域名组参数和旧 Chart 的兼容输入，不复刻路由哈希或 Ingress 名称，不逐条覆盖 `ingress.<哈希>`。Helm 渲染后，面板根据实际 Ingress 的 TLS 补充缺少的证书默认注解，保留 Chart 显式配置的签发器和续期时间。泛域名先在安装入口签发绑定命名空间、Release、域名及签发器的授权，再在渲染后校验并派生为绑定实际 Ingress 名称的 DNS 授权；授权不进入 Chart values。ZPK Chart 只负责路由、TLS 引用及 HTTPS/跳转约束。先更新面板再更新制品库；直接使用 Helm 安装时需自行提供证书签发器配置。
+
+旧主子应用分别持有内部 `default` 安装组；旧子应用未声明命名组、也未提供绑定时，在入口复制主应用主组的域名、SSL、DNS 配置，之后统一走分组校验与传值。先整理主应用，再处理子应用，不依赖请求列表顺序。显式提交（含留空）及新命名分组不覆盖。面板表单同步尚未单独编辑的旧子组，继承标记仅保留在表单状态，不加入安装协议。

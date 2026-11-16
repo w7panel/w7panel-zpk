@@ -331,6 +331,7 @@ export const startParamsManifestMethods = {
             module_name: item.module_name,
             description: item.description || '',
             hidden: Boolean(item.hidden),
+            lock: Boolean(item.lock),
         }));
         return this.form.type == 'app-plugin'
             ? withPluginTraditionStartParams(startParams, this.form.traditionName)

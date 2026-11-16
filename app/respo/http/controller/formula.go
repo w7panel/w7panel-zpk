@@ -357,6 +357,7 @@ func (c Formula) Info(ctx *gin.Context) {
 			startParams := formulalogic.ResolveStartParamAppReferencesCopy(
 				item.Platform.StartParams,
 				formula.AllManifest,
+				item.Application.Identifie,
 			)
 			hasStorageDevice := item.Platform.Storage != nil && item.Platform.Storage.Mode == logic2.StorageDevice
 			if !hasStorageDevice {

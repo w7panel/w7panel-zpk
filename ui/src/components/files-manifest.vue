@@ -534,7 +534,7 @@
                         </div>
                     </div>
 
-                    <div v-if="!['helm', 'metrics-plugin'].includes(form.type) && form.type != 'app-plugin' && form.type != 'gateway-plugin' && form.type != 'system-image'" class="bg-white com-line mt-20">
+                    <div v-if="!['helm', 'metrics-plugin'].includes(form.type) && form.type != 'app-plugin' && form.type != 'gateway-plugin' && form.type != 'system-image'" class="bg-white mt-20">
                         <div class="mt-16">
                             <a-form-item label="应用配置">
                                 <div v-if="form.containers && form.containers.length">
@@ -554,7 +554,7 @@
                         </div>
                     </div>
 
-                    <div v-if="['docker', 'tradition', 'system-image'].includes(form.type)" class="bg-white com-line mt-20" :inert="Boolean(option?.startParamsOnly)">
+                    <div v-if="['docker', 'tradition', 'system-image'].includes(form.type)" class="bg-white" :inert="Boolean(option?.startParamsOnly)">
                         <a-form-item class="mt-16" label="存储设置">
                             <span>{{ json.platform?.storage?.mode === 'device' ? '基于存储设备' : (json.platform?.storage?.mode === 'partition' ? '基于存储分区' : '未设置') }}</span>
                             <span class="cursor c-blue ml-10" @click="openStorageSettings">编辑</span>
@@ -751,13 +751,32 @@
         </a-modal>
 
         <a-modal v-model:visible="storageSettings.show" title="存储设置" :width="620" @ok="saveStorageSettings">
-            <div class="mb-16">此设置作用于应用已有的持久化挂载，挂载目录仍在应用配置中设置；已指定固定 PVC 的挂载不受影响。</div>
-            <a-radio-group v-model="storageSettings.mode" direction="vertical">
-                <a-radio value="device">基于存储设备</a-radio>
-                <div class="ml-24 mb-16">新建应用专用 PVC，单独申请存储容量。安装时选择存储类、容量和读写模式；PVC 不随应用自动删除。独立 PVC 不代表独占物理磁盘。创建后沿用原 PVC，容量调整请在面板存储管理中操作。</div>
-                <a-radio value="partition">基于存储分区</a-radio>
-                <div class="ml-24">使用已创建的 PVC，共享其存储容量，不单独限制目录容量。子路径由应用配置控制，留空时保持为空；已有站点和系统层目录保持不变。</div>
+            <div class="storage-settings-intro">为应用已有的持久化挂载选择存储方式。</div>
+            <a-radio-group v-model="storageSettings.mode" direction="vertical" class="storage-mode-options">
+                <div class="storage-mode-card" :class="{ 'is-selected': storageSettings.mode === 'device' }" @click="storageSettings.mode = 'device'">
+                    <a-radio value="device"><span class="storage-mode-title">基于存储设备</span><span class="storage-mode-tag">容量独享</span></a-radio>
+                    <div class="storage-mode-content">
+                        <p>新建应用专用 PVC，单独申请存储容量。</p>
+                        <dl>
+                            <div><dt>安装时</dt><dd>选择存储类、容量和读写模式</dd></div>
+                            <div><dt>创建后</dt><dd>沿用原 PVC，容量在面板存储管理中调整</dd></div>
+                        </dl>
+                        <div class="storage-mode-note">PVC 不随应用自动删除；专用 PVC 不代表独占物理磁盘。</div>
+                    </div>
+                </div>
+                <div class="storage-mode-card" :class="{ 'is-selected': storageSettings.mode === 'partition' }" @click="storageSettings.mode = 'partition'">
+                    <a-radio value="partition"><span class="storage-mode-title">基于存储分区</span><span class="storage-mode-tag">容量共享</span></a-radio>
+                    <div class="storage-mode-content">
+                        <p>使用已创建的 PVC，共享其存储容量。</p>
+                        <dl>
+                            <div><dt>容量</dt><dd>不单独限制目录容量</dd></div>
+                            <div><dt>子路径</dt><dd>由应用配置控制，留空时保持为空</dd></div>
+                        </dl>
+                        <div class="storage-mode-note">已有站点和系统层目录保持不变。</div>
+                    </div>
+                </div>
             </a-radio-group>
+            <div class="storage-settings-footnote">挂载目录仍在应用配置中设置；已指定固定 PVC 的挂载不受影响。</div>
         </a-modal>
         <a-modal v-model:visible="spEdit.show" title="启动参数" :width="700" modal-class="envdialog" :footer="false">
             <span class="c-66">格式：键=值 #标题 : 描述 : 必填(1或0) : 依赖组件标识</span>
@@ -2079,5 +2098,78 @@ export default {
 
 .start-param-options-table :deep(.table td) {
     padding: 10px 12px;
+}
+</style>
+
+<style scoped>
+.storage-settings-intro {
+    margin-bottom: 16px;
+    color: var(--color-text-2);
+    line-height: 1.6;
+}
+.storage-mode-options {
+    width: 100%;
+    gap: 14px;
+}
+.storage-mode-card {
+    padding: 16px 18px;
+    border: 1px solid var(--color-border-2);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: border-color .15s, background-color .15s;
+}
+.storage-mode-card:hover {
+    border-color: rgb(var(--primary-4));
+}
+.storage-mode-card.is-selected {
+    border-color: rgb(var(--primary-6));
+    background: var(--color-primary-light-1);
+}
+.storage-mode-title {
+    font-weight: 500;
+    color: var(--color-text-1);
+}
+.storage-mode-tag {
+    margin-left: 12px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: var(--color-fill-2);
+    color: var(--color-text-2);
+    font-size: 12px;
+}
+.storage-mode-content {
+    margin: 10px 0 0 24px;
+    line-height: 1.7;
+    color: var(--color-text-2);
+}
+.storage-mode-content p {
+    margin: 0 0 10px;
+}
+.storage-mode-content dl {
+    margin: 0;
+}
+.storage-mode-content dl > div {
+    display: flex;
+    margin-top: 6px;
+}
+.storage-mode-content dt {
+    flex: 0 0 64px;
+    color: var(--color-text-3);
+}
+.storage-mode-content dd {
+    margin: 0;
+    flex: 1;
+    min-width: 0;
+}
+.storage-mode-note {
+    margin-top: 12px;
+    color: var(--color-text-3);
+    font-size: 12px;
+}
+.storage-settings-footnote {
+    margin-top: 16px;
+    color: var(--color-text-3);
+    font-size: 12px;
+    line-height: 1.7;
 }
 </style>

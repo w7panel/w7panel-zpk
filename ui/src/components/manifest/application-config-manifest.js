@@ -73,13 +73,19 @@ export const applicationConfigManifestMethods = {
         this.domainConfig.show = false;
     },
     formatIngressRoutes(routes = []) {
-        return routes.filter(route => route.path && route.backend?.port).map(route => ({
-            ...route,
-            backend: {
-                ...route.backend,
-                port: Number(route.backend.port),
-            },
-        }));
+        return routes.filter(route => route.path && route.backend?.port).map(route => {
+            const backend = { ...route.backend, port: Number(route.backend.port) };
+            if (backend.moreMatch) {
+                backend.moreMatch = { ...backend.moreMatch };
+                for (const kind of ['header', 'query']) {
+                    if (!Array.isArray(backend.moreMatch[kind])) continue;
+                    backend.moreMatch[kind] = backend.moreMatch[kind]
+                        .filter(item => String(item.key || '').trim())
+                        .map(item => ({ ...item, key: String(item.key).trim() }));
+                }
+            }
+            return { ...route, backend };
+        });
     },
     openAppset() {
         const volumes = this.json?.platform?.volumes;

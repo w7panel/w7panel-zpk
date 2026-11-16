@@ -1331,14 +1331,22 @@ func (hc *HelmPack) addIngressMatchAnnotations(annotations map[string]interface{
 	// Header 匹配
 	if backend.MoreMatch != nil && backend.MoreMatch.Header != nil {
 		for _, header := range backend.MoreMatch.Header {
-			annotations[fmt.Sprintf("higress.io/%s-match-header-%s", header.Type, header.Key)] = header.Value
+			key := strings.TrimSpace(header.Key)
+			if key == "" {
+				continue
+			}
+			annotations[fmt.Sprintf("higress.io/%s-match-header-%s", header.Type, key)] = header.Value
 		}
 	}
 
 	// Query 匹配
 	if backend.MoreMatch != nil && backend.MoreMatch.Query != nil {
 		for _, query := range backend.MoreMatch.Query {
-			annotations[fmt.Sprintf("higress.io/%s-match-query-%s", query.Type, query.Key)] = query.Value
+			key := strings.TrimSpace(query.Key)
+			if key == "" {
+				continue
+			}
+			annotations[fmt.Sprintf("higress.io/%s-match-query-%s", query.Type, key)] = query.Value
 		}
 	}
 

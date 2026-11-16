@@ -337,6 +337,7 @@ func (c Formula) Info(ctx *gin.Context) {
 	formula.Manifest = formula.AllManifest[0]
 
 	type FormulaInstallInfo struct {
+		Ingress     []logic2.Ingress     `json:"ingress"`
 		Name        string               `json:"name"`
 		Title       string               `json:"title"`
 		Required    bool                 `json:"required"`
@@ -371,6 +372,7 @@ func (c Formula) Info(ctx *gin.Context) {
 				volumes = make([]v1.Volume, 0)
 			}
 			installFormulas = append(installFormulas, FormulaInstallInfo{
+				Ingress:     installFormulaIngress(item.Platform),
 				Name:        item.Application.Identifie,
 				Title:       item.Application.Name,
 				Required:    index == 0 || formulaRequiredMap[item.Application.Identifie],
@@ -960,4 +962,13 @@ func installFormulaPorts(platform logic2.Platform) []v1.ContainerPort {
 		ports = append(ports, container.Ports...)
 	}
 	return ports
+}
+
+// installFormulaIngress returns each application's own routes. An empty array
+// explicitly tells installation clients not to inherit the parent routes.
+func installFormulaIngress(platform logic2.Platform) []logic2.Ingress {
+	if platform.Ingress == nil {
+		return []logic2.Ingress{}
+	}
+	return platform.Ingress
 }

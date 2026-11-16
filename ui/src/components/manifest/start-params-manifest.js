@@ -233,7 +233,13 @@ export const startParamsManifestMethods = {
         (this.form.ingress || []).forEach((item, index) => {
             if (!item.domainParam && this.formatIngressRoutes(item.routes || []).length) {
                 if (!used.has('DOMAIN_URL')) item.domainParam = 'DOMAIN_URL';
-                else {
+                else if (/^[A-Za-z][A-Za-z0-9_-]*$/.test(item.name || '')) {
+                    const base = `DOMAIN_URL_${item.name.replace(/-/g, '_').toUpperCase()}`;
+                    let name = base;
+                    let suffix = 2;
+                    while (used.has(name)) name = `${base}_${suffix++}`;
+                    item.domainParam = name;
+                } else {
                     while (used.has(`DOMAIN_URL_${next}`)) next++;
                     item.domainParam = `DOMAIN_URL_${next++}`;
                 }
@@ -278,7 +284,38 @@ export const startParamsManifestMethods = {
     },
     isDomainStartParam(item) {
         return item?.mark === 'domain'
+            || (!item?.module_name && (this.form.ingress || []).some(group => group.domainParam === item?.name)
+                && ['%DOMAIN_URL%', '%DOMAIN_SSL_URL%'].includes(item?.values_text))
             || (!item?.module_name && /^DOMAIN_URL(?:_\d+)?$/.test(item?.name || '') && ['%DOMAIN_URL%', '%DOMAIN_SSL_URL%'].includes(item?.values_text));
+    },
+    canEditDomainParamName(item) {
+        return !this.option?.startParamsOnly && this.form.type === 'docker'
+            && this.isDomainStartParam(item)
+            && item.name !== 'DOMAIN_URL'
+            && (this.form.ingress || []).findIndex(group => group.domainParam === item.name) > 0;
+    },
+    changeStartParamName(item, value) {
+        if (!this.canEditDomainParamName(item)) {
+            if (this.computedSpDisabled(item)) return;
+            item.name = value;
+            this.getStart();
+            return;
+        }
+        const name = String(value || '').trim();
+        if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
+            this.$message.error('标识只能包含英文字母、数字和下划线，且不能以数字开头');
+            return;
+        }
+        if (this.form.startParams.some(param => param !== item && param.name === name)
+            || this.form.ingress.some(group => group.domainParam !== item.name && group.domainParam === name)) {
+            this.$message.error('标识已存在，请使用其他标识');
+            return;
+        }
+        for (const group of this.form.ingress) {
+            if (group.domainParam === item.name) group.domainParam = name;
+        }
+        item.name = name;
+        this.changeForm();
     },
     isBuiltInStartParam(item) {
         const name = String(item?.name || '').trim();

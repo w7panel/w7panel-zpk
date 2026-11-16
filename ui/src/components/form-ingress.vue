@@ -10,7 +10,7 @@
                         <a-input v-model="item.name" :spellcheck="false" placeholder="请输入名称"
                             class="ingress-name-input" @change="emitUpdate"></a-input>
                         <a-checkbox v-model="item.autoSSL" @change="emitUpdate">自动 SSL</a-checkbox>
-                        <a-checkbox v-model="item.required" @change="emitUpdate">必填</a-checkbox>
+                        <a-checkbox v-model="item.required" :disabled="index === 0" @change="emitUpdate">必填</a-checkbox>
                     </div>
                     <div @click.stop>
                         <manifest-config-table :rows="item.routes" table-class="ingress-table"
@@ -111,6 +111,7 @@ export default {
     watch: {
         modelValue: {
             handler(newVal) {
+                if (newVal?.[0]) newVal[0].required = true;
                 if (!newVal?.length) {
                     this.activeTab = undefined;
                 } else if (this.activeTab === undefined || Number(this.activeTab) >= newVal.length) {
@@ -223,6 +224,8 @@ export default {
             this.emitUpdate();
         },
         emitUpdate() {
+            const firstGroup = this.modelValue[0];
+            if (firstGroup) firstGroup.required = true;
             this.$emit('update:modelValue', this.modelValue);
         },
         addIngressEnd(name = '') {

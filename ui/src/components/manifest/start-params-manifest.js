@@ -239,7 +239,8 @@ export const startParamsManifestMethods = {
                 }
                 used.add(item.domainParam);
             }
-            if (typeof item.required !== 'boolean') item.required = index === 0;
+            if (index === 0) item.required = true;
+            else if (typeof item.required !== 'boolean') item.required = false;
             if (typeof item.autoSSL !== 'boolean') {
                 item.autoSSL = this.form.startParams.some(param => param.name === item.domainParam && param.values_text === '%DOMAIN_SSL_URL%');
             }

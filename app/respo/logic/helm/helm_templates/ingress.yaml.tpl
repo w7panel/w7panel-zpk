@@ -11,7 +11,7 @@
 {{- $existing := lookup "networking.k8s.io/v1" "Ingress" .Release.Namespace (print $fullName "-__INGRESS_NAME__") | default dict -}}
 {{- if $config.domainParam -}}
   {{- if not $domain -}}
-    {{- $domain = printf "%s.private.cluster.invalid" (printf "%s/%s/%s/%s" .Release.Namespace .Release.Name $fullName $config.domainParam | sha256sum | trunc 24) -}}
+    {{- $domain = printf "%s.private.cluster.invalid" (printf "%s/%s/%s/%s" .Release.Namespace .Release.Name $fullName $config.domainParam | sha256sum | trunc 12) -}}
   {{- end -}}
 {{- end -}}
 {{- $annotations := deepCopy ($config.annotations | default dict) -}}

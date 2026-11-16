@@ -125,7 +125,7 @@ spec:
           {{- end }}
           env: 
             {{- with .env }}
-            {{- toYaml . | nindent 12 }}
+            {{- include "common.containerEnv" (dict "root" $rootCtx "env" .) | nindent 12 }}
             {{- end }}
             {{- if $rootCtx.Values.startParams }}
             {{- range $qkey, $qvalue := $rootCtx.Values.startParams }}
@@ -184,7 +184,7 @@ spec:
           {{- end }}
           env:
             {{- with .env }}
-            {{- toYaml . | nindent 12 }}
+            {{- include "common.containerEnv" (dict "root" $rootCtx "env" .) | nindent 12 }}
             {{- end }}
             {{- if $rootCtx.Values.startParams }}
             {{- range $qkey, $qvalue := $rootCtx.Values.startParams }}

@@ -80,7 +80,7 @@ spec:
             - {{ tpl $job.shell $root | quote }}
           env:
             {{- with $job.container.env }}
-            {{- toYaml . | nindent 12 }}
+            {{- include "common.containerEnv" (dict "root" $root "env" .) | nindent 12 }}
             {{- end }}
             {{- if $root.Values.startParams }}
             {{- range $k, $v := $root.Values.startParams }}

@@ -294,3 +294,17 @@ The writer validates Service names and port values; this helper checks only the 
 {{- end -}}
 {{- toJson $backends -}}
 {{- end -}}
+
+{{/* Render only env values as templates, preserving names and valueFrom. */}}
+{{- define "common.containerEnv" -}}
+{{- $root := .root -}}
+{{- $env := list -}}
+{{- range .env -}}
+  {{- $item := deepCopy . -}}
+  {{- if and (hasKey $item "value") (contains "{{" (toString $item.value)) -}}
+    {{- $_ := set $item "value" (tpl (toString $item.value) $root) -}}
+  {{- end -}}
+  {{- $env = append $env $item -}}
+{{- end -}}
+{{- toYaml $env -}}
+{{- end -}}

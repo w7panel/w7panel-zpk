@@ -1,5 +1,6 @@
 import jsyaml from 'js-yaml';
 import emitWujieEvent from '@/utils/wujie-event';
+import { traditionToolDependency } from '@/components/manifest/tradition-manifest';
 
 export function applicationConfigFormDefaults() {
     return {
@@ -72,6 +73,17 @@ export const applicationConfigManifestMethods = {
         this.changeForm();
         this.domainConfig.show = false;
     },
+    applyIngressPlatform() {
+        this.normalizeIngressDomainGroups();
+        this.json.platform = this.json.platform || {};
+        this.json.platform.ingress = (this.form.ingress || []).map(item => ({
+            name: item.name,
+            domainParam: item.domainParam,
+            autoSSL: Boolean(item.autoSSL),
+            required: Boolean(item.required),
+            routes: this.formatIngressRoutes(item.routes || []),
+        }));
+    },
     formatIngressRoutes(routes = []) {
         return routes.filter(route => route.path && route.backend?.port).map(route => {
             const backend = { ...route.backend, port: Number(route.backend.port) };
@@ -122,10 +134,7 @@ export const applicationConfigManifestMethods = {
             if (this.form.type == 'tradition') {
                 this.syncTraditionIngress();
             } else {
-                this.json.platform.ingress = (this.form.ingress || []).map(item => ({
-                    name: item.name,
-                    routes: this.formatIngressRoutes(item.routes),
-                }));
+                this.applyIngressPlatform();
             }
 
             this.syncApplicationBuiltInStartParams();
@@ -182,6 +191,15 @@ export const applicationConfigManifestMethods = {
                 name: item.name,
                 title: item.title || item.name,
             })));
+        // The tool exposes its Service through Helm, so it may have no
+        // manifest container ports to include in the parent's application list.
+        if (this.form.type === 'tradition') {
+            const tool = traditionToolDependency.identifie;
+            if (!this.app_names.some(item => item.id === tool)) {
+                this.app_names.push({ id: tool, name: tool, title: '传统应用工具' });
+            }
+            if (!this.app_ports[tool]?.length) this.app_ports[tool] = ['80'];
+        }
     },
     validateSysboxContainerName() {
         if (this.form.type == 'system-image') {

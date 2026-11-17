@@ -24,12 +24,7 @@
                                 <manifest-config-table-column data-index="path" title="目录" width="22%" />
                                 <manifest-config-table-column data-index="backend.name" title="应用" width="22%">
                                     <template #cell="{ record }">
-                                        <div v-if="record.backend && mainapp">
-                                            {{ appNames.find(v => v.id == record.backend.name)?.title }}
-                                        </div>
-                                        <div v-else-if="record.backend && !mainapp">
-                                            {{ appNamesFilter.find(v => v.id == record.backend.name)?.title }}
-                                        </div>
+                                        {{ appNames.find(v => v.id == record.backend?.name)?.title || record.backend?.name || '-' }}
                                     </template>
                                 </manifest-config-table-column>
                                 <manifest-config-table-column data-index="backend.port" title="端口" width="16%">

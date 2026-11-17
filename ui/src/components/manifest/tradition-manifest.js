@@ -74,7 +74,6 @@ function marketPluginDependsOnTradition(plugin, traditionIdentifie) {
 
 const traditionBuiltInStartParamNames = Object.freeze([
     'IMAGE_VERSION',
-    'DOMAIN_URL',
     traditionGatewayStartParamName,
     traditionPluginPolicyStartParamName,
     'PVC_NAME',
@@ -99,7 +98,6 @@ export function withTraditionStartParams(
         .filter(item => !isTraditionBuiltInStartParamName(item?.name));
     return [
         { mark: 'tradition', name: 'IMAGE_VERSION', title: '传统应用版本', required: true, options: [...(versions || [])], values_text: versions?.[0] || '', module_name: '', description: '选择要安装的传统应用版本', type: 'select' },
-        { mark: 'environment-site', name: 'DOMAIN_URL', title: '站点域名', required: true, values_text: '%DOMAIN_URL%', module_name: '', description: '用于站点访问和区分不同站点的代码', type: 'text' },
         { mark: 'tradition-gateway', name: traditionGatewayStartParamName, title: '开启网关服务', required: true, values_text: String(Boolean(gatewayEnabled)), module_name: '', description: '启用传统应用网关服务', type: 'text', hidden: true },
         { mark: 'tradition-plugin-policy', name: traditionPluginPolicyStartParamName, title: '插件文件优先级配置', required: true, values_text: traditionPluginPolicyValue(plugins), module_name: '', description: '供应用插件安装工具读取的 Base64 策略', type: 'text', hidden: true },
         { name: 'PVC_NAME', title: '存储', required: true, values_text: '%PVC_NAME%', module_name: '', description: '安装时选择的站点存储空间，代码按域名分开保存', type: 'text', hidden: false },
@@ -229,6 +227,7 @@ export function withTraditionAppIngress(
     platform = {},
     applicationIdentifie = '',
     nginxGateway = false,
+    forceBackend = true,
 ) {
     const nextPlatform = { ...(platform || {}) };
     const containerPort = traditionAppDefaultContainerPort(nextPlatform);
@@ -253,6 +252,7 @@ export function withTraditionAppIngress(
         }
         item.routes.forEach(route => {
             const backend = route.backend;
+            if (!forceBackend && backend.name) return;
             if (nginxGateway) {
                 backend.name = traditionToolIdentifie;
                 backend.port = 80;
@@ -614,7 +614,7 @@ export const traditionManifestMethods = {
             }
             this.form.traditionNginxGateway = enabled;
             this.syncTraditionGatewayStartParam();
-            this.syncTraditionIngress();
+            this.syncTraditionIngress(true);
             this.changeForm();
         };
         if (enabled) {
@@ -724,7 +724,7 @@ export const traditionManifestMethods = {
         this.json.application = this.json.application || {};
         this.json.application.annotation = result.annotations;
     },
-    syncTraditionIngress() {
+    syncTraditionIngress(forceBackend = false) {
         if (this.form.type != 'tradition' || !this.json?.platform) {
             return this.json?.platform?.ingress || [];
         }
@@ -733,15 +733,17 @@ export const traditionManifestMethods = {
                 ? `${this.form.author}-${this.form.identifie}`
                 : this.identifie || '');
         this.json.platform = withTraditionAppIngress(
-            this.json.platform,
+            { ...this.json.platform, ingress: this.form.ingress || [] },
             applicationIdentifie,
             Boolean(this.form.traditionNginxGateway),
+            forceBackend,
         );
         const ingress = JSON.parse(JSON.stringify(this.json.platform.ingress || []));
         if (JSON.stringify(this.form.ingress || []) != JSON.stringify(ingress)) {
             this.form.ingress = ingress;
         }
-        return ingress;
+        this.applyIngressPlatform();
+        return this.json.platform.ingress;
     },
     applyTraditionAnnotationForm(annotation = {}) {
         this.traditionNginxVhostTemplateBackup = '';

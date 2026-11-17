@@ -99,7 +99,7 @@ export const startParamsManifestWatch = {
     },
     'form.domain'(value) {
         if (this.initializingStartParamsOnly || this.option?.startParamsOnly) return;
-        if (this.form.type === 'docker') {
+        if (this.supportsDomainConfig()) {
             this.syncIngressDomainStartParams();
             this.getStart();
             return;
@@ -111,6 +111,9 @@ export const startParamsManifestWatch = {
 };
 
 export const startParamsManifestMethods = {
+    supportsDomainConfig() {
+        return !['helm', 'metrics-plugin', 'app-plugin', 'gateway-plugin', 'system-image'].includes(this.form.type);
+    },
     beginStartParamsInitialization(manifest) {
         this.initializingStartParamsOnly = Boolean(this.option?.startParamsOnly);
         this.startParamsOnlySource = this.option?.startParamsOnly
@@ -157,8 +160,8 @@ export const startParamsManifestMethods = {
             this.form.startParams = this.systemImageStartParams();
         } else if (this.form.type == 'docker') {
             this.syncDockerBuiltInStartParams();
-            this.syncIngressDomainStartParams();
         }
+        this.syncIngressDomainStartParams();
         this.syncStorageModeStartParams();
         this.syncStorageModePVCReferences();
     },
@@ -204,7 +207,7 @@ export const startParamsManifestMethods = {
         })));
     },
     syncIngressDomainStartParams() {
-        if (this.form.type !== 'docker') return;
+        if (this.option?.startParamsOnly || !this.supportsDomainConfig()) return;
         this.normalizeIngressDomainGroups();
         const groups = (this.form.ingress || []).filter(item => this.formatIngressRoutes(item.routes || []).length > 0);
         const enabled = groups.length > 0;
@@ -227,7 +230,7 @@ export const startParamsManifestMethods = {
         }
     },
     normalizeIngressDomainGroups() {
-        if (this.option?.startParamsOnly || this.form.type !== 'docker') return;
+        if (this.option?.startParamsOnly || !this.supportsDomainConfig()) return;
         const used = new Set([...(this.form.ingress || []).map(item => item.domainParam), ...this.form.startParams.filter(item => !this.isDomainStartParam(item)).map(item => item.name)].filter(Boolean));
         let next = 2;
         (this.form.ingress || []).forEach((item, index) => {
@@ -265,6 +268,7 @@ export const startParamsManifestMethods = {
             this.ensureSystemImageContainer();
         } else if (this.form.type == 'tradition') {
             this.ensureTraditionContainerDefaults();
+            this.syncTraditionIngress();
             this.form.startParams = this.traditionStartParams();
         }
 
@@ -289,7 +293,7 @@ export const startParamsManifestMethods = {
             || (!item?.module_name && /^DOMAIN_URL(?:_\d+)?$/.test(item?.name || '') && ['%DOMAIN_URL%', '%DOMAIN_SSL_URL%'].includes(item?.values_text));
     },
     canEditDomainParamName(item) {
-        return !this.option?.startParamsOnly && this.form.type === 'docker'
+        return !this.option?.startParamsOnly && this.supportsDomainConfig()
             && this.isDomainStartParam(item)
             && item.name !== 'DOMAIN_URL'
             && (this.form.ingress || []).findIndex(group => group.domainParam === item.name) > 0;

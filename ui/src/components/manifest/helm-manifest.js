@@ -135,7 +135,9 @@ export const helmManifestMethods = {
         const kv = (this.form.helm?.kv || [])
             .filter(item => item.name && item.value)
             .map(item => ({ name: item.name, value: item.value }));
-        this.json.platform.helm = this.form.helm.helmtype == '1'
+        this.json.platform.helm = !this.form.helm.useHelm
+            ? { depend_yamls: dependYamls }
+            : this.form.helm.helmtype == '1'
             ? {
                 repository: this.form.helm.repository,
                 chartName: this.form.helm.chartName,

@@ -54,12 +54,12 @@
                                         <a-radio value="metrics-plugin">监控插件</a-radio>
                                     </a-radio-group>
 
-                                    <a-form-item v-if="form.type == 'helm'" class="mt-20" style="margin-bottom:10px;"
-                                        label="启用helm配置">
+                                    <a-form-item v-if="['helm', 'metrics-plugin'].includes(form.type)" class="mt-20" style="margin-bottom:10px;"
+                                        label="启用 Helm 配置">
                                         <a-switch v-model="form.helm.useHelm" @change="changeForm"></a-switch>
                                     </a-form-item>
 
-                                    <div v-if="['helm', 'metrics-plugin'].includes(form.type) && (form.type == 'metrics-plugin' || form.helm.useHelm)" class="greybox"
+                                    <div v-if="['helm', 'metrics-plugin'].includes(form.type) && form.helm.useHelm" class="greybox"
                                         style="margin-bottom:20px;">
                                         <div class="greybox-title">Helm配置</div>
 
@@ -134,7 +134,7 @@
                                         </a-form-item>
 
                                     </div>
-                                    <div v-if="form.type == 'helm'" class="greybox">
+                                    <div v-if="['helm', 'metrics-plugin'].includes(form.type)" class="greybox">
                                         <div class="greybox-title">YAML配置</div>
                                         <div>
                                             <div v-for="(item, index) in form.helm.depend_yamls" :key="index"
@@ -757,10 +757,6 @@
                     <a-radio value="device"><span class="storage-mode-title">基于存储设备</span><span class="storage-mode-tag">容量独享</span></a-radio>
                     <div class="storage-mode-content">
                         <p>新建应用专用 PVC，单独申请存储容量。</p>
-                        <dl>
-                            <div><dt>安装时</dt><dd>选择存储类、容量和读写模式</dd></div>
-                            <div><dt>创建后</dt><dd>沿用原 PVC，容量在面板存储管理中调整</dd></div>
-                        </dl>
                         <div class="storage-mode-note">PVC 不随应用自动删除；专用 PVC 不代表独占物理磁盘。</div>
                     </div>
                 </div>
@@ -768,10 +764,6 @@
                     <a-radio value="partition"><span class="storage-mode-title">基于存储分区</span><span class="storage-mode-tag">容量共享</span></a-radio>
                     <div class="storage-mode-content">
                         <p>使用已创建的 PVC，共享其存储容量。</p>
-                        <dl>
-                            <div><dt>容量</dt><dd>不单独限制目录容量</dd></div>
-                            <div><dt>子路径</dt><dd>由应用配置控制，留空时保持为空</dd></div>
-                        </dl>
                         <div class="storage-mode-note">已有站点和系统层目录保持不变。</div>
                     </div>
                 </div>
@@ -1221,7 +1213,7 @@ export default {
                     return;
                 }
 
-                if (this.form.type == 'metrics-plugin' && !this.validateMetricsChart()) {
+                if (this.form.type == 'metrics-plugin' && this.form.helm.useHelm && !this.validateMetricsChart()) {
                     messageWarning('请配置监控插件的 Helm Chart 包');
                     fail();
                     return;

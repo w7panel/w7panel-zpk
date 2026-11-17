@@ -2109,7 +2109,6 @@ export default {
 }
 .storage-mode-options {
     width: 100%;
-    gap: 14px;
 }
 .storage-mode-card {
     padding: 16px 18px;
@@ -2117,6 +2116,9 @@ export default {
     border-radius: 8px;
     cursor: pointer;
     transition: border-color .15s, background-color .15s;
+}
+.storage-mode-card + .storage-mode-card {
+    margin-top: 14px;
 }
 .storage-mode-card:hover {
     border-color: rgb(var(--primary-4));

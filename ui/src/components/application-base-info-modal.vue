@@ -63,7 +63,7 @@
                         <a-checkbox v-model="form.once" :disabled="isInstallOnlyOnceType || isInstallNeverOnceType">仅安装一次</a-checkbox>
                         <a-checkbox v-model="form.clusterPrivileges">集群特权</a-checkbox>
                         <a-checkbox v-model="form.registerSite" :disabled="isRegisterSiteDisabled">创建站点</a-checkbox>
-                        <a-checkbox v-model="form.officialApp">官方应用</a-checkbox>
+                        <a-checkbox v-model="form.coreApp">核心服务</a-checkbox>
                         <a-checkbox v-model="form.denyDelete">禁止卸载</a-checkbox>
                     </div>
                 </a-form-item>
@@ -90,9 +90,9 @@ import ManifestConfigTable from '@/components/manifest-config-table.vue';
 import ManifestConfigTableColumn from '@/components/manifest-config-table-column.vue';
 import { messageError, messageSuccess } from '@/utils/ui-feedback';
 
-const officialAppAnnotationKey = 'w7.cc/official-app';
+const coreAppAnnotationKey = 'w7.cc/core-app';
 const denyDeleteAnnotationKey = 'w7.cc/deny-delete';
-const baseInfoPropertyAnnotationKeys = [officialAppAnnotationKey, denyDeleteAnnotationKey];
+const baseInfoPropertyAnnotationKeys = [coreAppAnnotationKey, denyDeleteAnnotationKey];
 
 export default {
     name: 'ApplicationBaseInfoModal',
@@ -139,7 +139,7 @@ export default {
                 once: false,
                 clusterPrivileges: false,
                 registerSite: false,
-                officialApp: false,
+                coreApp: false,
                 denyDelete: false,
             },
             editorToolbars: {
@@ -248,7 +248,7 @@ export default {
                 this.form.annotations = Object.entries(annotation)
                     .filter(([key]) => !baseInfoPropertyAnnotationKeys.includes(key))
                     .map(([key, value]) => ({ key, value: String(value) }));
-                this.form.officialApp = String(annotation[officialAppAnnotationKey]).toLowerCase() == 'true';
+                this.form.coreApp = String(annotation[coreAppAnnotationKey]).toLowerCase() == 'true';
                 this.form.denyDelete = String(annotation[denyDeleteAnnotationKey]).toLowerCase() == 'true';
                 this.form.once = this.isInstallOnlyOnceType ? true : (this.isInstallNeverOnceType ? false : Boolean(baseInfo.once));
                 this.form.clusterPrivileges = Boolean(baseInfo.cluster_privileges);
@@ -309,8 +309,8 @@ export default {
                     }
                     return result;
                 }, {});
-                if (this.form.officialApp) {
-                    annotation[officialAppAnnotationKey] = 'true';
+                if (this.form.coreApp) {
+                    annotation[coreAppAnnotationKey] = 'true';
                 }
                 if (this.form.denyDelete) {
                     annotation[denyDeleteAnnotationKey] = 'true';

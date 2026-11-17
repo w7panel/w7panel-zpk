@@ -68,7 +68,7 @@
                         @change="changeForm('clusterPrivileges')">集群特权</a-checkbox>
                     <a-checkbox v-model="edit.registerSite" :disabled="isRegisterSiteDisabled"
                         @change="changeForm('registerSite')">创建站点</a-checkbox>
-                    <a-checkbox v-model="edit.officialApp" @change="changeForm('officialApp')">官方应用</a-checkbox>
+                    <a-checkbox v-model="edit.coreApp" @change="changeForm('coreApp')">核心服务</a-checkbox>
                     <a-checkbox v-model="edit.denyDelete" @change="changeForm('denyDelete')">禁止卸载</a-checkbox>
                 </div>
             </a-form-item>
@@ -121,7 +121,7 @@ v: 2
 `
 
 const propertyAnnotationKeys = {
-    officialApp: 'w7.cc/official-app',
+    coreApp: 'w7.cc/core-app',
     denyDelete: 'w7.cc/deny-delete',
 };
 
@@ -144,7 +144,7 @@ export default {
                 once: false,
                 clusterPrivileges: false,
                 registerSite: false,
-                officialApp: false,
+                coreApp: false,
                 denyDelete: false,
                 description: '',
                 categoryInput: '',
@@ -154,7 +154,7 @@ export default {
                 once: false,
                 clusterPrivileges: false,
                 registerSite: false,
-                officialApp: false,
+                coreApp: false,
                 denyDelete: false,
             },
             annotationEdit: {
@@ -199,13 +199,13 @@ export default {
                 this.form.description = this.json?.application?.description || '';
                 this.form.clusterPrivileges = this.json?.application?.clusterPrivileges || false;
                 this.form.registerSite = this.isRegisterSiteDisabled ? false : (this.json?.application?.registerSite || false);
-                this.form.officialApp = String(annotation[propertyAnnotationKeys.officialApp]).toLowerCase() == 'true';
+                this.form.coreApp = String(annotation[propertyAnnotationKeys.coreApp]).toLowerCase() == 'true';
                 this.form.denyDelete = String(annotation[propertyAnnotationKeys.denyDelete]).toLowerCase() == 'true';
             }
             this.edit.once = this.isInstallOnlyOnceType ? true : (this.isInstallNeverOnceType ? false : (this.json?.application?.once || false));
             this.edit.clusterPrivileges = this.json?.application?.clusterPrivileges || false;
             this.edit.registerSite = this.isRegisterSiteDisabled ? false : (this.json?.application?.registerSite || false);
-            this.edit.officialApp = this.form.officialApp;
+            this.edit.coreApp = this.form.coreApp;
             this.edit.denyDelete = this.form.denyDelete;
 
             this.logoimg = this.info?.icon_url;

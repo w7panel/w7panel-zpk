@@ -235,7 +235,7 @@ func traditionGatewayEnabled(manifest logic2.Manifest) bool {
 
 // applyTraditionToolJobVolumeMounts mounts the site-manager PVC location used
 // by w7-traditiontool for NGINX configuration. The path matches
-// w7panel-sitemanager/charts: /www/server/nginx backed by nginx-dir.
+// w7panel-sitemanager/charts: /www/server/nginx backed by nginx-dir/<domain>.
 func applyTraditionToolJobVolumeMounts(values map[string]interface{}) {
 	jobs, ok := values["jobs"].([]map[string]interface{})
 	if !ok {
@@ -250,7 +250,7 @@ func applyTraditionToolJobVolumeMounts(values map[string]interface{}) {
 			container["volumeMounts"] = []v1.VolumeMount{{
 				Name:      traditionStorageVolumeName,
 				MountPath: "/www/server/nginx",
-				SubPath:   "nginx-dir",
+				SubPath:   "nginx-dir/{{ .Values.DOMAIN_URL }}",
 			}}
 		}
 	}

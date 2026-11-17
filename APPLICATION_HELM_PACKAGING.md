@@ -478,7 +478,7 @@ tradition-tool 支持安装后切换网关：直接修改工具自身的镜像�
 - 若配置了 `w7.cc/nginx_vhost_template`，生成安装/升级 vhost 和卸载 vhost 的 Job。安装/升级先将当前生效配置与上次保存的模板比较，再保存本次模板：当前文件不存在时生成；内容与上次模板一致时自动更新；有实际修改（包括清空文件）、没有上次模板或生效路径为符号链接时保留当前文件，不自动合并。比较统一 CRLF/LF 换行并忽略引号外的空白行，其余空格、缩进、注释和引号内多行内容保留；规范化只用于比较，不直接改写用户配置。不需要额外基准文件或修改标记，使用已有模板文件作为上次内容。卸载仍删除当前域名的配置文件；
 - 每次安装/升级同时将本次渲染出的完整配置保存到共享 nginx 目录的 `template-configs/<主域名>.conf`，只保留最近一次 Hook 生成的模板，通过临时文件写完后替换；比较或生效配置更新失败时不发布新模板。该目录位于 `conf.d` 外，不参与默认 nginx 加载；传统应用卸载时同步删除对应模板文件。tradition-tool 的 nginx 页面可读取它，按同样的比较规则判断与当前生效配置有差异时，提示用户查看、复制后手动合并。旧 Chart 没有该文件时仍可编辑现有配置；该文件是最近一次 Hook 生成的候选内容，升级后续步骤失败时不代表整个应用升级已成功；
 - 启用 NGINX 网关时，vhost 安装/升级及卸载 Job 将 `site-storage` PVC 的 `nginx-dir/<DOMAIN_URL>` 挂载到 `/www/server/nginx`，与工具 Chart 一致；未启用时不追加该配置目录挂载；
-- 支持 `{SERVER_NAME}`、`{LOG_DIR}`、`{ROOT_DIR}`、`{K8S_DOMAIN}`、`{UPSTREAM_APP_NAME}` 模板变量。其中 tradition-tool 将 PVC 的 `nginx-web-dir/<DOMAIN_URL>` 子目录挂载到 `/www/wwwroot/<DOMAIN_URL>`，所以 `{ROOT_DIR}` 是 NGINX 容器看到的站点目录 `/www/wwwroot/<domain>`；FastCGI 转发给应用容器的代码路径固定为 `/www/wwwroot`。
+- 支持 `{SERVER_NAME}`、`{LOG_DIR}`、`{ROOT_DIR}`、`{K8S_DOMAIN}`、`{UPSTREAM_APP_NAME}` 模板变量。其中 tradition-tool 将 PVC 的 `nginx-web-dir/<DOMAIN_URL>` 子目录挂载到 `/www/wwwroot`，`{ROOT_DIR}` 固定为 `/www/wwwroot`；FastCGI 转发给应用容器的代码路径同样为 `/www/wwwroot`。
 
 ### 7.5 存储
 

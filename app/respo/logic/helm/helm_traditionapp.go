@@ -81,7 +81,7 @@ const traditionNginxVhostShell = `{{- $rawDomain := toString .Values.DOMAIN_URL 
 {{- $domain = trimSuffix "/" $domain -}}
 {{- $serverName := replace "," " " $domain -}}
 {{- $primaryDomain := first (splitList " " (trimAll " " $serverName)) -}}
-{{- $rootDir := print "/www/wwwroot/" $primaryDomain -}}
+{{- $rootDir := "/www/wwwroot" -}}
 {{- $k8sDomain := print (include "common.fullname" .) "." .Release.Namespace ".svc.cluster.local" -}}
 {{- $upstream := print .Release.Name "-" $primaryDomain | sha256sum | trunc 16 -}}
 {{- $config := .Values.tradition.site.nginxVhostTemplate -}}

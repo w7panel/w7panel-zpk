@@ -71,12 +71,12 @@ export default {
                 let hasDockerfile = false;
                 let hasroot = true;
                 let root = "";
-                zip.forEach((path, o) => {
+                zip.forEach((path) => {
                     if (path.match(/^([^/]+)\//)) {
                         if (root) {
                             if (!RegExp('^' + root + '/').test(path)) { hasroot = false; }
                         } else {
-                            root = path.match(/^[^\/]+/)[0];
+                            root = path.match(/^[^/]+/)[0];
                         }
                         if (path.match(/^([^/]+)\/Dockerfile/)) {
                             hasDockerfile = true;

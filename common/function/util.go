@@ -11,19 +11,6 @@ import (
 	"strings"
 )
 
-func ArrUnique[T comparable](slice []T) []T {
-	encountered := map[T]bool{}
-	result := []T{}
-
-	for _, v := range slice {
-		if !encountered[v] {
-			encountered[v] = true
-			result = append(result, v)
-		}
-	}
-	return result
-}
-
 func GetRandomString(n int) string {
 	str := "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz123456789"
 	bytes := []byte(str)

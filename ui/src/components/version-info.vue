@@ -489,46 +489,6 @@ export default {
     margin-top: 3px;
 }
 
-.tag-cpn {
-    width: 100%;
-    box-sizing: border-box;
-    border-radius: 4px;
-    padding: 7px 7px 1px;
-    border: 1px solid #dcdfe6;
-}
-
-.tag-cpn.active {
-    border-color: #409eff;
-}
-
-.tag-cpn .tag {
-    height: 24px;
-    margin-right: 6px;
-    margin-bottom: 6px;
-    margin-top: 0;
-}
-
-.tag-cpn .input {
-    width: -webkit-min-content;
-    width: min-content;
-    height: 24px;
-    min-width: 60px;
-    margin-bottom: 6px;
-}
-
-.tag-cpn .input input {
-    width: 100%;
-    height: 100%;
-    display: block;
-    border: 0;
-    outline: 0;
-    padding: 0 6px;
-}
-
-.tag-cpn .input input::placeholder {
-    color: #999;
-}
-
 .table {
     width: 100%;
 }

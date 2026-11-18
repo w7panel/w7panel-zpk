@@ -308,12 +308,9 @@ export default {
     },
     data() {
         return {
-            vtitle: '',
             loading: false,
             saving: false,
-            source: 'remote',
             docsFiles: [],
-            docsOrderContent: '',
             activeDocPath: '',
             draggingDocPath: '',
             dragOverDocPath: '',
@@ -328,7 +325,6 @@ export default {
             },
             mdtxt: '',
             savingPath: '',
-            isEditing: true,
             editorToolbars: {
                 bold: true,
                 italic: true,
@@ -360,18 +356,11 @@ export default {
                 help: false,
                 preview: true,
             },
-            xssOptions: {
-                stripIgnoreTag: false,
-                stripIgnoreTagBody: false,
-            }
         }
     },
     computed: {
         formulaIdentifie() {
             return this.identifie || this.$route.query.id || '';
-        },
-        hasDocsFiles() {
-            return this.docsFiles.length > 0;
         },
         activeDoc() {
             return this.docsFiles.find(item => item.path === this.activeDocPath) || null;
@@ -385,15 +374,6 @@ export default {
         currentTitle() {
             return this.activeDoc?.title || '文档';
         },
-        toolbarDescription() {
-            return '默认显示编辑器内置预览，可通过工具栏切换编辑。';
-        },
-        currentContent() {
-            return this.activeDoc?.content || '';
-        },
-    },
-    created() {
-        this.vtitle = this.$route.query.vtitle || '';
     },
     mounted() {
         this.getFiles();
@@ -411,7 +391,6 @@ export default {
                 });
                 let list = res?.data?.data?.list || {};
 
-                this.docsOrderContent = list[DOCS_ORDER_PATH] || '';
                 this.docsFiles = this.parseDocsFiles(list);
                 let previousPath = this.activeDocPath || '';
                 let nextPath = this.docsFiles.find(item => item.path === previousPath)?.path
@@ -462,7 +441,6 @@ export default {
             return files.map(item => normalizePath(item.path)).filter(Boolean).join(',');
         },
         postDocsOrderFile(content = this.getDocsOrderContent()) {
-            this.docsOrderContent = content;
             return myAxios.post('/respo/share-file/file', {
                 identifie: this.formulaIdentifie,
                 filename: DOCS_ORDER_PATH,
@@ -537,15 +515,6 @@ export default {
                 this.patchMavonMarkdown();
             });
         },
-        startEditDoc(path) {
-            if (!path) { return }
-            if (path !== this.activeDocPath) {
-                this.selectDoc(path);
-            }
-            let content = this.currentContent;
-            this.isEditing = true;
-            this.inputContent(content);
-        },
         openCreateDialog() {
             this.persistEditorContent();
             this.createDialog.show = true;
@@ -604,7 +573,6 @@ export default {
 
                 await this.$nextTick();
                 this.selectDoc(file.path);
-                this.startEditDoc(file.path);
             } finally {
                 this.saving = false;
             }
@@ -714,7 +682,6 @@ export default {
             this.docsFiles.splice(currentIndex, 1);
             this.docsFiles = [...this.docsFiles];
             let nextDoc = this.docsFiles[currentIndex] || this.docsFiles[currentIndex - 1] || null;
-            this.isEditing = true;
             if (this.docsFiles.length) {
                 this.activeDocPath = nextDoc?.path || '';
                 this.inputContent(nextDoc?.content || '');
@@ -836,7 +803,6 @@ export default {
 
                 messageSuccess(successText);
                 await this.getFiles();
-                this.isEditing = true;
             } finally {
                 this.saving = false;
                 this.savingPath = '';
@@ -854,46 +820,6 @@ export default {
 
 .description-spin {
     display: block;
-}
-
-.page-header {
-    padding: 20px;
-    border-bottom: 1px solid #e7e7e7;
-}
-
-.page-body {
-    padding: 20px;
-}
-
-.env-toolbar {
-    padding: 0 0 16px;
-}
-
-.env-label {
-    margin-right: 12px;
-    font-size: 13px;
-    color: #606266;
-}
-
-.env-path {
-    font-size: 13px;
-    color: #909399;
-}
-
-.toolbar {
-    padding: 0 0 16px;
-}
-
-.toolbar-title {
-    font-size: 18px;
-    color: #303133;
-    line-height: 1;
-}
-
-.toolbar-desc {
-    margin-top: 8px;
-    font-size: 13px;
-    color: #909399;
 }
 
 .content-box {
@@ -1027,13 +953,6 @@ export default {
     width: 100%;
 }
 
-.sidebar-item-path {
-    margin-top: 6px;
-    font-size: 12px;
-    color: #909399;
-    word-break: break-all;
-}
-
 .editor-panel {
     display: flex;
     flex: 1;
@@ -1062,13 +981,6 @@ export default {
 .editor-title {
     font-size: 18px;
     color: #303133;
-}
-
-.editor-path {
-    margin-top: 6px;
-    font-size: 12px;
-    color: #909399;
-    word-break: break-all;
 }
 
 .editor-body {
@@ -1206,20 +1118,5 @@ export default {
 .form-label {
     width: 80px;
     color: #606266;
-}
-
-.form-value {
-    flex: 1;
-    padding: 10px 12px;
-    background: #f5f7fa;
-    border-radius: 4px;
-    word-break: break-all;
-    color: #303133;
-}
-
-.form-tip {
-    font-size: 12px;
-    color: #909399;
-    line-height: 1.6;
 }
 </style>

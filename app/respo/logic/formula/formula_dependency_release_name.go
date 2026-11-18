@@ -53,7 +53,6 @@ func ConfigureManifestExternalDependencies(manifest *commonlogic.Manifest, bindi
 			continue
 		}
 		if dependency.ReleaseName != "" {
-			dependency.ReleaseName = dependency.ReleaseName
 			dependency.ReleaseNameFixed = true
 			continue
 		}

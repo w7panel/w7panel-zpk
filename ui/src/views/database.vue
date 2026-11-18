@@ -64,7 +64,6 @@ export default {
             checked: false,
             canSwitch: null,
             statusError: '',
-            statusMessage: '',
             pollTimer: null,
             form: {
                 host: '',
@@ -126,7 +125,6 @@ export default {
                 this.statusError = '';
                 myAxios.post(`/system/util/db/switch/mysql/run`, this.buildPayload()).then(() => {
                     this.migrating = true;
-                    this.statusMessage = 'MySQL 连接信息已提交'
                     this.startPolling();
                 }).finally(() => {
                     this.submitting = false;
@@ -165,7 +163,6 @@ export default {
             const canSwitch = typeof status.can_switch === 'boolean' ? status.can_switch : null;
             const progressText = `${status.message || ''} ${status.status || ''}`;
             this.canSwitch = canSwitch;
-            this.statusMessage = '';
 
             if (status.error) {
                 this.statusError = status.error;
@@ -316,14 +313,6 @@ export default {
     line-height: 28px;
 }
 
-.subtitle {
-    margin-top: 8px;
-    margin-bottom: 20px;
-    font-size: 14px;
-    line-height: 22px;
-    color: #4e5969;
-}
-
 .migration-form {
     max-width: 560px;
 }
@@ -356,15 +345,6 @@ export default {
     color: #00a870;
     line-height: 32px;
     margin-left: 10px;
-}
-
-.status-text {
-    padding: 12px 14px;
-    border-radius: 8px;
-    color: #4e5969;
-    line-height: 22px;
-    font-size: 14px;
-    word-break: break-all;
 }
 
 .mb-20 {

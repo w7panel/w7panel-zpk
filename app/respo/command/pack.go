@@ -26,7 +26,6 @@ func (pack Pack) Handle(cmd *cobra.Command, args []string) {
 	list, err := dao.Q.Formula.Find()
 	if err != nil {
 		panic(err)
-		return
 	}
 
 	depot, _ := formula.NewDepot()

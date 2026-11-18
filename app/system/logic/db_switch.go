@@ -272,17 +272,6 @@ func LoadDBSwitchState(path string, config *viper.Viper) (DBSwitchState, error) 
 	return state, nil
 }
 
-func CurrentDBMode(config *viper.Viper) string {
-	state, err := LoadDBSwitchStateByConfig(config)
-	if err != nil {
-		return DBModeSQLite
-	}
-	if state.Mode == DBModeMySQL {
-		return DBModeMySQL
-	}
-	return DBModeSQLite
-}
-
 func SaveDBSwitchStateByConfig(config *viper.Viper, state DBSwitchState) error {
 	return SaveDBSwitchState(ResolveDBSwitchStateFile(config), state)
 }

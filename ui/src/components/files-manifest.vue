@@ -1435,7 +1435,6 @@ export default {
     white-space: nowrap;
 }
 
-
 .nginx-template-field {
     width: 500px;
 }
@@ -1559,26 +1558,6 @@ export default {
 .install-depend-table {
     width: 100%;
     table-layout: fixed;
-}
-
-.install-depend-name-col {
-    width: 36%;
-}
-
-.install-depend-sub-col {
-    width: 34%;
-}
-
-.install-depend-required-col {
-    width: 10%;
-}
-
-.install-depend-identifie-col {
-    width: 12%;
-}
-
-.install-depend-action-col {
-    width: 8%;
 }
 
 .install-depend-table td {
@@ -1763,78 +1742,6 @@ export default {
     display: none;
 }
 
-
-.tag-cpn {
-    width: 500px;
-    box-sizing: border-box;
-    border-radius: 4px;
-    padding: 7px 7px 1px;
-    border: 1px solid #dcdfe6;
-}
-
-.tag-cpn.active {
-    border-color: #409eff;
-}
-
-.tag-cpn .tag {
-    height: 24px;
-    margin-right: 6px;
-    margin-bottom: 6px;
-}
-
-.tag-cpn .input {
-    width: -webkit-min-content;
-    width: min-content;
-    height: 24px;
-    min-width: 60px;
-    margin-bottom: 6px;
-}
-
-.tag-cpn .input input {
-    width: 100%;
-    height: 100%;
-    display: block;
-    border: 0;
-    outline: 0;
-    padding: 0 6px;
-}
-
-.tag-cpn .input input::placeholder {
-    color: #999;
-}
-
-.logobox {
-    width: 64px;
-    height: 64px;
-    margin-right: 10px;
-    border-radius: 4px;
-    overflow: hidden;
-    box-sizing: border-box;
-    position: relative;
-    border: 1px solid #f1f1f1;
-}
-
-.logobox .icon {
-    width: 100%;
-    height: 100%;
-    position: absolute;
-    top: 0;
-    left: 0;
-    z-index: 1;
-}
-
-.logobox input[type='file'] {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 2;
-    min-width: 0;
-    opacity: 0;
-    cursor: pointer;
-}
-
 .content {
     padding: 20px;
     height: 100%;
@@ -1895,8 +1802,6 @@ export default {
 .box :deep(input[type="number"]) {
     appearance: textfield;
 }
-
-
 
 .branch {
     margin-left: 30px;
@@ -1978,11 +1883,6 @@ export default {
     line-height: 20x;
     cursor: pointer;
     margin-left: 10px;
-}
-
-.elseoption {
-    padding: 6px 12px;
-    cursor: pointer;
 }
 
 :deep(pre .hljs) {

@@ -132,7 +132,6 @@ export default {
       visible: false,
       page: 1,
       paginate: 10,
-      last_page: 1,
       list: [],
 
       userRole: '',
@@ -167,7 +166,6 @@ export default {
         myAxios.post("/v2/api/namespace/list").then(res => {
           let data = res.data?.data?.list ?? [];
           this.list = data;
-          this.last_page = Math.ceil(data.length / this.paginate);
           this.namespaceCountMap = res.data?.data?.namespace_registry_count || {}
         });
       }
@@ -205,7 +203,7 @@ export default {
           myAxios.post('/v2/api/permission/namespace/set', {
             namespace: this.form.name,
             permissions: permissions,
-          }).then(res => {
+          }).then(() => {
             messageSuccess('操作成功');
             this.getData(1, false)
             this.visible = false

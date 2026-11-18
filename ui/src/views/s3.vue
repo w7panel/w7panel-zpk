@@ -76,9 +76,7 @@ export default {
             checking: false,
             submitting: false,
             checked: false,
-            statusError: '',
             storageType: '',
-            configInfo: {},
             form: {
                 s3_protocol: 'https',
                 s3_access_key: '',
@@ -117,7 +115,6 @@ export default {
         checkS3Status() {
             this.validateForm(() => {
                 this.checking = true;
-                this.statusError = '';
                 myAxios.post(`/system/util/registry/storage/s3/test`, this.buildS3Payload()).then(() => {
                     this.checked = true;
                     messageSuccess('连通性测试成功');
@@ -133,7 +130,6 @@ export default {
                     return;
                 }
                 this.submitting = true;
-                this.statusError = '';
                 myAxios.post(`/system/util/registry/storage/config/update`, this.buildUpdatePayload()).then(() => {
                     messageSuccess('存储设置成功');
                     this.storageType = 's3';
@@ -160,9 +156,7 @@ export default {
             return data;
         },
         applyConfig(config = {}) {
-            this.configInfo = config;
             this.storageType = config.storage_type || '';
-            this.statusError = '';
             this.applyS3Config(config);
         },
         applyS3Config(config = {}) {
@@ -309,14 +303,6 @@ export default {
     line-height: 28px;
 }
 
-.subtitle {
-    margin-top: 8px;
-    margin-bottom: 20px;
-    font-size: 14px;
-    line-height: 22px;
-    color: #4e5969;
-}
-
 .setting-form {
     max-width: 560px;
 }
@@ -349,15 +335,6 @@ export default {
     color: #00a870;
     line-height: 32px;
     margin-left: 10px;
-}
-
-.status-text {
-    padding: 12px 14px;
-    border-radius: 8px;
-    color: #4e5969;
-    line-height: 22px;
-    font-size: 14px;
-    word-break: break-all;
 }
 
 .mb-20 {

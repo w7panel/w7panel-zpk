@@ -221,17 +221,11 @@ export default {
       activeNamespace: -1,
       subNamespace: -1,
       subNamespaceData: [],
-      domainVisible: false,
       form: {
         name: '',
         namespace: '',
         desc: '',
         visible_type: 3
-      },
-      domainForm: {
-        registry_host: '',
-        registry_username: '',
-        registry_password: ''
       },
       namespace: [],
       editId: '',

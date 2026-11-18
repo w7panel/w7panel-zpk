@@ -967,7 +967,6 @@ export default {
     },
     data() {
         return {
-            vtitle: '',
             showYaml: false,
 
             zip: {
@@ -985,7 +984,6 @@ export default {
 
             json: {},
             yaml: '',
-            git: { url: '' },
             form: {
                 menu_type: 'thirdparty_cd',
                 type: 'front',
@@ -1064,7 +1062,6 @@ export default {
             },
             showAddRole: false,
             newRole: { title: "", name: "" },
-            app_names: [],
 
             rules: {
                 name: [
@@ -1095,40 +1092,18 @@ export default {
                 cpu: [{ required: true, message: '内容不能为空', trigger: 'blur' }],
                 mem: [{ required: true, message: '内容不能为空', trigger: 'blur' }],
             },
-            addRules: {
-                identifie: [
-                    { required: true, message: '内容不能为空', trigger: 'blur' },
-
-                    {
-                        required: true, trigger: 'blur', validator: (value, callback) => {
-                            if (/^[a-zA-Z0-9]+-[a-zA-Z0-9]+$/.test(value)) { callback() }
-                            else { callback("标识格式有误") }
-                        }
-                    },
-                ],
-                name: [{ required: true, message: '内容不能为空', trigger: 'blur' }],
-            },
             yamlDom: "",
             downloadUrl: "",
 
             dialogVisible: false,
             activeItem: null,
 
-            frameVisible: false,
-            downloadFrame: null,
-            beforeDownload: false,
 
             showIngress: false,
             newIngressEnd: { name: "" },
-            ingressEditIndex: -1,
-            ingressEdit: '',
 
 
-            otherData: {},
-            logoimg: '',
-            logofile: null,
 
-            baseurl: '',
 
             depend: {
                 input: '',
@@ -1146,12 +1121,7 @@ export default {
                 from: '',
             },
 
-            languageList: [],
 
-            spEdit: {
-                show: false,
-                values: '',
-            },
 
             noRole: false,
             isCreate: false,
@@ -1161,14 +1131,10 @@ export default {
         }
     },
     created() {
-        this.baseurl = window?.$wujie?.props?.url || '';
         hljs.configure({ ignoreUnescapedHTML: true });
         this.initPanelRoles();
         this.init(this.data);
 
-        this.jsonp('https://console.w7.cc/zpk?path=/respo/list&page=1&limit=99&tag=%E8%BF%90%E8%A1%8C%E7%8E%AF%E5%A2%83', 'getlanguage' + (this.json?.application?.identifie || Math.random()), (data) => {
-            this.languageList = data?.data?.list || [];
-        });
     },
     watch: {
         'dependForm.identifie_before'() {
@@ -2039,7 +2005,6 @@ export default {
         init(data) {
             if (!data) { return }
             this.json = jsyaml.load(data);
-            this.vtitle = this.json?.application?.name;
             this.noRole = !this.json?.bindings?.length && !this.json?.web?.url;
             this.noPlatform = !this.json.platform;
 
@@ -2282,23 +2247,6 @@ export default {
             this.setYaml();
         },
 
-        jsonp(url, name, callback) {
-            var win = window?.rawWindow || window;
-            win[name] = (data) => {
-                callback(data);
-                win[name] = null;
-            };
-            let u = new URL(url);
-            u.searchParams.append('callback', name);
-            let script = document.createElement("script");
-            script.type = "text/javascript";
-            script.setAttribute('ignore', 'true')
-            script.async = true;
-            script.src = u.href;
-            script.onload = function () { document.body.removeChild(this); };
-            script.onerror = function () { document.body.removeChild(this); };
-            document.body.append(script);
-        },
 
 
 
@@ -2480,78 +2428,6 @@ export default {
     display: none;
 }
 
-
-.tag-cpn {
-    width: 500px;
-    box-sizing: border-box;
-    border-radius: 4px;
-    padding: 7px 7px 1px;
-    border: 1px solid #dcdfe6;
-}
-
-.tag-cpn.active {
-    border-color: #409eff;
-}
-
-.tag-cpn .tag {
-    height: 24px;
-    margin-right: 6px;
-    margin-bottom: 6px;
-}
-
-.tag-cpn .input {
-    width: -webkit-min-content;
-    width: min-content;
-    height: 24px;
-    min-width: 60px;
-    margin-bottom: 6px;
-}
-
-.tag-cpn .input input {
-    width: 100%;
-    height: 100%;
-    display: block;
-    border: 0;
-    outline: 0;
-    padding: 0 6px;
-}
-
-.tag-cpn .input input::placeholder {
-    color: #999;
-}
-
-.logobox {
-    width: 64px;
-    height: 64px;
-    margin-right: 10px;
-    border-radius: 4px;
-    overflow: hidden;
-    box-sizing: border-box;
-    position: relative;
-    border: 1px solid #f1f1f1;
-}
-
-.logobox .icon {
-    width: 100%;
-    height: 100%;
-    position: absolute;
-    top: 0;
-    left: 0;
-    z-index: 1;
-}
-
-.logobox input[type='file'] {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 2;
-    min-width: 0;
-    opacity: 0;
-    cursor: pointer;
-}
-
 .content {
     padding: 20px;
     height: 100%;
@@ -2722,10 +2598,6 @@ export default {
     font-weight: 600;
 }
 
-.manifest-front-section-title-first {
-    margin-top: 0;
-}
-
 .manifest-front-upload-section+.greybox-title {
     margin-top: 4px;
 }
@@ -2737,21 +2609,6 @@ export default {
 .frontend-default-prop-row td:nth-child(3) {
     color: #4e5969;
     line-height: 20px;
-}
-
-.proxy-address-row {
-    margin-bottom: 22px;
-    line-height: 22px;
-}
-
-.iframe-tip-alert {
-    margin-bottom: 22px;
-}
-
-.iframe-tip-list {
-    margin: 0;
-    padding-left: 18px;
-    line-height: 22px;
 }
 
 .backend-url-form-field {
@@ -2850,10 +2707,6 @@ export default {
     line-height: 18px;
 }
 
-.manifest-submit-item {
-    margin-bottom: 0;
-}
-
 .backend-url-config {
     width: 620px;
     height: 32px;
@@ -2907,12 +2760,6 @@ export default {
     width: 120px !important;
 }
 
-.start-param-select {
-    width: 100%;
-    min-width: 0;
-    max-width: 100%;
-}
-
 .backend-url-protocol {
     flex: 0 0 110px !important;
     width: 110px !important;
@@ -2946,17 +2793,6 @@ export default {
 
 .backend-url-config :deep(.arco-select-view-single) {
     padding: 0 8px;
-}
-
-.elseoption {
-    padding: 6px 12px;
-    cursor: pointer;
-}
-
-.addrole {
-    border: 1px dashed #2d5fff;
-    background: rgb(240, 243, 250);
-    padding: 10px;
 }
 
 :deep(pre .hljs) {

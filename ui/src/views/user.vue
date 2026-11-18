@@ -117,7 +117,6 @@ export default {
             visible: false,
             page: 1,
             paginate: 10,
-            last_page: 1,
             list: [],
         }
     },
@@ -138,7 +137,6 @@ export default {
                 myAxios.post("/v2/api/user/list").then(res => {
                     let data = res.data?.data?.list ?? [];
                     this.list = data;
-                    this.last_page = Math.ceil(data.length / this.paginate);
                 });
             }
 

@@ -105,7 +105,7 @@ export default {
         },
         getInfo(id, callback, n) {
             n = n || 0;
-            myAxios.get('/respo/v2/info/' + id).then(res => {
+            myAxios.get('/respo/v2/info/' + id).then(() => {
                 callback && callback();
             }).catch(() => {
                 if (n > 10) { return }

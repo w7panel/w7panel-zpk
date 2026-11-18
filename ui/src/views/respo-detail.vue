@@ -97,17 +97,13 @@ export default {
             this.onekeyCopy(url);
         },
         onekeyCopy(text) {
-            if (0 && navigator.clipboard) {
-                navigator.clipboard.writeText(text);
-            } else {
-                var createInput = document.createElement('input');
-                createInput.value = text;
-                document.body.appendChild(createInput);
-                createInput.select();
-                document.execCommand("Copy");
-                createInput.className = 'createInput';
-                createInput.style.display = 'none';
-            }
+            var createInput = document.createElement('input');
+            createInput.value = text;
+            document.body.appendChild(createInput);
+            createInput.select();
+            document.execCommand("Copy");
+            createInput.className = 'createInput';
+            createInput.style.display = 'none';
             messageSuccess("复制成功")
         },
     }

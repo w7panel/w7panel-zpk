@@ -158,15 +158,12 @@ export default {
   data() {
     return {
       listRequestId: 0,
-      starShowIndex: -1,
       paginate: 10,
       dfimg: dfimg,
-      nozpk: false,
       page: 1,
       limit: 9,
       total: 1,
       list: [],
-      tags: [],
       loading: false,
       add: {
         loading: false,
@@ -177,7 +174,6 @@ export default {
         keyword: '',
         tag: '',
       },
-      allTag: false,
       is_register: false,
 
       cloudApp: {
@@ -204,7 +200,7 @@ export default {
       this.cloudApp.loading = true;
       myAxios.post('/respo/cloud-app/notapp/unpack', {
         id: this.cloudApp.selectId[0]
-      }).then(res => {
+      }).then(() => {
         messageSuccess('操作成功');
         this.cloudApp.show = false;
       }).catch((error) => {
@@ -376,7 +372,7 @@ export default {
           return;
         }
         this.add.loading = true;
-        myAxios.post('/respo/add', { identifie: this.add.title }).then(res => {
+        myAxios.post('/respo/add', { identifie: this.add.title }).then(() => {
           let id = this.add.title;
           this.getInfo(id, () => {
             this.add = { show: false, title: '', loading: false };
@@ -389,7 +385,7 @@ export default {
     },
     getInfo(id, callback, n) {
       n = n || 0;
-      myAxios.get('/respo/v2/info/' + id + '/1.0.0').then(res => {
+      myAxios.get('/respo/v2/info/' + id + '/1.0.0').then(() => {
         callback && callback();
       }).catch(() => {
         if (n > 10) { return }
@@ -403,45 +399,9 @@ export default {
 </script>
 
 <style scoped>
-.w-100 {
-  width: 100%;
-}
 
 .content {
   padding: 20px;
-}
-
-.labelbox {
-  border: 1px solid #E7E7E7;
-  border-radius: 8px;
-  padding: 15px 15px 5px;
-}
-
-.labelbox .label {
-  display: inline-flex;
-  cursor: pointer;
-  height: 30px;
-  line-height: 30px;
-  padding: 0 10px;
-  margin: 0 16px 10px 0;
-  border-radius: 2px;
-  white-space: nowrap;
-}
-
-.labelbox .label:hover {
-  background: #DCDCDC;
-}
-
-.labelbox .label.active {
-  background: #2D62FF;
-  color: #ffffff;
-}
-
-.alltag {
-  display: inline-block;
-  height: 30px;
-  line-height: 30px;
-  white-space: nowrap;
 }
 
 .respo-search-action {

@@ -456,10 +456,6 @@ export default {
                 description: [{ required: true, message: '请输入版本描述', trigger: 'blur' },],
                 service_fee: [{ required: true, message: '请输入费用', trigger: 'blur' },],
             },
-            pgRules: {
-                label_ids: [{ required: true, message: '请选择分类', trigger: 'blur' },],
-                goods_imgs: [{ required: true, message: '请上传图片', trigger: 'blur' },],
-            },
 
             info: {},
 
@@ -505,7 +501,6 @@ export default {
             },
 
 
-            is_register: false,
 
             goods_id: '',
             audit_status: 0,
@@ -524,7 +519,6 @@ export default {
         }
     },
     created() {
-        this.is_register = window?.$wujie?.props?.isRegister;
         this.baseurl = window?.$wujie?.props?.url || '';
         this.identifie = this.$route.query.id;
         this.title = this.$route.query.title;
@@ -858,7 +852,7 @@ export default {
 					trial_days: this.instFee.trial_enabled ? Number(this.instFee.trial_days) : 0,
                     service_packages,
                     version_prices,
-                }).then(res => {
+                }).then(() => {
 					const trialChanged = !!this.instFee.trial_enabled !== !!this.instFee.old_trial_enabled
 						|| Number(this.instFee.trial_enabled ? this.instFee.trial_days : 0) !== Number(this.instFee.old_trial_days || 0);
                     if (this.goods_id && (Number(this.instFee.service_fee) != Number(this.instFee.old_fee) || trialChanged) && this.list.length) {

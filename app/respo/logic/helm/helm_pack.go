@@ -669,28 +669,6 @@ func (hc *HelmPack) getVolumeClaimTemplateValues(platform logic2.Platform) []map
 	return templates
 }
 
-func hasSharedPersistentStorage(mainVolumes []v1.Volume, subVolumes []v1.Volume) bool {
-	mainExistsClaim := false
-	for _, volume := range mainVolumes {
-		if volume.PersistentVolumeClaim != nil {
-			mainExistsClaim = true
-			break
-		}
-	}
-
-	if !mainExistsClaim {
-		return false
-	}
-
-	for _, volume := range subVolumes {
-		if volume.PersistentVolumeClaim != nil {
-			return true
-		}
-	}
-
-	return false
-}
-
 func buildStableSubPathTemplate(containerName string, volumeMount v1.VolumeMount) string {
 	return fmt.Sprintf(`{{ include "common.resolveStableSubPath" (dict "root" . "containerName" %q "volumeName" %q "mountPath" %q) }}`,
 		containerName,

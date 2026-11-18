@@ -482,11 +482,6 @@ func (c Formula) Detail(ctx *gin.Context) {
 		c.JsonResponseWithError(ctx, err, 500)
 		return
 	}
-	detailMds := map[string]string{}
-	for key, val := range fileList {
-		detailMds[key] = val
-	}
-
 	var versionList []map[string]interface{}
 	err = dao.Version.
 		Where(dao.Version.FormulaID.Eq(formula.ID)).
@@ -503,7 +498,7 @@ func (c Formula) Detail(ctx *gin.Context) {
 		"title":        formula.Manifest.Application.Name,
 		"description":  formula.Manifest.Application.Description,
 		"icon":         formula.Icon,
-		"mds":          detailMds,
+		"mds":          fileList,
 		"version_list": versionList,
 	})
 	return

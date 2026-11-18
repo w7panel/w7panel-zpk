@@ -86,21 +86,6 @@ export default {
     data() {
         return {
             activeTab: 0,
-            ingressRewrite: {
-                show: false,
-                ingressIndex: 0,
-                routesIndex: 0,
-                path: '',
-                host: '',
-            },
-            ingressMoreMatch: {
-                show: false,
-                ingressIndex: 0,
-                routesIndex: 0,
-                method: [],
-                query: [],
-                header: [],
-            },
         }
     },
     watch: {
@@ -125,9 +110,6 @@ export default {
         }
     },
     computed: {
-        appNamesFilter() {
-            return this.appNames?.filter?.(v => v.id == this.identifie) || [];
-        },
     },
     mounted() {
         if (!this.modelValue.length) {
@@ -281,26 +263,6 @@ export default {
 
 .ingress-table {
     table-layout: fixed;
-}
-
-.ingress-match-col {
-    width: 18%;
-}
-
-.ingress-path-col {
-    width: 28%;
-}
-
-.ingress-app-col {
-    width: 26%;
-}
-
-.ingress-port-col {
-    width: 16%;
-}
-
-.ingress-action-col {
-    width: 12%;
 }
 
 .table td {

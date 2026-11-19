@@ -79,7 +79,7 @@ CLI 的 `app push/pull` 复用本节的 OCI 格式，不增加应用包外壳或
 
 CLI 沿用一个后端 ZIP、多个前端包的原有约定：主应用后端源码使用原无路径后缀的 media type，多个前端包按原有媒体类型路径后缀区分，不扩展多后端包协议。`latest` 是 OCI 版本别名，推送事件不将其创建为业务版本；CLI 的上传成功不代表 Helm 构建或市场发布完成。
 
-CLI 在本地生成完整 manifest，并按内容摘要复用仓库已有 blob；服务端推送回调仅识别应用包、同步版本及失效缓存，不参与增量合并或重新打包。附件继续在后续 `GetFormula` 读取时按原逻辑恢复；管理端 `packToOci` 也保持原有打包逻辑。
+CLI 在本地生成完整 manifest，并按内容摘要复用仓库已有 blob；服务端推送回调识别应用包、同步版本及失效缓存，不参与增量合并或重新打包。CLI 指定 `--publish` 时携带 OCI manifest annotation `w7.cc/auto_publish: "true"`；回调校验应用拥有者 / 管理员后，直接调用上层 `FormulaPublish.PublishFormula`，复用 OCI 上传之后的市场同步与 Helm 发布队列，沿用制品已有云端账号绑定和自动同步市场设置。未指定时只同步版本；最终状态以服务端队列结果为准，旧服务端忽略该 annotation。附件继续在后续 `GetFormula` 读取时按原逻辑恢复；管理端 `packToOci` 也保持原有打包逻辑。
 
 本地缓存缺文件时，`GetFormula` 会根据 OCI layer 把 manifest、源码、前端包、Helm 包恢复到 Depot。
 

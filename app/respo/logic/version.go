@@ -8,10 +8,8 @@ import (
 
 	"github.com/hashicorp/go-version"
 	formulalogic "github.com/w7panel/w7panel-zpk/app/respo/logic/formula"
-	goodslogic "github.com/w7panel/w7panel-zpk/app/respo/logic/zpkmarket/goods"
 	"github.com/w7panel/w7panel-zpk/common/dao"
 	"github.com/w7panel/w7panel-zpk/common/entity"
-	"github.com/w7panel/w7panel-zpk/common/service/w7/devcenter"
 )
 
 type Version struct {
@@ -111,31 +109,4 @@ func (l Version) FindNextUpgrade(formula *formulalogic.Formula, currentVerStr st
 	}
 
 	return versionMap[sortVersionNames[nextVersionIndex]], nil
-}
-
-func (c Version) PublishFormula(consoleUid int32, formula *formulalogic.Formula) error {
-	// 如果没有zip包，只有镜像时，不需要打包发布
-	// 将文件打包到 Storage 目录，需要同步的再进行同步
-	depot, _ := formulalogic.NewDepot()
-	err := depot.Pack(formula, false)
-	if err != nil {
-		return err
-	}
-
-	if formula.Setting != nil && formula.Setting.SupportAutoPublishToZpkMarket {
-		if consoleUid <= 0 {
-			return errors.New("请先在面板绑定微擎云端账号")
-		}
-		if formula.ConsoleUid > 0 && formula.ConsoleUid != consoleUid {
-			return errors.New("当前面板绑定的微擎云端账号与该制品所属账号不一致，请切换账号后重试")
-		}
-		err = goodslogic.PublishGoods(formula, devcenter.PublishGoodsReq{
-			ConsoleUid: int(consoleUid),
-		})
-		if err != nil {
-			return err
-		}
-	}
-
-	return AddFormulaPublishTask(formula.Name, formula.Version, formula.VersionId)
 }

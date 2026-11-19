@@ -130,7 +130,7 @@ func PackFrontedCodeZipToOci(zipPaths map[string]string) ([]FileOciDescriptor, e
 	return fileDescriptors, nil
 }
 
-func PushOciToRemote(ctx context.Context, remoteRepository *remote.Repository, tag string, resourcesDescriptor []FileOciDescriptor, baseLayers []v1.Descriptor) error {
+func PushOciToRemote(ctx context.Context, remoteRepository *remote.Repository, tag string, resourcesDescriptor []FileOciDescriptor, baseLayers []v1.Descriptor, annotations map[string]string) error {
 	filesDescriptor := make([]v1.Descriptor, 0)
 	if baseLayers != nil && len(baseLayers) > 0 {
 		filesDescriptor = append(filesDescriptor, baseLayers...)
@@ -154,7 +154,8 @@ func PushOciToRemote(ctx context.Context, remoteRepository *remote.Repository, t
 		OS:           "linux",
 	}
 	manifestDescriptor, err := oras.PackManifest(ctx, remoteRepository, oras.PackManifestVersion1_1, artifactType, oras.PackManifestOptions{
-		Layers: filesDescriptor,
+		Layers:              filesDescriptor,
+		ManifestAnnotations: annotations,
 	})
 	if err != nil {
 		return err

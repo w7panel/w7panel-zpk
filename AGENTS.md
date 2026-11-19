@@ -30,7 +30,7 @@
 - **启动有写入副作用**：`main.go` 加载配置及数据库切换状态、初始化 DAO/SDK，再注册三个 Provider。Provider 可能迁移数据库、规范化制品名、初始化默认用户/命名空间、恢复后台任务。不能为查看帮助或验证启动直接使用真实配置运行服务。
 - **制品加载不是纯查询**：`Depot.GetFormula` 聚合数据库元数据、版本文件、制品级 BaseInfo 与子 manifest，可能从 OCI 恢复附件并异步恢复图标。传入非管理员 user 才在此处限制所属用户；传 nil 的调用者须有自己的准入规则。轻量选择器优先沿用 `SelectableList` / `FormulaInstallOnlyOnce`。
 - **数据分层**：版本目录保存根/子 manifest；制品级设置、简介和图标独立维护；完整 manifest 不只存在数据库中。根 manifest 保存会应用 BaseInfo。`FormulaSetting.Get` 在旧记录缺 BaseInfo 时可能写回；设置中的 `*bool` 区分省略与显式 false。
-- **保存与发布分阶段**：版本发布先同步打包 OCI，按设置同步市场商品，再进入 `publish_loop.go` 后台构建 Helm。接口“发起打包成功”不等于全部发布完成；保留 pending=1、success=2、fail=3、未发布/下架=-1 与历史已发布状态 0 的语义。同制品按队列串行、任务去重，并在启动恢复 pending。
+- **保存与发布分阶段**：版本发布先同步打包 OCI，按设置同步市场商品，再进入 `helm/helm_pack_queue.go` 后台构建 Helm。接口“发起打包成功”不等于全部发布完成；保留 pending=1、success=2、fail=3、未发布/下架=-1 与历史已发布状态 0 的语义。同制品按队列串行、任务去重，并在启动恢复 pending。
 - **跨存储无统一事务**：文件、数据库、OCI、市场及 Kubernetes 操作可能部分成功。修改前明确阶段、失败返回和补偿方式；不能把尽力恢复说成原子回滚。版本下架还会选择前一已发布版本并重新发布。
 - **安装 info 多模式**：`Formula.Info` 区分身份/token、普通安装/升级、`runtime_context` 和 `full_manifest`。订单可能切换目标制品或限定版本；运行上下文不是安装授权结果，完整导入响应不能按普通响应裁剪。预检、ticket 与订单核销中的域名、应用标识、升级/重装信息必须一致。
 - **文件与附件协议**：manifest/file 与 share-file 分开，后者禁止 manifest；Depot 空内容表示删除。复用路径规范化和范围校验。上传返回的 `file://` 是逻辑引用；一次性下载映射命中即删除，重试可能需要重新获取 info。

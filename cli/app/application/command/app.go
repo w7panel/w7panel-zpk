@@ -25,6 +25,7 @@ func (c App) Configure(cmd *cobra.Command) {
 	cmd.PersistentFlags().Bool("plain-http", false, "use HTTP for this registry")
 	push := &cobra.Command{Use: "push [identifier[:version] | path]", Short: "push a complete local application directory as OCI", Args: cobra.MaximumNArgs(1), RunE: runAppPush}
 	push.Flags().StringP("path", "p", ".", "application package directory")
+	push.Flags().Bool("publish", false, "request version publication after pushing")
 	pull := &cobra.Command{Use: "pull <identifier[:version]>", Short: "download an editable application directory", Args: cobra.ExactArgs(1), RunE: runAppPull}
 	pull.Flags().StringP("path", "p", "", "new destination directory (defaults to identifier)")
 	pull.Flags().String("host", "", "default pull registry (overrides login host)")
@@ -158,7 +159,8 @@ func runAppPush(cmd *cobra.Command, args []string) error {
 	}
 	ctx, cancel := context.WithTimeout(cmd.Context(), 30*time.Minute)
 	defer cancel()
-	_, err = respo.Push(ctx, target, *session, directory, cmd.OutOrStdout())
+	publish, _ := cmd.Flags().GetBool("publish")
+	_, err = respo.Push(ctx, target, *session, directory, publish, cmd.OutOrStdout())
 	return err
 }
 func runAppPull(cmd *cobra.Command, args []string) error {

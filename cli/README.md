@@ -81,6 +81,9 @@ zpk app push ./zpk
 
 # 显式指定应用及版本。
 zpk app push demo:1.2.3 --path ./zpk
+
+# 上传后请求服务端发布该版本。
+zpk app push demo --path ./zpk --publish
 ```
 
 push 仅使用 `zpk login` 保存的默认仓库，不接受完整仓库引用或 `--host` 覆盖。应用标识映射到 `<登录 host>/<DEPOT_OCI_NAMESPACE，默认 zpk_oci>/<应用标识>`，沿用物理 OCI repository 中连字符转下划线的历史规则。
@@ -95,7 +98,9 @@ push 仅使用 `zpk login` 保存的默认仓库，不接受完整仓库引用�
 
 本地 `apps/<id>/manifest.yaml` 转为现有 `files.json` 中的 `<id>/manifest.yaml`，附件沿用现有 media type 和 `file:///Storage/...` 引用。可编辑文件路径用标准 OCI descriptor title annotation 保存；旧工具忽略该 annotation 仍可读取已有应用层。附件目录内部文件只进入所属 ZIP/TGZ，不逐文件增加 OCI 层。普通说明及未引用资源使用标准 MIME 内容层，不新增 ZPK 专有文件协议。
 
-命令成功表示 OCI 推送完成。Registry 接收、应用版本导入、管理端发布、Helm 构建和市场同步继续按现有服务端流程执行，不新增 prepare / publish / status 接口。
+默认只上传 OCI 并由回调同步版本。加 `--publish` 时，CLI 在标准 OCI manifest annotations 中写入 `w7.cc/auto_publish: "true"`；服务端同步版本后校验推送者为应用拥有者或管理员，再按现有设置同步市场商品并将 Helm 构建加入发布队列，不再重新打包或推送 OCI。启用自动同步市场时，使用服务端已保存的制品云端账号绑定，缺少绑定会记录发布失败。`latest` 和 `shared` 回调不创建或发布业务版本。
+
+命令成功表示 OCI 推送完成，携带发布标记不代表版本已发布；最终状态和失败原因在管理端查看。任务在队列中时沿用现有去重，重启恢复 pending 任务。不新增 prepare / publish / status 接口。`--publish` 需要配套服务端支持，旧服务端忽略该 annotation，仍只同步版本。
 
 ## 拉取与修改
 
@@ -194,7 +199,7 @@ OCI 传输直接使用主项目 `common/logic.PushOciToRemote`、`GetOciManifest
 
 服务端推送回调只识别应用包、同步版本及失效缓存，跳过 latest 别名；不参与 CLI 打包或增量合并。服务端打包、附件恢复均保持原有逻辑，一个后端 ZIP、多个前端包沿用原媒体类型约定。管理端重新打包可能丢失 CLI 附加的普通资源及原始路径 annotation。
 
-`make build` / `make build-compress` 的产物为 `bin/zpk_darwin_amd64_v2`、`bin/zpk_linux_amd64_v2` 和 `bin/zpk_windows_amd64_v2.exe`。Release 工作流上传这些文件，并使用 Linux CLI 拉取已有 `w7-zpkv2` 应用，更新解压后的 Helm 目录和前端构建目录，再通过 `app push` 自动打包发布新版本。
+`make build` / `make build-compress` 的产物为 `bin/zpk_darwin_amd64_v2`、`bin/zpk_linux_amd64_v2` 和 `bin/zpk_windows_amd64_v2.exe`。Release 工作流上传这些文件，并使用 Linux CLI 拉取已有 `w7-zpkv2` 应用，更新解压后的 Helm 目录和前端构建目录，再通过 `app push --publish` 上传新版本并请求服务端自动发布；最终发布状态以服务端为准。
 
 ```sh
 # 在 cli/ 下执行；测试只访问本地模拟 Registry 和模拟 Docker。

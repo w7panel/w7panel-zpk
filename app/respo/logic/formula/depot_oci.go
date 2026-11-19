@@ -12,11 +12,8 @@ import (
 
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/w7panel/w7panel-zpk/common/dao"
-	"github.com/w7panel/w7panel-zpk/common/entity"
 	"github.com/w7panel/w7panel-zpk/common/function"
 	"github.com/w7panel/w7panel-zpk/common/logic"
-	"github.com/w7panel/w7panel-zpk/common/types/registry"
-	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"oras.land/oras-go/v2"
 	"oras.land/oras-go/v2/registry/remote"
 	"sigs.k8s.io/yaml"
@@ -41,60 +38,6 @@ func (self *Depot) Copy(src *Formula, dest *Formula) error {
 
 	_, err = oras.Copy(context.Background(), srcRemoteOci, self.GetFormulaOciTag(src), destRemoteOci, self.GetFormulaOciTag(dest), oras.DefaultCopyOptions)
 	return err
-}
-
-func (self Depot) OnRepositoryPushed(payload registry.RegistryRepositoryWebHookPayLoad) {
-	slog.Info("depot OnRepositoryPushed", "payload", payload)
-	repositoryName, namespace := logic.ParseRepositoryNameAndNamespace(payload.Event.Target.Repository)
-	if namespace != facade.GetConfig().GetString("setting.depot.oci_namespace") {
-		return
-	}
-	tag := payload.Event.Target.Tag
-	if tag == "" || tag == AssetsOCITag || tag == "latest" {
-		return
-	}
-
-	depot, _ := NewDepot()
-	formula := GetFormulaByName(repositoryName)
-	if formula == nil {
-		username := payload.Event.Actor.Name
-		if username == "" {
-			slog.Error("OnRepositoryPushed UnPackOciToLocal err", "payload", payload, "err", "empty username")
-			return
-		}
-		user, err := logic.User{}.GetByUsername(username)
-		if err != nil {
-			slog.Error("OnRepositoryPushed UnPackOciToLocal GetByUsername err", "payload", payload, "err", err)
-			return
-		}
-		err = depot.AddFormula(repositoryName, tag, user)
-		if err != nil {
-			slog.Error("OnRepositoryPushed Failed to add formula to repository", "payload", payload, "err", err)
-			return
-		}
-		formula = GetFormulaByName(repositoryName)
-	}
-	if formula == nil {
-		slog.Error("OnRepositoryPushed Failed to get formula from repository", "payload", payload)
-		return
-	}
-
-	version, _ := dao.Q.Version.Where(dao.Q.Version.FormulaID.Eq(formula.ID)).Where(dao.Q.Version.Name.Eq(tag)).First()
-	if version == nil {
-		err := dao.Q.Version.Create(&entity.Version{
-			FormulaID:     formula.ID,
-			Name:          tag,
-			Description:   "新版本",
-			PublishStatus: -1,
-		})
-		if err != nil {
-			slog.Error("OnRepositoryPushed Failed to create version", "payload", payload, "err", err)
-		}
-	} else {
-		filesDir := filepath.Join(depot.GetBasePath(), filepath.Join(GetFormulaRelativeDir(formula.Name, version.ID), "files"))
-		slog.Info("OnRepositoryPushed formula oci after push clear cache", "payload:", payload, "filesDir", filesDir)
-		os.RemoveAll(filesDir)
-	}
 }
 
 func (self *Depot) packToOci(formula *Formula) error {
@@ -172,7 +115,7 @@ func (self *Depot) packToOci(formula *Formula) error {
 	resourcesDescriptor = append(resourcesDescriptor, helmFileDescriptors...)
 
 	tag := self.GetFormulaOciTag(formula)
-	err = logic.PushOciToRemote(context.Background(), remoteOci, tag, resourcesDescriptor, nil)
+	err = logic.PushOciToRemote(context.Background(), remoteOci, tag, resourcesDescriptor, nil, nil)
 	slog.Info("打包完成", "name", formula.Name, "tag", tag, "err", err)
 	return err
 }

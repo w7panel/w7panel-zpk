@@ -8,6 +8,7 @@ import (
 	"github.com/w7panel/w7panel-zpk/app/respo/http/controller"
 	"github.com/w7panel/w7panel-zpk/app/respo/logic"
 	"github.com/w7panel/w7panel-zpk/app/respo/logic/formula"
+	"github.com/w7panel/w7panel-zpk/app/respo/logic/helm"
 	logic2 "github.com/w7panel/w7panel-zpk/app/system/logic"
 	"github.com/w7panel/w7panel-zpk/common/entity"
 	"github.com/w7panel/w7panel-zpk/common/middleware"
@@ -71,7 +72,7 @@ func (provider *Provider) normalizeFormulaNames() error {
 }
 
 func (p Provider) registerEvent() {
-	_ = facade.GetEvent().Subscribe(registry.RegistryRepositoryAfterPushedEvent, formula.Depot{}.OnRepositoryPushed)
+	_ = facade.GetEvent().Subscribe(registry.RegistryRepositoryAfterPushedEvent, logic.FormulaPublish{}.OnRepositoryPushed)
 }
 
 func (provider *Provider) Register(httpServer *http_server.Server, console console.Console) {
@@ -175,6 +176,6 @@ func (provider *Provider) Register(httpServer *http_server.Server, console conso
 	}
 	go depot.PackLoop()
 
-	logic.InitFormulaPublishLoop()
-	logic.RecoverFormulaPublishTasks()
+	helm.InitFormulaHelmPackQueue()
+	helm.RecoverFormulaHelmPackTasks()
 }

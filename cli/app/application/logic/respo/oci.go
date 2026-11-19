@@ -40,7 +40,7 @@ type appManifest struct {
 	manifest commonlogic.Manifest
 }
 
-func Push(ctx context.Context, target clicommon.Target, session clicommon.Session, directory string, output io.Writer) (*TransferResult, error) {
+func Push(ctx context.Context, target clicommon.Target, session clicommon.Session, directory string, publish bool, output io.Writer) (*TransferResult, error) {
 	workDir, err := os.MkdirTemp("", "zpk-pack-")
 	if err != nil {
 		return nil, err
@@ -69,7 +69,11 @@ func Push(ctx context.Context, target clicommon.Target, session clicommon.Sessio
 		}
 	}
 	result := &TransferResult{Reference: target.Reference(), Version: version}
-	if err = commonlogic.PushOciToRemote(ctx, repository, version, pkg.Resources, nil); err != nil {
+	var annotations map[string]string
+	if publish {
+		annotations = map[string]string{"w7.cc/auto_publish": "true"}
+	}
+	if err = commonlogic.PushOciToRemote(ctx, repository, version, pkg.Resources, nil, annotations); err != nil {
 		return nil, err
 	}
 	descriptor, err := repository.Resolve(ctx, version)
@@ -91,6 +95,9 @@ func Push(ctx context.Context, target clicommon.Target, session clicommon.Sessio
 	result.Digest = descriptor.Digest.String()
 	if output != nil {
 		fmt.Fprintf(output, "OCI 已推送 %s:%s\n%s\n", result.Reference, result.Version, result.Digest)
+		if publish {
+			fmt.Fprintln(output, "已携带版本发布请求，最终发布状态请在管理端查看（需要服务端支持）")
+		}
 	}
 	return result, nil
 }

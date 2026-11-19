@@ -43,7 +43,7 @@ func (d *Depot) syncAssetsToOCI(formula *Formula) error {
 	if err != nil {
 		return err
 	}
-	return commonlogic.PushOciToRemote(context.Background(), remoteOci, AssetsOCITag, descriptors, nil)
+	return commonlogic.PushOciToRemote(context.Background(), remoteOci, AssetsOCITag, descriptors, nil, nil)
 }
 
 // restoreAssetsFromOCI 从 OCI 恢复制品附属资源到本地目录。

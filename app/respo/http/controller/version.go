@@ -94,7 +94,7 @@ func (c Version) Publish(ctx *gin.Context) {
 	}
 
 	consoleUid := logic2.User{}.GetConsoleUid(ctx)
-	err = logic.Version{}.PublishFormula(consoleUid, formula)
+	err = logic.FormulaPublish{}.PublishFormula(consoleUid, formula, true)
 	if err != nil {
 		c.JsonResponseWithServerError(ctx, err)
 		return
@@ -169,7 +169,7 @@ func (c Version) Unpublish(ctx *gin.Context) {
 	}
 
 	consoleUid := logic2.User{}.GetConsoleUid(ctx)
-	err = logic.Version{}.PublishFormula(consoleUid, prevVersionFormula)
+	err = logic.FormulaPublish{}.PublishFormula(consoleUid, prevVersionFormula, true)
 	if err != nil {
 		c.JsonResponseWithServerError(ctx, errors.New("顺延版本发布失败, 请尝试手动发布，err:"+err.Error()))
 		return

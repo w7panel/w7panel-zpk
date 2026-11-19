@@ -1,4 +1,4 @@
-package logic
+package helm
 
 import (
 	"fmt"
@@ -8,49 +8,54 @@ import (
 	"sync"
 
 	formulalogic "github.com/w7panel/w7panel-zpk/app/respo/logic/formula"
-	"github.com/w7panel/w7panel-zpk/app/respo/logic/helm"
 	"github.com/w7panel/w7panel-zpk/common/dao"
 	"github.com/w7panel/w7panel-zpk/common/entity"
 )
 
 const (
-	formulaPublishWorkerCount = 5
+	formulaHelmPackWorkerCount = 5
 )
 
-type formulaPublishTask struct {
+type formulaHelmPackTask struct {
 	formulaIdentify string
 	VersionName     string
 	VersionId       int32
 }
 
-type FormulaPublishLoop struct {
+type FormulaHelmPackQueue struct {
 	once    sync.Once
-	queues  []chan formulaPublishTask
+	queues  []chan formulaHelmPackTask
 	pending sync.Map
 }
 
-var defaultFormulaPublishLoop = &FormulaPublishLoop{
-	queues: makeFormulaPublishQueues(),
+var defaultFormulaHelmPackQueue = &FormulaHelmPackQueue{
+	queues: makeFormulaHelmPackQueues(),
 }
 
-func InitFormulaPublishLoop() {
-	defaultFormulaPublishLoop.Start()
+func InitFormulaHelmPackQueue() {
+	defaultFormulaHelmPackQueue.Start()
 }
 
-func AddFormulaPublishTask(formulaIdentify, versionName string, versionId int32) error {
-	return defaultFormulaPublishLoop.Add(formulaIdentify, versionName, versionId)
+func AddFormulaHelmPackTask(formulaIdentify, versionName string, versionId int32) error {
+	return defaultFormulaHelmPackQueue.Add(formulaIdentify, versionName, versionId)
 }
 
-func RecoverFormulaPublishTasks() {
+func IsFormulaHelmPackPending(formulaIdentify, versionName string) bool {
+	task := formulaHelmPackTask{formulaIdentify: formulaIdentify, VersionName: versionName}
+	_, pending := defaultFormulaHelmPackQueue.pending.Load(defaultFormulaHelmPackQueue.taskKey(task))
+	return pending
+}
+
+func RecoverFormulaHelmPackTasks() {
 	go func() {
-		err := defaultFormulaPublishLoop.Recover()
+		err := defaultFormulaHelmPackQueue.Recover()
 		if err != nil {
 			panic(err)
 		}
 	}()
 }
 
-func (l *FormulaPublishLoop) Start() {
+func (l *FormulaHelmPackQueue) Start() {
 	l.once.Do(func() {
 		for i, queue := range l.queues {
 			go l.run(i+1, queue)
@@ -58,8 +63,8 @@ func (l *FormulaPublishLoop) Start() {
 	})
 }
 
-func (l *FormulaPublishLoop) Add(formulaIdentify, versionName string, versionId int32) error {
-	task := formulaPublishTask{
+func (l *FormulaHelmPackQueue) Add(formulaIdentify, versionName string, versionId int32) error {
+	task := formulaHelmPackTask{
 		formulaIdentify: formulaIdentify,
 		VersionName:     versionName,
 		VersionId:       versionId,
@@ -78,7 +83,7 @@ func (l *FormulaPublishLoop) Add(formulaIdentify, versionName string, versionId 
 	return nil
 }
 
-func (l *FormulaPublishLoop) Recover() error {
+func (l *FormulaHelmPackQueue) Recover() error {
 	versions, err := dao.Q.Version.Where(dao.Q.Version.PublishStatus.Eq(formulalogic.FormulaPublishStatusPending)).Find()
 	if err != nil {
 		return err
@@ -106,7 +111,7 @@ func (l *FormulaPublishLoop) Recover() error {
 	for _, version := range versions {
 		formulaName, ok := formulaNameByID[version.FormulaID]
 		if !ok {
-			slog.Warn("skip recover formula publish task because formula not found", "formula_id", version.FormulaID, "version_id", version.ID)
+			slog.Warn("skip recover formula Helm pack task because formula not found", "formula_id", version.FormulaID, "version_id", version.ID)
 			continue
 		}
 
@@ -116,33 +121,33 @@ func (l *FormulaPublishLoop) Recover() error {
 	}
 
 	if len(versions) > 0 {
-		slog.Info("recover formula publish tasks", "count", len(versions))
+		slog.Info("recover formula Helm pack tasks", "count", len(versions))
 	}
 	return nil
 }
 
-func (l *FormulaPublishLoop) run(workerID int, queue <-chan formulaPublishTask) {
+func (l *FormulaHelmPackQueue) run(workerID int, queue <-chan formulaHelmPackTask) {
 	for task := range queue {
-		slog.Info("run formula publish task begin", "worker_id", workerID, "task", task)
+		slog.Info("run formula Helm pack task begin", "worker_id", workerID, "task", task)
 		err := l.handle(task)
-		slog.Info("run formula publish task complete", "worker_id", workerID, "task", task, "err", err)
+		slog.Info("run formula Helm pack task complete", "worker_id", workerID, "task", task, "err", err)
 		if err != nil {
 			err1 := updateVersionPublishState(nil, task.VersionId, formulalogic.FormulaPublishStatusFail, err.Error())
-			slog.Error("formula publish task failed", "worker_id", workerID, "task", task, "err", err, "err1", err1)
+			slog.Error("formula Helm pack task failed", "worker_id", workerID, "task", task, "err", err, "err1", err1)
 		}
 
 		l.pending.Delete(l.taskKey(task))
 	}
 }
 
-func (l *FormulaPublishLoop) handle(task formulaPublishTask) error {
+func (l *FormulaHelmPackQueue) handle(task formulaHelmPackTask) error {
 	depot, _ := formulalogic.NewDepot()
 	formula, err := depot.GetFormula(task.formulaIdentify, task.VersionName, nil)
 	if err != nil {
 		return err
 	}
 
-	if _, err = helm.PackFormulaToHelmAndPack(*formula, true); err != nil {
+	if _, err = PackFormulaToHelmAndPack(*formula, true); err != nil {
 		return err
 	}
 
@@ -154,23 +159,23 @@ func (l *FormulaPublishLoop) handle(task formulaPublishTask) error {
 	return nil
 }
 
-func (l *FormulaPublishLoop) taskKey(task formulaPublishTask) string {
+func (l *FormulaHelmPackQueue) taskKey(task formulaHelmPackTask) string {
 	return fmt.Sprintf("%s:%s", task.formulaIdentify, task.VersionName)
 }
 
-func (l *FormulaPublishLoop) queueFor(task formulaPublishTask) chan formulaPublishTask {
+func (l *FormulaHelmPackQueue) queueFor(task formulaHelmPackTask) chan formulaHelmPackTask {
 	if len(l.queues) == 0 {
-		panic("formula publish queues not initialized")
+		panic("formula Helm pack queues not initialized")
 	}
 
 	index := hashFormulaIdentify(task.formulaIdentify) % uint32(len(l.queues))
 	return l.queues[index]
 }
 
-func makeFormulaPublishQueues() []chan formulaPublishTask {
-	queues := make([]chan formulaPublishTask, formulaPublishWorkerCount)
+func makeFormulaHelmPackQueues() []chan formulaHelmPackTask {
+	queues := make([]chan formulaHelmPackTask, formulaHelmPackWorkerCount)
 	for i := range queues {
-		queues[i] = make(chan formulaPublishTask, 128)
+		queues[i] = make(chan formulaHelmPackTask, 128)
 	}
 	return queues
 }
@@ -193,7 +198,8 @@ func updateVersionPublishState(formula *formulalogic.Formula, versionID int32, s
 			}
 		}
 
-		_, err := tx.Version.Where(tx.Version.ID.Eq(versionID)).Updates(entity.Version{
+		_, err := tx.Version.Where(tx.Version.ID.Eq(versionID)).
+			Select(tx.Version.PublishStatus, tx.Version.PublishFailReason).Updates(entity.Version{
 			PublishStatus:     status,
 			PublishFailReason: failReason,
 		})

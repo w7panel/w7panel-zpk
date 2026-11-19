@@ -19,8 +19,6 @@ const (
 	FORMULA_RECOMMEND = 99
 )
 
-const FORMULA_FREE_UPGRADE = 0
-
 const (
 	FormulaPublishStatusPending = int32(1)
 	FormulaPublishStatusSuccess = int32(2)

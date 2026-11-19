@@ -90,7 +90,7 @@ push 仅使用 `zpk login` 保存的默认仓库，不接受完整仓库引用�
 
 应用发布版本采用三个非负数字段，可带小写 `v` 前缀，例如 `1.2.3`、`v1.2.3`；不接受缺段版本、文字 tag 或预发布后缀。省略版本或 push 指定 `latest` 时，从远端符合规则的版本中选择最新版并递增 patch，例如 `1.2.3 → 1.2.4`、`v1.2.3 → v1.2.4`；没有符合规则的版本时初始使用 `1.0.0`。同名版本沿用原有更新行为，允许推送新内容。
 
-自动版本与 latest 选择先过滤 `release`、`shared`、`2026.11` 等不符合版本规则的 tag，再复用项目现有的 `SortTagsDesc` 数字排序规则。`latest` 指向排序最新的已上传 OCI 包，不是数据库业务版本，也不保证 Helm 或市场发布已完成。上传较早版本不会将 latest 回退。本地 manifest 中的旧版本字段不会决定自动版本。
+自动版本与 latest 选择先过滤 `release`、`shared`、`2026.11` 等不符合版本规则的 tag，再复用项目现有的 `SortTagsDesc` 数字排序规则。push 只推送具体版本 tag，不创建或更新远端 `latest` 标签。pull 中的 `latest` 表示按版本号排序最新的已上传 OCI 包，不是数据库业务版本，也不保证 Helm 或市场发布已完成。本地 manifest 中的旧版本字段不会决定自动版本。
 
 版本分配在 CLI 内完成，同一应用的自动版本推送应串行；显式指定同名 tag 时，以仓库最后一次成功写入的内容为准。
 
@@ -187,7 +187,7 @@ app/application/logic/
 
 应用流程对外使用 `respo.Push`、`respo.Pull`、`respo.Update`，`pack` / `unpack` 为内部方法，分别只由 push / pull 调用。临时打包目录由 push 管理，下载和临时 blob 由 pull 管理，unpack 只处理本地内容；appPackage 仅保存打包结果。推送始终以本地完整目录为准，不维护旧的附件合并流程。
 
-OCI 传输直接使用主项目 `common/logic.PushOciToRemote`、`GetOciManifest` 和 `UnPackOciToLocal`，推送方法统一处理 blob 复用、manifest 生成和版本 tag；CLI 负责版本选择及 latest。命令入口直接设置请求超时，负责参数组合、版本格式和应用标识校验，并在调用处完成应用仓库映射及历史连字符 / 下划线转换。
+OCI 传输直接使用主项目 `common/logic.PushOciToRemote`、`GetOciManifest` 和 `UnPackOciToLocal`，推送方法统一处理 blob 复用、manifest 生成和版本 tag；CLI 负责自动版本选择和拉取最新版的解析。命令入口直接设置请求超时，负责参数组合、版本格式和应用标识校验，并在调用处完成应用仓库映射及历史连字符 / 下划线转换。
 
 各领域依赖 CLI 的 `common`，不相互依赖。CLI 共享层只提供会话、仓库和版本能力。manifest 解析、字段读写和标识校验直接使用主项目 `common/logic/manifest.go`；路径解析、文件读写和复制使用主项目 `common/function`，临时文件采用通用的 `.<目标文件名>.tmp-` 前缀；后续文档可复用仓库、版本和传输能力。
 

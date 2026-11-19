@@ -62,18 +62,6 @@ type NotAppInfoReq struct {
 	ConsoleUid int32 `json:"console_uid"`
 }
 
-type CreateNotAppReq struct {
-	ConsoleUid    int32  `json:"console_uid"`
-	Name          string `json:"name"`
-	Description   string `json:"design_description"`
-	Logo          string `json:"logo"`
-	Title         string `json:"title"`
-	NotAppType    int    `json:"notapp_type"`
-	IsShortcut    int    `json:"is_shortcut"`
-	IsFreeInstall int    `json:"is_free_install"`
-	DisplayOrder  int    `json:"displayorder"`
-}
-
 type NotAppBranchInfoReq struct {
 	ConsoleUid int32 `json:"console_uid"`
 	AppId      int   `json:"id"`

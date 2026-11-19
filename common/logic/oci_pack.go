@@ -27,7 +27,6 @@ const (
 	MediaTypeBackendCodeZip = "application/vnd.w7.formula.code.zip+zip"
 	MediaTypeFrontedCodeZip = "application/vnd.w7.formula.code.web.zip+zip"
 	MediaTypeHelmZip        = "application/vnd.w7.formula.helm.zip+zip"
-	MediaTypeAuth           = "application/vnd.w7.formula.auth"
 )
 
 type FileOciDescriptor struct {

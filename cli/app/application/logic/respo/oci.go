@@ -80,18 +80,6 @@ func Push(ctx context.Context, target clicommon.Target, session clicommon.Sessio
 	if err != nil {
 		return nil, fmt.Errorf("版本 %s 已推送，但查询推送结果失败: %w", version, err)
 	}
-	latestDescriptor := descriptor
-	versions := append(tags, version)
-	function.SortTagsDesc(versions)
-	if versions[0] != version {
-		latestDescriptor, err = repository.Resolve(ctx, versions[0])
-		if err != nil {
-			return nil, fmt.Errorf("版本 %s 已推送，但解析最新版失败: %w", version, err)
-		}
-	}
-	if err = repository.Tag(ctx, latestDescriptor, "latest"); err != nil {
-		return nil, fmt.Errorf("版本 %s 已推送，但 latest 更新失败: %w", version, err)
-	}
 	result.Digest = descriptor.Digest.String()
 	if output != nil {
 		fmt.Fprintf(output, "OCI 已推送 %s:%s\n%s\n", result.Reference, result.Version, result.Digest)

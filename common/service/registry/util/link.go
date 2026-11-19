@@ -1,7 +1,6 @@
 package util
 
 import (
-	"fmt"
 	"strings"
 )
 
@@ -12,29 +11,8 @@ type Link struct {
 	Attrs map[string]string
 }
 
-// String returns the string representation of a link
-func (l *Link) String() string {
-	s := fmt.Sprintf("<%s>", l.URL)
-	if len(l.Rel) > 0 {
-		s = fmt.Sprintf(`%s; rel="%s"`, s, l.Rel)
-	}
-	for key, value := range l.Attrs {
-		s = fmt.Sprintf(`%s; %s="%s"`, s, key, value)
-	}
-	return s
-}
-
 // Links is a link object array
 type Links []*Link
-
-// String returns the string representation of links
-func (l Links) String() string {
-	var strs []string
-	for _, link := range l {
-		strs = append(strs, link.String())
-	}
-	return strings.Join(strs, " , ")
-}
 
 // ParseLinks parses the link header into Links
 // e.g. <http://example.com/TheBook/chapter2>; rel="previous"; title="previous chapter" , <http://example.com/TheBook/chapter4>; rel="next"; title="next chapter"

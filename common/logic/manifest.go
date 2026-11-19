@@ -1,12 +1,14 @@
 package logic
 
 import (
+	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"sigs.k8s.io/yaml"
 )
 
 const (
@@ -726,4 +728,63 @@ func int64Ptr(i int64) *int64 {
 
 func GetPortName(port v1.ContainerPort) string {
 	return "port-" + strconv.Itoa(int(port.ContainerPort))
+}
+
+func ReadManifest(content []byte) (map[string]interface{}, Manifest, error) {
+	var raw map[string]interface{}
+	var manifest Manifest
+	if err := yaml.Unmarshal(content, &raw); err != nil {
+		return nil, manifest, err
+	}
+	if err := yaml.Unmarshal(content, &manifest); err != nil {
+		return nil, manifest, err
+	}
+	if raw == nil {
+		return nil, manifest, fmt.Errorf("manifest 不能为空")
+	}
+	if err := ValidateAppIdentifier(manifest.Application.Identifie); err != nil {
+		return nil, manifest, err
+	}
+	if manifest.Application.Type == "" {
+		return nil, manifest, fmt.Errorf("application.type 不能为空")
+	}
+	return raw, manifest, nil
+}
+
+func ManifestObject(raw map[string]interface{}, section string) map[string]interface{} {
+	for _, name := range strings.Split(section, ".") {
+		next, ok := raw[name].(map[string]interface{})
+		if !ok {
+			return nil
+		}
+		raw = next
+	}
+	return raw
+}
+
+func ManifestString(raw map[string]interface{}, section, field string) string {
+	value, _ := ManifestObject(raw, section)[field].(string)
+	return value
+}
+
+func SetManifestString(raw map[string]interface{}, section, field, value string) {
+	current := raw
+	for _, name := range strings.Split(section, ".") {
+		next, ok := current[name].(map[string]interface{})
+		if !ok {
+			next = map[string]interface{}{}
+			current[name] = next
+		}
+		current = next
+	}
+	current[field] = value
+}
+
+var appIdentifier = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
+
+func ValidateAppIdentifier(value string) error {
+	if !appIdentifier.MatchString(value) {
+		return fmt.Errorf("应用标识无效: %q（仅支持小写字母、数字及单个连字符）", value)
+	}
+	return nil
 }

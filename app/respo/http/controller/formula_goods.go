@@ -120,16 +120,18 @@ func (c FormulaGoods) SetServiceFee(ctx *gin.Context) {
 		params.ServicePackages = make([]devcenter.NotAppServicePackage, 0)
 	}
 
-	_, err = dao.Q.Formula.Where(dao.Formula.ID.Eq(formula.ID)).Updates(entity.Formula{
-		InstallServiceFee: params.InstallServiceFee,
-		ServicePackages: &accessor.ServicePackagesOption{
-			List: params.ServicePackages,
-		},
-		VersionPrices: &accessor.VersionPricesOption{
-			List: params.VersionPrices,
-		},
-		Setting: formula.Setting,
-	})
+	_, err = dao.Q.Formula.Where(dao.Formula.ID.Eq(formula.ID)).
+		Select(dao.Formula.InstallServiceFee, dao.Formula.ServicePackages, dao.Formula.VersionPrices, dao.Formula.Setting).
+		Updates(entity.Formula{
+			InstallServiceFee: params.InstallServiceFee,
+			ServicePackages: &accessor.ServicePackagesOption{
+				List: params.ServicePackages,
+			},
+			VersionPrices: &accessor.VersionPricesOption{
+				List: params.VersionPrices,
+			},
+			Setting: formula.Setting,
+		})
 	if err != nil {
 		c.JsonResponseWithError(ctx, err, 500)
 		return

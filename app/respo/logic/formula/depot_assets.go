@@ -1,6 +1,7 @@
 package formula
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -42,7 +43,7 @@ func (d *Depot) syncAssetsToOCI(formula *Formula) error {
 	if err != nil {
 		return err
 	}
-	return commonlogic.PushOciToRemote(remoteOci, AssetsOCITag, descriptors, nil)
+	return commonlogic.PushOciToRemote(context.Background(), remoteOci, AssetsOCITag, descriptors, nil)
 }
 
 // restoreAssetsFromOCI 从 OCI 恢复制品附属资源到本地目录。
@@ -51,7 +52,7 @@ func (d *Depot) restoreAssetsFromOCI(formula *Formula) error {
 	if err != nil {
 		return err
 	}
-	manifest, err := commonlogic.GetOciManifest(remoteOci, AssetsOCITag)
+	manifest, err := commonlogic.GetOciManifest(context.Background(), remoteOci, AssetsOCITag)
 	if errors.Is(err, commonlogic.OciManifestNotFoundErr) {
 		return nil
 	}
@@ -59,7 +60,7 @@ func (d *Depot) restoreAssetsFromOCI(formula *Formula) error {
 		return err
 	}
 
-	return commonlogic.UnPackOciToLocal(remoteOci, manifest, []string{commonlogic.MediaTypeFilesJson}, func(_ string, _ string, reader io.Reader) error {
+	return commonlogic.UnPackOciToLocal(context.Background(), remoteOci, manifest, []string{commonlogic.MediaTypeFilesJson}, func(_ string, _ string, reader io.Reader) error {
 		files := map[string]string{}
 		if err = json.NewDecoder(reader).Decode(&files); err != nil {
 			return err

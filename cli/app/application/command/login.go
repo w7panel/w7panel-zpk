@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"github.com/w7panel/w7panel-zpk/cli/app/application/logic"
+	clicommon "github.com/w7panel/w7panel-zpk/cli/app/application/logic/common"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/console"
 )
 
@@ -43,20 +43,26 @@ func (c Login) Handle(cmd *cobra.Command, args []string) {
 	if strings.Contains(host, "://") || strings.Contains(host, "/") {
 		panic("host must be a domain or host:port without protocol")
 	}
-	encryptPwd, err := logic.EncryptPassword(password)
+	encryptPwd, err := clicommon.EncryptPassword(password)
 	if err != nil {
 		panic(err)
 	}
 
-	session, err := logic.LoadSession()
+	session, err := clicommon.LoadSession()
 	if err != nil {
 		panic(err)
 	}
+	if session.Credentials == nil {
+		session.Credentials = map[string]clicommon.RegistryCredential{}
+	}
+	if session.Host != "" && session.Username != "" && session.Password != "" {
+		session.Credentials[session.Host] = clicommon.RegistryCredential{Username: session.Username, Password: session.Password}
+	}
+	session.Credentials[host] = clicommon.RegistryCredential{Username: username, Password: encryptPwd}
 	session.Host = host
 	session.Username = username
 	session.Password = encryptPwd
-	session.Artifact = ""
-	if err := logic.SaveSession(session); err != nil {
+	if err := clicommon.SaveSession(session); err != nil {
 		panic(err)
 	}
 

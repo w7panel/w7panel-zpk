@@ -19,24 +19,24 @@ build-compress: build-all compress
 
 build-darwin:
 	mkdir -p $(BIN_DIR)
-	GOOS=darwin GOARCH=amd64 $(GO_BUILD) -o $(BIN_DIR)/$(CLI_NAME)_darwin_amd64 .
+	GOOS=darwin GOARCH=amd64 $(GO_BUILD) -o $(BIN_DIR)/$(CLI_NAME)_darwin_amd64_v2 .
 
 build-linux:
 	mkdir -p $(BIN_DIR)
-	GOOS=linux GOARCH=amd64 $(GO_BUILD) -o $(BIN_DIR)/$(CLI_NAME)_linux_amd64 .
+	GOOS=linux GOARCH=amd64 $(GO_BUILD) -o $(BIN_DIR)/$(CLI_NAME)_linux_amd64_v2 .
 
 build-windows:
 	mkdir -p $(BIN_DIR)
-	GOOS=windows GOARCH=amd64 $(GO_BUILD) -o $(BIN_DIR)/$(CLI_NAME)_windows_amd64.exe .
+	GOOS=windows GOARCH=amd64 $(GO_BUILD) -o $(BIN_DIR)/$(CLI_NAME)_windows_amd64_v2.exe .
 
 compress:
 	@if ! command -v $(UPX) >/dev/null 2>&1; then \
 		echo "upx not found, please install upx first"; \
 		exit 1; \
 	fi
-	$(UPX) $(UPX_DARWIN_FLAGS) $(BIN_DIR)/$(CLI_NAME)_darwin_amd64
-	$(UPX) $(UPX_FLAGS) $(BIN_DIR)/$(CLI_NAME)_linux_amd64
-	$(UPX) $(UPX_FLAGS) $(BIN_DIR)/$(CLI_NAME)_windows_amd64.exe
+	$(UPX) $(UPX_DARWIN_FLAGS) $(BIN_DIR)/$(CLI_NAME)_darwin_amd64_v2
+	$(UPX) $(UPX_FLAGS) $(BIN_DIR)/$(CLI_NAME)_linux_amd64_v2
+	$(UPX) $(UPX_FLAGS) $(BIN_DIR)/$(CLI_NAME)_windows_amd64_v2.exe
 
 clean:
 	rm -rf $(BIN_DIR)

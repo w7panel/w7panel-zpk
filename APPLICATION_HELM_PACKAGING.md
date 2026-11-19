@@ -75,6 +75,12 @@ OCI repository 名为：
 <DEPOT_OCI_NAMESPACE>/<formula-identifie 中的 - 替换为 _>
 ```
 
+CLI 的 `app push/pull` 复用本节的 OCI 格式，不增加应用包外壳或专有索引层。本地根 `manifest.yaml` 与子应用 `apps/<identifie>/manifest.yaml` 转换为现有 `files.json` 路径；主子应用附件统一放在 `apps/<identifie>/assets/`，主应用在根 manifest 中使用 `./apps/<主应用标识>/assets/...` 引用，不重复保存主应用 manifest；完整目录规范和命令见 [CLI 发布工具](cli/README.md)。本地附件路径可通过标准 OCI descriptor title annotation 还原，未声明 annotation 时按附件类型使用默认目录名。CLI pull 将附件安全解压为可编辑目录，push 将后端、前端目录稳定打包为 ZIP，将 Helm 目录打包为 TGZ；附件内部文件不单独生成 OCI 层。CLI 只有 pull 解包；app update 从目录导入完整附件、替换目录内文件或覆盖 / patch manifest，不接受压缩包；只有 push 打包，服务端协议保持不变。
+
+CLI 沿用一个后端 ZIP、多个前端包的原有约定：主应用后端源码使用原无路径后缀的 media type，多个前端包按原有媒体类型路径后缀区分，不扩展多后端包协议。`latest` 是 OCI 版本别名，推送事件不将其创建为业务版本；CLI 的上传成功不代表 Helm 构建或市场发布完成。
+
+CLI 在本地生成完整 manifest，并按内容摘要复用仓库已有 blob；服务端推送回调仅识别应用包、同步版本及失效缓存，不参与增量合并或重新打包。附件继续在后续 `GetFormula` 读取时按原逻辑恢复；管理端 `packToOci` 也保持原有打包逻辑。
+
 本地缓存缺文件时，`GetFormula` 会根据 OCI layer 把 manifest、源码、前端包、Helm 包恢复到 Depot。
 
 ### 2.3 生成最终 Helm 包
@@ -152,7 +158,7 @@ OCI repository 名为：
 
 `metrics-plugin` 与 `helm` 共用配置界面，均显示“启用 Helm 配置”开关和 YAML 配置区。关闭开关只保存 `platform.helm.depend_yamls`，忽略未清空的 Chart/仓库/安装配置输入；开启时保存 Chart 与安装配置，并保留附加 YAML。已有 Chart 的配置重新加载时默认开启开关，仅 YAML 时关闭。监控插件启用 Helm 时校验 Chart 来源；仅 YAML 时直接复用 YAML 打包分支，不生成原生容器或 Higress WasmPlugin。类型切换和已有 manifest 字段不变。
 
-监控插件描述制品用途，指标采集目标、存储及展示由 Chart 本身配置；本次不新增面板指标接入协议。安装仍使用既有 Helm 包接口；外部客户端如需按新类型分类，需识别 `application.type: metrics-plugin`，本仓库不会自动更新外部客户端。
+监控插件在主应用编辑器保存时默认归入“监控插件”分类，不依赖市场分类列表是否包含该名称；子应用编辑不修改制品级分类。监控插件描述制品用途，指标采集目标、存储及展示由 Chart 本身配置；本次不新增面板指标接入协议。安装仍使用既有 Helm 包接口；外部客户端如需按新类型分类，需识别 `application.type: metrics-plugin`，本仓库不会自动更新外部客户端。
 
 因此类型和数据应保持一致。例如非 Helm 类型意外残留 `platform.helm` 时，也会优先按用户 Helm 包处理。当前 UI 在切换类型时会清理这类残留字段。
 

@@ -1,4 +1,4 @@
-package logic
+package common
 
 import (
 	"crypto/aes"
@@ -12,34 +12,22 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"slices"
 	"time"
 )
 
-const (
-	AttachTypeFrontend = "frontend"
-	AttachTypeBackend  = "backend"
-	AttachTypeHelm     = "helm"
-)
-
-type Attachment struct {
-	Path      string    `json:"path"`
-	Type      string    `json:"type"`
-	AddedAt   time.Time `json:"added_at"`
-	MediaHint string    `json:"media_hint,omitempty"`
-	Artifact  string    `json:"artifact"`
+type RegistryCredential struct {
+	Username string `json:"username"`
+	Password string `json:"encrypted_password"`
 }
 
+// Session shares registry credentials across artifact commands. Saved sessions
+// from the previous CLI remain readable; obsolete selection fields are ignored.
 type Session struct {
-	Host          string       `json:"host"`
-	Username      string       `json:"username"`
-	Password      string       `json:"encrypted_password"`
-	Artifact      string       `json:"artifact"`
-	OciRegistry   string       `json:"oci_registry,omitempty"`
-	OciRepository string       `json:"oci_repository,omitempty"`
-	OciTag        string       `json:"oci_tag,omitempty"`
-	Attachments   []Attachment `json:"attachments"`
-	UpdatedAt     time.Time    `json:"updated_at"`
+	Credentials map[string]RegistryCredential `json:"credentials,omitempty"`
+	Host        string                        `json:"host"`
+	Username    string                        `json:"username"`
+	Password    string                        `json:"encrypted_password"`
+	UpdatedAt   time.Time                     `json:"updated_at"`
 }
 
 func LoadSession() (*Session, error) {
@@ -125,14 +113,6 @@ func DecryptPassword(ciphertext string) (string, error) {
 		return "", err
 	}
 	return string(plaintext), nil
-}
-
-func NormalizeAttachType(value string) (string, error) {
-	if slices.Contains([]string{AttachTypeFrontend, AttachTypeBackend, AttachTypeHelm}, value) {
-		return value, nil
-	}
-
-	return "", fmt.Errorf("unsupported attachment type %q, allowed: frontend, backend, helm", value)
 }
 
 func encryptionKey() [32]byte {

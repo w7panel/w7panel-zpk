@@ -153,6 +153,13 @@ func (l Repository) OnRepositoryPushedCreate(payload registry.RegistryRepository
 	}
 }
 
+func (l Repository) OnUpdateRepositoryEvent(payload registry.UpdateRepositoryPayload) {
+	name, namespace := logic.ParseRepositoryNameAndNamespace(payload.Repository)
+	_, err := dao.Q.RegistryRepository.Where(dao.Q.RegistryRepository.Namespace.Eq(namespace)).
+		Where(dao.Q.RegistryRepository.Name.Eq(name)).Update(dao.Q.RegistryRepository.VisibleType, payload.VisibleType)
+	slog.Info("OnUpdateRepositoryEvent", "payload", payload, "err", err)
+}
+
 func (l Repository) OnRepositoryPushed(payload registry.RegistryRepositoryWebHookPayLoad) {
 	l.OnRepositoryPushedCreate(payload)
 

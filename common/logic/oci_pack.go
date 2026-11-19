@@ -8,7 +8,6 @@ import (
 	"io"
 	"log/slog"
 	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 
@@ -20,7 +19,6 @@ import (
 	"oras.land/oras-go/v2/registry/remote"
 )
 
-var DefaultWorkDir = filepath.Join(os.TempDir(), "w7panel-zpk", "oci-pack")
 var OciManifestNotFoundErr = errors.New("oci manifest not found")
 
 const (
@@ -132,30 +130,22 @@ func PackFrontedCodeZipToOci(zipPaths map[string]string) ([]FileOciDescriptor, e
 	return fileDescriptors, nil
 }
 
-func PushOciToRemote(remoteRepository *remote.Repository, tag string, resourcesDescriptor []FileOciDescriptor, baseLayers []v1.Descriptor) error {
+func PushOciToRemote(ctx context.Context, remoteRepository *remote.Repository, tag string, resourcesDescriptor []FileOciDescriptor, baseLayers []v1.Descriptor) error {
 	filesDescriptor := make([]v1.Descriptor, 0)
 	if baseLayers != nil && len(baseLayers) > 0 {
 		filesDescriptor = append(filesDescriptor, baseLayers...)
 	}
-	ctx := context.Background()
 	for _, item := range resourcesDescriptor {
-		if item.Content != nil {
-			err := remoteRepository.Push(ctx, item.Descriptor, bytes.NewReader(item.Content))
-			if err != nil {
-				return err
-			}
-		} else {
-			file, err := os.Open(item.Path)
-			if err != nil {
-				return err
-			}
-			err = remoteRepository.Push(ctx, item.Descriptor, file)
-			file.Close()
-			if err != nil {
-				return err
-			}
-		}
 		filesDescriptor = append(filesDescriptor, item.Descriptor)
+		err := remoteRepository.Mount(ctx, item.Descriptor, remoteRepository.Reference.Repository, func() (io.ReadCloser, error) {
+			if item.Content != nil {
+				return io.NopCloser(bytes.NewReader(item.Content)), nil
+			}
+			return os.Open(item.Path)
+		})
+		if err != nil {
+			return err
+		}
 	}
 
 	artifactType := "application/vnd.w7.files.v1+tar"
@@ -172,8 +162,8 @@ func PushOciToRemote(remoteRepository *remote.Repository, tag string, resourcesD
 	return remoteRepository.Tag(ctx, manifestDescriptor, tag)
 }
 
-func GetOciManifest(remoteRepository *remote.Repository, tag string) (*v1.Manifest, error) {
-	_, fetchedManifestContent, err := oras.FetchBytes(context.Background(), remoteRepository, tag, oras.DefaultFetchBytesOptions)
+func GetOciManifest(ctx context.Context, remoteRepository *remote.Repository, tag string) (*v1.Manifest, error) {
+	_, fetchedManifestContent, err := oras.FetchBytes(ctx, remoteRepository, tag, oras.DefaultFetchBytesOptions)
 	if err != nil {
 		if strings.Contains(err.Error(), tag+": not found") {
 			return nil, OciManifestNotFoundErr
@@ -190,27 +180,35 @@ func GetOciManifest(remoteRepository *remote.Repository, tag string) (*v1.Manife
 	return &manifest, nil
 }
 
-func UnPackOciToLocal(remoteRepository *remote.Repository, manifest *v1.Manifest, mediaTypes []string, writeHandler func(mediaType string, savePath string, reader io.Reader) error) error {
+func UnPackOciToLocal(ctx context.Context, remoteRepository *remote.Repository, manifest *v1.Manifest, mediaTypes []string, writeHandler func(mediaType string, savePath string, reader io.Reader) error) error {
 	for _, layer := range manifest.Layers {
 		if slices.Contains(mediaTypes, layer.MediaType) {
-			reader, err := remoteRepository.Fetch(context.Background(), layer)
+			reader, err := remoteRepository.Fetch(ctx, layer)
 			if err != nil {
 				return err
 			}
 			err = writeHandler(layer.MediaType, "", reader)
+			closeErr := reader.Close()
 			if err != nil {
 				return err
 			}
+			if closeErr != nil {
+				return closeErr
+			}
 		} else {
 			for _, item := range mediaTypes {
-				if strings.Contains(layer.MediaType, item) {
-					reader, err := remoteRepository.Fetch(context.Background(), layer)
+				if strings.HasPrefix(layer.MediaType, item+"/") {
+					reader, err := remoteRepository.Fetch(ctx, layer)
 					if err != nil {
 						return err
 					}
 					err = writeHandler(item, layer.MediaType[len(item)+1:], reader)
+					closeErr := reader.Close()
 					if err != nil {
 						return err
+					}
+					if closeErr != nil {
+						return closeErr
 					}
 					break
 				}

@@ -1,3 +1,7 @@
+应用发布工具的目录规范、`zpk app push/pull/update` 和 `zpk image push` 用法见 [CLI 发布工具](cli/README.md)。`app` 复用原有 respo OCI 格式；文档发布暂不支持。
+
+应用 OCI 仓库创建时沿用“跟随 namespace”，制品 namespace 的默认配置为公开读，因此未发布的应用也可匿名拉取。发布商品成功后，根据本次商品授权费用切换对应 repository 的权限：价格为 0 时为公有读私有写，否则为私有。修改价格后再次发布商品时同步，单独保存价格不改变仓库权限。不修改 namespace 和用户授权，私有应用仍需要目标仓库中具有 pull 权限的账号。公开读覆盖整个仓库的全部版本；既有 Registry token 的有效期保持原机制。
+
 # 测试证书
 openssl genpkey -algorithm RSA -out registry-key.pem -pkeyopt rsa_keygen_bits:4096
 openssl req -new -x509 -key registry-key.pem -out registry-cert.pem -days 365 -subj "/CN=registry.w7.com"

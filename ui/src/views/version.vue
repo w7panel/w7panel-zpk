@@ -7,7 +7,7 @@
             </span>
             <a-breadcrumb>
                 <a-breadcrumb-item>
-                    <router-link to="/zpk" class="c-99 fw-400">制品管理</router-link>
+                    <router-link to="/zpk" class="c-99 fw-400">应用管理</router-link>
                 </a-breadcrumb-item>
                 <a-breadcrumb-item>{{ title || identifie }}</a-breadcrumb-item>
             </a-breadcrumb>

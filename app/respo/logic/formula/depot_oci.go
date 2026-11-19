@@ -50,7 +50,7 @@ func (self Depot) OnRepositoryPushed(payload registry.RegistryRepositoryWebHookP
 		return
 	}
 	tag := payload.Event.Target.Tag
-	if tag == "" || tag == AssetsOCITag {
+	if tag == "" || tag == AssetsOCITag || tag == "latest" {
 		return
 	}
 
@@ -172,7 +172,7 @@ func (self *Depot) packToOci(formula *Formula) error {
 	resourcesDescriptor = append(resourcesDescriptor, helmFileDescriptors...)
 
 	tag := self.GetFormulaOciTag(formula)
-	err = logic.PushOciToRemote(remoteOci, tag, resourcesDescriptor, nil)
+	err = logic.PushOciToRemote(context.Background(), remoteOci, tag, resourcesDescriptor, nil)
 	slog.Info("打包完成", "name", formula.Name, "tag", tag, "err", err)
 	return err
 }
@@ -190,7 +190,7 @@ func (self *Depot) unPackManifestFilesFromOci(formula *Formula) error {
 		return err
 	}
 
-	return logic.UnPackOciToLocal(remoteOci, manifest, []string{logic.MediaTypeFilesJson}, func(mediaType string, savePath string, reader io.Reader) error {
+	return logic.UnPackOciToLocal(context.Background(), remoteOci, manifest, []string{logic.MediaTypeFilesJson}, func(mediaType string, savePath string, reader io.Reader) error {
 		files := map[string]string{}
 		if err := json.NewDecoder(reader).Decode(&files); err != nil {
 			return err
@@ -264,7 +264,7 @@ func (self *Depot) unPackSourceCodeFromOCI(formula *Formula) error {
 		return err
 	}
 
-	return logic.UnPackOciToLocal(remoteOci, manifest, mediaTypes, func(mediaType string, savePath string, reader io.Reader) error {
+	return logic.UnPackOciToLocal(context.Background(), remoteOci, manifest, mediaTypes, func(mediaType string, savePath string, reader io.Reader) error {
 		data, err := io.ReadAll(reader)
 		if err != nil {
 			return err
@@ -310,7 +310,7 @@ func (self *Depot) unPackIconFromOCI(formula *Formula) error {
 		return err
 	}
 
-	return logic.UnPackOciToLocal(remoteOci, manifest, mediaTypes, func(mediaType string, savePath string, reader io.Reader) error {
+	return logic.UnPackOciToLocal(context.Background(), remoteOci, manifest, mediaTypes, func(mediaType string, savePath string, reader io.Reader) error {
 		data, err := io.ReadAll(reader)
 		if err != nil {
 			return err
@@ -341,7 +341,7 @@ func (self *Depot) getOciManifest(formula *Formula) (*remote.Repository, *v1.Man
 		return nil, nil, err
 	}
 
-	manifest, err := logic.GetOciManifest(remoteOci, ociTag)
+	manifest, err := logic.GetOciManifest(context.Background(), remoteOci, ociTag)
 
 	return remoteOci, manifest, err
 }

@@ -5,7 +5,7 @@
                 <icon-arrow-left class="backicon" />
             </span>
             <a-breadcrumb>
-                <a-breadcrumb-item><router-link to="/zpk" class="c-99 fw-400">制品管理</router-link></a-breadcrumb-item>
+                <a-breadcrumb-item><router-link to="/zpk" class="c-99 fw-400">应用管理</router-link></a-breadcrumb-item>
                 <a-breadcrumb-item>
                     <router-link :to="{ path: '/zpk-version', query: { id: identifie, title: vtitle } }"
                         class="c-99 fw-400">{{ vtitle || identifie }}</router-link>

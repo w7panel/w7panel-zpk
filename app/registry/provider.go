@@ -62,6 +62,7 @@ func (p Provider) registerEvent() {
 	_ = facade.GetEvent().Subscribe(registry.RegistryRepositoryPushedEvent, logic.Repository{}.OnRepositoryPushed)
 	_ = facade.GetEvent().Subscribe(registry.RegistryRepositoryPulledEvent, logic.Repository{}.OnRepositoryPulled)
 	_ = facade.GetEvent().Subscribe(registry.RegistryRepositoryAfterPushedEvent, logic.Deploy{}.OnRepositoryPushed)
+	_ = facade.GetEvent().Subscribe(registry.UpdateRepositoryEvent, logic.Repository{}.OnUpdateRepositoryEvent)
 	_ = facade.GetEvent().Subscribe(registry.ClearUserPermissionEvent, logic.Permission{}.OnClearUserPermissionEvent)
 	_ = facade.GetEvent().Subscribe(registry.AddUserPermissionEvent, logic.Permission{}.OnAddUserPermissionEvent)
 	_ = facade.GetEvent().Subscribe(registry.DeleteUserPermissionEvent, logic.Permission{}.OnDelUserPermissionEvent)

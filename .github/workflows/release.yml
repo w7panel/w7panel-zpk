@@ -38,7 +38,7 @@ jobs:
         uses: azure/setup-helm@v4
 
       - name: Install build dependencies
-        run: sudo apt-get update && sudo apt-get install -y musl-tools zip
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
@@ -74,13 +74,14 @@ jobs:
         run: |
           npm install
           npm run build
-          cd dist
-          zip -r ../frontend.zip .
 
       - name: Upload CLI assets to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: cli/bin/*
+          files: |
+            cli/bin/zpk_darwin_amd64_v2
+            cli/bin/zpk_linux_amd64_v2
+            cli/bin/zpk_windows_amd64_v2.exe
 
       - name: Update latest tag
         run: |
@@ -92,7 +93,10 @@ jobs:
         with:
           tag_name: latest
           name: Latest
-          files: cli/bin/*
+          files: |
+            cli/bin/zpk_darwin_amd64_v2
+            cli/bin/zpk_linux_amd64_v2
+            cli/bin/zpk_windows_amd64_v2.exe
           overwrite_files: true
           make_latest: false
 
@@ -117,15 +121,19 @@ jobs:
             echo "helm package not found under charts/"
             exit 1
           fi
-          FRONTEND_PACKAGE="ui/frontend.zip"
-          if [ ! -f "${FRONTEND_PACKAGE}" ]; then
-            echo "frontend package not found at ${FRONTEND_PACKAGE}"
+          FRONTEND_DIRECTORY="ui/dist"
+          if [ ! -d "${FRONTEND_DIRECTORY}" ]; then
+            echo "frontend directory not found at ${FRONTEND_DIRECTORY}"
             exit 1
           fi
 
-          ZPK="./cli/bin/zpk_linux_amd64"
+          PUBLISH_DIRECTORY="$(mktemp -d "${RUNNER_TEMP}/zpk-release.XXXXXX")"
+          mkdir -p "${PUBLISH_DIRECTORY}/helm"
+          tar -xzf "${HELM_PACKAGE}" -C "${PUBLISH_DIRECTORY}/helm"
+
+          ZPK="./cli/bin/zpk_linux_amd64_v2"
           "${ZPK}" login --username="${ZPK_DOCKER_USERNAME}" --password="${ZPK_DOCKER_PASSWORD}" --host="${ZPK_HOST}"
-          "${ZPK}" use "${ZPK_ARTIFACT}"
-          "${ZPK}" attach add --path="${HELM_PACKAGE}" --type=helm
-          "${ZPK}" attach add --path="${FRONTEND_PACKAGE}" --type=frontend
-          "${ZPK}" push
+          "${ZPK}" app pull "${ZPK_ARTIFACT}" --path="${PUBLISH_DIRECTORY}/app"
+          "${ZPK}" app update helm --path="${PUBLISH_DIRECTORY}/app" --dir="${PUBLISH_DIRECTORY}/helm"
+          "${ZPK}" app update frontend --path="${PUBLISH_DIRECTORY}/app" --dir="${FRONTEND_DIRECTORY}"
+          "${ZPK}" app push --path="${PUBLISH_DIRECTORY}/app"

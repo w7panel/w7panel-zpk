@@ -10,8 +10,6 @@ type Provider struct {
 
 func (*Provider) Register(console console.Console) {
 	console.RegisterCommand(new(command.Login))
-	console.RegisterCommand(new(command.Use))
-	console.RegisterCommand(new(command.Attach))
-	console.RegisterCommand(new(command.Push))
-	console.RegisterCommand(new(command.List))
+	console.RegisterCommand(new(command.App))
+	console.RegisterCommand(new(command.Image))
 }

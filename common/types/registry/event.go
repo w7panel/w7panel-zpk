@@ -11,6 +11,7 @@ var RegistryRepositoryDeletedEvent = "registry_repository_deleted"
 var RegistryRepositoryMountedEvent = "registry_repository_mounted"
 
 var RegistryRepositoryAfterPushedEvent = "registry_repository_after_pushed"
+var UpdateRepositoryEvent = "update_repository"
 
 var AddUserPermissionEvent = "add_user_permission"
 var DeleteUserPermissionEvent = "delete_user_permission"
@@ -23,6 +24,11 @@ type RegistryRepositoryPayLoad struct {
 
 type RegistryRepositoryWebHookPayLoad struct {
 	Event Event
+}
+
+type UpdateRepositoryPayload struct {
+	Repository  string
+	VisibleType int32
 }
 
 type ClearUserPermissionPayload struct {

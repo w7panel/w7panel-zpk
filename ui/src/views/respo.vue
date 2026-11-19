@@ -7,12 +7,12 @@
             <div class="zpk-toolbar-left">
               <a-button type="primary" @click="add.show = true;">
                 <template #icon><icon-plus /></template>
-                添加制品
+                添加应用
               </a-button>
               <a-button v-if="is_register" @click="openCloudApps">云端找回</a-button>
             </div>
             <div class="zpk-toolbar-right">
-              <a-input v-model="search.keyword" style="width:256px;" placeholder="输入制品名称搜索" @keydown.enter="getData(1)">
+              <a-input v-model="search.keyword" style="width:256px;" placeholder="输入应用名称搜索" @keydown.enter="getData(1)">
                 <template #suffix>
                   <span class="respo-search-action" @click="getData(1)">
                     <icon-search :size="16" />
@@ -24,7 +24,7 @@
           <a-table :loading="loading" class="mt-20 table-header table-respo-list" :data="list" :pagination="false"
             row-key="identifie">
             <template #columns>
-              <a-table-column data-index="name" title="制品名称">
+              <a-table-column data-index="name" title="应用名称">
                 <template #cell="{ record }">
                   <div class="respo-name-cell">
                     <img :src="getLogo(record.icon)" class="respo-name-icon"
@@ -97,7 +97,7 @@
         </div>
       </div>
     </div>
-    <a-modal v-model:visible="add.show" title="添加制品" :width="540" :footer="false">
+    <a-modal v-model:visible="add.show" title="添加应用" :width="540" :footer="false">
       <a-spin :loading="add.loading">
       <a-form ref="form" :model="add" label-align="left" :label-col-props="{ span: 4, flex: '0 0 60px' }"
         :wrapper-col-props="{ span: 20, flex: '1' }" class="respo-form respo-add-form">

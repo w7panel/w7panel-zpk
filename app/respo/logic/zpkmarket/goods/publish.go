@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 
+	registrylogic "github.com/w7panel/w7panel-zpk/app/registry/logic"
 	attachlogic "github.com/w7panel/w7panel-zpk/app/respo/logic/attach"
 	formulalogic "github.com/w7panel/w7panel-zpk/app/respo/logic/formula"
 	"github.com/w7panel/w7panel-zpk/common/accessor"
@@ -16,6 +17,7 @@ import (
 	"github.com/w7panel/w7panel-zpk/common/service/w7"
 	"github.com/w7panel/w7panel-zpk/common/service/w7/devcenter"
 	"github.com/w7panel/w7panel-zpk/common/service/w7/ip"
+	"github.com/w7panel/w7panel-zpk/common/types/registry"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 )
 
@@ -205,12 +207,26 @@ func PublishGoods(formula *formulalogic.Formula, publishGoodsReq devcenter.Publi
 		return err
 	}
 
-	_, err = dao.Formula.Where(dao.Formula.ID.Eq(formula.ID)).Updates(entity.Formula{
+	return savePublishedGoods(formula, entity.Formula{
 		GoodsID:        int32(goods.Id),
 		GoodsProductID: int32(goodsProductId),
 		RemoteUID:      int32(publishGoodsReq.ConsoleUid),
 	})
-	return err
+}
+
+func savePublishedGoods(formula *formulalogic.Formula, metadata entity.Formula) error {
+	if _, err := dao.Q.Formula.Where(dao.Q.Formula.ID.Eq(formula.ID)).Updates(metadata); err != nil {
+		return err
+	}
+	visibleType := registrylogic.VisibleTypePrivate
+	if formula.InstallServiceFee == 0 {
+		visibleType = registrylogic.VisibleTypePublicRead
+	}
+	facade.GetEvent().Publish(registry.UpdateRepositoryEvent, registry.UpdateRepositoryPayload{
+		Repository:  commonlogic.GetFormulaOciName(formula.Name),
+		VisibleType: int32(visibleType),
+	})
+	return nil
 }
 
 func buildApplicationTypeExtra(manifest commonlogic.Manifest) map[string]interface{} {

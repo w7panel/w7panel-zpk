@@ -205,16 +205,19 @@ export const manifestMetadataMethods = {
     async syncFormulaCategory(currentCategories = []) {
         if (this.option?.pureManifest || !this.identifie) return;
 
-        const categoriesResponse = await myAxios.post('/respo/category/list', { limit: 999 });
-        const categories = categoriesResponse?.data?.data?.list || [];
-        const categoryNames = new Set(categories.map(category => category.name));
         const defaultCategoryName = this.getDefaultTypeCategoryName(this.form.type);
-        const validDefaultCategoryName = categoryNames.has(defaultCategoryName)
-            ? defaultCategoryName
-            : '';
-        const currentCategoryName = currentCategories
-            .find(category => categoryNames.has(category.name))?.name || '';
-        const name = validDefaultCategoryName || currentCategoryName;
+        let name = defaultCategoryName;
+        if (this.form.type != 'metrics-plugin') {
+            const categoriesResponse = await myAxios.post('/respo/category/list', { limit: 999 });
+            const categories = categoriesResponse?.data?.data?.list || [];
+            const categoryNames = new Set(categories.map(category => category.name));
+            const validDefaultCategoryName = categoryNames.has(defaultCategoryName)
+                ? defaultCategoryName
+                : '';
+            const currentCategoryName = currentCategories
+                .find(category => categoryNames.has(category.name))?.name || '';
+            name = validDefaultCategoryName || currentCategoryName;
+        }
         const categoryUnchanged = currentCategories.length == (name ? 1 : 0)
             && (!name || currentCategories[0]?.name == name);
         if (categoryUnchanged) return;

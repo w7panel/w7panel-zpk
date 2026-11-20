@@ -25,19 +25,14 @@ const (
 // traditionCodeInstallShell is added to the generated chart as an internal
 // shell task.  It deliberately uses the same volume mount as the workload;
 // the traditional application editor persists that mount at /www/wwwroot,
-// backed by the matching nginx-web-dir/<domain> subPath in the shared
+// backed by the matching nginx-web-dir/<release-name> subPath in the shared
 // site-storage PVC.
-// DOMAIN_URL and the package URL are rendered from
-// the final chart values, so installer-selected values are used at runtime.
+// The package URL is rendered from the final chart values. Storage isolation
+// comes from the volume mounts and does not depend on the site's domain.
 const traditionCodeInstallShell = `set -eu
-domain_url={{ .Values.DOMAIN_URL | quote }}
-: "${domain_url:?DOMAIN_URL is required}"
 code_package_url={{ .Values.tradition.code.packageUrl | quote }}
 test -n "$code_package_url"
 code_install_path="/www/wwwroot"
-case "$domain_url" in
-  .|..|*[!A-Za-z0-9._,-]*) echo "invalid traditional application code path" >&2; exit 1 ;;
-esac
 plugin_state_dir="/var/lib/w7-tradition-plugin"
 policy_base64="${TRADITION_PLUGIN_POLICY:-}"
 if [ -z "$policy_base64" ]; then
@@ -60,14 +55,9 @@ w7-tradition-plugin app update \
   --package-dir "$package_dir" \
   --policy-file "$policy_file"`
 
-// traditionCodeUninstallShell clears only the mounted domain directory from
+// traditionCodeUninstallShell clears only the mounted application directory from
 // the shared site-storage PVC. The mount point and PVC remain intact.
 const traditionCodeUninstallShell = `set -eu
-domain_url={{ .Values.DOMAIN_URL | quote }}
-: "${domain_url:?DOMAIN_URL is required}"
-case "$domain_url" in
-  .|..|*[!A-Za-z0-9._,-]*) echo "refusing to remove invalid traditional application code path" >&2; exit 1 ;;
-esac
 code_install_path="/www/wwwroot"
 plugin_state_dir="/var/lib/w7-tradition-plugin"
 rm -rf -- "$code_install_path"/* "$code_install_path"/.[!.]* "$code_install_path"/..?*
@@ -201,7 +191,7 @@ func (hc *HelmPack) addTraditionAppValues(values map[string]interface{}) error {
 }
 
 // applyTraditionPluginStateVolumeMount gives the application update and
-// uninstall tasks isolated access to the current domain's OCI state.
+// uninstall tasks isolated access to the current application's OCI state.
 func applyTraditionPluginStateVolumeMount(values map[string]interface{}) {
 	jobs, ok := values["jobs"].([]map[string]interface{})
 	if !ok {
@@ -219,7 +209,7 @@ func applyTraditionPluginStateVolumeMount(values map[string]interface{}) {
 		container["volumeMounts"] = append(mounts, v1.VolumeMount{
 			Name:      traditionStorageVolumeName,
 			MountPath: pluginInstallerDataMount,
-			SubPath:   "tradition-plugin-dir/{{ .Values.DOMAIN_URL }}",
+			SubPath:   "tradition-plugin-dir/{{ .Release.Name }}",
 		})
 	}
 }
@@ -235,7 +225,7 @@ func traditionGatewayEnabled(manifest logic2.Manifest) bool {
 
 // applyTraditionToolJobVolumeMounts mounts the site-manager PVC location used
 // by w7-traditiontool for NGINX configuration. The path matches
-// w7panel-sitemanager/charts: /www/server/nginx backed by nginx-dir/<domain>.
+// w7panel-sitemanager/charts: /www/server/nginx backed by nginx-dir/<release-name>.
 func applyTraditionToolJobVolumeMounts(values map[string]interface{}) {
 	jobs, ok := values["jobs"].([]map[string]interface{})
 	if !ok {
@@ -250,7 +240,7 @@ func applyTraditionToolJobVolumeMounts(values map[string]interface{}) {
 			container["volumeMounts"] = []v1.VolumeMount{{
 				Name:      traditionStorageVolumeName,
 				MountPath: "/www/server/nginx",
-				SubPath:   "nginx-dir/{{ .Values.DOMAIN_URL }}",
+				SubPath:   "nginx-dir/{{ .Release.Name }}",
 			}}
 		}
 	}

@@ -100,7 +100,7 @@ export function withTraditionStartParams(
         { mark: 'tradition', name: 'IMAGE_VERSION', title: '传统应用版本', required: true, options: [...(versions || [])], values_text: versions?.[0] || '', module_name: '', description: '选择要安装的传统应用版本', type: 'select' },
         { mark: 'tradition-gateway', name: traditionGatewayStartParamName, title: '开启网关服务', required: true, values_text: String(Boolean(gatewayEnabled)), module_name: '', description: '启用传统应用网关服务', type: 'text', hidden: true },
         { mark: 'tradition-plugin-policy', name: traditionPluginPolicyStartParamName, title: '插件文件优先级配置', required: true, values_text: traditionPluginPolicyValue(plugins), module_name: '', description: '供应用插件安装工具读取的 Base64 策略', type: 'text', hidden: true },
-        { name: 'PVC_NAME', title: '存储', required: true, values_text: '%PVC_NAME%', module_name: '', description: '安装时选择的站点存储空间，代码按域名分开保存', type: 'text', hidden: false },
+        { name: 'PVC_NAME', title: '存储', required: true, values_text: '%PVC_NAME%', module_name: '', description: '安装时选择的站点存储空间，代码按应用 Release 名称分开保存', type: 'text', hidden: false },
         ...customParams,
     ];
 }
@@ -182,7 +182,7 @@ export function withTraditionAppStorage(platform = {}) {
         container.volumeMounts.push({
             name: traditionStorageVolumeName,
             mountPath: '/www/wwwroot',
-            subPath: 'nginx-web-dir/{{ .Values.DOMAIN_URL }}',
+            subPath: 'nginx-web-dir/{{ .Release.Name }}',
         });
     }
     nextPlatform['container-v2'] = containers;

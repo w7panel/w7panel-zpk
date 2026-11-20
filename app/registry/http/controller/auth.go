@@ -61,7 +61,7 @@ func (c Auth) Auth(ctx *gin.Context) {
 
 	for _, scope := range scopes {
 		if scope.Type == string(logic.ScopeRegistryType) {
-			facade.GetEvent().Publish(registry.RegistryRepositoryPrepareEvent, registry.RegistryRepositoryPayLoad{
+			go facade.GetEvent().Publish(registry.RegistryRepositoryPrepareEvent, registry.RegistryRepositoryPayLoad{
 				User:  user,
 				Scope: scope,
 			})

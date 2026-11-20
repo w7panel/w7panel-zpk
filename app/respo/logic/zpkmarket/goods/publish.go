@@ -222,7 +222,7 @@ func savePublishedGoods(formula *formulalogic.Formula, metadata entity.Formula) 
 	if formula.InstallServiceFee == 0 {
 		visibleType = registrylogic.VisibleTypePublicRead
 	}
-	facade.GetEvent().Publish(registry.UpdateRepositoryEvent, registry.UpdateRepositoryPayload{
+	go facade.GetEvent().Publish(registry.UpdateRepositoryEvent, registry.UpdateRepositoryPayload{
 		Repository:  commonlogic.GetFormulaOciName(formula.Name),
 		VisibleType: int32(visibleType),
 	})

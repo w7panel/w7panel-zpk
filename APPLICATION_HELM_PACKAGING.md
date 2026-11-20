@@ -388,7 +388,7 @@ info 接口会再解析/生成 `<TRADITION_APP>_RELEASE_NAME`。已有订单绑�
 ```sh
 set -eu
 
-# Job 的 workingDir 已经是 nginx-web-dir/<domain> subPath 的根目录
+# Job 的 workingDir 已经是 nginx-web-dir/<release-name> subPath 的根目录
 site_dir="$(pwd)"
 
 # 改成插件自己拥有的相对目录
@@ -406,8 +406,8 @@ rm -rf -- "$plugin_install_path"
 - volume 名固定为 `site-storage`。
 - PVC 名取传统应用依赖导出的 `.Values.PVC_NAME`。
 - Job mountPath 和 workingDir 均为 `/www/wwwroot`。
-- PVC subPath 为 `nginx-web-dir/<domain>`，与传统应用使用同一份站点代码目录。
-- 插件 OCI 状态挂载到 `/var/lib/w7-tradition-plugin`，对应 PVC 的 `tradition-plugin-dir/<domain>`。
+- PVC subPath 为 `nginx-web-dir/<release-name>`，与传统应用使用同一份站点代码目录。
+- 插件 OCI 状态挂载到 `/var/lib/w7-tradition-plugin`，对应 PVC 的 `tradition-plugin-dir/<release-name>`。
 - 应用插件不创建、不拥有也不删除该 PVC。
 - 因为默认按 RWO 处理，Job 用传统应用 release 的 pod affinity 调度到传统应用所在节点。
 
@@ -420,7 +420,7 @@ rm -rf -- "$plugin_install_path"
 - 支持版本：`w7.cc/image_version`，同时生成必填 `IMAGE_VERSION` select 参数。
 - 域名：必填 `DOMAIN_URL` 参数。
 - 至少一个非 init container；UI 缺失时会补默认容器和 Deployment。
-- 固定共享 volume `site-storage`，主容器只将 `nginx-web-dir/<domain>` 子目录挂载到 `/www/wwwroot`。
+- 固定共享 volume `site-storage`，主容器只将 `nginx-web-dir/<release-name>` 子目录挂载到 `/www/wwwroot`。
 
 打包时所有传统应用容器 image 中的 `{version}` 都替换为 `{{ .Values.IMAGE_VERSION }}`。
 
@@ -443,7 +443,7 @@ rm -rf -- "$plugin_install_path"
 
 `source.url` 可选。存在时自动追加：
 
-- 安装/升级前 Job：使用 `zpk.w7.cc/public/tradition-plugin:v1.0.0` 下载 zip，先更新 `/www/wwwroot`，再执行 `w7-tradition-plugin app update` 刷新原应用文件并重新应用受管插件层；OCI 状态保存在 `tradition-plugin-dir/<domain>`；
+- 安装/升级前 Job：使用 `zpk.w7.cc/public/tradition-plugin:v1.0.0` 下载 zip，先更新 `/www/wwwroot`，再执行 `w7-tradition-plugin app update` 刷新原应用文件并重新应用受管插件层；OCI 状态保存在 `tradition-plugin-dir/<release-name>`；
 - 卸载后 Job：清空该域名挂载目录，但保留挂载点和 PVC。
 
 因此传统应用既可以只是一个语言/runtime 服务，也可以自带初始站点代码。
@@ -468,7 +468,7 @@ rm -rf -- "$plugin_install_path"
 4. 在根 manifest 中保存 `type: in`、`from: https://zpk.w7.cc` 依赖。
 5. 把工具子应用的 `PVC_NAME.module_name` 指向当前传统应用；工具的 `DOMAIN_URL` 与传统应用保持一致。
 
-域名编辑器始终将传统应用工具列为可选关联应用，即使工具子 Chart 未在 manifest 声明容器端口。普通保存保留用户编辑的分组名、后端、端口及自动 SSL 设置；只有主动切换网关开关时才将路由后端切换到工具或主应用。传统应用仅提供默认域名组及默认关联后端；域名参数生成、分组名、`domainParam` 绑定、自动 SSL、必填设置和保存序列化与其他支持域名配置的应用共用逻辑。首组默认关联 `DOMAIN_URL`，新增组由通用逻辑分配参数标识；各组独立控制自动 SSL。NGINX 挂载仍使用安装时解析出的主域名。
+域名编辑器始终将传统应用工具列为可选关联应用，即使工具子 Chart 未在 manifest 声明容器端口。普通保存保留用户编辑的分组名、后端、端口及自动 SSL 设置；只有主动切换网关开关时才将路由后端切换到工具或主应用。传统应用仅提供默认域名组及默认关联后端；域名参数生成、分组名、`domainParam` 绑定、自动 SSL、必填设置和保存序列化与其他支持域名配置的应用共用逻辑。首组默认关联 `DOMAIN_URL`，新增组由通用逻辑分配参数标识；各组独立控制自动 SSL。NGINX 挂载与主应用共用安装 Release 的目录，域名仅用于访问路由。
 
 开启 NGINX 网关时，编辑器给 `w7-traditiontool` 设置隐藏启动参数 `gatewayEnabled=true`，并把传统应用 Ingress 后端改为工具子应用及其实际端口。关闭网关时显式设置 `gatewayEnabled=false`，不删除工具依赖。
 
@@ -485,14 +485,14 @@ tradition-tool 支持安装后切换网关：直接修改工具自身的镜像�
 - 给 `w7-traditiontool` 子 Workload 写 `w7.cc/tradition-tool-restart-revision={{ .Release.Revision }}`，使传统应用升级时工具同步滚动；
 - 若配置了 `w7.cc/nginx_vhost_template`，生成安装/升级 vhost 和卸载 vhost 的 Job。安装/升级先将当前生效配置与上次保存的模板比较，再保存本次模板：当前文件不存在时生成；内容与上次模板一致时自动更新；有实际修改（包括清空文件）、没有上次模板或生效路径为符号链接时保留当前文件，不自动合并。比较统一 CRLF/LF 换行并忽略引号外的空白行，其余空格、缩进、注释和引号内多行内容保留；规范化只用于比较，不直接改写用户配置。不需要额外基准文件或修改标记，使用已有模板文件作为上次内容。卸载仍删除当前域名的配置文件；
 - 每次安装/升级同时将本次渲染出的完整配置保存到共享 nginx 目录的 `template-configs/<主域名>.conf`，只保留最近一次 Hook 生成的模板，通过临时文件写完后替换；比较或生效配置更新失败时不发布新模板。该目录位于 `conf.d` 外，不参与默认 nginx 加载；传统应用卸载时同步删除对应模板文件。tradition-tool 的 nginx 页面可读取它，按同样的比较规则判断与当前生效配置有差异时，提示用户查看、复制后手动合并。旧 Chart 没有该文件时仍可编辑现有配置；该文件是最近一次 Hook 生成的候选内容，升级后续步骤失败时不代表整个应用升级已成功；
-- 启用 NGINX 网关时，vhost 安装/升级及卸载 Job 将 `site-storage` PVC 的 `nginx-dir/<DOMAIN_URL>` 挂载到 `/www/server/nginx`，与工具 Chart 一致；未启用时不追加该配置目录挂载；
-- 支持 `{SERVER_NAME}`、`{LOG_DIR}`、`{ROOT_DIR}`、`{K8S_DOMAIN}`、`{UPSTREAM_APP_NAME}` 模板变量。其中 tradition-tool 将 PVC 的 `nginx-web-dir/<DOMAIN_URL>` 子目录挂载到 `/www/wwwroot`，`{ROOT_DIR}` 固定为 `/www/wwwroot`；FastCGI 转发给应用容器的代码路径同样为 `/www/wwwroot`。
+- 启用 NGINX 网关时，vhost 安装/升级及卸载 Job 将 `site-storage` PVC 的 `nginx-dir/<release-name>` 挂载到 `/www/server/nginx`，与工具 Chart 一致；未启用时不追加该配置目录挂载；
+- 支持 `{SERVER_NAME}`、`{LOG_DIR}`、`{ROOT_DIR}`、`{K8S_DOMAIN}`、`{UPSTREAM_APP_NAME}` 模板变量。其中 tradition-tool 将 PVC 的 `nginx-web-dir/<release-name>` 子目录挂载到 `/www/wwwroot`，`{ROOT_DIR}` 固定为 `/www/wwwroot`；FastCGI 转发给应用容器的代码路径同样为 `/www/wwwroot`。
 
 ### 7.5 存储
 
 - 传统应用主容器的 `site-storage` claimName 默认为空，渲染时取 `.Values.PVC_NAME`。
-- 主容器把 PVC 的 `nginx-web-dir/<domain>` 子目录挂载到 `/www/wwwroot`，并以该目录作为 workingDir，可在容器及相关代码 Job 中通过 `pwd` 获取；每个域名的代码存于 PVC 的 `nginx-web-dir/<domain>/`。
-- NGINX 子 Chart、传统应用代码 Job 和 vhost Job 应通过安装端传值复用同一 PVC 与 `DOMAIN_URL`。工具和 vhost Job 的配置均在 `nginx-dir/<DOMAIN_URL>` 内，NGINX 只加载该目录的 `conf.d/*.conf`。
+- 主容器把 PVC 的 `nginx-web-dir/<release-name>` 子目录挂载到 `/www/wwwroot`，并以该目录作为 workingDir，可在容器及相关代码 Job 中通过 `pwd` 获取；每个新安装 Release 的代码存于 PVC 的 `nginx-web-dir/<release-name>/`。
+- NGINX 子 Chart、传统应用代码 Job 和 vhost Job 应通过安装端传值复用同一 PVC 与 `DOMAIN_URL`。工具和 vhost Job 的配置均在 `nginx-dir/<release-name>` 内，NGINX 只加载该目录的 `conf.d/*.conf`。
 - 新挂载规则需同步更新工具子 Chart、重新生成传统应用 Chart 并升级应用；不包含旧配置迁移脚本，不读取或复制旧共享目录的文件。
 - 当前传统应用 Chart 不创建 PVC，安装方必须准备 PVC 并传 `PVC_NAME`。
 - 未开启系统层还原时，还会通过注解把容器系统层映射到该持久卷中的 `www/server/<release-name>/<应用标识>-<版本>/system` 逻辑路径。
@@ -797,8 +797,8 @@ sidecar 框架本身不创建、分配或回收固定存储，也没有独立的
 | --- | --- | --- | --- | --- |
 | 原生 Deployment/DaemonSet PVC volume | 安装方/外部系统 | `PVC_NAME` 或 manifest 固定 claimName | manifest 自定义 | 应用 Chart 不创建时也不拥有 |
 | 原生 StatefulSet claim template | StatefulSet Controller | Helm 全局 values | manifest 自定义 | 随 StatefulSet/PVC policy 处理 |
-| 应用插件 | 传统应用/安装方 | 从传统应用依赖注入 `PVC_NAME` | 代码 `nginx-web-dir/<domain>`；状态 `tradition-plugin-dir/<domain>` | 只清目录，不删 PVC |
-| 传统应用 | 安装方 | `PVC_NAME` | 代码 `nginx-web-dir/<domain>`；插件状态 `tradition-plugin-dir/<domain>` | 卸载代码 Job 只清空当前域名目录 |
+| 应用插件 | 传统应用/安装方 | 从传统应用依赖注入 `PVC_NAME` | 代码 `nginx-web-dir/<release-name>`；状态 `tradition-plugin-dir/<release-name>` | 只清目录，不删 PVC |
+| 传统应用 | 安装方 | `PVC_NAME` | 代码 `nginx-web-dir/<release-name>`；插件状态 `tradition-plugin-dir/<release-name>` | 卸载代码 Job 只清空当前应用目录 |
 | Helm 应用 | 用户 Chart | 用户 values | 用户定义 | 用户 Chart 定义 |
 | 系统镜像 | 安装方 | `PVC_NAME` | 仅由 Sysbox 使用 `system-rootfs/<release-name>/<应用标识>-${IMAGE_VERSION}/system`，不默认挂载到容器内 | Chart 不创建 PVC |
 
@@ -946,3 +946,27 @@ helm template <release> <generated-chart-dir> -f <install-values.yaml>
 原生应用域名启动参数的标识支持手动编辑，同步更新对应 ingress.domainParam；校验环境变量标识格式及重复名称。首组默认 DOMAIN_URL，后续新组英文名称默认生成 DOMAIN_URL_<大写名称>（连字符转下划线，重名追加数字）；中文名称沿用数字默认值，不转拼音。已保存或手动编辑的标识不随分组名称改变。面板协议及参数取值规则保持不变。
 
 首组域名启动参数标识保持只读，默认 DOMAIN_URL 不向用户开放改名；后续分组可编辑标识，保留已有首组标识的兼容行为。
+
+
+### 2026-11-20 传统应用按 Release 隔离存储目录
+
+新安装的传统应用、工具子 Chart 和代码/NGINX/插件状态 Job，分别使用 `nginx-web-dir/<release-name>`、`nginx-dir/<release-name>`、`tradition-plugin-dir/<release-name>`。同一 PVC 上的不同 Release 不再因为域名相同而共用目录；`DOMAIN_URL` 仍用于域名和路由，不作为新站点的目录标识。外部存储继续由安装方选择。
+
+编辑器保存代码挂载为 `nginx-web-dir/{{ .Release.Name }}`；打包器只读取 manifest，不自动改写旧域名挂载。主、子 Chart 共用 Release 名称。工具 Chart 需同步更新、重新打包并重新导入传统应用，不能只更新主 Chart。
+
+独立应用插件沿用 ZPK 已生成的隐藏 `<DEPENDENCY>_RELEASE_NAME`（`module_name` 指向目标依赖）作为代码目录和插件状态目录后缀，不使用插件自身 Release。缺少目标 Release 或名称不合法时拒绝渲染，不通过集群查询或域名推测目录。
+
+按本次调整要求不兼容旧域名目录，不保留旧挂载、不自动搬迁数据。旧制品需要重新保存并打包；已有应用切换到新目录前须自行处理旧数据。面板无需新增参数协议。
+
+传统应用代码安装/卸载脚本只操作容器中的固定挂载点 `/www/wwwroot` 和 `/var/lib/w7-tradition-plugin`，不再校验域名作为目录名。插件安装器同样复用固定挂载点。NGINX 配置脚本通过 `nginx-dir/<release-name>` 挂载访问 `/www/server/nginx`，其中 `server_name` 仍按域名生成，vhost 文件名使用 `<release-name>.conf`，站点根目录及 FastCGI 路径保持 `/www/wwwroot`。
+
+
+### 2026-11-20 域名编辑与默认 NGINX 站点
+
+传统应用编辑器的默认 NGINX 示例使用 `listen 80 default_server;`，保留 `server_name {SERVER_NAME}` 以及既有 PHP/静态/代理处理。入口域名与证书由 Ingress 管理，未显式列出的新域名由该默认站点接收；用户已有自定义配置不自动改写监听方式。同一监听地址/端口只配置一个 default_server，其他命名 server 块可用于不同服务；在面板外部修改这些专用域名时仍需手工同步其 server_name。
+
+NGINX 生效配置和最新模板统一使用 `<Release名称>.conf`，安装、升级、卸载 Hook 与 sitemanager 读取和网关切换使用相同文件名，不再从域名推导文件。该调整须配套更新工具 UI、重新保存并打包应用，不兼容旧域名文件名、不自动迁移配置。
+
+sitemanager 开放主域名编辑，域名路由更新结果通过原有 pending/verify 流程确认。AppGroup 默认访问地址由面板维护，工具不写入该地址。工具从实际 Ingress 读取站点域名，并按 Release 匹配主应用挂载；不需要修改面板域名管理或增加集群监听器。
+
+网关开启/重新开启时不再按 Ingress 自动补写 NGINX `server_name`，已有配置和用户确认内容保持原样；默认站点处理未匹配域名。

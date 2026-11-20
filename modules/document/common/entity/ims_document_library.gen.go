@@ -20,6 +20,8 @@ type DocumentLibrary struct {
 	UserID      int32     `gorm:"column:user_id;not null;index:document_library_owner" json:"user_id"`
 	Revision    int32     `gorm:"column:revision;not null;default:1" json:"revision"`
 	Ready       int32     `gorm:"column:ready;not null" json:"ready"`
+	Public      int32     `gorm:"column:public;not null;default:0" json:"public"`
+	Protected   int32     `gorm:"column:protected;not null;default:0" json:"protected"`
 	CreatedAt   time.Time `gorm:"column:created_at;not null;default:CURRENT_TIMESTAMP" json:"created_at"`
 	UpdatedAt   time.Time `gorm:"column:updated_at;not null;default:CURRENT_TIMESTAMP" json:"updated_at"`
 }

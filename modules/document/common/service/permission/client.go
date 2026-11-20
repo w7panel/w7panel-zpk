@@ -13,12 +13,6 @@ import (
 	"time"
 )
 
-const (
-	Category = "document_category"
-	Library  = "document_library"
-	File     = "document_file"
-)
-
 var ErrDenied = errors.New("无操作权限")
 
 type Principal struct {
@@ -28,32 +22,10 @@ type Principal struct {
 	Admin    bool   `json:"admin"`
 }
 
-type Resource struct {
-	Type  string `json:"type"`
-	Value string `json:"value"`
-}
-
-type Grant struct {
-	UserID   int32    `json:"user_id"`
-	Resource Resource `json:"resource"`
-	Actions  []string `json:"actions"`
-}
-
-type Decision struct {
-	Allowed  bool `json:"allowed"`
-	Explicit bool `json:"explicit"`
-}
-
-// Resources are ordered from the most specific resource to its parents.
+// Service delegates login and identity to the existing system.
 type Service interface {
 	Identity(context.Context, string) (Principal, error)
 	Login(context.Context, string) (string, error)
-	Check(context.Context, string, []Resource, string) (Decision, error)
-	Replace(context.Context, string, []Grant) error
-	Initialize(context.Context, string, []Grant) error
-	CheckUser(context.Context, int32, []Resource, string) (Decision, error)
-	Batch(context.Context, string, []Request) ([]Decision, error)
-	BatchUser(context.Context, int32, []Request) ([]Decision, error)
 }
 
 type Client struct {
@@ -109,22 +81,6 @@ func (c *Client) Identity(ctx context.Context, token string) (Principal, error) 
 	return principal, err
 }
 
-func (c *Client) Check(ctx context.Context, token string, resources []Resource, action string) (Decision, error) {
-	var decision Decision
-	err := c.call(ctx, token, "/check", map[string]any{"resources": resources, "action": action}, &decision)
-	return decision, err
-}
-
-func (c *Client) Replace(ctx context.Context, token string, grants []Grant) error {
-	return c.call(ctx, token, "/replace", map[string]any{"grants": grants}, nil)
-}
-
-func (c *Client) CheckUser(ctx context.Context, userID int32, resources []Resource, action string) (Decision, error) {
-	var decision Decision
-	err := c.call(ctx, "", "/evaluate", map[string]any{"user_id": userID, "resources": resources, "action": action}, &decision)
-	return decision, err
-}
-
 func (c *Client) Login(ctx context.Context, accessToken string) (string, error) {
 	var result struct {
 		Token string `json:"token"`
@@ -134,31 +90,4 @@ func (c *Client) Login(ctx context.Context, accessToken string) (string, error) 
 		return "", ErrDenied
 	}
 	return result.Token, err
-}
-
-func (c *Client) Initialize(ctx context.Context, token string, grants []Grant) error {
-	return c.call(ctx, token, "/initialize", map[string]interface{}{"grants": grants}, nil)
-}
-
-type Request struct {
-	Resources []Resource `json:"resources"`
-	Action    string     `json:"action"`
-}
-
-func (c *Client) Batch(ctx context.Context, token string, requests []Request) ([]Decision, error) {
-	var decisions []Decision
-	err := c.call(ctx, token, "/check-batch", map[string]interface{}{"requests": requests}, &decisions)
-	if err == nil && len(decisions) != len(requests) {
-		err = errors.New("权限服务响应数量无效")
-	}
-	return decisions, err
-}
-
-func (c *Client) BatchUser(ctx context.Context, userID int32, requests []Request) ([]Decision, error) {
-	var decisions []Decision
-	err := c.call(ctx, "", "/evaluate-batch", map[string]interface{}{"user_id": userID, "requests": requests}, &decisions)
-	if err == nil && len(decisions) != len(requests) {
-		err = errors.New("权限服务响应数量无效")
-	}
-	return decisions, err
 }

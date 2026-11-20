@@ -16,49 +16,44 @@ import (
 )
 
 var (
-	Q                    = new(Query)
-	DocumentCategory     *documentCategory
-	DocumentDownloadLink *documentDownloadLink
-	DocumentFile         *documentFile
-	DocumentLibrary      *documentLibrary
+	Q                = new(Query)
+	DocumentCategory *documentCategory
+	DocumentFile     *documentFile
+	DocumentLibrary  *documentLibrary
 )
 
 func SetDefault(db *gorm.DB, opts ...gen.DOOption) {
 	*Q = *Use(db, opts...)
 	DocumentCategory = &Q.DocumentCategory
-	DocumentDownloadLink = &Q.DocumentDownloadLink
 	DocumentFile = &Q.DocumentFile
 	DocumentLibrary = &Q.DocumentLibrary
 }
 
 func Use(db *gorm.DB, opts ...gen.DOOption) *Query {
 	return &Query{
-		db:                   db,
-		DocumentCategory:     newDocumentCategory(db, opts...),
-		DocumentDownloadLink: newDocumentDownloadLink(db, opts...),
-		DocumentFile:         newDocumentFile(db, opts...),
-		DocumentLibrary:      newDocumentLibrary(db, opts...),
+		db:               db,
+		DocumentCategory: newDocumentCategory(db, opts...),
+		DocumentFile:     newDocumentFile(db, opts...),
+		DocumentLibrary:  newDocumentLibrary(db, opts...),
 	}
 }
 
 type Query struct {
 	db *gorm.DB
 
-	DocumentCategory     documentCategory
-	DocumentDownloadLink documentDownloadLink
-	DocumentFile         documentFile
-	DocumentLibrary      documentLibrary
+	DocumentCategory documentCategory
+	DocumentFile     documentFile
+	DocumentLibrary  documentLibrary
 }
 
 func (q *Query) Available() bool { return q.db != nil }
 
 func (q *Query) clone(db *gorm.DB) *Query {
 	return &Query{
-		db:                   db,
-		DocumentCategory:     q.DocumentCategory.clone(db),
-		DocumentDownloadLink: q.DocumentDownloadLink.clone(db),
-		DocumentFile:         q.DocumentFile.clone(db),
-		DocumentLibrary:      q.DocumentLibrary.clone(db),
+		db:               db,
+		DocumentCategory: q.DocumentCategory.clone(db),
+		DocumentFile:     q.DocumentFile.clone(db),
+		DocumentLibrary:  q.DocumentLibrary.clone(db),
 	}
 }
 
@@ -72,27 +67,24 @@ func (q *Query) WriteDB() *Query {
 
 func (q *Query) ReplaceDB(db *gorm.DB) *Query {
 	return &Query{
-		db:                   db,
-		DocumentCategory:     q.DocumentCategory.replaceDB(db),
-		DocumentDownloadLink: q.DocumentDownloadLink.replaceDB(db),
-		DocumentFile:         q.DocumentFile.replaceDB(db),
-		DocumentLibrary:      q.DocumentLibrary.replaceDB(db),
+		db:               db,
+		DocumentCategory: q.DocumentCategory.replaceDB(db),
+		DocumentFile:     q.DocumentFile.replaceDB(db),
+		DocumentLibrary:  q.DocumentLibrary.replaceDB(db),
 	}
 }
 
 type queryCtx struct {
-	DocumentCategory     IDocumentCategoryDo
-	DocumentDownloadLink IDocumentDownloadLinkDo
-	DocumentFile         IDocumentFileDo
-	DocumentLibrary      IDocumentLibraryDo
+	DocumentCategory IDocumentCategoryDo
+	DocumentFile     IDocumentFileDo
+	DocumentLibrary  IDocumentLibraryDo
 }
 
 func (q *Query) WithContext(ctx context.Context) *queryCtx {
 	return &queryCtx{
-		DocumentCategory:     q.DocumentCategory.WithContext(ctx),
-		DocumentDownloadLink: q.DocumentDownloadLink.WithContext(ctx),
-		DocumentFile:         q.DocumentFile.WithContext(ctx),
-		DocumentLibrary:      q.DocumentLibrary.WithContext(ctx),
+		DocumentCategory: q.DocumentCategory.WithContext(ctx),
+		DocumentFile:     q.DocumentFile.WithContext(ctx),
+		DocumentLibrary:  q.DocumentLibrary.WithContext(ctx),
 	}
 }
 

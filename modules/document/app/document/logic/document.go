@@ -87,12 +87,12 @@ func (d *Document) List(ctx context.Context, a Actor, category string, page, lim
 	return Page{rows, total}, e
 }
 
-// Create can initialize a homepage with a read-only file permission policy.
-func (d *Document) Create(ctx context.Context, a Actor, ref, name, description, homepage string, initialize bool) (*entity.DocumentLibrary, error) {
+// Create optionally initializes a protected library and immutable default homepage.
+func (d *Document) Create(ctx context.Context, a Actor, ref, name, description, homepage string, initialize bool, public int32) (*entity.DocumentLibrary, error) {
 	release := lock.Acquire("library:" + ref)
 	defer release()
 	category, id, e := ValidateRef(ref)
-	if e != nil || strings.TrimSpace(name) == "" || len(name) > 255 || len(description) > 4096 || len(homepage) > MaxContentSize {
+	if e != nil || strings.TrimSpace(name) == "" || len(name) > 255 || len(description) > 4096 || len(homepage) > MaxContentSize || (public != 0 && public != 1) {
 		return nil, ErrInvalid
 	}
 	if a.Principal.ID <= 0 {
@@ -101,39 +101,30 @@ func (d *Document) Create(ctx context.Context, a Actor, ref, name, description, 
 	if _, e = d.category(ctx, category); e != nil {
 		return nil, e
 	}
-	v, e := d.Permissions.Check(ctx, a.Token, []permission.Resource{permission.CategoryResource(category)}, "create")
-	if e != nil {
-		return nil, e
-	}
-	if !v.Allowed {
-		return nil, permission.ErrDenied
-	}
 	c, e := d.Library(ctx, ref)
 	if e == nil {
 		if c.UserID != a.Principal.ID || c.Ready < 0 || (!initialize && c.Ready == 1) {
 			return nil, ErrConflict
 		}
-		if c.Ready == 1 {
+		if c.Ready == 1 && (!initialize || c.Protected == 1) {
 			return c, nil
 		}
 	} else if !errors.Is(e, gorm.ErrRecordNotFound) {
 		return nil, e
 	} else {
-		c = &entity.DocumentLibrary{Category: category, Identifie: id, Name: name, Description: description, UserID: a.Principal.ID, Revision: 1}
+		c = &entity.DocumentLibrary{Category: category, Identifie: id, Name: name, Description: description, UserID: a.Principal.ID, Revision: 1, Public: public}
+		if initialize {
+			c.Protected = 1
+		}
 		if e = d.Q.DocumentLibrary.WithContext(ctx).Create(c); e != nil {
 			return nil, ErrConflict
 		}
 	}
-	actions := []string{"read", "write", "create", "delete"}
-	if initialize {
-		actions = []string{"read", "write", "create"}
-	}
-	grants := []permission.Grant{{UserID: a.Principal.ID, Resource: permission.LibraryResource(ref), Actions: actions}}
-	if initialize {
-		grants = append(grants, permission.Grant{UserID: a.Principal.ID, Resource: permission.FileResource(ref, "index.md"), Actions: []string{"read"}})
-	}
-	if e = d.Permissions.Initialize(ctx, a.Token, grants); e != nil {
-		return nil, e
+	if initialize && c.Protected != 1 {
+		if _, e = d.Q.DocumentLibrary.WithContext(ctx).Where(d.Q.DocumentLibrary.ID.Eq(c.ID)).Update(d.Q.DocumentLibrary.Protected, 1); e != nil {
+			return nil, e
+		}
+		c.Protected = 1
 	}
 	if initialize {
 		key, e := d.Store.Put(ctx, []byte(homepage))
@@ -158,21 +149,25 @@ func (d *Document) Create(ctx context.Context, a Actor, ref, name, description, 
 	return c, nil
 }
 
-func (d *Document) EditLibrary(ctx context.Context, a Actor, ref, name, description string, rev int32) error {
+func (d *Document) EditLibrary(ctx context.Context, a Actor, ref, name, description string, rev int32, public *int32) error {
 	release := lock.Acquire("library:" + ref)
 	defer release()
 	c, e := d.Library(ctx, ref)
 	if e != nil {
 		return e
 	}
-	if e = permission.Require(ctx, d.Permissions, a.Token, permission.Resources(c.Category, c.Identifie, ""), "write"); e != nil {
-		return e
+	if !permission.CanManage(a.Principal, *c) {
+		return permission.ErrDenied
 	}
-	if name == "" || len(name) > 255 || len(description) > 4096 || rev <= 0 {
+	if name == "" || len(name) > 255 || len(description) > 4096 || rev <= 0 || (public != nil && *public != 0 && *public != 1) {
 		return ErrInvalid
 	}
+	visibility := c.Public
+	if public != nil {
+		visibility = *public
+	}
 	q := d.Q.DocumentLibrary
-	r, e := q.WithContext(ctx).Where(q.ID.Eq(c.ID), q.Revision.Eq(rev), q.Ready.Eq(1)).Updates(map[string]interface{}{"name": name, "description": description, "revision": rev + 1, "updated_at": time.Now()})
+	r, e := q.WithContext(ctx).Where(q.ID.Eq(c.ID), q.Revision.Eq(rev), q.Ready.Eq(1)).Updates(map[string]interface{}{"name": name, "description": description, "public": visibility, "revision": rev + 1, "updated_at": time.Now()})
 	if e != nil {
 		return e
 	}
@@ -189,26 +184,8 @@ func (d *Document) DeleteLibrary(ctx context.Context, a Actor, ref string) error
 	if e != nil {
 		return e
 	}
-	if e = permission.Require(ctx, d.Permissions, a.Token, permission.Resources(c.Category, c.Identifie, ""), "delete"); e != nil {
-		return e
-	}
-	files, e := d.Q.DocumentFile.WithContext(ctx).Where(d.Q.DocumentFile.LibraryID.Eq(c.ID)).Find()
-	if e != nil {
-		return e
-	}
-	for _, f := range files {
-		if e = permission.Require(ctx, d.Permissions, a.Token, permission.Resources(c.Category, c.Identifie, f.Path), "delete"); e != nil {
-			return e
-		}
-	}
-	// Keep an explicit deny so recreation cannot inherit stale file-level grants.
-	grants := []permission.Grant{{UserID: c.UserID, Resource: permission.LibraryResource(ref), Actions: []string{}}}
-	for _, f := range files {
-		grants = append(grants, permission.Grant{UserID: c.UserID, Resource: permission.FileResource(ref, f.Path), Actions: []string{}})
-	}
-	// Resources use immutable paths; recreation is prevented by retaining the library tombstone.
-	if e = d.Permissions.Replace(ctx, a.Token, grants); e != nil {
-		return e
+	if !permission.CanManage(a.Principal, *c) || c.Protected == 1 {
+		return permission.ErrDenied
 	}
 	return d.Q.Transaction(func(tx *dao.Query) error {
 		q := tx.DocumentLibrary
@@ -219,8 +196,7 @@ func (d *Document) DeleteLibrary(ctx context.Context, a Actor, ref string) error
 		if r.RowsAffected != 1 {
 			return ErrConflict
 		}
-		_, e = tx.DocumentDownloadLink.WithContext(ctx).Where(tx.DocumentDownloadLink.LibraryID.Eq(c.ID)).Delete()
-		return e
+		return nil
 	})
 }
 
@@ -254,30 +230,13 @@ func (d *Document) Files(ctx context.Context, a Actor, ref string) (Tree, error)
 		return Tree{}, e
 	}
 	out := Tree{Files: []FileInfo{}, Revision: c.Revision, Name: c.Name}
-	if out.CanCreate, e = permission.Allowed(ctx, d.Permissions, a.Token, permission.Resources(c.Category, c.Identifie, ""), "create"); e != nil {
-		return out, e
-	}
-	canRead, e := permission.Allowed(ctx, d.Permissions, a.Token, permission.Resources(c.Category, c.Identifie, ""), "read")
-	if e != nil {
-		return out, e
-	}
-	paths := make([]string, 0, len(files))
-	for _, file := range files {
-		paths = append(paths, file.Path)
-	}
-	capabilities, err := permission.FileActions(ctx, d.Permissions, a.Token, c.Category, c.Identifie, paths, []string{"read", "write", "delete"})
-	if err != nil {
-		return out, err
-	}
-	for _, file := range files {
-		rights := capabilities[file.Path]
-		if !rights["read"] {
-			continue
-		}
-		out.Files = append(out.Files, FileInfo{file.Path, file.Title, file.Size, file.Position, file.Revision, rights["write"], rights["delete"]})
-	}
-	if !canRead && len(out.Files) == 0 {
+	if !permission.CanRead(a.Principal, *c) {
 		return out, permission.ErrDenied
+	}
+	out.CanCreate = permission.CanManage(a.Principal, *c)
+	for _, file := range files {
+		canChange := permission.CanChangeFile(a.Principal, *c, file.Path)
+		out.Files = append(out.Files, FileInfo{file.Path, file.Title, file.Size, file.Position, file.Revision, canChange, canChange})
 	}
 	return out, nil
 }
@@ -298,8 +257,8 @@ func (d *Document) Read(ctx context.Context, a Actor, ref, p string) (*entity.Do
 	if c.Ready != 1 {
 		return nil, nil, gorm.ErrRecordNotFound
 	}
-	if e = permission.Require(ctx, d.Permissions, a.Token, permission.Resources(c.Category, c.Identifie, p), "read"); e != nil {
-		return nil, nil, e
+	if !permission.CanRead(a.Principal, *c) {
+		return nil, nil, permission.ErrDenied
 	}
 	f, e := d.file(ctx, c.ID, p)
 	if e != nil {
@@ -351,36 +310,15 @@ func (d *Document) Save(ctx context.Context, a Actor, ref, p, title string, cont
 	if e != nil && !create {
 		return nil, e
 	}
+	if !permission.CanChangeFile(a.Principal, *c, p) {
+		return nil, permission.ErrDenied
+	}
 	if create {
 		if revision != 0 {
 			return nil, ErrConflict
 		}
-		if e = permission.Require(ctx, d.Permissions, a.Token, permission.Resources(c.Category, c.Identifie, ""), "create"); e != nil {
-			return nil, e
-		}
-		v, e := d.Permissions.Check(ctx, a.Token, []permission.Resource{permission.FileResource(ref, p)}, "write")
-		if e != nil {
-			return nil, e
-		}
-		if v.Explicit && !v.Allowed {
-			return nil, permission.ErrDenied
-		}
-	} else {
-		if revision <= 0 || revision != f.Revision {
-			return nil, ErrConflict
-		}
-		if e = permission.Require(ctx, d.Permissions, a.Token, permission.Resources(c.Category, c.Identifie, p), "write"); e != nil {
-			return nil, e
-		}
-	}
-	if create {
-		grants := []permission.Grant{{UserID: c.UserID, Resource: permission.FileResource(ref, p), Actions: []string{"read", "write", "delete"}}}
-		if a.Principal.ID != c.UserID && !a.Principal.Admin {
-			grants = append(grants, permission.Grant{UserID: a.Principal.ID, Resource: permission.FileResource(ref, p), Actions: []string{"read", "write", "delete"}})
-		}
-		if err := d.Permissions.Initialize(ctx, a.Token, grants); err != nil {
-			return nil, err
-		}
+	} else if revision <= 0 || revision != f.Revision {
+		return nil, ErrConflict
 	}
 	key, e := d.Store.Put(ctx, content)
 	if e != nil {
@@ -425,8 +363,8 @@ func (d *Document) DeleteFile(ctx context.Context, a Actor, ref, p string, revis
 	if e != nil {
 		return e
 	}
-	if e = permission.Require(ctx, d.Permissions, a.Token, permission.Resources(c.Category, c.Identifie, p), "delete"); e != nil {
-		return e
+	if !permission.CanChangeFile(a.Principal, *c, p) {
+		return permission.ErrDenied
 	}
 	f, e := d.file(ctx, c.ID, p)
 	if e != nil {
@@ -454,13 +392,13 @@ func (d *Document) DeleteFile(ctx context.Context, a Actor, ref, p string, revis
 func (d *Document) Rename(ctx context.Context, a Actor, ref, p, title string, revision int32) error {
 	release := lock.Acquire("library:" + ref)
 	defer release()
-	// Rename the display title rather than moving the permission-bearing path.
+	// Rename only the display title; file paths remain stable.
 	c, e := d.Library(ctx, ref)
 	if e != nil {
 		return e
 	}
-	if e = permission.Require(ctx, d.Permissions, a.Token, permission.Resources(c.Category, c.Identifie, p), "write"); e != nil {
-		return e
+	if !permission.CanChangeFile(a.Principal, *c, p) {
+		return permission.ErrDenied
 	}
 	if title == "" || len(title) > 255 || revision <= 0 {
 		return ErrInvalid
@@ -491,8 +429,8 @@ func (d *Document) Order(ctx context.Context, a Actor, ref string, paths []strin
 	if revision != c.Revision || revision <= 0 {
 		return ErrConflict
 	}
-	if e = permission.Require(ctx, d.Permissions, a.Token, permission.Resources(c.Category, c.Identifie, ""), "write"); e != nil {
-		return e
+	if !permission.CanManage(a.Principal, *c) {
+		return permission.ErrDenied
 	}
 	if len(paths) > 10000 {
 		return ErrInvalid
@@ -504,9 +442,6 @@ func (d *Document) Order(ctx context.Context, a Actor, ref string, paths []strin
 		}
 		seen[p] = true
 		if e = ValidatePath(p); e != nil {
-			return e
-		}
-		if e = permission.Require(ctx, d.Permissions, a.Token, permission.Resources(c.Category, c.Identifie, p), "read"); e != nil {
 			return e
 		}
 	}

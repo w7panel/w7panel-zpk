@@ -35,6 +35,8 @@ func newDocumentLibrary(db *gorm.DB, opts ...gen.DOOption) documentLibrary {
 	_documentLibrary.UserID = field.NewInt32(tableName, "user_id")
 	_documentLibrary.Revision = field.NewInt32(tableName, "revision")
 	_documentLibrary.Ready = field.NewInt32(tableName, "ready")
+	_documentLibrary.Public = field.NewInt32(tableName, "public")
+	_documentLibrary.Protected = field.NewInt32(tableName, "protected")
 	_documentLibrary.CreatedAt = field.NewTime(tableName, "created_at")
 	_documentLibrary.UpdatedAt = field.NewTime(tableName, "updated_at")
 
@@ -55,6 +57,8 @@ type documentLibrary struct {
 	UserID      field.Int32
 	Revision    field.Int32
 	Ready       field.Int32
+	Public      field.Int32
+	Protected   field.Int32
 	CreatedAt   field.Time
 	UpdatedAt   field.Time
 
@@ -81,6 +85,8 @@ func (d *documentLibrary) updateTableName(table string) *documentLibrary {
 	d.UserID = field.NewInt32(table, "user_id")
 	d.Revision = field.NewInt32(table, "revision")
 	d.Ready = field.NewInt32(table, "ready")
+	d.Public = field.NewInt32(table, "public")
+	d.Protected = field.NewInt32(table, "protected")
 	d.CreatedAt = field.NewTime(table, "created_at")
 	d.UpdatedAt = field.NewTime(table, "updated_at")
 
@@ -99,7 +105,7 @@ func (d *documentLibrary) GetFieldByName(fieldName string) (field.OrderExpr, boo
 }
 
 func (d *documentLibrary) fillFieldMap() {
-	d.fieldMap = make(map[string]field.Expr, 10)
+	d.fieldMap = make(map[string]field.Expr, 12)
 	d.fieldMap["id"] = d.ID
 	d.fieldMap["category"] = d.Category
 	d.fieldMap["identifie"] = d.Identifie
@@ -108,6 +114,8 @@ func (d *documentLibrary) fillFieldMap() {
 	d.fieldMap["user_id"] = d.UserID
 	d.fieldMap["revision"] = d.Revision
 	d.fieldMap["ready"] = d.Ready
+	d.fieldMap["public"] = d.Public
+	d.fieldMap["protected"] = d.Protected
 	d.fieldMap["created_at"] = d.CreatedAt
 	d.fieldMap["updated_at"] = d.UpdatedAt
 }

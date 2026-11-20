@@ -39,7 +39,7 @@ func New(options Options) (*Provider, error) {
 	}
 	query := dao.Use(options.DB)
 	if options.Migrate {
-		if err := options.DB.AutoMigrate(&entity.DocumentCategory{}, &entity.DocumentLibrary{}, &entity.DocumentFile{}, &entity.DocumentDownloadLink{}); err != nil {
+		if err := options.DB.AutoMigrate(&entity.DocumentCategory{}, &entity.DocumentLibrary{}, &entity.DocumentFile{}); err != nil {
 			return nil, err
 		}
 		if err := query.DocumentCategory.WithContext(context.Background()).Clauses(clause.OnConflict{DoNothing: true}).Create(&entity.DocumentCategory{Identifie: "applications", Name: "制品文档", UserID: 0, Revision: 1}); err != nil {
@@ -95,15 +95,16 @@ func (p *Provider) registerRoutes(engine *gin.Engine) {
 	library := controller.Library{Abstract: abstract}
 	file := controller.File{Abstract: abstract}
 	download := controller.Download{Abstract: abstract}
-	permissions := controller.Permission{Abstract: abstract}
-	category := controller.Category{Logic: &logic.Category{Q: p.Logic.Q, Permissions: p.Logic.Permissions}}
+	category := controller.Category{Logic: &logic.Category{Q: p.Logic.Q}}
 	login := controller.Login{Logic: &logic.Login{Permissions: p.Logic.Permissions}}
-	root.GET("/download", download.Public)
 	root.POST("/login", login.FromPanel)
+	read := root.Group("", middleware.Auth{Permissions: p.Logic.Permissions, Optional: true}.Process)
+	read.POST("/file/list", file.List)
+	read.POST("/file/read", file.Read)
+	read.GET("/download", download.Export)
 	auth := root.Group("", middleware.Auth{Permissions: p.Logic.Permissions}.Process)
 	auth.POST("/user", login.CurrentUser)
 	categoryRoutes := auth.Group("/category")
-	categoryRoutes.POST("/permission/set", category.SetPermission)
 	categoryRoutes.POST("/list", category.List)
 	categoryRoutes.POST("/create", category.Create)
 	categoryRoutes.POST("/edit", category.Edit)
@@ -113,15 +114,8 @@ func (p *Provider) registerRoutes(engine *gin.Engine) {
 	auth.POST("/library/initialize", library.Initialize)
 	auth.POST("/library/edit", library.Edit)
 	auth.POST("/library/delete", library.Delete)
-	auth.POST("/file/list", file.List)
-	auth.POST("/file/read", file.Read)
 	auth.POST("/file/save", file.Save)
 	auth.POST("/file/rename", file.Rename)
 	auth.POST("/file/delete", file.Delete)
 	auth.POST("/file/order", file.Order)
-	auth.POST("/permission/set", permissions.Set)
-	auth.POST("/link/create", download.CreateLink)
-	auth.POST("/link/list", download.Links)
-	auth.POST("/link/revoke", download.RevokeLink)
-	auth.POST("/download", download.Export)
 }

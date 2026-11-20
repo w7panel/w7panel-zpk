@@ -18,6 +18,8 @@ CREATE TABLE ims_document_library (
  user_id integer NOT NULL,
  revision integer NOT NULL DEFAULT 1,
  ready integer NOT NULL DEFAULT 0,
+ public integer NOT NULL DEFAULT 0,
+ protected integer NOT NULL DEFAULT 0,
  created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
  updated_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -35,14 +37,3 @@ CREATE TABLE ims_document_file (
  updated_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE UNIQUE INDEX document_file_path ON ims_document_file(library_id,path);
-CREATE TABLE ims_document_download_link (
- id INTEGER PRIMARY KEY AUTOINCREMENT,
- library_id integer NOT NULL,
- token_hash varchar(64) NOT NULL,
- paths text NOT NULL,
- user_id integer NOT NULL,
- expires_at datetime NOT NULL,
- revoked integer NOT NULL DEFAULT 0,
- created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-CREATE UNIQUE INDEX document_download_link_hash ON ims_document_download_link(token_hash);

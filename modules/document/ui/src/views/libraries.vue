@@ -4,12 +4,12 @@
             <div class="document-page-header">
                 <a-button @click="closeWorkbench">返回文档库</a-button><span>{{ selectedRef }}</span>
             </div>
-            <workbench :key="selectedRef" :client="client" :library-ref="selectedRef" :is-admin="isAdmin" />
+            <workbench :key="selectedRef" :client="client" :library-ref="selectedRef" />
         </template>
         <template v-else>
             <div class="document-page-header">
                 <h3>文档库</h3>
-                <a-button type="primary" @click="openCreate">新建文档库</a-button>
+                <a-button v-if="user.id" type="primary" @click="openCreate">新建文档库</a-button>
                 <a-select
                     v-model="category"
                     placeholder="全部分类"
@@ -32,14 +32,14 @@
                     <a-table-column title="标识"
                         ><template #cell="{ record }">{{ reference(record) }}</template></a-table-column
                     >
+                    <a-table-column title="可见性"><template #cell="{ record }"><a-tag :color="record.public ? 'green' : 'gray'">{{ record.public ? '公有' : '私有' }}</a-tag></template></a-table-column>
                     <a-table-column data-index="user_id" title="所有者 ID" />
                     <a-table-column data-index="updated_at" title="更新时间" />
                     <a-table-column title="操作"
                         ><template #cell="{ record }">
                             <a-button type="text" @click="openEdit(record)">编辑</a-button>
-                            <a-button v-if="isAdmin" type="text" @click="openPermission(record)">授权</a-button>
-                            <a-popconfirm content="确认删除文档库？受限文件会阻止删除。" @ok="removeLibrary(record)"
-                                ><a-button type="text" status="danger">删除</a-button></a-popconfirm
+                            <a-popconfirm content="确认删除文档库？" @ok="removeLibrary(record)"
+                                ><a-button type="text" status="danger" :disabled="!!record.protected">删除</a-button></a-popconfirm
                             >
                         </template></a-table-column
                     >
@@ -70,17 +70,9 @@
                 /></a-form-item>
                 <a-form-item label="名称"><a-input v-model="form.name" /></a-form-item>
                 <a-form-item label="描述"><a-textarea v-model="form.description" /></a-form-item>
+                <a-form-item label="可见性"><a-radio-group v-model="form.public"><a-radio :value="0">私有</a-radio><a-radio :value="1">公有</a-radio></a-radio-group></a-form-item>
+                <a-alert>公有文档库允许所有人查看和下载；仅所有者和创始人可以修改。</a-alert>
                 <a-button type="primary" :loading="saving" @click="save">保存</a-button>
-            </a-form>
-        </a-modal>
-        <a-modal v-model:visible="permission.visible" title="文档库授权" :footer="false">
-            <a-alert>文档库单独授权覆盖分类授权，文件单独授权优先于文档库授权。</a-alert>
-            <a-form :model="permission" layout="vertical" style="margin-top: 16px">
-                <a-form-item label="被授权用户 ID"><a-input v-model="permission.targetUserID" /></a-form-item>
-                <a-form-item label="动作"
-                    ><a-checkbox-group v-model="permission.actions" :options="['read', 'write', 'create', 'delete']"
-                /></a-form-item>
-                <a-button type="primary" :loading="saving" @click="savePermission">保存授权</a-button>
             </a-form>
         </a-modal>
     </main>
@@ -102,14 +94,9 @@ export default {
         saving: false,
         selectedRef: '',
         form: {},
-        permission: { visible: false, actions: [] },
     }),
-    computed: {
-        isAdmin() {
-            return !!this.user.admin || ['founder', 'super'].includes(this.user.role);
-        },
-    },
     async mounted() {
+        if (!this.user.id) return;
         try {
             this.categories = (await this.client.post('/category/list', {})) || [];
             await this.loadLibraries(1);
@@ -165,6 +152,7 @@ export default {
                 identifie: '',
                 name: '',
                 description: '',
+                public: 0,
             };
         },
         openEdit(record) {
@@ -186,6 +174,7 @@ export default {
                     ref: this.reference(this.form),
                     name: this.form.name.trim(),
                     description: this.form.description || '',
+                    public: this.form.public || 0,
                     revision: this.form.revision,
                 });
                 this.form.visible = false;
@@ -205,30 +194,7 @@ export default {
                 Message.error(error.message);
             }
         },
-        openPermission(record) {
-            this.permission = { visible: true, record, targetUserID: '', actions: ['read'] };
-        },
-        async savePermission() {
-            const targetUserID = Number(this.permission.targetUserID);
-            if (!Number.isInteger(targetUserID) || targetUserID <= 0) {
-                Message.warning('请输入有效的用户 ID');
-                return;
-            }
-            this.saving = true;
-            try {
-                await this.client.post('/permission/set', {
-                    ref: this.reference(this.permission.record),
-                    target_user_id: targetUserID,
-                    actions: this.permission.actions,
-                });
-                this.permission.visible = false;
-                Message.success('授权已保存');
-            } catch (error) {
-                Message.error(error.message);
-            } finally {
-                this.saving = false;
-            }
-        },
+
     },
 };
 </script>

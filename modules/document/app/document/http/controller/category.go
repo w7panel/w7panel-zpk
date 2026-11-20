@@ -71,17 +71,3 @@ func (c Category) respond(ctx *gin.Context, data interface{}, err error) {
 	}
 	c.JsonResponseWithError(ctx, err, status)
 }
-
-func (c Category) SetPermission(ctx *gin.Context) {
-	type ParamsValidate struct {
-		Identifie    string   `json:"identifie" binding:"required"`
-		TargetUserID int32    `json:"target_user_id" binding:"required,min=1"`
-		Actions      []string `json:"actions"`
-	}
-	params := ParamsValidate{}
-	if !c.Validate(ctx, &params) {
-		return
-	}
-	err := c.Logic.SetPermission(ctx.Request.Context(), actor(ctx), params.Identifie, params.TargetUserID, params.Actions)
-	c.respond(ctx, nil, err)
-}

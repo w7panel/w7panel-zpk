@@ -3,16 +3,7 @@
         <a-spin :loading="loading || saving" class="description-spin">
             <div class="document-actions">
                 <span class="document-reference">{{ libraryRef }}</span>
-                <a-button @click="download('zip')">下载可读文档</a-button>
-                <a-button @click="download('markdown')">下载 AI 上下文</a-button>
-                <a-button
-                    @click="
-                        linksVisible = true;
-                        loadLinks();
-                    "
-                    >下载地址</a-button
-                >
-                <a-button v-if="isAdmin && activeDoc" @click="permissionVisible = true">文件授权</a-button>
+                <a-button @click="linksVisible = true">整体下载地址</a-button>
             </div>
             <div class="content-box">
                 <div class="sidebar df-s0">
@@ -34,7 +25,7 @@
                             <div class="sidebar-item-head df ai-c jc-b">
                                 <div
                                     class="df ai-c sidebar-item-main"
-                                    :draggable="!saving"
+                                    :draggable="!saving && canCreate"
                                     @dragstart="onDocDragStart(item, $event)"
                                     @dragover.prevent="onDocDragOver(item)"
                                     @dragleave="onDocDragLeave(item)"
@@ -140,18 +131,8 @@
         </a-spin>
 
         <a-modal v-model:visible="linksVisible" title="整体下载地址" :footer="false">
-            <a-alert>链接仅包含签发时可读的文件，有效期 24 小时；后续撤权会影响下载。</a-alert>
-            <a-button class="mt-16" @click="createLink">生成下载地址</a-button>
-            <a-input v-if="linkURL" :model-value="linkURL" readonly class="mt-16" />
-            <div v-for="link in links" :key="link.id" class="document-link-row">
-                <span>#{{ link.id }} · {{ link.expires_at }} · {{ link.revoked ? '已撤销' : '有效' }}</span>
-                <a-button v-if="!link.revoked" type="text" status="danger" @click="revokeLink(link.id)">撤销</a-button>
-            </div>
-        </a-modal>
-        <a-modal v-model:visible="permissionVisible" title="设置文件授权" @ok="setPermission">
-            <a-alert>文件独立授权优先于文档库授权；未获授权的用户将不能继承上层权限。</a-alert>
-            <a-input v-model="targetUserID" placeholder="被授权用户 ID" class="mt-16" />
-            <a-checkbox-group v-model="permissionActions" :options="['read', 'write', 'delete']" class="mt-16" />
+            <a-alert>公有文档库可直接下载；私有文档库需通过请求头携带所有者或创始人的登录凭据。</a-alert>
+            <a-input :model-value="client.downloadURL(libraryRef)" readonly class="mt-16" />
         </a-modal>
         <a-modal v-model:visible="createDialog.show" title="添加文件" :width="560">
             <div class="create-form">
@@ -210,7 +191,6 @@ export default {
     props: {
         client: { type: Object, required: true },
         libraryRef: { type: String, required: true },
-        isAdmin: { type: Boolean, default: false },
     },
     data() {
         return {
@@ -220,11 +200,6 @@ export default {
             selectionVersion: 0,
             disposed: false,
             linksVisible: false,
-            links: [],
-            linkURL: '',
-            permissionVisible: false,
-            targetUserID: '',
-            permissionActions: ['read'],
             saving: false,
             docsFiles: [],
             activeDocPath: '',
@@ -296,58 +271,6 @@ export default {
         this.selectionVersion++;
     },
     methods: {
-        async download(format) {
-            try {
-                await this.client.download(this.libraryRef, format);
-            } catch (error) {
-                Message.error(error.message);
-            }
-        },
-        async loadLinks() {
-            try {
-                this.links = (await this.client.post('/link/list', { ref: this.libraryRef })) || [];
-            } catch (error) {
-                Message.error(error.message);
-            }
-        },
-        async createLink() {
-            try {
-                const result = await this.client.post('/link/create', { ref: this.libraryRef, hours: 24 });
-                this.linkURL = this.client.linkURL(result.token);
-                await this.loadLinks();
-            } catch (error) {
-                Message.error(error.message);
-            }
-        },
-        async revokeLink(id) {
-            try {
-                await this.client.post('/link/revoke', { id });
-                this.linkURL = '';
-                await this.loadLinks();
-            } catch (error) {
-                Message.error(error.message);
-            }
-        },
-        async setPermission() {
-            const targetUserID = Number(this.targetUserID);
-            if (!Number.isInteger(targetUserID) || targetUserID <= 0) {
-                Message.warning('请输入被授权用户 ID');
-                return;
-            }
-            try {
-                await this.client.post('/permission/set', {
-                    ref: this.libraryRef,
-                    path: this.activeDocPath,
-                    target_user_id: targetUserID,
-                    actions: this.permissionActions,
-                });
-                this.permissionVisible = false;
-                await this.getFiles();
-                Message.success('授权已保存');
-            } catch (error) {
-                Message.error(error.message);
-            }
-        },
         async getFiles() {
             this.loading = true;
             try {
@@ -396,7 +319,7 @@ export default {
             }
         },
         onDocDragStart(item, event) {
-            if (!item || this.saving) {
+            if (!item || this.saving || !this.canCreate) {
                 return;
             }
             this.draggingDocPath = item.path;
@@ -682,12 +605,7 @@ export default {
     color: #86909c;
     margin-right: auto;
 }
-.document-link-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-top: 12px;
-}
+
 .document-readonly {
     padding: 24px;
     overflow: auto;

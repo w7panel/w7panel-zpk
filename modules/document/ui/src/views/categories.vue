@@ -15,7 +15,6 @@
                 <a-table-column title="操作"
                     ><template #cell="{ record }">
                         <a-button type="text" @click="openEdit(record)">编辑</a-button>
-                        <a-button type="text" @click="openPermission(record)">授权</a-button>
                         <a-popconfirm content="仅允许删除空分类，确认删除？" @ok="remove(record)"
                             ><a-button type="text" status="danger" :disabled="record.identifie === 'applications'"
                                 >删除</a-button
@@ -38,15 +37,6 @@
                 <a-button type="primary" :loading="saving" @click="save">保存</a-button>
             </a-form>
         </a-modal>
-        <a-modal v-model:visible="permission.visible" title="分类授权" :footer="false">
-            <a-form :model="permission" layout="vertical">
-                <a-form-item label="被授权用户 ID"><a-input v-model="permission.targetUserID" /></a-form-item>
-                <a-form-item label="动作"
-                    ><a-checkbox-group v-model="permission.actions" :options="['read', 'write', 'create', 'delete']"
-                /></a-form-item>
-                <a-button type="primary" :loading="saving" @click="savePermission">保存授权</a-button>
-            </a-form>
-        </a-modal>
     </main>
 </template>
 <script>
@@ -64,7 +54,6 @@ export default {
         loading: false,
         saving: false,
         form: {},
-        permission: { visible: false, actions: [] },
     }),
     watch: {
         isAdmin: {
@@ -122,30 +111,7 @@ export default {
                 Message.error(error.message);
             }
         },
-        openPermission(record) {
-            this.permission = { visible: true, record, targetUserID: '', actions: ['read'] };
-        },
-        async savePermission() {
-            const targetUserID = Number(this.permission.targetUserID);
-            if (!Number.isInteger(targetUserID) || targetUserID <= 0) {
-                Message.warning('请输入有效的用户 ID');
-                return;
-            }
-            this.saving = true;
-            try {
-                await this.client.post('/category/permission/set', {
-                    identifie: this.permission.record.identifie,
-                    target_user_id: targetUserID,
-                    actions: this.permission.actions,
-                });
-                this.permission.visible = false;
-                Message.success('授权已保存');
-            } catch (error) {
-                Message.error(error.message);
-            } finally {
-                this.saving = false;
-            }
-        },
+
     },
 };
 </script>

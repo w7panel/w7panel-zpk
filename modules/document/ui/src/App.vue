@@ -4,6 +4,7 @@
         <aside class="document-navigation">
             <router-link to="/documents">文档库</router-link>
             <router-link v-if="user.admin" to="/categories">分类管理</router-link>
+            <a-button v-if="!user.id" @click="user = null">登录</a-button>
         </aside>
         <router-view :client="client" :user="user" class="document-content" />
     </div>
@@ -31,13 +32,20 @@ export default {
         error: '',
     }),
     async mounted() {
+        await this.$router.isReady();
         try {
             this.user = await this.client.start();
         } catch (error) {
-            this.error = error.message;
+            if (this.$route.query.ref) this.user = { id: 0, admin: false };
+            else this.error = error.message;
         } finally {
             this.loading = false;
         }
+    },
+    watch: {
+        '$route.query.ref'(reference) {
+            if (reference && !this.user && !this.loading) this.user = { id: 0, admin: false };
+        },
     },
     methods: {
         async login() {

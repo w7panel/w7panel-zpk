@@ -24,27 +24,9 @@ export function createDocumentClient(request, baseURL = documentBaseURL()) {
     }
     return {
         post,
-        linkURL(token) {
-            return new URL(baseURL.replace(/\/$/, '') + '/download?token=' + encodeURIComponent(token), location.origin)
+        downloadURL(reference) {
+            return new URL(baseURL.replace(/\/$/, '') + '/download?ref=' + encodeURIComponent(reference), location.origin)
                 .href;
-        },
-        async download(ref, format) {
-            const response = await request({
-                method: 'POST',
-                url: '/download',
-                data: { ref, format },
-                responseType: 'blob',
-                timeout: 300000,
-            });
-            if (!response || response.status !== 200) throw new Error('下载失败');
-            const url = URL.createObjectURL(response.data);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = ref.replace(/\//g, '-') + (format === 'markdown' ? '.md' : '.zip');
-            document.body.appendChild(link);
-            link.click();
-            link.remove();
-            setTimeout(() => URL.revokeObjectURL(url), 1000);
         },
     };
 }

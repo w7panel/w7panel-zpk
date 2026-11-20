@@ -84,6 +84,7 @@ func (provider *Provider) Register(httpServer *http_server.Server, console conso
 	console.RegisterCommand(new(command.Sqlite))
 	console.RegisterCommand(new(command.ResetTags))
 	console.RegisterCommand(new(command.SetEnvironmentCategory))
+	console.RegisterCommand(new(command.MigrateDocuments))
 
 	// 注册一些路由
 	httpServer.RegisterRouters(func(engine *gin.Engine) {

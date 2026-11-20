@@ -1,0 +1,25 @@
+app:
+  name: document
+  env: ${APP_ENV-release}
+  server: http
+server:
+  http:
+    host: ${DOCUMENT_LISTEN_HOST-127.0.0.1}
+    port: ${DOCUMENT_PORT-8001}
+log:
+  default:
+    driver: console
+  console:
+    driver: console
+    level: info
+database:
+  default:
+    driver: sqlite
+    db_name: ${DOCUMENT_DB_PATH-/tmp/document/document.db}
+    prefix: ims_
+    show_sql: false
+permission:
+  base_url: ${DOCUMENT_PERMISSION_URL-http://127.0.0.1:8000/zpk/v2/api/permission}
+document:
+  storage_path: ${DOCUMENT_STORAGE_PATH-/tmp/document/objects}
+  read_only: ${DOCUMENT_READ_ONLY-false}

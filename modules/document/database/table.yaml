@@ -1,0 +1,5 @@
+relation:
+  - table: document_category
+  - table: document_library
+  - table: document_file
+  - table: document_download_link

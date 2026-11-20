@@ -62,7 +62,12 @@ func (c Formula) Add(ctx *gin.Context) {
 		return
 	}
 
-	c.JsonSuccessResponse(ctx)
+	reference, err := (logic.FormulaDocument{}).Ensure(ctx.Request.Context(), ctx.GetHeader(logic2.ZpkTokenHeader), params.Identifie, (logic2.User{}).GetUser(ctx))
+	if err != nil {
+		c.JsonResponseWithError(ctx, fmt.Errorf("制品已创建，默认文档初始化未完成，请重试：%w", err), 503)
+		return
+	}
+	c.JsonResponseWithoutError(ctx, gin.H{"document_ref": reference})
 }
 
 func (c Formula) BaseInfo(ctx *gin.Context) {

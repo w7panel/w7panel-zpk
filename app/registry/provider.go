@@ -9,6 +9,7 @@ import (
 	"github.com/w7panel/w7panel-zpk/app/registry/command"
 	"github.com/w7panel/w7panel-zpk/app/registry/http/controller"
 	"github.com/w7panel/w7panel-zpk/app/registry/logic"
+	systemcontroller "github.com/w7panel/w7panel-zpk/app/system/http/controller"
 	respologic "github.com/w7panel/w7panel-zpk/app/system/logic"
 	workflowmodule "github.com/w7panel/w7panel-zpk/app/workflow"
 	"github.com/w7panel/w7panel-zpk/common/accessor"
@@ -32,6 +33,17 @@ func (p Provider) registerRoutes(httpServer *httpserver.Server) {
 
 		root.Any("/registry/auth", controller.Auth{}.Auth)
 		root.Any("/registry/webhook", controller.WebHook{}.Hook)
+
+		permissionService := root.Group("/api/permission")
+		permissionService.POST("/evaluate", controller.ResourcePermission{}.Evaluate)
+		permissionService.POST("/evaluate-batch", controller.ResourcePermission{}.EvaluateBatch)
+		permissionService.POST("/login", systemcontroller.OIDC{}.LoginFromW7panel)
+		permissionAuth := permissionService.Group("", middleware.Auth{}.Process)
+		permissionAuth.POST("/identity", controller.ResourcePermission{}.Identity)
+		permissionAuth.POST("/check", controller.ResourcePermission{}.Check)
+		permissionAuth.POST("/check-batch", controller.ResourcePermission{}.CheckBatch)
+		permissionAuth.POST("/replace", controller.ResourcePermission{}.Replace)
+		permissionAuth.POST("/initialize", controller.ResourcePermission{}.Initialize)
 
 		api := root.Group("/api", middleware.Cors{}.Process, middleware.DenyDomainReq{}.Process, middleware.Auth{}.Process)
 		api.POST("/permission/namespace/set", middleware.AdminUser{}.Process, controller.Permission{}.SetNamespacePermission)

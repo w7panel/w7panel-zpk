@@ -950,7 +950,7 @@ helm template <release> <generated-chart-dir> -f <install-values.yaml>
 
 ### 2026-11-20 传统应用按 Release 隔离存储目录
 
-新安装的传统应用、工具子 Chart 和代码/NGINX/插件状态 Job，分别使用 `nginx-web-dir/<release-name>`、`nginx-dir/<release-name>`、`tradition-plugin-dir/<release-name>`。同一 PVC 上的不同 Release 不再因为域名相同而共用目录；`DOMAIN_URL` 仍用于域名、路由、vhost 文件名，不作为新站点的目录标识。外部存储继续由安装方选择。
+新安装的传统应用、工具子 Chart 和代码/NGINX/插件状态 Job，分别使用 `nginx-web-dir/<release-name>`、`nginx-dir/<release-name>`、`tradition-plugin-dir/<release-name>`。同一 PVC 上的不同 Release 不再因为域名相同而共用目录；`DOMAIN_URL` 仍用于域名和路由，不作为新站点的目录标识。外部存储继续由安装方选择。
 
 编辑器保存代码挂载为 `nginx-web-dir/{{ .Release.Name }}`；打包器只读取 manifest，不自动改写旧域名挂载。主、子 Chart 共用 Release 名称。工具 Chart 需同步更新、重新打包并重新导入传统应用，不能只更新主 Chart。
 
@@ -958,4 +958,15 @@ helm template <release> <generated-chart-dir> -f <install-values.yaml>
 
 按本次调整要求不兼容旧域名目录，不保留旧挂载、不自动搬迁数据。旧制品需要重新保存并打包；已有应用切换到新目录前须自行处理旧数据。面板无需新增参数协议。
 
-传统应用代码安装/卸载脚本只操作容器中的固定挂载点 `/www/wwwroot` 和 `/var/lib/w7-tradition-plugin`，不再校验域名作为目录名。插件安装器同样复用固定挂载点。NGINX 配置脚本通过 `nginx-dir/<release-name>` 挂载访问 `/www/server/nginx`，其中 `server_name`、vhost 文件名仍按域名生成，站点根目录及 FastCGI 路径保持 `/www/wwwroot`。
+传统应用代码安装/卸载脚本只操作容器中的固定挂载点 `/www/wwwroot` 和 `/var/lib/w7-tradition-plugin`，不再校验域名作为目录名。插件安装器同样复用固定挂载点。NGINX 配置脚本通过 `nginx-dir/<release-name>` 挂载访问 `/www/server/nginx`，其中 `server_name` 仍按域名生成，vhost 文件名使用 `<release-name>.conf`，站点根目录及 FastCGI 路径保持 `/www/wwwroot`。
+
+
+### 2026-11-20 域名编辑与默认 NGINX 站点
+
+传统应用编辑器的默认 NGINX 示例使用 `listen 80 default_server;`，保留 `server_name {SERVER_NAME}` 以及既有 PHP/静态/代理处理。入口域名与证书由 Ingress 管理，未显式列出的新域名由该默认站点接收；用户已有自定义配置不自动改写监听方式。同一监听地址/端口只配置一个 default_server，其他命名 server 块可用于不同服务；在面板外部修改这些专用域名时仍需手工同步其 server_name。
+
+NGINX 生效配置和最新模板统一使用 `<Release名称>.conf`，安装、升级、卸载 Hook 与 sitemanager 读取和网关切换使用相同文件名，不再从域名推导文件。该调整须配套更新工具 UI、重新保存并打包应用，不兼容旧域名文件名、不自动迁移配置。
+
+sitemanager 开放主域名编辑，域名路由更新结果通过原有 pending/verify 流程确认。AppGroup 默认访问地址由面板维护，工具不写入该地址。工具从实际 Ingress 读取站点域名，并按 Release 匹配主应用挂载；不需要修改面板域名管理或增加集群监听器。
+
+网关开启/重新开启时不再按 Ingress 自动补写 NGINX `server_name`，已有配置和用户确认内容保持原样；默认站点处理未匹配域名。

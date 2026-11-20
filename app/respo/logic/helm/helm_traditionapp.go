@@ -81,7 +81,7 @@ const traditionNginxVhostShell = `{{- $rawDomain := toString .Values.DOMAIN_URL 
 {{- $config = replace "{ROOT_DIR}" $rootDir $config -}}
 {{- $config = replace "{K8S_DOMAIN}" $k8sDomain $config -}}
 set -eu
-nginx_vhost_file={{ print $primaryDomain ".conf" | quote }}
+nginx_vhost_file={{ print .Release.Name ".conf" | quote }}
 nginx_vhost_config_b64={{ $config | b64enc | quote }}
 mkdir -p /www/server/nginx/conf.d /www/server/nginx/template-configs
 nginx_tmp_dir=$(mktemp -d /www/server/nginx/template-configs/.vhost.XXXXXX)
@@ -135,14 +135,8 @@ else
 fi
 mv "$nginx_tmp_dir/new.conf" "/www/server/nginx/template-configs/$nginx_vhost_file"`
 
-const traditionNginxVhostUninstallShell = `{{- $rawDomain := toString .Values.DOMAIN_URL -}}
-{{- $domain := replace "https://" "" $rawDomain -}}
-{{- $domain = replace "http://" "" $domain -}}
-{{- $domain = trimSuffix "/" $domain -}}
-{{- $serverName := replace "," " " $domain -}}
-{{- $primaryDomain := first (splitList " " (trimAll " " $serverName)) -}}
-set -eu
-nginx_vhost_file={{ print $primaryDomain ".conf" | quote }}
+const traditionNginxVhostUninstallShell = `set -eu
+nginx_vhost_file={{ print .Release.Name ".conf" | quote }}
 rm -f -- "/www/server/nginx/conf.d/$nginx_vhost_file" "/www/server/nginx/template-configs/$nginx_vhost_file"`
 
 func withTraditionAppImages(platform logic2.Platform) logic2.Platform {

@@ -296,7 +296,7 @@ export const nginxTemplatePlaceholders = Object.freeze([
 ]);
 
 export const nginxTemplateExample = String.raw`server {
-    listen 80;
+    listen 80 default_server;
     server_name {SERVER_NAME};
 
     root {ROOT_DIR};

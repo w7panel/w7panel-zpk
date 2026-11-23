@@ -4,7 +4,7 @@
 {{- end -}}
 
 {{/* Use the target application's release, never the plugin's own release. */}}
-{{- define "plugin.codeInstallDirectory" -}}
+{{- define "plugin.traditionReleaseName" -}}
 {{- $identify := required "应用插件必须指定传统应用标识" .Values.plugin.traditionIdentifie | replace "_" "-" | lower -}}
 {{- $param := printf "%s_RELEASE_NAME" ($identify | replace "-" "_" | replace "." "_" | upper) -}}
 {{- $releaseName := required "应用插件必须指定传统应用 Release 名称" (index .Values $param) -}}

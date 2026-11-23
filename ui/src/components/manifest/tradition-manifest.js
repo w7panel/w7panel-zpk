@@ -134,7 +134,7 @@ export function traditionAppRootfsAnnotation(
     return JSON.stringify([{
         name,
         volumeName: traditionStorageVolumeName,
-        path: `www/server/system/${releaseName}/${version}`,
+        path: `www/server/${releaseName}/system/${version}`,
         persistentSpecialMounts: true,
     }]);
 }
@@ -182,7 +182,7 @@ export function withTraditionAppStorage(platform = {}) {
         container.volumeMounts.push({
             name: traditionStorageVolumeName,
             mountPath: '/www/wwwroot',
-            subPath: 'www/wwwroot/{{ .Release.Name }}',
+            subPath: 'www/server/{{ .Release.Name }}/wwwroot',
         });
     }
     nextPlatform['container-v2'] = containers;

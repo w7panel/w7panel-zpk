@@ -25,7 +25,7 @@ const (
 // traditionCodeInstallShell is added to the generated chart as an internal
 // shell task.  It deliberately uses the same volume mount as the workload;
 // the traditional application editor persists that mount at /www/wwwroot,
-// backed by the matching nginx-web-dir/<release-name> subPath in the shared
+// backed by the matching www/server/<release-name>/wwwroot subPath in the shared
 // site-storage PVC.
 // The package URL is rendered from the final chart values. Storage isolation
 // comes from the volume mounts and does not depend on the site's domain.
@@ -33,7 +33,7 @@ const traditionCodeInstallShell = `set -eu
 code_package_url={{ .Values.tradition.code.packageUrl | quote }}
 test -n "$code_package_url"
 code_install_path="/www/wwwroot"
-plugin_state_dir="/var/lib/w7-tradition-plugin"
+plugin_state_dir="/www/server/tradition-plugin"
 policy_base64="${TRADITION_PLUGIN_POLICY:-}"
 if [ -z "$policy_base64" ]; then
   policy_base64='eyJwbGF0Zm9ybSI6eyJ0cmFkaXRpb24iOnsicGx1Z2lucyI6W119fX0='
@@ -59,7 +59,7 @@ w7-tradition-plugin app update \
 // the shared site-storage PVC. The mount point and PVC remain intact.
 const traditionCodeUninstallShell = `set -eu
 code_install_path="/www/wwwroot"
-plugin_state_dir="/var/lib/w7-tradition-plugin"
+plugin_state_dir="/www/server/tradition-plugin"
 rm -rf -- "$code_install_path"/* "$code_install_path"/.[!.]* "$code_install_path"/..?*
 rm -rf -- "$plugin_state_dir"/* "$plugin_state_dir"/.[!.]* "$plugin_state_dir"/..?*`
 
@@ -203,7 +203,7 @@ func applyTraditionPluginStateVolumeMount(values map[string]interface{}) {
 		container["volumeMounts"] = append(mounts, v1.VolumeMount{
 			Name:      traditionStorageVolumeName,
 			MountPath: pluginInstallerDataMount,
-			SubPath:   "tradition-plugin-dir/{{ .Release.Name }}",
+			SubPath:   "www/server/{{ .Release.Name }}/tradition-plugin",
 		})
 	}
 }
@@ -219,7 +219,7 @@ func traditionGatewayEnabled(manifest logic2.Manifest) bool {
 
 // applyTraditionToolJobVolumeMounts mounts the site-manager PVC location used
 // by w7-traditiontool for NGINX configuration. The path matches
-// w7panel-sitemanager/charts: /www/server/nginx backed by nginx-dir/<release-name>.
+// w7panel-sitemanager/charts: /www/server/nginx backed by www/server/<release-name>/nginx.
 func applyTraditionToolJobVolumeMounts(values map[string]interface{}) {
 	jobs, ok := values["jobs"].([]map[string]interface{})
 	if !ok {
@@ -234,7 +234,7 @@ func applyTraditionToolJobVolumeMounts(values map[string]interface{}) {
 			container["volumeMounts"] = []v1.VolumeMount{{
 				Name:      traditionStorageVolumeName,
 				MountPath: "/www/server/nginx",
-				SubPath:   "nginx-dir/{{ .Release.Name }}",
+				SubPath:   "www/server/{{ .Release.Name }}/nginx",
 			}}
 		}
 	}

@@ -2,6 +2,7 @@ package controller
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/w7panel/w7panel-zpk/modules/document/app/document/logic"
 	"github.com/w7panel/w7panel-zpk/modules/document/common/service/permission"
 )
 
@@ -17,7 +18,7 @@ func (c Library) List(ctx *gin.Context) {
 	if !c.Bind(ctx, &params) {
 		return
 	}
-	result, e := c.Logic.List(ctx.Request.Context(), actor(ctx), params.Category, params.Page, params.Limit)
+	result, e := logic.Document{}.List(ctx.Request.Context(), actor(ctx), params.Category, params.Page, params.Limit)
 	c.Respond(ctx, result, e)
 }
 
@@ -32,7 +33,7 @@ func (c Library) Create(ctx *gin.Context) {
 	if !c.Bind(ctx, &params) {
 		return
 	}
-	result, e := c.Logic.Create(ctx.Request.Context(), actor(ctx), params.Ref, params.Name, params.Description, "", false, params.Public)
+	result, e := logic.Document{}.Create(ctx.Request.Context(), actor(ctx), params.Ref, params.Name, params.Description, "", false, params.Public)
 	c.Respond(ctx, result, e)
 }
 
@@ -55,7 +56,7 @@ func (c Library) Initialize(ctx *gin.Context) {
 		}
 		currentActor.Principal.ID = params.OwnerID
 	}
-	result, e := c.Logic.Create(ctx.Request.Context(), currentActor, params.Ref, params.Name, "", params.Homepage, true, 0)
+	result, e := logic.Document{}.Create(ctx.Request.Context(), currentActor, params.Ref, params.Name, "", params.Homepage, true, 0)
 	c.Respond(ctx, result, e)
 }
 
@@ -71,7 +72,7 @@ func (c Library) Edit(ctx *gin.Context) {
 	if !c.Bind(ctx, &params) {
 		return
 	}
-	c.Respond(ctx, nil, c.Logic.EditLibrary(ctx.Request.Context(), actor(ctx), params.Ref, params.Name, params.Description, params.Revision, params.Public))
+	c.Respond(ctx, nil, logic.Document{}.EditLibrary(ctx.Request.Context(), actor(ctx), params.Ref, params.Name, params.Description, params.Revision, params.Public))
 }
 
 func (c Library) Delete(ctx *gin.Context) {
@@ -82,5 +83,5 @@ func (c Library) Delete(ctx *gin.Context) {
 	if !c.Bind(ctx, &params) {
 		return
 	}
-	c.Respond(ctx, nil, c.Logic.DeleteLibrary(ctx.Request.Context(), actor(ctx), params.Ref))
+	c.Respond(ctx, nil, logic.Document{}.DeleteLibrary(ctx.Request.Context(), actor(ctx), params.Ref))
 }

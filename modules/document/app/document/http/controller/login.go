@@ -1,14 +1,17 @@
 package controller
 
 import (
+	"errors"
+	"net/http"
+
 	"github.com/gin-gonic/gin"
 	"github.com/w7panel/w7panel-zpk/modules/document/app/document/logic"
+	"github.com/w7panel/w7panel-zpk/modules/document/common/service/zpk"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 )
 
 type Login struct {
 	controller.Abstract
-	Logic *logic.Login
 }
 
 func (c Login) FromPanel(ctx *gin.Context) {
@@ -19,9 +22,13 @@ func (c Login) FromPanel(ctx *gin.Context) {
 	if !c.Validate(ctx, &params) {
 		return
 	}
-	token, err := c.Logic.FromPanel(ctx.Request.Context(), params.AccessToken)
+	token, err := logic.Login{}.FromPanel(ctx, params.AccessToken)
 	if err != nil {
-		c.JsonResponseWithError(ctx, err, 401)
+		status := http.StatusServiceUnavailable
+		if errors.Is(err, zpk.ErrUnauthenticated) {
+			status = http.StatusUnauthorized
+		}
+		c.JsonResponseWithError(ctx, err, status)
 		return
 	}
 	c.JsonResponseWithoutError(ctx, gin.H{"token": token})

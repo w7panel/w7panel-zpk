@@ -1,35 +1,50 @@
 package middleware
 
 import (
+	"errors"
+
 	"github.com/gin-gonic/gin"
-	"github.com/w7panel/w7panel-zpk/modules/document/common/service/permission"
+	"github.com/w7panel/w7panel-zpk/modules/document/app/document/logic"
+	"github.com/w7panel/w7panel-zpk/modules/document/common/service"
+	"github.com/w7panel/w7panel-zpk/modules/document/common/service/zpk"
 	"github.com/w7panel/w7panel-zpk/modules/document/common/types"
 )
 
 type Auth struct {
-	Permissions permission.Service
-	Optional    bool
+	Optional bool
 }
 
 func (m Auth) Process(c *gin.Context) {
-	token := c.GetHeader("X-Document-Token")
-	if token == "" {
-		token = c.GetHeader("X-Zpk-Token")
-	}
-	if token == "" && m.Optional {
+	token := c.GetHeader(logic.TokenHeader)
+	accessToken := c.GetHeader("X-W7Panel-Access-Token")
+	if token == "" && accessToken == "" && m.Optional {
 		c.Set("document.actor", types.Actor{})
 		c.Next()
 		return
 	}
-	if token == "" {
+	if token == "" && accessToken == "" {
 		c.AbortWithStatusJSON(401, gin.H{"code": 401, "error": "token 错误"})
 		return
 	}
-	p, e := m.Permissions.Identity(c.Request.Context(), token)
-	if e != nil {
-		c.AbortWithStatusJSON(401, gin.H{"code": 401, "error": "身份验证失败"})
+	var principal zpk.User
+	var err error
+	if token != "" {
+		principal, err = (logic.Session{}).GetUserInfo(c, token)
+	} else {
+		principal, err = service.ZPKSdk.CurrentUser(c.Request.Context(), accessToken)
+	}
+	if err != nil {
+		status := 503
+		if errors.Is(err, zpk.ErrUnauthenticated) {
+			status = 401
+		}
+		message := "身份验证服务不可用"
+		if status == 401 {
+			message = "token 错误"
+		}
+		c.AbortWithStatusJSON(status, gin.H{"code": status, "error": message})
 		return
 	}
-	c.Set("document.actor", types.Actor{Principal: p, Token: token})
+	c.Set("document.actor", types.Actor{Principal: principal})
 	c.Next()
 }

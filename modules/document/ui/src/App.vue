@@ -106,4 +106,15 @@ body {
 .mt-16 {
     margin-top: 16px;
 }
+.document-delete-popconfirm .arco-popconfirm-footer {
+    display: flex;
+    flex-direction: row-reverse;
+}
+.document-delete-popconfirm .arco-popconfirm-footer > button {
+    margin-left: 8px;
+}
+.document-delete-popconfirm .arco-btn-primary.arco-btn-status-danger {
+    background-color: rgb(var(--danger-6));
+    border-color: transparent;
+}
 </style>

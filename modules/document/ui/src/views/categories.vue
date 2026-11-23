@@ -15,7 +15,17 @@
                 <a-table-column title="操作"
                     ><template #cell="{ record }">
                         <a-button type="text" @click="openEdit(record)">编辑</a-button>
-                        <a-popconfirm content="仅允许删除空分类，确认删除？" @ok="remove(record)"
+                        <a-popconfirm
+                            content="仅允许删除空分类，确认删除？"
+                            position="lt"
+                            type="warning"
+                            content-class="document-delete-popconfirm"
+                            ok-text="确定"
+                            cancel-text="取消"
+                            :disabled="record.identifie === 'applications'"
+                            :ok-button-props="{ status: 'danger' }"
+                            :cancel-button-props="{ type: 'secondary' }"
+                            @ok="remove(record)"
                             ><a-button type="text" status="danger" :disabled="record.identifie === 'applications'"
                                 >删除</a-button
                             ></a-popconfirm

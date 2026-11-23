@@ -7,7 +7,9 @@ import (
 	"io"
 	"os"
 
+	"github.com/w7panel/w7panel-zpk/modules/document/common/dao"
 	"github.com/w7panel/w7panel-zpk/modules/document/common/entity"
+	"github.com/w7panel/w7panel-zpk/modules/document/common/service"
 	"github.com/w7panel/w7panel-zpk/modules/document/common/service/permission"
 	"gorm.io/gorm"
 )
@@ -18,7 +20,7 @@ type Snapshot struct {
 }
 
 // Immutable blob keys plus a library revision check form a stable content snapshot.
-func (d *Document) snapshot(ctx context.Context, ref string) (Snapshot, error) {
+func (d Document) snapshot(ctx context.Context, ref string) (Snapshot, error) {
 	for i := 0; i < 3; i++ {
 		c, e := d.Library(ctx, ref)
 		if e != nil {
@@ -27,7 +29,7 @@ func (d *Document) snapshot(ctx context.Context, ref string) (Snapshot, error) {
 		if c.Ready != 1 {
 			return Snapshot{}, gorm.ErrRecordNotFound
 		}
-		q := d.Q.DocumentFile
+		q := dao.Q.DocumentFile
 		rows, e := q.WithContext(ctx).Where(q.LibraryID.Eq(c.ID)).Order(q.Position, q.ID).Find()
 		if e != nil {
 			return Snapshot{}, e
@@ -44,7 +46,7 @@ func (d *Document) snapshot(ctx context.Context, ref string) (Snapshot, error) {
 }
 
 // Export spools a ZIP snapshot to disk before sending headers.
-func (d *Document) Export(ctx context.Context, a Actor, ref string) (*os.File, error) {
+func (d Document) Export(ctx context.Context, a Actor, ref string) (*os.File, error) {
 	s, e := d.snapshot(ctx, ref)
 	if e != nil {
 		return nil, e
@@ -106,8 +108,8 @@ func (d *Document) Export(ctx context.Context, a Actor, ref string) (*os.File, e
 	return output, nil
 }
 
-func (d *Document) copyBlob(ctx context.Context, w io.Writer, f *entity.DocumentFile) error {
-	r, e := d.Store.Open(ctx, f.StorageKey)
+func (d Document) copyBlob(ctx context.Context, w io.Writer, f *entity.DocumentFile) error {
+	r, e := service.DocumentStorage.Open(ctx, f.StorageKey)
 	if e != nil {
 		return e
 	}

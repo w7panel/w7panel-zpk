@@ -11,9 +11,9 @@ import (
 
 	"github.com/w7panel/w7panel-zpk/modules/document/common/dao"
 	"github.com/w7panel/w7panel-zpk/modules/document/common/entity"
+	"github.com/w7panel/w7panel-zpk/modules/document/common/service"
 	"github.com/w7panel/w7panel-zpk/modules/document/common/service/lock"
 	"github.com/w7panel/w7panel-zpk/modules/document/common/service/permission"
-	"github.com/w7panel/w7panel-zpk/modules/document/common/service/storage"
 	"github.com/w7panel/w7panel-zpk/modules/document/common/types"
 	"gorm.io/gorm"
 )
@@ -25,15 +25,7 @@ var identifiePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,95}$`)
 const MaxContentSize = 4 << 20
 
 type Actor = types.Actor
-type Document struct {
-	Q           *dao.Query
-	Permissions permission.Service
-	Store       storage.Store
-}
-
-func New(query *dao.Query, permissions permission.Service, store storage.Store) *Document {
-	return &Document{Q: query, Permissions: permissions, Store: store}
-}
+type Document struct{}
 
 func ValidateRef(ref string) (string, string, error) {
 	parts := strings.Split(ref, "/")
@@ -50,17 +42,17 @@ func ValidatePath(p string) error {
 	return nil
 }
 
-func (d *Document) Library(ctx context.Context, ref string) (*entity.DocumentLibrary, error) {
+func (d Document) Library(ctx context.Context, ref string) (*entity.DocumentLibrary, error) {
 	category, id, e := ValidateRef(ref)
 	if e != nil {
 		return nil, e
 	}
-	q := d.Q.DocumentLibrary
+	q := dao.Q.DocumentLibrary
 	return q.WithContext(ctx).Where(q.Category.Eq(category), q.Identifie.Eq(id)).First()
 }
 
-func (d *Document) category(ctx context.Context, id string) (*entity.DocumentCategory, error) {
-	q := d.Q.DocumentCategory
+func (d Document) category(ctx context.Context, id string) (*entity.DocumentCategory, error) {
+	q := dao.Q.DocumentCategory
 	return q.WithContext(ctx).Where(q.Identifie.Eq(id)).First()
 }
 
@@ -69,26 +61,26 @@ type Page struct {
 	Total int64                     `json:"total"`
 }
 
-func (d *Document) List(ctx context.Context, a Actor, category string, page, limit int) (Page, error) {
+func (d Document) List(ctx context.Context, a Actor, category string, page, limit int) (Page, error) {
 	if page < 1 {
 		page = 1
 	}
 	if limit < 1 || limit > 100 {
 		limit = 20
 	}
-	q := d.Q.DocumentLibrary.WithContext(ctx).Where(d.Q.DocumentLibrary.Ready.Eq(1))
+	q := dao.Q.DocumentLibrary.WithContext(ctx).Where(dao.Q.DocumentLibrary.Ready.Eq(1))
 	if !a.Principal.Admin {
-		q = q.Where(d.Q.DocumentLibrary.UserID.Eq(a.Principal.ID))
+		q = q.Where(dao.Q.DocumentLibrary.UserID.Eq(a.Principal.ID))
 	}
 	if category != "" {
-		q = q.Where(d.Q.DocumentLibrary.Category.Eq(category))
+		q = q.Where(dao.Q.DocumentLibrary.Category.Eq(category))
 	}
-	rows, total, e := q.Order(d.Q.DocumentLibrary.ID.Desc()).FindByPage((page-1)*limit, limit)
+	rows, total, e := q.Order(dao.Q.DocumentLibrary.ID.Desc()).FindByPage((page-1)*limit, limit)
 	return Page{rows, total}, e
 }
 
 // Create optionally initializes a protected library and immutable default homepage.
-func (d *Document) Create(ctx context.Context, a Actor, ref, name, description, homepage string, initialize bool, public int32) (*entity.DocumentLibrary, error) {
+func (d Document) Create(ctx context.Context, a Actor, ref, name, description, homepage string, initialize bool, public int32) (*entity.DocumentLibrary, error) {
 	release := lock.Acquire("library:" + ref)
 	defer release()
 	category, id, e := ValidateRef(ref)
@@ -116,40 +108,40 @@ func (d *Document) Create(ctx context.Context, a Actor, ref, name, description, 
 		if initialize {
 			c.Protected = 1
 		}
-		if e = d.Q.DocumentLibrary.WithContext(ctx).Create(c); e != nil {
+		if e = dao.Q.DocumentLibrary.WithContext(ctx).Create(c); e != nil {
 			return nil, ErrConflict
 		}
 	}
 	if initialize && c.Protected != 1 {
-		if _, e = d.Q.DocumentLibrary.WithContext(ctx).Where(d.Q.DocumentLibrary.ID.Eq(c.ID)).Update(d.Q.DocumentLibrary.Protected, 1); e != nil {
+		if _, e = dao.Q.DocumentLibrary.WithContext(ctx).Where(dao.Q.DocumentLibrary.ID.Eq(c.ID)).Update(dao.Q.DocumentLibrary.Protected, 1); e != nil {
 			return nil, e
 		}
 		c.Protected = 1
 	}
 	if initialize {
-		key, e := d.Store.Put(ctx, []byte(homepage))
+		key, e := service.DocumentStorage.Put(ctx, []byte(homepage))
 		if e != nil {
 			return nil, e
 		}
 		f := &entity.DocumentFile{LibraryID: c.ID, Path: "index.md", Title: "首页", StorageKey: key, Size: int64(len(homepage)), Revision: 1}
-		count, err := d.Q.DocumentFile.WithContext(ctx).Where(d.Q.DocumentFile.LibraryID.Eq(c.ID), d.Q.DocumentFile.Path.Eq("index.md")).Count()
+		count, err := dao.Q.DocumentFile.WithContext(ctx).Where(dao.Q.DocumentFile.LibraryID.Eq(c.ID), dao.Q.DocumentFile.Path.Eq("index.md")).Count()
 		if err != nil {
 			return nil, err
 		}
 		if count == 0 {
-			if e = d.Q.DocumentFile.WithContext(ctx).Create(f); e != nil {
+			if e = dao.Q.DocumentFile.WithContext(ctx).Create(f); e != nil {
 				return nil, e
 			}
 		}
 	}
-	if _, e = d.Q.DocumentLibrary.WithContext(ctx).Where(d.Q.DocumentLibrary.ID.Eq(c.ID)).Update(d.Q.DocumentLibrary.Ready, 1); e != nil {
+	if _, e = dao.Q.DocumentLibrary.WithContext(ctx).Where(dao.Q.DocumentLibrary.ID.Eq(c.ID)).Update(dao.Q.DocumentLibrary.Ready, 1); e != nil {
 		return nil, e
 	}
 	c.Ready = 1
 	return c, nil
 }
 
-func (d *Document) EditLibrary(ctx context.Context, a Actor, ref, name, description string, rev int32, public *int32) error {
+func (d Document) EditLibrary(ctx context.Context, a Actor, ref, name, description string, rev int32, public *int32) error {
 	release := lock.Acquire("library:" + ref)
 	defer release()
 	c, e := d.Library(ctx, ref)
@@ -166,7 +158,7 @@ func (d *Document) EditLibrary(ctx context.Context, a Actor, ref, name, descript
 	if public != nil {
 		visibility = *public
 	}
-	q := d.Q.DocumentLibrary
+	q := dao.Q.DocumentLibrary
 	r, e := q.WithContext(ctx).Where(q.ID.Eq(c.ID), q.Revision.Eq(rev), q.Ready.Eq(1)).Updates(map[string]interface{}{"name": name, "description": description, "public": visibility, "revision": rev + 1, "updated_at": time.Now()})
 	if e != nil {
 		return e
@@ -177,7 +169,7 @@ func (d *Document) EditLibrary(ctx context.Context, a Actor, ref, name, descript
 	return nil
 }
 
-func (d *Document) DeleteLibrary(ctx context.Context, a Actor, ref string) error {
+func (d Document) DeleteLibrary(ctx context.Context, a Actor, ref string) error {
 	release := lock.Acquire("library:" + ref)
 	defer release()
 	c, e := d.Library(ctx, ref)
@@ -187,7 +179,7 @@ func (d *Document) DeleteLibrary(ctx context.Context, a Actor, ref string) error
 	if !permission.CanManage(a.Principal, *c) || c.Protected == 1 {
 		return permission.ErrDenied
 	}
-	return d.Q.Transaction(func(tx *dao.Query) error {
+	return dao.Q.Transaction(func(tx *dao.Query) error {
 		q := tx.DocumentLibrary
 		r, e := q.WithContext(ctx).Where(q.ID.Eq(c.ID), q.Revision.Eq(c.Revision), q.Ready.Eq(1)).Updates(map[string]interface{}{"ready": -1, "revision": c.Revision + 1})
 		if e != nil {
@@ -217,7 +209,7 @@ type Tree struct {
 	Name      string     `json:"name"`
 }
 
-func (d *Document) Files(ctx context.Context, a Actor, ref string) (Tree, error) {
+func (d Document) Files(ctx context.Context, a Actor, ref string) (Tree, error) {
 	c, e := d.Library(ctx, ref)
 	if e != nil {
 		return Tree{}, e
@@ -225,7 +217,7 @@ func (d *Document) Files(ctx context.Context, a Actor, ref string) (Tree, error)
 	if c.Ready != 1 {
 		return Tree{}, gorm.ErrRecordNotFound
 	}
-	files, e := d.Q.DocumentFile.WithContext(ctx).Where(d.Q.DocumentFile.LibraryID.Eq(c.ID)).Order(d.Q.DocumentFile.Position, d.Q.DocumentFile.ID).Find()
+	files, e := dao.Q.DocumentFile.WithContext(ctx).Where(dao.Q.DocumentFile.LibraryID.Eq(c.ID)).Order(dao.Q.DocumentFile.Position, dao.Q.DocumentFile.ID).Find()
 	if e != nil {
 		return Tree{}, e
 	}
@@ -241,15 +233,15 @@ func (d *Document) Files(ctx context.Context, a Actor, ref string) (Tree, error)
 	return out, nil
 }
 
-func (d *Document) file(ctx context.Context, c int32, p string) (*entity.DocumentFile, error) {
+func (d Document) file(ctx context.Context, c int32, p string) (*entity.DocumentFile, error) {
 	if e := ValidatePath(p); e != nil {
 		return nil, e
 	}
-	q := d.Q.DocumentFile
+	q := dao.Q.DocumentFile
 	return q.WithContext(ctx).Where(q.LibraryID.Eq(c), q.Path.Eq(p)).First()
 }
 
-func (d *Document) Read(ctx context.Context, a Actor, ref, p string) (*entity.DocumentFile, []byte, error) {
+func (d Document) Read(ctx context.Context, a Actor, ref, p string) (*entity.DocumentFile, []byte, error) {
 	c, e := d.Library(ctx, ref)
 	if e != nil {
 		return nil, nil, e
@@ -264,7 +256,7 @@ func (d *Document) Read(ctx context.Context, a Actor, ref, p string) (*entity.Do
 	if e != nil {
 		return nil, nil, e
 	}
-	r, e := d.Store.Open(ctx, f.StorageKey)
+	r, e := service.DocumentStorage.Open(ctx, f.StorageKey)
 	if e != nil {
 		return nil, nil, e
 	}
@@ -276,7 +268,7 @@ func (d *Document) Read(ctx context.Context, a Actor, ref, p string) (*entity.Do
 	return f, b, e
 }
 
-func (d *Document) bump(ctx context.Context, tx *dao.Query, c *entity.DocumentLibrary) error {
+func (d Document) bump(ctx context.Context, tx *dao.Query, c *entity.DocumentLibrary) error {
 	q := tx.DocumentLibrary
 	r, e := q.WithContext(ctx).Where(q.ID.Eq(c.ID), q.Revision.Eq(c.Revision), q.Ready.Eq(1)).Updates(map[string]interface{}{"revision": c.Revision + 1, "updated_at": time.Now()})
 	if e != nil {
@@ -289,7 +281,7 @@ func (d *Document) bump(ctx context.Context, tx *dao.Query, c *entity.DocumentLi
 }
 
 // Save uses explicit create/update semantics: empty content is a valid document, never deletion.
-func (d *Document) Save(ctx context.Context, a Actor, ref, p, title string, content []byte, revision int32) (*entity.DocumentFile, error) {
+func (d Document) Save(ctx context.Context, a Actor, ref, p, title string, content []byte, revision int32) (*entity.DocumentFile, error) {
 	release := lock.Acquire("library:" + ref)
 	defer release()
 	if e := ValidatePath(p); e != nil {
@@ -320,7 +312,7 @@ func (d *Document) Save(ctx context.Context, a Actor, ref, p, title string, cont
 	} else if revision <= 0 || revision != f.Revision {
 		return nil, ErrConflict
 	}
-	key, e := d.Store.Put(ctx, content)
+	key, e := service.DocumentStorage.Put(ctx, content)
 	if e != nil {
 		return nil, e
 	}
@@ -330,7 +322,7 @@ func (d *Document) Save(ctx context.Context, a Actor, ref, p, title string, cont
 	if create {
 		f = &entity.DocumentFile{LibraryID: c.ID, Path: p, Title: title, StorageKey: key, Size: int64(len(content)), Revision: 1, Position: 1000}
 	}
-	e = d.Q.Transaction(func(tx *dao.Query) error {
+	e = dao.Q.Transaction(func(tx *dao.Query) error {
 		if e := d.bump(ctx, tx, c); e != nil {
 			return e
 		}
@@ -356,7 +348,7 @@ func (d *Document) Save(ctx context.Context, a Actor, ref, p, title string, cont
 	return f, nil
 }
 
-func (d *Document) DeleteFile(ctx context.Context, a Actor, ref, p string, revision int32) error {
+func (d Document) DeleteFile(ctx context.Context, a Actor, ref, p string, revision int32) error {
 	release := lock.Acquire("library:" + ref)
 	defer release()
 	c, e := d.Library(ctx, ref)
@@ -373,7 +365,7 @@ func (d *Document) DeleteFile(ctx context.Context, a Actor, ref, p string, revis
 	if revision <= 0 || f.Revision != revision {
 		return ErrConflict
 	}
-	return d.Q.Transaction(func(tx *dao.Query) error {
+	return dao.Q.Transaction(func(tx *dao.Query) error {
 		if e := d.bump(ctx, tx, c); e != nil {
 			return e
 		}
@@ -389,7 +381,7 @@ func (d *Document) DeleteFile(ctx context.Context, a Actor, ref, p string, revis
 	})
 }
 
-func (d *Document) Rename(ctx context.Context, a Actor, ref, p, title string, revision int32) error {
+func (d Document) Rename(ctx context.Context, a Actor, ref, p, title string, revision int32) error {
 	release := lock.Acquire("library:" + ref)
 	defer release()
 	// Rename only the display title; file paths remain stable.
@@ -403,7 +395,7 @@ func (d *Document) Rename(ctx context.Context, a Actor, ref, p, title string, re
 	if title == "" || len(title) > 255 || revision <= 0 {
 		return ErrInvalid
 	}
-	return d.Q.Transaction(func(tx *dao.Query) error {
+	return dao.Q.Transaction(func(tx *dao.Query) error {
 		if e := d.bump(ctx, tx, c); e != nil {
 			return e
 		}
@@ -419,7 +411,7 @@ func (d *Document) Rename(ctx context.Context, a Actor, ref, p, title string, re
 	})
 }
 
-func (d *Document) Order(ctx context.Context, a Actor, ref string, paths []string, revision int32) error {
+func (d Document) Order(ctx context.Context, a Actor, ref string, paths []string, revision int32) error {
 	release := lock.Acquire("library:" + ref)
 	defer release()
 	c, e := d.Library(ctx, ref)
@@ -445,7 +437,7 @@ func (d *Document) Order(ctx context.Context, a Actor, ref string, paths []strin
 			return e
 		}
 	}
-	return d.Q.Transaction(func(tx *dao.Query) error {
+	return dao.Q.Transaction(func(tx *dao.Query) error {
 		if e := d.bump(ctx, tx, c); e != nil {
 			return e
 		}

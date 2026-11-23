@@ -3,6 +3,7 @@ package system
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/w7panel/w7panel-zpk/app/system/http/controller"
+	systemmiddleware "github.com/w7panel/w7panel-zpk/app/system/http/middleware"
 	"github.com/w7panel/w7panel-zpk/common/middleware"
 	http_server "github.com/we7coreteam/w7-rangine-go/v2/src/http/server"
 )
@@ -17,6 +18,8 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 		cors := root.Group("/", middleware.Cors{}.Process)
 		oidc := cors.Group("/oidc", middleware.Cors{}.Process, middleware.DenyDomainReq{}.Process)
 		oidc.Match([]string{"POST", "OPTIONS"}, "/w7panel/login", controller.OIDC{}.LoginFromW7panel)
+		userAPI := root.Group("/v2/api/user", middleware.Cors{}.Process, middleware.DenyDomainReq{}.Process)
+		userAPI.POST("/current", systemmiddleware.OIDC{}.Process, controller.User{}.CurrentUser)
 
 		group := cors.Group("/system", middleware.Cors{}.Process, middleware.DenyDomainReq{}.Process, middleware.Auth{}.Process, middleware.AdminUser{}.Process)
 

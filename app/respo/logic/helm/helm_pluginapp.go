@@ -133,7 +133,7 @@ func (hc *HelmPack) getPluginShellJobContainerValues() map[string]interface{} {
 		"env":        []v1.EnvVar{},
 		"resources":  v1.ResourceRequirements{},
 		"volumeMounts": []v1.VolumeMount{
-			{Name: traditionStorageVolumeName, MountPath: "/www/wwwroot", SubPath: "nginx-web-dir/{{ include \"plugin.codeInstallDirectory\" . }}"},
+			{Name: traditionStorageVolumeName, MountPath: "/www/wwwroot", SubPath: "www/wwwroot/{{ include \"plugin.codeInstallDirectory\" . }}"},
 			{Name: traditionStorageVolumeName, MountPath: pluginInstallerDataMount, SubPath: "tradition-plugin-dir/{{ include \"plugin.codeInstallDirectory\" . }}"},
 		},
 		"securityContext": map[string]interface{}{},

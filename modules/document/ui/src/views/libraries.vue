@@ -9,18 +9,25 @@
         <template v-else>
             <div class="document-page-header">
                 <h3>文档库</h3>
-                <a-button v-if="user.id" type="primary" @click="openCreate">新建文档库</a-button>
-                <a-select
-                    v-model="category"
-                    placeholder="全部分类"
-                    allow-clear
-                    style="width: 200px"
-                    @change="loadLibraries(1)"
-                >
-                    <a-option v-for="item in categories" :key="item.identifie" :value="item.identifie">{{
-                        item.name
-                    }}</a-option>
-                </a-select>
+            </div>
+            <div class="document-page-toolbar">
+                <div class="document-toolbar-left">
+                    <a-button v-if="user.id" type="primary" @click="openCreate">新建文档库</a-button>
+                </div>
+                <div class="document-toolbar-right">
+                    <span>分类：</span>
+                    <a-select
+                        v-model="category"
+                        placeholder="全部分类"
+                        allow-clear
+                        class="document-category-select"
+                        @change="loadLibraries(1)"
+                    >
+                        <a-option v-for="item in categories" :key="item.identifie" :value="item.identifie">{{
+                            item.name
+                        }}</a-option>
+                    </a-select>
+                </div>
             </div>
             <a-table :data="libraries" :loading="loading" :pagination="false" row-key="id">
                 <template #columns>
@@ -38,7 +45,17 @@
                     <a-table-column title="操作"
                         ><template #cell="{ record }">
                             <a-button type="text" @click="openEdit(record)">编辑</a-button>
-                            <a-popconfirm content="确认删除文档库？" @ok="removeLibrary(record)"
+                            <a-popconfirm
+                                content="确认删除文档库？"
+                                position="lt"
+                                type="warning"
+                                content-class="document-delete-popconfirm"
+                                ok-text="确定"
+                                cancel-text="取消"
+                                :disabled="!!record.protected"
+                                :ok-button-props="{ status: 'danger' }"
+                                :cancel-button-props="{ type: 'secondary' }"
+                                @ok="removeLibrary(record)"
                                 ><a-button type="text" status="danger" :disabled="!!record.protected">删除</a-button></a-popconfirm
                             >
                         </template></a-table-column
@@ -214,6 +231,34 @@ export default {
 .document-page-header h3 {
     margin: 0 auto 0 0;
     font-size: 18px;
+}
+.document-page-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 20px;
+}
+.document-toolbar-left,
+.document-toolbar-right {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    min-width: 0;
+}
+.document-toolbar-right {
+    flex-wrap: nowrap;
+    flex-shrink: 0;
+    justify-content: flex-end;
+    margin-left: auto;
+    color: var(--color-text-2);
+    font-size: 14px;
+}
+.document-toolbar-right :deep(.document-category-select) {
+    width: 180px;
+    flex-shrink: 0;
 }
 .document-pagination {
     margin-top: 24px;

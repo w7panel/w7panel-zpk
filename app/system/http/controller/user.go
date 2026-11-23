@@ -13,6 +13,17 @@ type User struct {
 	controller.Abstract
 }
 
+// CurrentUser returns the current authenticated ZPK user.
+func (c User) CurrentUser(ctx *gin.Context) {
+	user := (logic2.User{}).GetUser(ctx)
+	c.JsonResponseWithoutError(ctx, gin.H{
+		"id":       user.ID,
+		"username": user.Username,
+		"role":     user.Role,
+		"admin":    (logic2.User{}).IsAdminUser(user),
+	})
+}
+
 func (c User) CurUserInfo(ctx *gin.Context) {
 	user := logic2.User{}.GetUser(ctx)
 

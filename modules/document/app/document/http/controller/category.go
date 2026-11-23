@@ -12,11 +12,10 @@ import (
 
 type Category struct {
 	controller.Abstract
-	Logic *logic.Category
 }
 
 func (c Category) List(ctx *gin.Context) {
-	result, e := c.Logic.Categories(ctx.Request.Context(), actor(ctx))
+	result, e := logic.Category{}.Categories(ctx.Request.Context(), actor(ctx))
 	c.respond(ctx, result, e)
 }
 
@@ -30,7 +29,7 @@ func (c Category) Create(ctx *gin.Context) {
 	if !c.Validate(ctx, &params) {
 		return
 	}
-	e := c.Logic.CreateCategory(ctx.Request.Context(), actor(ctx), params.Identifie, params.Name, params.Description)
+	e := logic.Category{}.CreateCategory(ctx.Request.Context(), actor(ctx), params.Identifie, params.Name, params.Description)
 	c.respond(ctx, nil, e)
 }
 
@@ -45,7 +44,7 @@ func (c Category) Edit(ctx *gin.Context) {
 	if !c.Validate(ctx, &params) {
 		return
 	}
-	e := c.Logic.EditCategory(ctx.Request.Context(), actor(ctx), params.Identifie, params.Name, params.Description, params.Revision)
+	e := logic.Category{}.EditCategory(ctx.Request.Context(), actor(ctx), params.Identifie, params.Name, params.Description, params.Revision)
 	c.respond(ctx, nil, e)
 }
 
@@ -57,7 +56,7 @@ func (c Category) Delete(ctx *gin.Context) {
 	if !c.Validate(ctx, &params) {
 		return
 	}
-	c.respond(ctx, nil, c.Logic.DeleteCategory(ctx.Request.Context(), actor(ctx), params.Identifie))
+	c.respond(ctx, nil, logic.Category{}.DeleteCategory(ctx.Request.Context(), actor(ctx), params.Identifie))
 }
 
 func (c Category) respond(ctx *gin.Context, data interface{}, err error) {

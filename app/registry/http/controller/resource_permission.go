@@ -11,11 +11,6 @@ import (
 
 type ResourcePermission struct{ controller.Abstract }
 
-func (c ResourcePermission) Identity(ctx *gin.Context) {
-	user := userlogic.User{}.GetUser(ctx)
-	c.JsonResponseWithoutError(ctx, gin.H{"id": user.ID, "admin": (userlogic.User{}).IsAdminUser(user), "username": user.Username, "role": user.Role})
-}
-
 func (c ResourcePermission) Check(ctx *gin.Context) {
 	type ParamsValidate struct {
 		Resources []registrylogic.ResourcePermissionResource `json:"resources" binding:"required"`

@@ -20,6 +20,8 @@ import (
 
 const oidcUserInfoPath = "/panel-api/v1/oidc/userinfo"
 
+var ErrOIDCUnauthenticated = errors.New("面板身份验证失败")
+
 type OIDC struct{}
 
 type UserInfo struct {
@@ -56,6 +58,9 @@ func (OIDC) UserInfo(ctx context.Context, accessToken string) (*UserInfo, error)
 		return nil, err
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+		return nil, ErrOIDCUnauthenticated
+	}
 
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if err != nil {

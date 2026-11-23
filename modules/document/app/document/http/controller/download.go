@@ -7,12 +7,13 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/w7panel/w7panel-zpk/modules/document/app/document/logic"
 )
 
 type Download struct{ Abstract }
 
 func (c Download) Export(ctx *gin.Context) {
-	f, e := c.Logic.Export(ctx.Request.Context(), actor(ctx), ctx.Query("ref"))
+	f, e := logic.Document{}.Export(ctx.Request.Context(), actor(ctx), ctx.Query("ref"))
 	if e != nil {
 		c.Respond(ctx, nil, e)
 		return

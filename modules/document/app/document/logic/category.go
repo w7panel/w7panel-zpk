@@ -12,7 +12,7 @@ import (
 	"github.com/w7panel/w7panel-zpk/modules/document/common/types"
 )
 
-type Category struct{ Q *dao.Query }
+type Category struct{}
 
 func (l Category) CreateCategory(ctx context.Context, a types.Actor, id, name, description string) error {
 	if !a.Principal.Admin {
@@ -22,14 +22,14 @@ func (l Category) CreateCategory(ctx context.Context, a types.Actor, id, name, d
 		return ErrInvalid
 	}
 	c := entity.DocumentCategory{Identifie: id, Name: name, Description: description, UserID: a.Principal.ID, Revision: 1}
-	if e := l.Q.DocumentCategory.WithContext(ctx).Create(&c); e != nil {
+	if e := dao.Q.DocumentCategory.WithContext(ctx).Create(&c); e != nil {
 		return ErrConflict
 	}
 	return nil
 }
 
 func (l Category) Categories(ctx context.Context, a types.Actor) ([]*entity.DocumentCategory, error) {
-	rows, e := l.Q.DocumentCategory.WithContext(ctx).Order(l.Q.DocumentCategory.ID).Find()
+	rows, e := dao.Q.DocumentCategory.WithContext(ctx).Order(dao.Q.DocumentCategory.ID).Find()
 	if e != nil {
 		return nil, e
 	}
@@ -43,7 +43,7 @@ func (l Category) EditCategory(ctx context.Context, a types.Actor, id, name, des
 	if name == "" || len(name) > 255 || len(description) > 4096 || revision <= 0 {
 		return ErrInvalid
 	}
-	q := l.Q.DocumentCategory
+	q := dao.Q.DocumentCategory
 	r, e := q.WithContext(ctx).Where(q.Identifie.Eq(id), q.Revision.Eq(revision)).Updates(map[string]interface{}{"name": name, "description": description, "revision": revision + 1, "updated_at": time.Now()})
 	if e != nil {
 		return e
@@ -61,7 +61,7 @@ func (l Category) DeleteCategory(ctx context.Context, a types.Actor, id string) 
 	if id == "applications" {
 		return errors.New("默认分类不可删除")
 	}
-	return l.Q.Transaction(func(tx *dao.Query) error {
+	return dao.Q.Transaction(func(tx *dao.Query) error {
 		count, e := tx.DocumentLibrary.WithContext(ctx).Where(tx.DocumentLibrary.Category.Eq(id)).Count()
 		if e != nil {
 			return e

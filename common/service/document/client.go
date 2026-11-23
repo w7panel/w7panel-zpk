@@ -45,6 +45,9 @@ func (c *Client) CurrentUser(ctx context.Context, token string) (User, error) {
 }
 
 func (c *Client) call(ctx context.Context, token, route string, body any, out any) error {
+	if strings.TrimSpace(token) == "" {
+		return &ResponseError{StatusCode: http.StatusUnauthorized, Message: "token 错误，请通过面板重新登录"}
+	}
 	data, err := json.Marshal(body)
 	if err != nil {
 		return err
@@ -54,7 +57,7 @@ func (c *Client) call(ctx context.Context, token, route string, body any, out an
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Zpk-Token", token)
+	req.Header.Set("X-W7Panel-Access-Token", token)
 	response, err := c.HTTP.Do(req)
 	if err != nil {
 		return fmt.Errorf("文档服务不可用: %w", err)

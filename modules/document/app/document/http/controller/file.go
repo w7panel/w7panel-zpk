@@ -1,6 +1,9 @@
 package controller
 
-import "github.com/gin-gonic/gin"
+import (
+	"github.com/gin-gonic/gin"
+	"github.com/w7panel/w7panel-zpk/modules/document/app/document/logic"
+)
 
 type File struct{ Abstract }
 
@@ -12,7 +15,7 @@ func (c File) List(ctx *gin.Context) {
 	if !c.Bind(ctx, &params) {
 		return
 	}
-	result, e := c.Logic.Files(ctx.Request.Context(), actor(ctx), params.Ref)
+	result, e := logic.Document{}.Files(ctx.Request.Context(), actor(ctx), params.Ref)
 	c.Respond(ctx, result, e)
 }
 
@@ -25,7 +28,7 @@ func (c File) Read(ctx *gin.Context) {
 	if !c.Bind(ctx, &params) {
 		return
 	}
-	f, b, e := c.Logic.Read(ctx.Request.Context(), actor(ctx), params.Ref, params.Path)
+	f, b, e := logic.Document{}.Read(ctx.Request.Context(), actor(ctx), params.Ref, params.Path)
 	if e != nil {
 		c.Respond(ctx, nil, e)
 		return
@@ -45,7 +48,7 @@ func (c File) Save(ctx *gin.Context) {
 	if !c.Bind(ctx, &params) {
 		return
 	}
-	f, e := c.Logic.Save(ctx.Request.Context(), actor(ctx), params.Ref, params.Path, params.Title, []byte(params.Content), params.Revision)
+	f, e := logic.Document{}.Save(ctx.Request.Context(), actor(ctx), params.Ref, params.Path, params.Title, []byte(params.Content), params.Revision)
 	if e != nil {
 		c.Respond(ctx, nil, e)
 		return
@@ -64,7 +67,7 @@ func (c File) Rename(ctx *gin.Context) {
 	if !c.Bind(ctx, &params) {
 		return
 	}
-	c.Respond(ctx, nil, c.Logic.Rename(ctx.Request.Context(), actor(ctx), params.Ref, params.Path, params.Title, params.Revision))
+	c.Respond(ctx, nil, logic.Document{}.Rename(ctx.Request.Context(), actor(ctx), params.Ref, params.Path, params.Title, params.Revision))
 }
 
 func (c File) Delete(ctx *gin.Context) {
@@ -77,7 +80,7 @@ func (c File) Delete(ctx *gin.Context) {
 	if !c.Bind(ctx, &params) {
 		return
 	}
-	c.Respond(ctx, nil, c.Logic.DeleteFile(ctx.Request.Context(), actor(ctx), params.Ref, params.Path, params.Revision))
+	c.Respond(ctx, nil, logic.Document{}.DeleteFile(ctx.Request.Context(), actor(ctx), params.Ref, params.Path, params.Revision))
 }
 
 func (c File) Order(ctx *gin.Context) {
@@ -90,5 +93,5 @@ func (c File) Order(ctx *gin.Context) {
 	if !c.Bind(ctx, &params) {
 		return
 	}
-	c.Respond(ctx, nil, c.Logic.Order(ctx.Request.Context(), actor(ctx), params.Ref, params.Paths, params.Revision))
+	c.Respond(ctx, nil, logic.Document{}.Order(ctx.Request.Context(), actor(ctx), params.Ref, params.Paths, params.Revision))
 }

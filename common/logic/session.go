@@ -26,9 +26,15 @@ type Session struct {
 }
 
 type UserSession struct {
-	UserID     int32  `json:"user_id"`
-	ConsoleUid int32  `json:"console_uid"`
-	Username   string `json:"username"`
+	UserID           int32  `json:"user_id"`
+	ConsoleUid       int32  `json:"console_uid"`
+	Username         string `json:"username"`
+	PanelAccessToken string `json:"panel_access_token,omitempty"`
+}
+
+// PanelAccessToken is the original OIDC credential, never a ZPK session token.
+func (Session) PanelAccessToken(ctx *gin.Context) string {
+	return ctx.GetString("panel_access_token")
 }
 
 func (l Session) SaveUserInfo(ctx *gin.Context, user UserSession) (string, error) {

@@ -8,18 +8,33 @@ server:
     port: ${DOCUMENT_PORT-8001}
 log:
   default:
-    driver: console
+    driver: stack
+    channels:
+      - file
+      - console
+  file:
+    driver: file
+    path: run.log
+    level: info
   console:
     driver: console
-    level: info
+    level: debug
 database:
   default:
     driver: sqlite
     db_name: ${DOCUMENT_DB_PATH-/tmp/document/document.db}
     prefix: ims_
     show_sql: false
-permission:
-  base_url: ${DOCUMENT_PERMISSION_URL-http://127.0.0.1:8000/zpk/v2/api/permission}
+zpk:
+  base_url: ${DOCUMENT_ZPK_URL-http://127.0.0.1:8000/zpk}
+session:
+  secret: ${DOCUMENT_SESSION_SECRET-document-session-secret}
+cookie:
+  path: /zpk/document
+  http_only: true
+  secure: ${DOCUMENT_COOKIE_SECURE-true}
+  expires: ${DOCUMENT_SESSION_MAX_AGE-86400}
+  same_site: lax
 document:
   storage_path: ${DOCUMENT_STORAGE_PATH-/tmp/document/objects}
   read_only: ${DOCUMENT_READ_ONLY-false}

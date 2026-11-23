@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/viper"
 	"github.com/w7panel/w7panel-zpk/modules/document/app/document"
+	"github.com/w7panel/w7panel-zpk/modules/document/common/service"
 	application "github.com/we7coreteam/w7-rangine-go/v2/src"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/core/helper"
 	ranginehttp "github.com/we7coreteam/w7-rangine-go/v2/src/http"
@@ -28,8 +29,11 @@ func main() {
 	httpServer := new(ranginehttp.Provider).Register(app.GetConfig(), app.GetConsole(), app.GetServerManager()).Export()
 	httpServer.Use(middleware.GetPanicHandlerMiddleware())
 
-	provider := new(document.Provider)
-	defer provider.Close()
-	provider.Register(httpServer)
+	if err := service.InitSDK(app.GetConfig()); err != nil {
+		panic(err)
+	}
+	defer service.DocumentStorage.Close()
+
+	new(document.Provider).Register(httpServer)
 	app.RunConsole()
 }

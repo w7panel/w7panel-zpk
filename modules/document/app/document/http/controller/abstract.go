@@ -13,7 +13,6 @@ import (
 
 type Abstract struct {
 	controller.Abstract
-	Logic *logic.Document
 }
 
 func actor(c *gin.Context) logic.Actor { return c.MustGet("document.actor").(logic.Actor) }

@@ -45,9 +45,9 @@ func (MigrateDocuments) run(cmd *cobra.Command, _ []string) error {
 	if systemlogic.ShouldBlockWrites(config) {
 		return errors.New("数据库迁移进行中，当前已禁止写操作")
 	}
-	token := strings.TrimSpace(os.Getenv("ZPK_TOKEN"))
+	token := strings.TrimSpace(os.Getenv("W7PANEL_ACCESS_TOKEN"))
 	if token == "" {
-		return errors.New("请通过 ZPK_TOKEN 环境变量提供创始人的登录 token")
+		return errors.New("请通过 W7PANEL_ACCESS_TOKEN 环境变量提供创始人的面板访问凭据")
 	}
 	identifie, err := cmd.Flags().GetString("identifie")
 	if err != nil {

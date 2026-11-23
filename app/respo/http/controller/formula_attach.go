@@ -201,7 +201,7 @@ func (c FormulaAttach) SaveAssetFile(ctx *gin.Context) {
 	}
 	if respologic.IsFormulaDocumentPath(params.Filename) {
 		documents := respologic.FormulaDocument{}
-		token := ctx.GetHeader(logic2.ZpkTokenHeader)
+		token := (logic2.Session{}).PanelAccessToken(ctx)
 		reference, err := documents.Ensure(ctx.Request.Context(), token, params.Identifie, logic2.User{}.GetUser(ctx))
 		if err == nil {
 			err = documents.Save(ctx.Request.Context(), token, reference, params.Filename, sanitizeFormulaAttachContent(params.Content))
@@ -249,7 +249,7 @@ func (c FormulaAttach) AssetFiles(ctx *gin.Context) {
 		return
 	}
 	documents := respologic.FormulaDocument{}
-	token := ctx.GetHeader(logic2.ZpkTokenHeader)
+	token := (logic2.Session{}).PanelAccessToken(ctx)
 	reference, err := documents.Ensure(ctx.Request.Context(), token, params.Identifie, logic2.User{}.GetUser(ctx))
 	if err == nil {
 		fileList, err = documents.Files(ctx.Request.Context(), token, reference, fileList)

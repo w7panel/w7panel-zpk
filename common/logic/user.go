@@ -1,6 +1,7 @@
 package logic
 
 import (
+	"errors"
 	"sync"
 
 	"github.com/w7panel/w7panel-zpk/common/dao"
@@ -8,6 +9,7 @@ import (
 	"github.com/w7panel/w7panel-zpk/common/function"
 	"github.com/w7panel/w7panel-zpk/common/types/registry"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
+	"gorm.io/gorm"
 )
 
 var UserRoleSuper = "super"
@@ -48,13 +50,32 @@ func (l User) GetByUsername(username string) (*entity.RegistryUser, error) {
 }
 
 func (l User) GetOrCreatePanelUser(userId string, username string, userRole string) (*entity.RegistryUser, error) {
-	unlock := lockPanelUserCreation(username)
+	if userId == "" || username == "" || userRole == "" {
+		return nil, errors.New("面板用户信息不完整")
+	}
+	unlock := lockPanelUserCreation(userId)
 	defer unlock()
 
 	var user *entity.RegistryUser
-	w7panelUser, _ := dao.Q.W7panelUser.Where(dao.Q.W7panelUser.W7panelUsername.Eq(username)).First()
+	w7panelUser, err := dao.Q.W7panelUser.Where(dao.Q.W7panelUser.W7panelUID.Eq(userId)).First()
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+	if w7panelUser == nil {
+		// Display names can be reused; only the verified panel subject identifies an account.
+		existing, err := dao.Q.W7panelUser.Where(dao.Q.W7panelUser.W7panelUsername.Eq(username)).First()
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, err
+		}
+		if existing != nil {
+			return nil, errors.New("面板用户名已绑定其他用户")
+		}
+	}
 	if w7panelUser != nil {
-		user, _ = dao.Q.RegistryUser.Where(dao.Q.RegistryUser.ID.Eq(w7panelUser.UserUID)).First()
+		user, err = dao.Q.RegistryUser.Where(dao.Q.RegistryUser.ID.Eq(w7panelUser.UserUID)).First()
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, err
+		}
 	}
 	if user == nil {
 		err := dao.Q.Transaction(func(tx *dao.Query) error {
@@ -99,6 +120,7 @@ func (l User) GetOrCreatePanelUser(userId string, username string, userRole stri
 		if err != nil {
 			return nil, err
 		}
+		user.Role = userRole
 	}
 
 	return user, nil

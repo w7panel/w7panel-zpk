@@ -25,7 +25,7 @@ const (
 // traditionCodeInstallShell is added to the generated chart as an internal
 // shell task.  It deliberately uses the same volume mount as the workload;
 // the traditional application editor persists that mount at /www/wwwroot,
-// backed by the matching nginx-web-dir/<release-name> subPath in the shared
+// backed by the matching www/wwwroot/<release-name> subPath in the shared
 // site-storage PVC.
 // The package URL is rendered from the final chart values. Storage isolation
 // comes from the volume mounts and does not depend on the site's domain.
@@ -219,7 +219,7 @@ func traditionGatewayEnabled(manifest logic2.Manifest) bool {
 
 // applyTraditionToolJobVolumeMounts mounts the site-manager PVC location used
 // by w7-traditiontool for NGINX configuration. The path matches
-// w7panel-sitemanager/charts: /www/server/nginx backed by nginx-dir/<release-name>.
+// w7panel-sitemanager/charts: /www/server/nginx backed by www/server/nginx/<release-name>.
 func applyTraditionToolJobVolumeMounts(values map[string]interface{}) {
 	jobs, ok := values["jobs"].([]map[string]interface{})
 	if !ok {
@@ -234,7 +234,7 @@ func applyTraditionToolJobVolumeMounts(values map[string]interface{}) {
 			container["volumeMounts"] = []v1.VolumeMount{{
 				Name:      traditionStorageVolumeName,
 				MountPath: "/www/server/nginx",
-				SubPath:   "nginx-dir/{{ .Release.Name }}",
+				SubPath:   "www/server/nginx/{{ .Release.Name }}",
 			}}
 		}
 	}

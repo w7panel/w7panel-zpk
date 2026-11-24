@@ -26,12 +26,13 @@ service:
   type: ClusterIP
   port: 8001
 
-# 安装时传入 ZPK 实际 Service 的 origin，不包含 /zpk 等接口路径。
+# ZPK 单次安装的 Service 为 default 命名空间下的 w7-zpkv2。
+# 仅配置 origin，不包含 /zpk 等接口路径。
 zpk:
-  baseURL: ""
+  baseURL: "http://w7-zpkv2.default.svc.cluster.local:8000"
 permission:
   # 留空时使用 zpk.baseURL。
-  serverURL: ""
+  serverURL: "http://w7-zpkv2.default.svc.cluster.local:8000"
 
 auth:
   tokenTTLSeconds: 86400

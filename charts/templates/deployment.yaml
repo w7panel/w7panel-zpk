@@ -60,6 +60,8 @@ spec:
               value: w7_zpk
             - name: REGISTRY_NATIVE_URL
               value: http://{{.Release.Name}}-registry.{{ .Release.Namespace}}.svc.cluster.local:5000
+            - name: DOCUMENT_BASE_URL
+              value: http://w7-zpkdocument.default.svc.cluster.local:8001
             - name: REGISTRY_EXTERNAL_DOMAIN
               value: {{ .Values.global.DOMAIN }}
             - name: REGISTRY_NATIVE_USERNAME

@@ -3,10 +3,12 @@ package main
 import (
 	"bytes"
 	_ "embed"
+	"os"
 
 	"github.com/spf13/viper"
 	"github.com/w7panel/w7panel-zpk/cli/app/application"
 	app "github.com/we7coreteam/w7-rangine-go/v2/src"
+	"github.com/we7coreteam/w7-rangine-go/v2/src/console"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/core/helper"
 )
 
@@ -28,5 +30,7 @@ func main() {
 	// 注册业务 provider，此模块中需要使用 http server 和 console
 	new(application.Provider).Register(app.GetConsole())
 
-	app.RunConsole()
+	if err := app.GetConsole().(*console.Console).GetHandler().Execute(); err != nil {
+		os.Exit(1)
+	}
 }

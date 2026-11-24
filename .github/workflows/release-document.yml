@@ -1,0 +1,74 @@
+name: Release document
+
+on:
+  workflow_call:
+    secrets:
+      ZPK_DOCKER_USERNAME:
+        required: true
+      ZPK_DOCKER_PASSWORD:
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: modules/document/ui/package-lock.json
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+
+      - name: Install build dependencies
+        run: sudo apt-get update && sudo apt-get install -y musl-tools zip
+
+      - name: Login to ZPK Registry
+        uses: docker/login-action@v3
+        with:
+          registry: zpk.w7.cc
+          username: ${{ secrets.ZPK_DOCKER_USERNAME }}
+          password: ${{ secrets.ZPK_DOCKER_PASSWORD }}
+
+      - name: Install frontend dependencies
+        run: make -C modules/document ui-deps
+
+      - name: Publish document image and build packages
+        run: |
+          set -euo pipefail
+
+          RELEASE_TAG="${GITHUB_REF_NAME}"
+          RELEASE_VERSION="${RELEASE_TAG#v}"
+
+          make -C modules/document publish \
+            BUILD_CC=musl-gcc \
+            BUILD_CXX=g++ \
+            IMAGE_TAG="${RELEASE_TAG}" \
+            LOCAL_IMAGE="w7-zpkdocument:${RELEASE_TAG}" \
+            HELM_CHART_VERSION="${RELEASE_VERSION}" \
+            HELM_APP_VERSION="${RELEASE_TAG}"
+
+      - name: Upload document packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: w7-zpkdocument
+          path: |
+            modules/document/builder/w7-zpkdocument-*.tgz
+            modules/document/builder/document-ui.zip
+          if-no-files-found: error
+          retention-days: 7

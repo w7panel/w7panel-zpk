@@ -43,16 +43,16 @@ chart:
 	mkdir -p "$(BUILD_DIR)"
 	@chart_dir=$$(mktemp -d); \
 	trap 'rm -rf "$$chart_dir"' EXIT; \
-	cp -R "$(CHART_DIR)" "$$chart_dir/document"; \
+	cp -R "$(CHART_DIR)" "$$chart_dir/w7-zpkdocument"; \
 	awk -v repository="$(IMAGE_REPOSITORY)" -v tag="$(IMAGE_TAG)" ' \
 		/^image:/ { in_image=1; print; next } \
 		in_image && /^[^[:space:]]/ { in_image=0 } \
 		in_image && /^[[:space:]]*repository:/ { sub(/repository:.*/, "repository: " repository) } \
 		in_image && /^[[:space:]]*tag:/ { sub(/tag:.*/, "tag: " tag) } \
 		{ print } \
-	' "$$chart_dir/document/values.yaml" > "$$chart_dir/values.yaml" && \
-	mv "$$chart_dir/values.yaml" "$$chart_dir/document/values.yaml" && \
-	helm package "$$chart_dir/document" --destination "$(BUILD_DIR)" --version "$(HELM_CHART_VERSION)" --app-version "$(HELM_APP_VERSION)"
+	' "$$chart_dir/w7-zpkdocument/values.yaml" > "$$chart_dir/values.yaml" && \
+	mv "$$chart_dir/values.yaml" "$$chart_dir/w7-zpkdocument/values.yaml" && \
+	helm package "$$chart_dir/w7-zpkdocument" --destination "$(BUILD_DIR)" --version "$(HELM_CHART_VERSION)" --app-version "$(HELM_APP_VERSION)"
 
 lint:
 	@test -n "$(CHART_PACKAGE)" || (echo '请指定平台注入 Sidecar 模板后的 CHART_PACKAGE'; exit 1)

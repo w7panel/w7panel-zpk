@@ -11,7 +11,7 @@ make build                 # Linux amd64 musl，依赖 x86_64-linux-musl-gcc/g++
 make dockerbuild           # 编译后构建 document 镜像
 make ui-deps               # 按 package-lock.json 安装前端依赖
 make webzip                # builder/document-ui.zip，根目录直接包含 index.html
-make chart                 # builder/document-0.1.0.tgz
+make chart                 # builder/w7-zpkdocument-0.1.0.tgz
 make lint CHART_PACKAGE=/绝对路径/平台最终包.tgz
 make test
 ```
@@ -20,7 +20,9 @@ make test
 
 `charts/` 是文档后端自己的独立 application Chart，默认单副本、Recreate 升级，SQLite 与正文共同保存在 `/home/document/data` 的 PVC 中。`persistence.existingClaim` 可使用已有 PVC；`persistence.storageClass` 留空使用集群默认 StorageClass，`-` 表示显式不使用 StorageClass。不要让多个文档实例共用同一个 SQLite 文件。
 
-安装时通过 `zpk.baseURL` 指定实际 ZPK Service 的 origin，例如 `http://实际ZPK服务名.命名空间.svc.cluster.local:8000`，不包含 `/zpk`。`permission.serverURL` 默认复用此地址，也可指定独立权限服务的 origin。原 Chart 未绑定 ZPK 的 Release 名称，聚合包应按实际 Service helper 和端口生成这两个值；未填写时应用沿用开发环境配置，不能直接用于集群互调。`service.port` 为 Service 端口，后端容器固定监听 8001。Chart 不直接提供前端静态服务或手写 MicroApp，前端安装与菜单由制品的前端附件、bindings 和平台生成的 MicroApp 负责。
+ZPK 制品标识为 `w7-zpkv2`，按单次安装规则使用相同的 Release 名，当前 Chart 的 Service 名也是 `w7-zpkv2`，端口为 8000。按部署在 default 命名空间的约定，`zpk.baseURL` 和 `permission.serverURL` 均默认使用完整地址 `http://w7-zpkv2.default.svc.cluster.local:8000`，不需要安装时传入 `--set`。地址仅包含 origin，接口路径由 SDK 拼接；若单独部署或修改了 ZPK 的命名空间、Service 名或端口，可在 values 中调整。权限服务当前由 ZPK 提供，`permission.serverURL` 显式留空时跟随 `zpk.baseURL`。`service.port` 为文档 Service 端口，后端容器固定监听 8001。Chart 不直接提供前端静态服务或手写 MicroApp，前端安装与菜单由制品的前端附件、bindings 和平台生成的 MicroApp 负责。
+
+文档制品使用 `application.identifie=w7-zpkdocument`、`application.once=true`，Chart 名也使用 `w7-zpkdocument`，使面板传入的子应用 values 与 dependency 名一致。安装时面板将其 `fullnameOverride` 设为 `w7-zpkdocument`，文档 Service 使用这个名称。ZPK Chart 通过环境变量 `DOCUMENT_BASE_URL` 默认注入 `http://w7-zpkdocument.default.svc.cluster.local:8001`，用于 ZPK 调用文档 SDK；两端均无需额外传入地址参数。仅原 Chart 的命名无法代替制品 manifest 的单次安装配置，发布文档制品时需按此配置。
 
 ### Sidecar 接入
 
@@ -29,6 +31,12 @@ Chart 只保留 Sidecar 调用位置和 values 占位，`_w7panel-sidecars.tpl` 
 原包保留 `w7panelSidecars: []` 占位；将 Chart 和前端 ZIP 发布为 Helm 类型制品，作为 ZPK 的子应用导入后，根制品开启 `application.registerSite`，由现有打包流程注入 cloudnoauth library、Sidecar 列表及共享资源配置。原包仅接好插槽，没有内置 cloudnoauth 或创建 Site；直接安装原包不具备签名凭据来源。共享子应用的 `sharedSidecarResources=true` 由打包器设置，根 Chart 统一输出共享资源和账号 Binding。
 
 文档初始化立即经代理请求 `http://api.w7.cc/api/app/info` 获取凭据，目前请求失败会退出，需由 Kubernetes 重启策略在代理及 Site 就绪后重启；探针不会阻止主进程启动。这里不改变现有 SDK 初始化逻辑。主子应用需属于同一 Release/AppGroup，使用同一 Site 的 AppID/AppSecret。
+
+### GitHub 发布流程
+
+推送 `v*` 标签触发主 `Release` workflow，由其调用 `.github/workflows/release-document.yml`。文档子 workflow 使用相同标签构建 Linux 镜像，推送到 `zpk.w7.cc/public/zpk-document`，生成对应版本的 `w7-zpkdocument-<版本>.tgz` 和 `document-ui.zip`，通过 GitHub Actions artifact 返回主流程。镜像推送复用仓库已有的 `ZPK_DOCKER_USERNAME`、`ZPK_DOCKER_PASSWORD` secrets，账号需有该镜像仓库的推送权限。
+
+主流程等待文档构建成功后，拉取现有 `w7-zpkv2` 制品，通过 CLI 的 `app update --app=w7-zpkdocument` 更新已添加子应用的 Helm 和前端附件，与主应用附件一起推送并发起发布。根 manifest 的依赖、子应用的菜单、bindings、单次安装配置及 manifest 版本保持已有值；缺少该子应用时终止，不推送这次主制品。版本处理与 ZPK 主项目一致：镜像 tag 和 Helm appVersion 使用 Git 标签，Chart version 去掉标签前缀 `v`，制品版本由现有 `app push --publish` 流程分配，不额外修改子应用 manifest。文档构建不会单独发布远端 `w7-zpkdocument` 制品，最终后台 Helm 打包状态仍需在制品管理端确认。
 
 ## 业务与页面归属
 
@@ -106,7 +114,7 @@ npm run build -- --dest /private/tmp/zpk-document-ui-check/dist
 
 ## 独立服务配置
 
-- ZPK 配置 `DOCUMENT_BASE_URL`（文档服务地址，默认 `http://127.0.0.1:8001`），固定接口前缀 `/zpk/document/openapi` 由文档 SDK 拼接。
+- ZPK Chart 默认注入 `DOCUMENT_BASE_URL=http://w7-zpkdocument.default.svc.cluster.local:8001`；直接运行后端时可通过此环境变量配置文档服务地址，未设置则使用开发默认值 `http://127.0.0.1:8001`。固定接口前缀 `/zpk/document/openapi` 由文档 SDK 拼接。
 - 文档服务配置 `DOCUMENT_ZPK_URL`（ZPK 服务地址，默认 `http://127.0.0.1:8000`，固定 `/zpk` 前缀由 ZPK SDK 拼接）、`DOCUMENT_DB_PATH` 和 `DOCUMENT_STORAGE_PATH`。面板认证地址由 ZPK 配置。
 - 权限服务配置 `permission.server_url`，环境变量为 `DOCUMENT_PERMISSION_SERVER_URL`，默认 `http://127.0.0.1:8000`，固定接口前缀 `/zpk/v2/openapi/permission` 由权限 SDK 拼接。权限系统目前仍部署在 ZPK，文档只通过 HTTP SDK 访问，可单独配置服务地址。
 - 文档登录返回 JWT 格式的 `data.token`，后续请求通过 `X-Document-Token` 携带；不创建或查询会话表，不使用 Cookie。`auth.token_ttl_seconds` 配置 token 的有效期，环境变量为 `DOCUMENT_TOKEN_TTL_SECONDS`（默认 86400 秒），到期后由前端使用宿主面板凭据重新登录。JWT 只保存 ZPK 返回的用户身份和签发、到期等字段，不保存面板访问凭据。使用 HS256，由 cloudnoauth 提供的 AppSecret 按文档登录用途派生签名密钥，同时验证 issuer、AppID audience 和时间字段；ZPK 与文档使用不同用途密钥及 issuer，登录 token 不能互换。

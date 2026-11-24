@@ -121,6 +121,8 @@ pull 先下载并校验 blob，再由内部 unpack 从本地 blob 恢复 manifes
 
 日常直接编辑 manifest、附件目录中的文件或重新构建 assets 后即可 push，不需要每次先 pull。pull 得到的是设计配置与发布产物，不保证包含前端、后端原始开发工程。
 
+CLI 命令失败返回非零退出码，自动发布脚本可使用 `set -e` 在拉取、更新或推送失败时终止后续操作。
+
 ## 本地更新
 
 统一使用 `app update <backend|frontend|helm|manifest>`，仅修改本地交付目录，不登录或上传。`--path` 默认当前目录；不传 `--app` 时选择主应用，也可显式填写主应用标识。子应用使用 `--app <identifie>`，本地后端仍只支持主应用。

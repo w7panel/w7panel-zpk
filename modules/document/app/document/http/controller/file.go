@@ -37,17 +37,29 @@ func (c File) Read(ctx *gin.Context) {
 }
 
 func (c File) Save(ctx *gin.Context) {
+	c.save(ctx, false)
+}
+
+func (c File) SaveFromApp(ctx *gin.Context) {
+	c.save(ctx, true)
+}
+
+func (c File) save(ctx *gin.Context, fromApp bool) {
 	type ParamsValidate struct {
-		Ref     string `json:"ref" binding:"required,document_ref"`
-		Path    string `json:"path" binding:"required,document_path"`
-		Title   string `json:"title" binding:"maxbytes=255"`
-		Content string `json:"content" binding:"maxbytes=4194304"`
+		Ref       string `json:"ref" binding:"required,document_ref"`
+		Path      string `json:"path" binding:"required,document_path"`
+		Title     string `json:"title" binding:"maxbytes=255"`
+		Content   string `json:"content" binding:"maxbytes=4194304"`
+		Protected *int32 `json:"protected" binding:"omitempty,oneof=0 1"`
 	}
 	params := ParamsValidate{}
 	if !c.Validate(ctx, &params) {
 		return
 	}
-	f, e := logic.File{}.Save(ctx.Request.Context(), currentUser(ctx), params.Ref, params.Path, params.Title, []byte(params.Content))
+	if !fromApp {
+		params.Protected = nil
+	}
+	f, e := logic.File{}.Save(ctx.Request.Context(), currentUser(ctx), params.Ref, params.Path, params.Title, []byte(params.Content), params.Protected)
 	if e != nil {
 		c.Respond(ctx, nil, e)
 		return

@@ -84,6 +84,16 @@ func (c *Client) call(ctx context.Context, token, route string, body any, out an
 	return nil
 }
 
+type CreateCategory struct {
+	Identifie   string `json:"identifie"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
+func (c *Client) CreateCategory(ctx context.Context, token string, params CreateCategory) error {
+	return c.call(ctx, token, "/category/create", params, nil)
+}
+
 type CreateLibrary struct {
 	Ref         string        `json:"ref"`
 	Name        string        `json:"name"`
@@ -94,19 +104,8 @@ type CreateLibrary struct {
 	Files       []FileContent `json:"files"`
 }
 
-type Library struct {
-	UserID    int32 `json:"user_id"`
-	Protected int32 `json:"protected"`
-}
-
 func (c *Client) Create(ctx context.Context, token string, params CreateLibrary) error {
 	return c.call(ctx, token, "/library/create", params, nil)
-}
-
-func (c *Client) Info(ctx context.Context, token, ref string) (Library, error) {
-	var library Library
-	err := c.call(ctx, token, "/library/info", map[string]string{"ref": ref}, &library)
-	return library, err
 }
 
 func (c *Client) Save(ctx context.Context, token, ref, path, title, content string) error {
@@ -122,6 +121,13 @@ type File struct {
 type FileContent struct {
 	File
 	Content string `json:"content"`
+}
+
+func (c *Client) SaveFile(ctx context.Context, token, ref string, file FileContent) error {
+	return c.call(ctx, token, "/file/save", struct {
+		Ref string `json:"ref"`
+		FileContent
+	}{Ref: ref, FileContent: file}, nil)
 }
 
 type FileTree struct {

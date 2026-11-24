@@ -2,8 +2,6 @@
 package document
 
 import (
-	"context"
-	"errors"
 	"path"
 	"regexp"
 	"strconv"
@@ -14,12 +12,9 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/w7panel/w7panel-zpk/modules/document/app/document/http/controller"
 	"github.com/w7panel/w7panel-zpk/modules/document/app/document/http/middleware"
-	"github.com/w7panel/w7panel-zpk/modules/document/app/document/logic"
-	"github.com/w7panel/w7panel-zpk/modules/document/common/dao"
 	"github.com/w7panel/w7panel-zpk/modules/document/common/entity"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	httpserver "github.com/we7coreteam/w7-rangine-go/v2/src/http/server"
-	"gorm.io/gorm"
 )
 
 type Provider struct{}
@@ -62,14 +57,6 @@ func (p *Provider) initDb() {
 	if err := db.AutoMigrate(&entity.DocumentCategory{}, &entity.DocumentLibrary{}, &entity.DocumentFile{}); err != nil {
 		panic(err)
 	}
-	query := dao.Q.DocumentCategory
-	_, err = query.WithContext(context.Background()).Unscoped().Where(query.Identifie.Eq("app")).First()
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		err = (logic.Category{}).CreateCategory(context.Background(), 0, "app", "制品文档", "")
-	}
-	if err != nil {
-		panic(err)
-	}
 }
 
 func (p *Provider) Register(httpServer *httpserver.Server) {
@@ -105,11 +92,12 @@ func (p *Provider) registerRoutes(engine *gin.Engine) {
 
 	openapi := root.Group("/openapi", middleware.App{}.Process, middleware.Auth{}.Process)
 	openapi.POST("/user", controller.Login{}.CurrentUser)
+	openapi.POST("/category/create", controller.Category{}.Create)
 	openapi.POST("/library/info", controller.Library{}.Info)
 	openapi.POST("/library/create", controller.Library{}.Create)
 	openapi.POST("/file/list", controller.File{}.List)
 	openapi.POST("/file/read", controller.File{}.Read)
-	openapi.POST("/file/save", controller.File{}.Save)
+	openapi.POST("/file/save", controller.File{}.SaveFromApp)
 	openapi.POST("/file/delete", controller.File{}.Delete)
 	openapi.POST("/file/order", controller.File{}.Order)
 }

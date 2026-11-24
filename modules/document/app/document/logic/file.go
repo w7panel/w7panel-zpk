@@ -88,7 +88,7 @@ func (l File) Read(ctx context.Context, user zpk.User, ref, p string) (*entity.D
 }
 
 // Save creates or overwrites a document; empty content is valid, never deletion.
-func (l File) Save(ctx context.Context, user zpk.User, ref, p, title string, content []byte) (*entity.DocumentFile, error) {
+func (l File) Save(ctx context.Context, user zpk.User, ref, p, title string, content []byte, protected *int32) (*entity.DocumentFile, error) {
 	c, e := (Library{}).Get(ctx, ref)
 	if e != nil {
 		return nil, e
@@ -116,16 +116,23 @@ func (l File) Save(ctx context.Context, user zpk.User, ref, p, title string, con
 		file, err = query.WithContext(ctx).Unscoped().Where(query.LibraryID.Eq(library.ID), query.Path.Eq(p)).First()
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			file = &entity.DocumentFile{LibraryID: library.ID, Path: p, Title: title, StorageKey: key, Size: int64(len(content)), Position: 1000}
+			if protected != nil {
+				file.Protected = *protected
+			}
 			return query.WithContext(ctx).Create(file)
 		}
 		if err != nil {
 			return err
 		}
-		if file.Protected == 1 {
+		if file.Protected == 1 && protected == nil {
 			return permission.ErrDenied
 		}
 		updates := entity.DocumentFile{StorageKey: key, Size: int64(len(content)), Title: title, UpdatedAt: time.Now()}
 		fields := []field.Expr{query.StorageKey, query.Size, query.Title, query.UpdatedAt}
+		if protected != nil {
+			updates.Protected = *protected
+			fields = append(fields, query.Protected)
+		}
 		write := query.WithContext(ctx).Where(query.ID.Eq(file.ID))
 		if file.DeletedAt.Valid {
 			write = write.Unscoped()
@@ -142,6 +149,9 @@ func (l File) Save(ctx context.Context, user zpk.User, ref, p, title string, con
 			}
 		}
 		file.Title, file.StorageKey, file.Size = title, key, int64(len(content))
+		if protected != nil {
+			file.Protected = *protected
+		}
 		if file.DeletedAt.Valid {
 			file.DeletedAt = gorm.DeletedAt{}
 			file.Position = 1000

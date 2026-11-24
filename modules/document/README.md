@@ -8,11 +8,11 @@
 | --- | --- | --- | --- |
 | 分类管理 | `app/document/provider.go`，controller 和 logic 各自的 `category.go` | `ui/src/views/categories.vue` | `/categories` |
 | 文档库、文件及下载 | `app/document/provider.go` | `ui/src/views/libraries.vue` | `/documents` |
-| 面板登录及当前用户 | `app/document/provider.go`，controller 和 logic 各自的 `login.go` | `ui/src/App.vue` | 登录入口 |
+| 面板自动登录及当前用户 | `app/document/provider.go`，controller 和 logic 各自的 `login.go` | `ui/src/App.vue` | 页面启动时自动认证 |
 
 分类业务放在 `app/document/http/controller/category.go`、`app/document/logic/category.go`，由 document 的 provider 统一注册路由和初始化数据。分类和文档库各自维护独立页面和页面状态。文档库页面调用分类列表用于选择、筛选分类；分类管理页面负责分类 CRUD。分类的创建、编辑和删除由 `Admin` 中间件统一限制为管理员；分类列表向登录用户开放，文档库列表按当前用户过滤，管理员可查看全局。
 
-分类管理、文档库管理及其菜单、路由统一放在本目录 UI 内，ZPK 主 UI 不注册这些管理页面。
+分类管理、文档库管理页面及路由放在本目录 UI 内，面板菜单分别打开 `#/categories` 和 `#/documents`，页面直接展示对应内容，不再提供内部侧栏或手动登录表单。管理页面使用面板注入的 `access_token` 自动登录，认证失败时显示错误；公有文档的匿名阅读入口继续保留。ZPK 主 UI 不注册这些管理页面。
 
 `ui/src/components/workbench.vue` 是本系统文档库页面使用的文档操作台，新建文件直接使用库内根路径，不固定添加 `docs/`。ZPK 的 `description.vue` 通过 `/respo/document/path-tree` 和 `/respo/document/file` 请求制品后端，由调用方 SDK 转接读取、保存、删除及排序；ZPK UI 不引用本目录代码。文档路径直接使用 `guide.md`、`manual/guide.md` 等库内相对路径，不添加 `docs/` 前缀。`.order` 仅为制品编辑器的排序字段，由适配层转换成文档系统的排序请求；空内容沿用制品编辑器的删除语义。`/respo/share-file/*` 单独处理制品简介和其他共享文件，文档库中的 `readme.md` 不会覆盖制品简介。默认 `index.md` 保留在文档库根目录，在文档系统 UI 查看，不映射成可编辑的制品文档。
 
@@ -33,15 +33,15 @@
 }
 ```
 
-库级 `protected=1` 表示库不可删除，文件级 `protected=1` 表示该文件不可修改、改名或删除，两者独立，不绑定文件名。`owner_id` 省略时使用当前用户，仅管理员可为其他用户建库。库与初始文件元数据在同一事务内创建，重复标识返回 409，不覆盖或升级已有数据。制品端遇到重复时，通过通用 `/library/info` 和 `/file/list` 确认所有者、库及首页保护属性，符合自己的默认文档规则才复用，后续保存文档引用失败可重试。正文存储与数据库不共享事务，数据库失败时正文可能保留。
+库级 `protected=1` 表示库不可删除，文件级 `protected=1` 表示该文件在普通用户接口不可修改、改名或删除，两者独立，不绑定文件名。`owner_id` 省略时使用当前用户，仅管理员可为其他用户建库。库与初始文件元数据在同一事务内创建，重复标识返回 409。制品端遇到库已存在时，直接通过 `POST /zpk/document/openapi/file/save` 更新本次推送的首页，不再查询库信息和文件列表作复用确认，不修改库的所有者、公私状态或其他文档。签名服务保存接口可显式传入 `protected` 维护受保护文件，仍校验用户对文档库的维护权限；普通保存接口不能通过传入该字段绕过保护。正文存储与数据库不共享事务，数据库失败时正文可能保留。
 
 ## 调用边界
 
 - 数据模型和生成 DAO 放在本目录的 `common/entity`、`common/dao`，业务直接使用 DAO。模型定义由 `database/schema.sql`、`database/table.yaml` 驱动；在本目录运行 `go run ./tools/generate`，生成过程使用临时数据库。
 - ZPK 用户 SDK 在 `common/service/zpk`，携带前端提供的面板 `access_token` 请求 `POST /zpk/v2/openapi/user/current`，仅通过 OIDC 中间件验证面板凭据，不挂 App、CORS 或域名限制中间件；复用 `CurUserInfo`，在 `data.user` 中返回用户 ID、用户名、角色和管理员标记。文档直接使用返回结果建立独立会话，不再重复请求面板或计算角色。登录和 JWT 签发、验证逻辑统一在 `app/document/logic/login.go` 的 `Login` 中。ZPK SDK 由 `main.go` 调用 `service.InitSDK` 初始化，登录逻辑和认证中间件直接使用 `service.ZPKSdk`，不通过 Provider 传递，也不增加用户转发层。`common/service/permission` 是权限服务 SDK，公有/私有和所有者的操作权限均通过远程接口判断；文档只维护默认首页不可修改等业务保护规则。
-- ZPK 请求文档的 SDK 属于调用方，位于宿主 `common/service/w7/document`。宿主入口统一调用 `w7.InitW7Sdk`，其内部使用已有 AppID/AppSecret 初始化 `w7.DocumentSdk`，签名复用 `w7/base`。`app/respo/logic/document.go` 的 `FormulaDocument.Initialize` 生成 `app/制品标识` 引用、文档名称、首页正文与保护标记，通过 SDK 的通用 `Create` 接口推送，普通制品流程和一次性制品文档迁移命令共用这套规则。SDK 不生成制品业务内容，文档系统没有 `Initialize` 接口或对应逻辑。
+- ZPK 请求文档的 SDK 属于调用方，位于宿主 `common/service/w7/document`。宿主入口统一调用 `w7.InitW7Sdk`，其内部使用已有 AppID/AppSecret 初始化 `w7.DocumentSdk`，签名复用 `w7/base`。`app/respo/logic/document.go` 的 `FormulaDocument.Initialize` 先通过 SDK 调用通用 `POST /zpk/document/openapi/category/create` 创建 `app` 分类，已存在时复用且不覆盖分类设置；随后生成 `app/制品标识` 引用、文档名称、首页正文与保护标记，通过 SDK 的通用 `Create` 接口推送。分类创建失败时不继续建库，普通制品流程和一次性制品文档迁移命令共用这套规则。分类服务入口验证 App 签名和用户身份，管理页面创建分类仍要求管理员。SDK 不生成制品业务内容，文档系统没有 `Initialize` 接口或对应逻辑。
 - 文档库通过 `public` 字段设置公有（1）或私有（0，默认），库内所有文件继承。创建及修改可见性时，文档 SDK 将所有者的维护权限及公有库的匿名读取权限提交给 permission 服务；删除库时清除对应资源的权限。文件读取、编辑、删除、排序和整体下载均请求 permission 校验，不依据本地 `public` 或管理员标记绕过远程验证。公有库允许匿名查看及下载，私有库按用户授权及原有 namespace 兜底规则校验；默认仅向所有者授予维护动作，管理员沿用现有放行规则。分类关联公共命名空间；登录用户可选择文档本地已有分类新建自己的文档库。文档当前使用 `push/pull`：所有者拥有两者，公有库额外授予匿名用户 `pull`；文档内部将 `pull` 对应查看和下载，将 `push` 对应编辑、新建、删除等维护操作。权限接口按格式校验动作名称，允许业务后续增加细粒度动作，文档当前操作保持不变。授权验证沿用镜像的完整流程，namespace 兜底为内置规则；调用前准备公共动作：镜像根据现有 `visible_type` 及是否跟随 namespace，先算出最终公共 `actions`；文档直接使用保存的匿名授权动作。权限分两层：上层按资源完整路径解析 namespace，优先选择当前用户的资源授权；未命中时，push 在资源配置过任何精确授权后停止兜底，pull 仍可使用 namespace 用户授权。底层只校验准备好的公共动作和用户授权，不查询 namespace，也不读取可见性枚举。文档当前仅传文档库资源校验，文件继承库权限，文档库公私状态独立设置，用户授权按内置 namespace 规则兜底。
-- `protected` 是库和文件的通用保护属性，不记录来源，创始人也遵循保护限制。制品端提交库及 `index.md` 的保护属性，其他文件默认可正常维护；文档后端不对 `index.md` 作特殊处理。
+- `protected` 是库和文件的通用保护属性，不记录来源，普通用户接口中创始人也遵循保护限制。制品端提交库及 `index.md` 的保护属性，通过签名服务保存接口维护首页；其他文件默认可正常维护，文档后端不对 `index.md` 作特殊处理。
 - 元数据保存在数据库，正文通过 `storage.Store` 接口访问，本版启动时选择本机文件驱动并采用不可变内容键。接口统一提供写入、读取和关闭，业务不依赖具体驱动。数据库和正文目录均需持久化、备份。
 - 整体下载统一提供固定 ZIP 地址：`GET /zpk/document/download?ref=分类%2F文档标识`，基于一致内容快照导出整个文档库。公有库直接访问；私有库请求需携带 `X-Document-Token` 文档会话凭据，服务端代调可使用 `X-W7Panel-Access-Token` 面板 OIDC 凭据。地址不包含凭据，改为私有后原地址立即按私有规则校验；不生成临时分享链接，不需要 `download_link` 表。
 - 公有库可通过 UI 的 `#/documents?ref=分类%2F文档标识` 地址匿名阅读；管理列表仍保持普通用户仅看自己的、创始人查看全局。
@@ -83,7 +83,7 @@ npm run build -- --dest /private/tmp/zpk-document-ui-check/dist
 - 权限服务配置 `permission.server_url`，环境变量为 `DOCUMENT_PERMISSION_SERVER_URL`，默认 `http://127.0.0.1:8000`，固定接口前缀 `/zpk/v2/openapi/permission` 由权限 SDK 拼接。权限系统目前仍部署在 ZPK，文档只通过 HTTP SDK 访问，可单独配置服务地址。
 - 文档登录返回 JWT 格式的 `data.token`，后续请求通过 `X-Document-Token` 携带；不创建或查询会话表，不使用 Cookie。`auth.token_ttl_seconds` 配置 token 的有效期，环境变量为 `DOCUMENT_TOKEN_TTL_SECONDS`（默认 86400 秒），到期后由前端使用宿主面板凭据重新登录。JWT 只保存 ZPK 返回的用户身份和签发、到期等字段，不保存面板访问凭据。使用 HS256，由 cloudnoauth 提供的 AppSecret 按文档登录用途派生签名密钥，同时验证 issuer、AppID audience 和时间字段；ZPK 与文档使用不同用途密钥及 issuer，登录 token 不能互换。
 - 两个系统各自部署、各自持久化数据库，不共享 SQLite 文件或目录。分类、文档库的 `user_id` 仍为 ZPK 的整数用户 ID，不复制用户表、不新增文档用户表。ZPK 用户接口按面板稳定 `sub` 解析或创建现有用户，不接受客户端指定用户 ID 或角色。
-- 文档服务首次初始化默认 `app` 分类时，先通过 SDK 确认或创建公共空间，成功后保存本地分类，首次初始化需要 ZPK namespace 服务可用。后续建库仅检查本地分类关联，不反复请求远程 namespace；不调整制品 OCI 存储或历史包的定位。ZPK 不直接写入文档分类或权限表。
+- 文档服务启动仅初始化数据表，不预建 `app` 分类。制品首次推送文档时由制品侧通过文档 SDK 创建分类，文档分类逻辑通过 ZPK SDK 确认或创建公共空间，成功后保存本地分类；该阶段需要 ZPK namespace 服务可用。分类已存在时直接复用，建库只检查本地分类关联，不反复请求远程 namespace；不调整制品 OCI 存储或历史包的定位。ZPK 不直接写入文档分类或权限表。
 - 文档服务不可用或拒绝操作时，原制品接口返回错误；制品创建已成功但默认文档未初始化时保留错误提示，后续访问原文档接口可重试初始化。
 - 旧文档仅通过一次性命令 `respo:migrate-documents` 迁移，日常接口不再自动复制旧文档。源文件保留，文档列表以文档服务结果为准。
 - 文档按单人维护的场景处理，不维护 `revision` 或应用层互斥锁，保存直接覆盖当前内容。分类、文档库和文件接口及调用方 SDK 均不传版本号；多处同时编辑时，以后成功保存的内容为准。相关写操作沿用数据库事务和唯一索引，在事务内检查库状态与操作权限；删除和更新检查执行结果，避免记录不存在时误报成功。整体下载在同一数据库读取事务内获取库与文件元数据，再按不可变内容键打包。

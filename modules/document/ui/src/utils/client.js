@@ -68,7 +68,6 @@ export function createStandaloneClient(baseURL = documentBaseURL()) {
     }
     return {
         ...createDocumentClient(request, baseURL),
-        login,
         async start() {
             if (accessToken()) await login();
             return this.post('/user');

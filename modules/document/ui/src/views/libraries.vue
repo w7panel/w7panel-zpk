@@ -70,7 +70,7 @@
                 @change="loadLibraries"
             />
         </template>
-        <a-modal v-model:visible="form.visible" :title="form.edit ? '编辑文档库' : '新建文档库'" :footer="false">
+        <a-modal v-model:visible="form.visible" :title="form.edit ? '编辑文档库' : '新建文档库'">
             <a-form :model="form" layout="vertical">
                 <a-form-item v-if="!form.edit" label="分类"
                     ><a-select v-model="form.category"
@@ -89,8 +89,11 @@
                 <a-form-item label="描述"><a-textarea v-model="form.description" /></a-form-item>
                 <a-form-item label="可见性"><a-radio-group v-model="form.public"><a-radio :value="0">私有</a-radio><a-radio :value="1">公有</a-radio></a-radio-group></a-form-item>
                 <a-alert>公有文档库允许所有人查看和下载；仅所有者和创始人可以修改。</a-alert>
-                <a-button type="primary" :loading="saving" @click="save">保存</a-button>
             </a-form>
+            <template #footer>
+                <a-button @click="form.visible = false">取消</a-button>
+                <a-button type="primary" :loading="saving" @click="save">保存</a-button>
+            </template>
         </a-modal>
     </main>
 </template>

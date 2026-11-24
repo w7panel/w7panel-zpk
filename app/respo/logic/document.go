@@ -19,15 +19,22 @@ import (
 type FormulaDocument struct{}
 
 func (l FormulaDocument) Initialize(ctx context.Context, token string, formula *entity.Formula) (string, error) {
+	if err := w7.DocumentSdk.CreateCategory(ctx, token, documentsdk.CreateCategory{Identifie: "app", Name: "制品文档"}); err != nil {
+		var responseError *documentsdk.ResponseError
+		if !errors.As(err, &responseError) || responseError.StatusCode != http.StatusConflict {
+			return "", err
+		}
+	}
 	title := formula.Title
 	if title == "" {
 		title = formula.Name
 	}
 	reference := "app/" + formula.Name
 	homepage := "# " + title + "\n\n应用标识：" + formula.Name + "\n"
+	file := documentsdk.FileContent{File: documentsdk.File{Path: "index.md", Title: "首页", Protected: 1}, Content: homepage}
 	err := w7.DocumentSdk.Create(ctx, token, documentsdk.CreateLibrary{
 		Ref: reference, Name: title, OwnerID: formula.UserID, Protected: 1,
-		Files: []documentsdk.FileContent{{File: documentsdk.File{Path: "index.md", Title: "首页", Protected: 1}, Content: homepage}},
+		Files: []documentsdk.FileContent{file},
 	})
 	if err == nil {
 		return reference, nil
@@ -36,24 +43,10 @@ func (l FormulaDocument) Initialize(ctx context.Context, token string, formula *
 	if !errors.As(err, &responseError) || responseError.StatusCode != http.StatusConflict {
 		return "", err
 	}
-	// A previous document creation may have succeeded before saving its reference.
-	library, infoErr := w7.DocumentSdk.Info(ctx, token, reference)
-	if infoErr != nil {
-		return "", infoErr
-	}
-	if library.UserID != formula.UserID || library.Protected != 1 {
+	if err := w7.DocumentSdk.SaveFile(ctx, token, reference, file); err != nil {
 		return "", err
 	}
-	tree, treeErr := w7.DocumentSdk.Tree(ctx, token, reference)
-	if treeErr != nil {
-		return "", treeErr
-	}
-	for _, file := range tree.Files {
-		if file.Path == "index.md" && file.Protected == 1 {
-			return reference, nil
-		}
-	}
-	return "", err
+	return reference, nil
 }
 
 func isDocumentMarkdownPath(filename string) bool {

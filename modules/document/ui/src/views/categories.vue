@@ -35,7 +35,7 @@
                 >
             </template>
         </a-table>
-        <a-modal v-model:visible="form.visible" :title="form.edit ? '编辑分类' : '新建分类'" :footer="false">
+        <a-modal v-model:visible="form.visible" :title="form.edit ? '编辑分类' : '新建分类'">
             <a-form :model="form" layout="vertical">
                 <a-form-item label="命名空间标识"
                     ><a-input
@@ -45,8 +45,11 @@
                 /></a-form-item>
                 <a-form-item label="分类名称"><a-input v-model="form.name" /></a-form-item>
                 <a-form-item label="描述"><a-textarea v-model="form.description" /></a-form-item>
-                <a-button type="primary" :loading="saving" @click="save">保存</a-button>
             </a-form>
+            <template #footer>
+                <a-button @click="form.visible = false">取消</a-button>
+                <a-button type="primary" :loading="saving" @click="save">保存</a-button>
+            </template>
         </a-modal>
     </main>
 </template>

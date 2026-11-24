@@ -48,7 +48,7 @@ make image-push-multi IMAGE_TAG=v1.0.1
 | `--policy-file` | `app update`、`plugin install`、`plugin uninstall` | 传统应用配置 JSON 文件，工具从 `platform.tradition.plugins` 读取受管插件及优先级。 |
 | `--plugin` | `plugin install`、`plugin uninstall` | 插件唯一标识，必须与配置中的 `identifie` 完全一致，不会自动转换格式。 |
 
-插件状态统一挂载：PVC `www/server/<release-name>/tradition-plugin` → 容器内 `/www/server/tradition-plugin`。由 Chart 负责实例隔离，工具不解析域名或 Release。以下示例使用该容器内目录。
+插件状态统一挂载：PVC `www/<release-name>/server/tradition-plugin` → 容器内 `/www/server/tradition-plugin`。由 Chart 负责实例隔离，工具不解析域名或 Release。以下示例使用该容器内目录。
 
 ```bash
 plugin_state_dir=/www/server/tradition-plugin

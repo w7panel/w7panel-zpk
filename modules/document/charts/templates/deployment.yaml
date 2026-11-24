@@ -1,0 +1,103 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "document.fullname" . }}
+  labels:
+    {{- include "document.labels" . | nindent 4 }}
+    w7.cc/group-name: {{ .Release.Name | quote }}
+  annotations:
+    w7.cc.app/title: 文档管理
+spec:
+  # SQLite 使用单副本，升级时先停止旧实例。
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "document.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "document.selectorLabels" . | nindent 8 }}
+        w7.cc/group-name: {{ .Release.Name | quote }}
+      {{- $annotations := include "document.podAnnotations" . }}
+      {{- if $annotations }}
+      annotations:
+        {{- $annotations | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "document.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- $hostAliases := include "w7panel.sidecars.hostAliases" . }}
+      {{- if $hostAliases }}
+      hostAliases:
+        {{- $hostAliases | nindent 8 }}
+      {{- end }}
+      {{- $initContainers := include "w7panel.sidecars.initContainers" . }}
+      {{- if $initContainers }}
+      initContainers:
+        {{- $initContainers | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: document
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          env:
+            - name: DOCUMENT_LISTEN_HOST
+              value: "0.0.0.0"
+            - name: DOCUMENT_PORT
+              value: "8001"
+            - name: DOCUMENT_DB_PATH
+              value: /home/document/data/document.db
+            - name: DOCUMENT_STORAGE_PATH
+              value: /home/document/data/objects
+            {{- with .Values.zpk.baseURL }}
+            - name: DOCUMENT_ZPK_URL
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with (.Values.permission.serverURL | default .Values.zpk.baseURL) }}
+            - name: DOCUMENT_PERMISSION_SERVER_URL
+              value: {{ . | quote }}
+            {{- end }}
+            - name: DOCUMENT_TOKEN_TTL_SECONDS
+              value: {{ .Values.auth.tokenTTLSeconds | quote }}
+          ports:
+            - name: http
+              containerPort: 8001
+              protocol: TCP
+          readinessProbe:
+            tcpSocket:
+              port: http
+          livenessProbe:
+            tcpSocket:
+              port: http
+          volumeMounts:
+            - name: document-data
+              mountPath: /home/document/data
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+        {{- include "w7panel.sidecars.containers" . | nindent 8 }}
+      volumes:
+        - name: document-data
+          persistentVolumeClaim:
+            claimName: {{ include "document.storageClaimName" . }}
+        {{- include "w7panel.sidecars.volumes" . | nindent 8 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

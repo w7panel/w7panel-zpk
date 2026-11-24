@@ -1,0 +1,49 @@
+image:
+  repository: zpk.w7.cc/public/zpk-document
+  tag: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+podAnnotations: {}
+podSecurityContext: {}
+securityContext: {}
+
+# ZPK 创建站点时注入 cloudnoauth library 和此列表。
+w7panelSidecars: []
+w7panelArtifact:
+  serviceAccountName: '{{ include "document.serviceAccountName" . }}'
+  sharedSidecarResources: false
+
+service:
+  type: ClusterIP
+  port: 8001
+
+# 安装时传入 ZPK 实际 Service 的 origin，不包含 /zpk 等接口路径。
+zpk:
+  baseURL: ""
+permission:
+  # 留空时使用 zpk.baseURL。
+  serverURL: ""
+
+auth:
+  tokenTTLSeconds: 86400
+
+persistence:
+  existingClaim: ""
+  storageClass: ""
+  accessModes:
+    - ReadWriteOnce
+  size: 1Gi
+
+resources: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}

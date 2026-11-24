@@ -2,6 +2,34 @@
 
 本目录作为文档系统的项目根目录，后端和 UI 不引用宿主 ZPK 的业务代码。当前使用根 Go module 管理依赖，通过本目录的后端入口独立启动。ZPK 主服务不注册文档 Provider，不连接文档数据库或初始化文档正文存储。
 
+## 构建与部署包
+
+在本目录运行以下命令，默认产物写入 `builder/`。后端编译、前端和 Chart 打包可通过 `BUILD_DIR` 指定其他绝对目录；镜像构建使用文档根目录作为上下文，读取默认的 `builder/server`：
+
+```sh
+make build                 # Linux amd64 musl，依赖 x86_64-linux-musl-gcc/g++
+make dockerbuild           # 编译后构建 document 镜像
+make ui-deps               # 按 package-lock.json 安装前端依赖
+make webzip                # builder/document-ui.zip，根目录直接包含 index.html
+make chart                 # builder/document-0.1.0.tgz
+make lint CHART_PACKAGE=/绝对路径/平台最终包.tgz
+make test
+```
+
+镜像构建只复制文档二进制，前端 ZIP 作为独立的制品前端附件上传。`make publish` 会构建这些产物并推送镜像；`make beta BETA_SUFFIX=beta1` 在版本后添加后缀。镜像仓库和版本可通过 `IMAGE_REPOSITORY`、`IMAGE_TAG` 覆盖，Chart 版本可通过 `HELM_CHART_VERSION` 覆盖；这些目标不自动向 ZPK 上传制品附件。首次使用前需要发布实际镜像，默认的 `zpk.w7.cc/public/zpk-document:v0.1.0` 仅为构建发布目标。
+
+`charts/` 是文档后端自己的独立 application Chart，默认单副本、Recreate 升级，SQLite 与正文共同保存在 `/home/document/data` 的 PVC 中。`persistence.existingClaim` 可使用已有 PVC；`persistence.storageClass` 留空使用集群默认 StorageClass，`-` 表示显式不使用 StorageClass。不要让多个文档实例共用同一个 SQLite 文件。
+
+安装时通过 `zpk.baseURL` 指定实际 ZPK Service 的 origin，例如 `http://实际ZPK服务名.命名空间.svc.cluster.local:8000`，不包含 `/zpk`。`permission.serverURL` 默认复用此地址，也可指定独立权限服务的 origin。原 Chart 未绑定 ZPK 的 Release 名称，聚合包应按实际 Service helper 和端口生成这两个值；未填写时应用沿用开发环境配置，不能直接用于集群互调。`service.port` 为 Service 端口，后端容器固定监听 8001。Chart 不直接提供前端静态服务或手写 MicroApp，前端安装与菜单由制品的前端附件、bindings 和平台生成的 MicroApp 负责。
+
+### Sidecar 接入
+
+Chart 只保留 Sidecar 调用位置和 values 占位，`_w7panel-sidecars.tpl` 及资源入口由制品打包器自动注入，源码中不重复维护。Pod 已接入 annotations、hostAliases、initContainers、containers、volumes 插槽，配置 Sidecar 后自动添加根 CA 注入注解。Deployment 和 Pod 均使用当前 Release 的 `w7.cc/group-name`，`w7panelArtifact.serviceAccountName` 与 Pod 使用相同账号 helper。原 Chart 可以直接打包；lint 和渲染需使用平台注入模板后的最终包，原包直接渲染会缺少 `w7panel.*` helper。
+
+原包保留 `w7panelSidecars: []` 占位；将 Chart 和前端 ZIP 发布为 Helm 类型制品，作为 ZPK 的子应用导入后，根制品开启 `application.registerSite`，由现有打包流程注入 cloudnoauth library、Sidecar 列表及共享资源配置。原包仅接好插槽，没有内置 cloudnoauth 或创建 Site；直接安装原包不具备签名凭据来源。共享子应用的 `sharedSidecarResources=true` 由打包器设置，根 Chart 统一输出共享资源和账号 Binding。
+
+文档初始化立即经代理请求 `http://api.w7.cc/api/app/info` 获取凭据，目前请求失败会退出，需由 Kubernetes 重启策略在代理及 Site 就绪后重启；探针不会阻止主进程启动。这里不改变现有 SDK 初始化逻辑。主子应用需属于同一 Release/AppGroup，使用同一 Site 的 AppID/AppSecret。
+
 ## 业务与页面归属
 
 | 业务 | 后端入口 | UI 页面 | UI 路由 |

@@ -486,11 +486,6 @@ func (c Formula) Detail(ctx *gin.Context) {
 		return
 	}
 
-	fileList, err := depotLogin.GetAssetFiles(formula)
-	if err != nil {
-		c.JsonResponseWithError(ctx, err, 500)
-		return
-	}
 	var versionList []map[string]interface{}
 	err = dao.Version.
 		Where(dao.Version.FormulaID.Eq(formula.ID)).
@@ -503,11 +498,15 @@ func (c Formula) Detail(ctx *gin.Context) {
 		return
 	}
 
+	readme := ""
+	if formula.Readme != nil {
+		readme = *formula.Readme
+	}
 	c.JsonResponseWithoutError(ctx, gin.H{
 		"title":        formula.Manifest.Application.Name,
 		"description":  formula.Manifest.Application.Description,
 		"icon":         formula.Icon,
-		"mds":          fileList,
+		"mds":          gin.H{"readme.md": readme},
 		"version_list": versionList,
 	})
 	return

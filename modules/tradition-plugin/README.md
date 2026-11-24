@@ -1,6 +1,6 @@
 # 传统应用插件安装工具
 
-传统应用插件安装及文件优先级管理工具。项目结构与 `../cli` 一致，使用 Rangine、Cobra 和独立 Go module，可单独构建。
+传统应用插件安装及文件优先级管理工具。项目结构与 `../../cli` 一致，使用 Rangine、Cobra 和独立 Go module，可单独构建。
 
 OCI Layout 只有一个逻辑制品和一个 `current` tag：config 只保存每个插件的文件路径列表，manifest 的 layers 固定按“原应用文件 → 低优先级插件 → 高优先级插件”排列。Layer 名称、Blob descriptor 和顺序都直接从 manifest 获取，不在 config 中重复保存。
 
@@ -33,7 +33,7 @@ make image-push-multi
 make image-push-multi IMAGE_TAG=v1.0.1
 ```
 
-推送前需要先通过 `docker login zpk.w7.cc` 登录制品库。镜像只使用 `tradition-plugin` 目录作为构建上下文，不依赖主项目源码。
+推送前需要先通过 `docker login zpk.w7.cc` 登录制品库。镜像只使用 `modules/tradition-plugin` 目录作为构建上下文，不依赖主项目源码。
 
 ## 命令
 

@@ -32,6 +32,7 @@ func newFormula(db *gorm.DB, opts ...gen.DOOption) formula {
 	_formula.RemoteUID = field.NewInt32(tableName, "remote_uid")
 	_formula.Name = field.NewString(tableName, "name")
 	_formula.Title = field.NewString(tableName, "title")
+	_formula.Readme = field.NewString(tableName, "readme")
 	_formula.RemoteFormulaInfoURL = field.NewString(tableName, "remote_formula_info_url")
 	_formula.VersionLatestID = field.NewInt32(tableName, "version_latest_id")
 	_formula.InstallTotal = field.NewInt32(tableName, "install_total")
@@ -97,6 +98,7 @@ type formula struct {
 	RemoteUID                  field.Int32
 	Name                       field.String
 	Title                      field.String
+	Readme                     field.String
 	RemoteFormulaInfoURL       field.String
 	VersionLatestID            field.Int32
 	InstallTotal               field.Int32
@@ -139,6 +141,7 @@ func (f *formula) updateTableName(table string) *formula {
 	f.RemoteUID = field.NewInt32(table, "remote_uid")
 	f.Name = field.NewString(table, "name")
 	f.Title = field.NewString(table, "title")
+	f.Readme = field.NewString(table, "readme")
 	f.RemoteFormulaInfoURL = field.NewString(table, "remote_formula_info_url")
 	f.VersionLatestID = field.NewInt32(table, "version_latest_id")
 	f.InstallTotal = field.NewInt32(table, "install_total")
@@ -173,12 +176,13 @@ func (f *formula) GetFieldByName(fieldName string) (field.OrderExpr, bool) {
 }
 
 func (f *formula) fillFieldMap() {
-	f.fieldMap = make(map[string]field.Expr, 24)
+	f.fieldMap = make(map[string]field.Expr, 26)
 	f.fieldMap["id"] = f.ID
 	f.fieldMap["user_id"] = f.UserID
 	f.fieldMap["remote_uid"] = f.RemoteUID
 	f.fieldMap["name"] = f.Name
 	f.fieldMap["title"] = f.Title
+	f.fieldMap["readme"] = f.Readme
 	f.fieldMap["remote_formula_info_url"] = f.RemoteFormulaInfoURL
 	f.fieldMap["version_latest_id"] = f.VersionLatestID
 	f.fieldMap["install_total"] = f.InstallTotal

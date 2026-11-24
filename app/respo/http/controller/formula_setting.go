@@ -46,7 +46,10 @@ func (c FormulaSetting) Get(ctx *gin.Context) {
 		}
 	}
 
-	c.JsonResponseWithoutError(ctx, &setting)
+	c.JsonResponseWithoutError(ctx, struct {
+		*accessor.FormulaSettingOption
+		Readme *string `json:"readme"`
+	}{FormulaSettingOption: &setting, Readme: formula.Readme})
 }
 
 func (c FormulaSetting) Set(ctx *gin.Context) {
@@ -56,6 +59,7 @@ func (c FormulaSetting) Set(ctx *gin.Context) {
 		SupportAutoPublishToZpkMarket *bool                           `form:"support_auto_publish_to_zpk_market" json:"support_auto_publish_to_zpk_market"`
 		EnableServicePackageFee       *bool                           `form:"enable_service_package_fee" json:"enable_service_package_fee"`
 		BaseInfo                      *accessor.FormulaBaseInfoOption `json:"base_info"`
+		Readme                        *string                         `json:"readme" binding:"omitempty,max=4194304"`
 	}
 	params := ParamsValidate{}
 	if !c.Validate(ctx, &params) {
@@ -95,6 +99,10 @@ func (c FormulaSetting) Set(ctx *gin.Context) {
 
 	update := entity.Formula{
 		Setting: formula.Setting,
+	}
+	if params.Readme != nil {
+		readme := sanitizeFormulaAttachContent(*params.Readme)
+		update.Readme = &readme
 	}
 	if params.BaseInfo != nil {
 		update.Title = params.BaseInfo.Name

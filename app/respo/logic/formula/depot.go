@@ -203,6 +203,7 @@ func (self *Depot) GetFormula(name string, version string, user *entity.Registry
 		UserId:               row.UserID,
 		Name:                 row.Name,
 		Title:                row.Title,
+		Readme:               row.Readme,
 		VersionId:            row.VersionLatestID,
 		LatestVersionId:      row.VersionLatestID,
 		Manifest:             &logic.Manifest{},
@@ -238,13 +239,6 @@ func (self *Depot) GetFormula(name string, version string, user *entity.Registry
 	if err != nil {
 		slog.Error("unPackManifestFilesFromOci err", "formula_name", result.Name, "version", result.Version, "err", err)
 		return nil, err
-	}
-	sharedFilesDir := self.getAssetsDir(result.Name)
-	if !function.FileExists(sharedFilesDir) || function.IsDirEmpty(sharedFilesDir) {
-		if err = self.restoreAssetsFromOCI(result); err != nil {
-			slog.Error("restoreAssetsFromOCI err", "formula_name", result.Name, "version", result.Version, "err", err)
-			return nil, err
-		}
 	}
 	//load all manifest
 	list, _ := self.GetManifestFileList(result)
@@ -418,18 +412,6 @@ func (self *Depot) SaveManifestFile(formula *Formula, filename string, content s
 	return self.saveFile(filepath.Join(self.basePath, formula.GetFilesRelativeDir()), filename, content)
 }
 
-// SaveAssetFile 仅保存制品附属资源到本地，不同步 OCI，也不允许写入版本专属 manifest。
-func (self *Depot) SaveAssetFile(formula *Formula, filename string, content string) error {
-	filename, err := NormalizeFormulaFilePath(filename)
-	if err != nil {
-		return err
-	}
-	if IsFormulaManifestPath(filename) {
-		return fmt.Errorf("manifest 文件必须保存到版本目录: %s", filename)
-	}
-	return self.saveFile(self.getAssetsDir(formula.Name), filename, content)
-}
-
 func (self *Depot) saveFile(filesDir, filename, content string) error {
 	filePath, err := resolveFormulaFilePath(filesDir, filename)
 	if err != nil {
@@ -494,20 +476,6 @@ func (self *Depot) GetManifestFileList(formula *Formula) (map[string]string, err
 	return files, nil
 }
 
-// GetAssetFiles 返回本地制品附属资源的相对路径及内容，不包含版本专属 manifest。
-func (self *Depot) GetAssetFiles(formula *Formula) (map[string]string, error) {
-	files, err := self.getFileList(self.getAssetsDir(formula.Name))
-	if err != nil {
-		return nil, err
-	}
-	for path := range files {
-		if IsFormulaManifestPath(path) {
-			delete(files, path)
-		}
-	}
-	return files, nil
-}
-
 func (self *Depot) getFileList(dir string) (map[string]string, error) {
 	function.CreateDirIfNotExist(dir, os.ModePerm)
 	files := map[string]string{}
@@ -531,10 +499,6 @@ func (self *Depot) getFileList(dir string) (map[string]string, error) {
 	return files, nil
 }
 
-func (self *Depot) getAssetsDir(formulaName string) string {
-	return filepath.Join(self.basePath, GetFormulaRelativeDir(formulaName, 0), "files")
-}
-
 func (self *Depot) GetBackendZipFileList(formula *Formula) ([]string, error) {
 	result := make([]string, 0)
 
@@ -543,10 +507,6 @@ func (self *Depot) GetBackendZipFileList(formula *Formula) ([]string, error) {
 	}
 
 	fileList, _ := self.GetManifestFileList(formula)
-	sharedFiles, _ := self.GetAssetFiles(formula)
-	for path, content := range sharedFiles {
-		fileList[path] = content
-	}
 	zipPath := filepath.Join(self.basePath, formula.ZipPath)
 	zipReader, err := zip.OpenReader(zipPath)
 	if err != nil {

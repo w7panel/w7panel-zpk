@@ -14,7 +14,7 @@
 
 分类管理、文档库管理页面及路由放在本目录 UI 内，面板菜单分别打开 `#/categories` 和 `#/documents`，页面直接展示对应内容，不再提供内部侧栏或手动登录表单。管理页面使用面板注入的 `access_token` 自动登录，认证失败时显示错误；公有文档的匿名阅读入口继续保留。ZPK 主 UI 不注册这些管理页面。
 
-`ui/src/components/workbench.vue` 是本系统文档库页面使用的文档操作台，新建文件直接使用库内根路径，不固定添加 `docs/`。ZPK 的 `description.vue` 通过 `/respo/document/path-tree` 和 `/respo/document/file` 请求制品后端，由调用方 SDK 转接读取、保存、删除及排序；ZPK UI 不引用本目录代码。文档路径直接使用 `guide.md`、`manual/guide.md` 等库内相对路径，不添加 `docs/` 前缀。`.order` 仅为制品编辑器的排序字段，由适配层转换成文档系统的排序请求；空内容沿用制品编辑器的删除语义。`/respo/share-file/*` 单独处理制品简介和其他共享文件，文档库中的 `readme.md` 不会覆盖制品简介。默认 `index.md` 保留在文档库根目录，在文档系统 UI 查看，不映射成可编辑的制品文档。
+`ui/src/components/workbench.vue` 是本系统文档库页面使用的文档操作台，新建文件直接使用库内根路径，不固定添加 `docs/`。ZPK 的 `description.vue` 通过 `/respo/document/path-tree` 和 `/respo/document/file` 请求制品后端，由调用方 SDK 转接读取、保存、删除及排序；ZPK UI 不引用本目录代码。文档路径直接使用 `guide.md`、`manual/guide.md` 等库内相对路径，不添加 `docs/` 前缀。`.order` 仅为制品编辑器的排序字段，由适配层转换成文档系统的排序请求；空内容沿用制品编辑器的删除语义。制品简介通过 `/respo/setting/get` 和 `/respo/setting/set` 读写制品表的 `readme` 字段，旧 `/respo/share-file/*` 接口已移除；文档库中的 `readme.md` 不会覆盖制品简介。默认 `index.md` 保留在文档库根目录，在文档系统 UI 查看，不映射成可编辑的制品文档。
 
 操作台维护目录、草稿、文件切换、保存和下载状态，Markdown 编辑及预览由 `ui/src/components/markdown-editor.vue` 负责。后端文档库、文件和下载业务分别放在 `app/document/logic/library.go`、`file.go`、`download.go`，`document.go` 仅保留公共错误、内容大小常量和引用解析。请求参数的格式、长度、取值与路径校验统一由 controller 的 `Validate` 处理，自定义验证规则在 Provider 注册阶段显式注册；logic 保留权限、关联存在性与业务保护检查，不重复校验参数。
 
@@ -111,9 +111,20 @@ ZPK 的 OIDC 登录同样返回 JWT，不在服务端保存登录态。制品前
 ./server respo:migrate-documents --identifie demo-app
 ```
 
-省略 `--identifie` 时分批迁移全部制品。新文档库和默认首页通过文档 API 初始化；仅复制旧 `docs/` 下的 Markdown 文件，移除最外层 `docs/` 后保存到文档库，嵌套子路径保留；`docs/.order` 中的路径同步转换后恢复顺序。旧 `docs/index.md` 会与默认首页冲突，命令会报错，需先重命名该旧文档。制品根目录的 readme、manifest 和图标不迁移。复用已有文档标识，跳过目标中已有的正文，保留旧文件。单个制品的复制及排序成功后才保存其新文档标识；失败会停止并指出制品，可以重试。重试时跳过已复制正文，排序会按旧顺序重新同步。
+省略 `--identifie` 时分批迁移全部制品。新文档库和默认首页通过文档 API 初始化；仅复制旧 `docs/` 下的 Markdown 文件，移除最外层 `docs/` 后保存到文档库，嵌套子路径保留；`docs/.order` 中的路径同步转换后恢复顺序。旧 `docs/index.md` 会与默认首页冲突，命令会报错，需先重命名该旧文档。源数据先读取旧 `shared` OCI，再用本地 `<depot>/Formula/<name>/files` 覆盖同路径内容。根目录 `readme.md` 写入制品表，manifest 和图标不迁移；已保存的简介（包括主动清空的简介）不会被覆盖。复用已有文档标识，跳过目标中已有的正文，保留旧文件。单个制品的复制及排序成功后才保存其新文档标识和简介；失败会停止并指出制品，可以重试。重试时跳过已复制正文，排序会按旧顺序重新同步。
 
 该命令在旧文档切换使用前手动执行，数据库切换禁写期间拒绝执行。代码验证不运行真实迁移。
+
+迁移确认完成后，可单独清理旧 `shared` tag：
+
+```sh
+./server respo:clean-shared-tags --dry-run
+./server respo:clean-shared-tags --identifie demo-app
+./server respo:clean-shared-tags
+```
+
+清理前检查简介已写入数据库；旧包含文档时，还通过文档 API 确认对应路径存在，需要提供 `W7PANEL_ACCESS_TOKEN`。发现未知旧资源、未迁移文档或与其他 tag 共用 manifest 时拒绝删除。`--dry-run` 只检查；实际清理删除 shared manifest 及对应本地 tag 记录，保留其他 tag 和本地源文件。命令不执行 Registry blob 垃圾回收。上述命令需手动执行，代码验证不运行真实删除。
+
 
 ## 服务间签名
 

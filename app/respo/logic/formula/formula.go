@@ -86,6 +86,7 @@ type Formula struct {
 	UserId               int32
 	Name                 string
 	Title                string
+	Readme               *string
 	VersionId            int32
 	LatestVersionId      int32
 	Version              string

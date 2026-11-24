@@ -161,3 +161,9 @@ ZPK 与独立文档服务均不保存服务端 Session。OIDC 登录返回的 `d
 JWT 不包含面板 access token。制品前端对自有 ZPK origin/path 额外携带宿主 `X-W7Panel-Access-Token`，供后端代调文档；第三方和跳过认证的请求不携带这些凭据。调用制品创建、文档接口的其他客户端也需提供该面板凭据。
 
 切换后旧 Session token 失效，需重新登录；不自动删除已有数据库中的历史会话表。无状态 token 在到期前无法单独撤销，轮换 AppSecret 会使旧 token 失效。文档 token 中的身份与角色在重新登录时更新。
+
+## 旧制品文档与简介迁移
+
+制品简介保存在制品表 `readme` 字段，文档由独立文档服务维护，不再读写 `shared` OCI。旧数据使用 `respo:migrate-documents` 一次性迁移，确认后使用 `respo:clean-shared-tags --dry-run` 预检查，再手动清理旧 tag。两个命令均支持 `--identifie` 限定制品；清理命令不删除本地源文件，也不执行 blob 垃圾回收。
+
+运行条件、失败处理与命令示例见 [文档系统迁移说明](modules/document/README.md#一次性旧文档迁移)。

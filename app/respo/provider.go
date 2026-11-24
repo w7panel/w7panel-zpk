@@ -85,6 +85,7 @@ func (provider *Provider) Register(httpServer *http_server.Server, console conso
 	console.RegisterCommand(new(command.ResetTags))
 	console.RegisterCommand(new(command.SetEnvironmentCategory))
 	console.RegisterCommand(new(command.MigrateDocuments))
+	console.RegisterCommand(new(command.CleanSharedTags))
 
 	// 注册一些路由
 	httpServer.RegisterRouters(func(engine *gin.Engine) {
@@ -105,8 +106,6 @@ func (provider *Provider) Register(httpServer *http_server.Server, console conso
 		group.Match([]string{"POST", "OPTIONS"}, "/manifest/file", middleware.DenyDomainReq{}.Process, middleware.Auth{}.Process, controller.FormulaAttach{}.SaveManifestFile)
 		group.Match([]string{"POST", "OPTIONS"}, "/manifest/import", middleware.DenyDomainReq{}.Process, middleware.Auth{}.Process, controller.Formula{}.ImportRemoteChildApplications)
 		group.Match([]string{"POST", "OPTIONS"}, "/manifest/path-tree", middleware.DenyDomainReq{}.Process, middleware.Auth{}.Process, controller.FormulaAttach{}.ManifestFiles)
-		group.Match([]string{"POST", "OPTIONS"}, "/share-file/file", middleware.DenyDomainReq{}.Process, middleware.Auth{}.Process, controller.FormulaAttach{}.SaveAssetFile)
-		group.Match([]string{"POST", "OPTIONS"}, "/share-file/path-tree", middleware.DenyDomainReq{}.Process, middleware.Auth{}.Process, controller.FormulaAttach{}.AssetFiles)
 		group.Match([]string{"POST", "OPTIONS"}, "/document/file", middleware.DenyDomainReq{}.Process, middleware.Auth{}.Process, controller.FormulaDocument{}.Save)
 		group.Match([]string{"POST", "OPTIONS"}, "/document/path-tree", middleware.DenyDomainReq{}.Process, middleware.Auth{}.Process, controller.FormulaDocument{}.Files)
 		group.Match([]string{"GET", "OPTIONS"}, "/list", middleware.Auth{CanSkip: true}.Process, middleware.ConsoleUser{CanSkip: true}.Process, controller.Formula{}.List)

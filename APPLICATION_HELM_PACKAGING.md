@@ -808,7 +808,7 @@ sidecar 框架本身不创建、分配或回收固定存储，也没有独立的
 | --- | --- | --- |
 | Formula/Version/用户等元数据 | SQLite `zpk.db`，也支持切换 MySQL | ZPK Chart 将 `/home/zpk/db` 的 `sqlite_db` subPath 挂到 PVC |
 | manifest 编辑文件 | `<depot>/Formula/<name>/<versionId>/files` | 发布后进入 OCI `files.json` layer；本地缺失时恢复 |
-| 共享描述等文件 | `<depot>/Formula/<name>/files` | 有独立 shared-file 打包/恢复逻辑 |
+| 制品简介 | 制品表 `readme` 长文本字段 | 与制品基础信息一起保存，不进入 OCI；旧 `shared` 仅通过一次性命令迁移与清理 |
 | 上传 zip/tgz | `<depot>/Storage/YYYYMM/hash.ext` | 发布后进入 OCI 对应附件 layer；本地缺失时恢复 |
 | 最终 Helm tgz | `<depot>/Helm/*.tgz` | 本地缓存，可由 manifest+OCI 附件重新生成 |
 | Helm repository index | `<depot>/helm_charts/<repo-md5>.yaml` | 2 小时后刷新，进程内缓存 |

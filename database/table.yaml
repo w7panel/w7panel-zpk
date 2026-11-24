@@ -1,6 +1,11 @@
 relation:
   - table: formula
     column:
+      readme:
+        type: '*string'
+        tag:
+          gorm:
+            type: longtext
       service_packages:
         type: ServicePackagesOption
         serializer: json

@@ -17,6 +17,7 @@ type Formula struct {
 	RemoteUID                  int32                                `gorm:"column:remote_uid" json:"remote_uid"`
 	Name                       string                               `gorm:"column:name;not null" json:"name"`
 	Title                      string                               `gorm:"column:title;not null" json:"title"`
+	Readme                     *string                              `gorm:"column:readme;type:longtext" json:"readme"`
 	RemoteFormulaInfoURL       string                               `gorm:"column:remote_formula_info_url" json:"remote_formula_info_url"`
 	VersionLatestID            int32                                `gorm:"column:version_latest_id" json:"version_latest_id"`
 	InstallTotal               int32                                `gorm:"column:install_total" json:"install_total"`

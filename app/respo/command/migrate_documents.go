@@ -2,10 +2,14 @@ package command
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"io/fs"
 	"os"
 	"path"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -16,9 +20,12 @@ import (
 	"github.com/w7panel/w7panel-zpk/common/accessor"
 	"github.com/w7panel/w7panel-zpk/common/dao"
 	"github.com/w7panel/w7panel-zpk/common/entity"
+	commonlogic "github.com/w7panel/w7panel-zpk/common/logic"
 	"github.com/w7panel/w7panel-zpk/common/service/w7"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/console"
+	"gorm.io/gen/field"
+	"oras.land/oras-go/v2/registry/remote"
 )
 
 type MigrateDocuments struct{ console.Abstract }
@@ -26,7 +33,7 @@ type MigrateDocuments struct{ console.Abstract }
 func (MigrateDocuments) GetName() string { return "respo:migrate-documents" }
 
 func (MigrateDocuments) GetDescription() string {
-	return "一次性将制品旧文档复制到独立文档系统，保留原文件"
+	return "迁移制品旧文档到文档系统、旧简介到数据库，保留源数据"
 }
 
 func (command MigrateDocuments) Configure(cmd *cobra.Command) {
@@ -87,18 +94,14 @@ func (MigrateDocuments) run(cmd *cobra.Command, _ []string) error {
 			break
 		}
 		for _, item := range batch {
-			loaded, err := depot.GetFormula(item.Name, "", nil)
-			if err != nil {
-				return fmt.Errorf("读取制品 %s 失败: %w", item.Name, err)
-			}
-			assets, err := depot.GetAssetFiles(loaded)
+			assets, err := readLegacyFormulaAssets(cmd.Context(), depot.GetBasePath(), item.Name)
 			if err != nil {
 				return fmt.Errorf("读取制品 %s 旧文档失败: %w", item.Name, err)
 			}
 			if err := migrateFormulaDocuments(cmd.Context(), token, item, assets); err != nil {
 				return fmt.Errorf("迁移制品 %s 失败（可重试，已复制正文不会覆盖）: %w", item.Name, err)
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "制品 %s 文档迁移完成\n", item.Name)
+			fmt.Fprintf(cmd.OutOrStdout(), "制品 %s 文档及简介迁移完成\n", item.Name)
 			total++
 			lastID = item.ID
 		}
@@ -182,7 +185,7 @@ func migrateFormulaDocuments(ctx context.Context, token string, item *entity.For
 			return err
 		}
 	}
-	// GetFormula may initialize BaseInfo; keep the latest settings when adding the reference.
+	// Preserve settings and introductions edited since the migration started.
 	query := dao.Q.Formula
 	current, err := query.WithContext(ctx).Where(query.ID.Eq(item.ID)).First()
 	if err != nil {
@@ -196,9 +199,76 @@ func migrateFormulaDocuments(ctx context.Context, token string, item *entity.For
 		if setting.DocumentRef != reference {
 			return errors.New("制品文档标识已变更，请检查后重试")
 		}
-		return nil
 	}
 	setting.DocumentRef = reference
-	_, err = query.WithContext(ctx).Where(query.ID.Eq(item.ID)).Select(query.Setting).Updates(entity.Formula{Setting: &setting})
+	updates := entity.Formula{Setting: &setting}
+	fields := []field.Expr{query.Setting}
+	if current.Readme == nil {
+		readme := assets["readme.md"]
+		updates.Readme = &readme
+		fields = append(fields, query.Readme)
+	}
+	_, err = query.WithContext(ctx).Where(query.ID.Eq(item.ID)).Select(fields...).Updates(updates)
 	return err
+}
+
+const legacySharedTag = "shared"
+
+// Only this one-off migration reads the retired shared storage.
+func readLegacyFormulaAssets(ctx context.Context, basePath, name string) (map[string]string, error) {
+	repository, err := commonlogic.GetDefaultRemoteOci(commonlogic.GetFormulaOciName(name))
+	if err != nil {
+		return nil, err
+	}
+	files, err := readLegacySharedFiles(ctx, repository)
+	if err != nil {
+		return nil, err
+	}
+	root := filepath.Join(basePath, formula.GetFormulaRelativeDir(name, 0), "files")
+	err = filepath.WalkDir(root, func(filename string, entry fs.DirEntry, err error) error {
+		if errors.Is(err, fs.ErrNotExist) && filename == root {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			return nil
+		}
+		if !entry.Type().IsRegular() {
+			return fmt.Errorf("旧资源包含非普通文件: %s", filename)
+		}
+		content, err := os.ReadFile(filename)
+		if err != nil {
+			return err
+		}
+		relative, err := filepath.Rel(root, filename)
+		if err == nil {
+			files[filepath.ToSlash(relative)] = string(content)
+		}
+		return err
+	})
+	return files, err
+}
+
+func readLegacySharedFiles(ctx context.Context, repository *remote.Repository) (map[string]string, error) {
+	files := map[string]string{}
+	manifest, err := commonlogic.GetOciManifest(ctx, repository, legacySharedTag)
+	if errors.Is(err, commonlogic.OciManifestNotFoundErr) {
+		return files, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	err = commonlogic.UnPackOciToLocal(ctx, repository, manifest, []string{commonlogic.MediaTypeFilesJson}, func(_, _ string, reader io.Reader) error {
+		var layerFiles map[string]string
+		if err := json.NewDecoder(reader).Decode(&layerFiles); err != nil {
+			return err
+		}
+		for filename, content := range layerFiles {
+			files[filename] = content
+		}
+		return nil
+	})
+	return files, err
 }

@@ -177,67 +177,6 @@ func (c FormulaAttach) ManifestFiles(ctx *gin.Context) {
 	})
 }
 
-func (c FormulaAttach) SaveAssetFile(ctx *gin.Context) {
-	type ParamsValidate struct {
-		Identifie string `form:"identifie" json:"identifie" binding:"required"`
-		Filename  string `form:"filename" json:"filename" binding:"required"`
-		Content   string `form:"content" json:"content" binding:"omitempty"`
-	}
-	params := ParamsValidate{}
-	if !c.Validate(ctx, &params) {
-		return
-	}
-	filename, err := formulalogic.NormalizeFormulaFilePath(params.Filename)
-	if err != nil {
-		c.JsonResponseWithError(ctx, err, 400)
-		return
-	}
-	params.Filename = filename
-	if formulalogic.IsFormulaManifestPath(params.Filename) {
-		c.JsonResponseWithError(ctx, fmt.Errorf("share-file 接口不支持 manifest 文件: %s", params.Filename), 500)
-		return
-	}
-
-	depot := c.getDepot()
-	formula, err := depot.GetFormula(params.Identifie, "", logic2.User{}.GetUser(ctx))
-	if err != nil {
-		c.JsonResponseWithError(ctx, err, 500)
-		return
-	}
-	if err = depot.SaveAssetFileAndSyncOCI(formula, params.Filename, sanitizeFormulaAttachContent(params.Content)); err != nil {
-		c.JsonResponseWithError(ctx, err, 500)
-		return
-	}
-
-	c.JsonSuccessResponse(ctx)
-}
-
-func (c FormulaAttach) AssetFiles(ctx *gin.Context) {
-	type ParamsValidate struct {
-		Identifie string `form:"identifie" json:"identifie" binding:"required"`
-	}
-	params := ParamsValidate{}
-	if !c.Validate(ctx, &params) {
-		return
-	}
-
-	depot := c.getDepot()
-	formula, err := depot.GetFormula(params.Identifie, "", logic2.User{}.GetUser(ctx))
-	if err != nil {
-		c.JsonResponseWithError(ctx, err, 500)
-		return
-	}
-	fileList, err := depot.GetAssetFiles(formula)
-	if err != nil {
-		c.JsonResponseWithError(ctx, err, 500)
-		return
-	}
-
-	c.JsonResponseWithoutError(ctx, gin.H{
-		"list": fileList,
-	})
-}
-
 func (c FormulaAttach) EditIcon(ctx *gin.Context) {
 	type ParamsValidate struct {
 		Identifie string `form:"identifie" binding:"required"`

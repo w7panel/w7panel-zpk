@@ -25,7 +25,7 @@ func (p FormulaPublish) OnRepositoryPushed(payload registry.RegistryRepositoryWe
 	slog.Info("OnRepositoryPushed", "payload", payload)
 	repositoryName, namespace := commonlogic.ParseRepositoryNameAndNamespace(payload.Event.Target.Repository)
 	tag := payload.Event.Target.Tag
-	if namespace != facade.GetConfig().GetString("setting.depot.oci_namespace") || tag == "" || tag == formulalogic.AssetsOCITag || tag == "latest" {
+	if namespace != facade.GetConfig().GetString("setting.depot.oci_namespace") || tag == "" || tag == "shared" || tag == "latest" {
 		return
 	}
 	var err error

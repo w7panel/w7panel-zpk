@@ -233,10 +233,9 @@ export default {
             this.loadFailed = false;
             this.resetSelectedIcon();
             try {
-                let [infoRes, settingRes, filesRes, categoriesRes] = await Promise.all([
+                let [infoRes, settingRes, categoriesRes] = await Promise.all([
                     myAxios.get('/respo/info/' + this.identifie),
                     myAxios.post('/respo/setting/get', { identifie: this.identifie }),
-                    myAxios.post('/respo/share-file/path-tree', { identifie: this.identifie }),
                     myAxios.post('/respo/category/list', { limit: 999 }),
                 ]);
                 let latestInfo = infoRes?.data?.data || this.info || {};
@@ -255,7 +254,7 @@ export default {
                 this.form.registerSite = this.isRegisterSiteDisabled ? false : Boolean(baseInfo.register_site);
                 this.iconPreview = this.getIconUrl(latestInfo?.icon_url || this.info?.icon_url || '');
 
-                this.form.introduction = filesRes?.data?.data?.list?.['readme.md'] || '';
+                this.form.introduction = settingRes?.data?.data?.readme || '';
                 this.categories = categoriesRes?.data?.data?.list || [];
                 this.initialCategories = latestInfo?.tags || this.info?.tags || [];
                 const currentCategory = this.initialCategories.find(item => (
@@ -318,6 +317,7 @@ export default {
 
                 await myAxios.post('/respo/setting/set', {
                     identifie: this.identifie,
+                    readme: this.form.introduction || '',
                     base_info: {
                         name,
                         description: (this.form.description || '').trim(),
@@ -326,11 +326,6 @@ export default {
                         cluster_privileges: Boolean(this.form.clusterPrivileges),
                         register_site: this.isRegisterSiteDisabled ? false : Boolean(this.form.registerSite),
                     },
-                });
-                await myAxios.post('/respo/share-file/file', {
-                    identifie: this.identifie,
-                    filename: 'readme.md',
-                    content: this.form.introduction || '',
                 });
 
                 let categoryName = this.requiredCategoryName || this.form.category;

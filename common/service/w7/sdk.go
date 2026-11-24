@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -12,10 +11,10 @@ import (
 	"github.com/spf13/viper"
 	opencloud "github.com/w7corp/sdk-open-cloud-go"
 	w7 "github.com/w7corp/sdk-open-cloud-go"
-	"github.com/w7panel/w7panel-zpk/common/service"
 	"github.com/w7panel/w7panel-zpk/common/service/w7/base"
 	"github.com/w7panel/w7panel-zpk/common/service/w7/cloudapi"
 	"github.com/w7panel/w7panel-zpk/common/service/w7/devcenter"
+	"github.com/w7panel/w7panel-zpk/common/service/w7/document"
 	"github.com/w7panel/w7panel-zpk/common/service/w7/ip"
 	zpk_market "github.com/w7panel/w7panel-zpk/common/service/w7/zpk-market"
 )
@@ -26,6 +25,8 @@ var W7CloudAttach *cloudapi.Attach
 var IpGoodsSdk *ip.GoodsService
 var ZpkMarketSdk *zpk_market.ZpkMarketService
 var OpenCloudSdk *opencloud.Client
+var DocumentSdk *document.Client
+var AppSdk *base.Base
 
 type appCredential struct {
 	Appid  string
@@ -86,14 +87,14 @@ func InitW7Sdk(config *viper.Viper) error {
 	OpenCloudSdk = opencloud.NewClient(credential.Appid, credential.Secret, w7.Option{
 		ApiUrl: "http://api.w7.cc",
 	})
-	service.InitDocumentSdk(config)
+	AppSdk = &base.Base{Appid: credential.Appid, Secret: credential.Secret}
+	DocumentSdk = document.New(config.GetString("setting.document.base_url"), credential.Appid, credential.Secret)
 
 	return nil
 }
 
 func resolveAppCredential(config *viper.Viper) (appCredential, error) {
 	credential, err := fetchAppCredential("http://api.w7.cc/api/app/info")
-	slog.Info("resolveAppCredential", "credential", credential, "err", err)
 	if err != nil && strings.Contains(err.Error(), "Route not found") {
 		return appCredential{
 			Appid:  config.GetString("zpk.appid"),

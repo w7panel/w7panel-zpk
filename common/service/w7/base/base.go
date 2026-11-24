@@ -4,9 +4,12 @@ import (
 	"bytes"
 	"context"
 	"crypto/md5"
+	cryptorand "crypto/rand"
+	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
+	"errors"
 	"io"
 	"log/slog"
 	"math/rand"
@@ -14,6 +17,7 @@ import (
 	"net/url"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -146,31 +150,18 @@ func (s Base) ConvertRequestSignWithContext(ctx context.Context, params map[stri
 }
 
 func (s Base) getSign(params map[string]string, secret string) string {
-	_, ok := params["sign"]
-	if ok {
-		delete(params, "sign")
-	}
-
-	var keys []string
-	signStr := ""
-	for s, _ := range params {
-		if s == "sign" {
-			continue
-		}
-		keys = append(keys, s)
+	delete(params, "sign")
+	keys := make([]string, 0, len(params))
+	for key := range params {
+		keys = append(keys, key)
 	}
 	sort.Strings(keys)
-	for i, k := range keys {
-		signStr += fmt.Sprintf("%s=%s", url.QueryEscape(k), url.QueryEscape(params[k]))
-		if i < len(keys)-1 {
-			signStr += "&"
-		}
+	parts := make([]string, 0, len(keys))
+	for _, key := range keys {
+		parts = append(parts, url.QueryEscape(key)+"="+url.QueryEscape(params[key]))
 	}
-
-	signStr += secret
-	md5Ctx := md5.New()
-	md5Ctx.Write([]byte(signStr))
-	return hex.EncodeToString(md5Ctx.Sum(nil))
+	digest := md5.Sum([]byte(strings.Join(parts, "&") + secret))
+	return hex.EncodeToString(digest[:])
 }
 
 func (s Base) makeRandStr(length int) string {
@@ -184,4 +175,108 @@ func (s Base) makeRandStr(length int) string {
 	}
 
 	return string(result)
+}
+
+var ErrSignature = errors.New("应用签名无效")
+var ErrCredential = errors.New("应用签名凭据未初始化")
+
+func readBody(request *http.Request) (map[string]string, error) {
+	if request.Body == nil {
+		return nil, ErrSignature
+	}
+	body, err := io.ReadAll(request.Body)
+	if err != nil {
+		return nil, err
+	}
+	request.Body.Close()
+	request.Body = io.NopCloser(bytes.NewReader(body))
+	decoder := json.NewDecoder(bytes.NewReader(body))
+	var data map[string]string
+	if err := decoder.Decode(&data); err != nil || data == nil {
+		return nil, ErrSignature
+	}
+	if decoder.Decode(&struct{}{}) != io.EOF {
+		return nil, ErrSignature
+	}
+	return data, nil
+}
+
+func tokenDigest(request *http.Request) string {
+	digest := sha256.Sum256([]byte(request.Header.Get("X-W7Panel-Access-Token") + "\x00" + request.Header.Get("X-Document-Token")))
+	return hex.EncodeToString(digest[:])
+}
+
+func (c *Base) Sign(request *http.Request) error {
+	if c == nil || c.Appid == "" || c.Secret == "" {
+		return ErrCredential
+	}
+	if request.Body == nil {
+		return ErrSignature
+	}
+	body, err := io.ReadAll(request.Body)
+	if err != nil {
+		return err
+	}
+	request.Body.Close()
+	request.Body = io.NopCloser(bytes.NewReader(body))
+	if !json.Valid(body) {
+		return ErrSignature
+	}
+	nonce := make([]byte, 16)
+	if _, err := cryptorand.Read(nonce); err != nil {
+		return err
+	}
+	params := map[string]string{
+		"body":                string(body),
+		"appid":               c.Appid,
+		"timestamp":           strconv.FormatInt(time.Now().Unix(), 10),
+		"nonce":               hex.EncodeToString(nonce),
+		"request_method":      request.Method,
+		"request_uri":         request.URL.RequestURI(),
+		"access_token_sha256": tokenDigest(request),
+	}
+	params["sign"] = c.getSign(params, c.Secret)
+	body, err = json.Marshal(params)
+	if err != nil {
+		return err
+	}
+	request.Body.Close()
+	request.Body = io.NopCloser(bytes.NewReader(body))
+	request.ContentLength = int64(len(body))
+	request.GetBody = func() (io.ReadCloser, error) { return io.NopCloser(bytes.NewReader(body)), nil }
+	request.Header.Set("Content-Type", "application/json")
+	return nil
+}
+
+func (c *Base) Verify(request *http.Request) error {
+	if c == nil || c.Appid == "" || c.Secret == "" {
+		return ErrCredential
+	}
+	if request.Method != http.MethodPost || !strings.HasPrefix(strings.ToLower(request.Header.Get("Content-Type")), "application/json") {
+		return ErrSignature
+	}
+	params, err := readBody(request)
+	if err != nil {
+		return ErrSignature
+	}
+	signature := params["sign"]
+	if signature == "" || params["appid"] != c.Appid ||
+		params["request_method"] != request.Method || params["request_uri"] != request.URL.RequestURI() ||
+		params["access_token_sha256"] != tokenDigest(request) || len(params["nonce"]) != 32 {
+		return ErrSignature
+	}
+	timestamp, err := strconv.ParseInt(params["timestamp"], 10, 64)
+	now := time.Now().Unix()
+	if err != nil || timestamp < now-300 || timestamp > now+300 {
+		return ErrSignature
+	}
+	expected := c.getSign(params, c.Secret)
+	if subtle.ConstantTimeCompare([]byte(signature), []byte(expected)) != 1 || !json.Valid([]byte(params["body"])) {
+		return ErrSignature
+	}
+	request.Body.Close()
+	request.Body = io.NopCloser(strings.NewReader(params["body"]))
+	request.ContentLength = int64(len(params["body"]))
+	request.GetBody = func() (io.ReadCloser, error) { return io.NopCloser(strings.NewReader(params["body"])), nil }
+	return nil
 }

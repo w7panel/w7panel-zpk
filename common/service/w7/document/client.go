@@ -10,11 +10,13 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/w7panel/w7panel-zpk/common/service/w7/base"
 )
 
 type Client struct {
-	BaseURL string
-	HTTP    *http.Client
+	base.Base
+	HTTP *http.Client
 }
 
 type ResponseError struct {
@@ -26,10 +28,10 @@ func (e *ResponseError) Error() string {
 	return fmt.Sprintf("文档服务返回 %d: %s", e.StatusCode, e.Message)
 }
 
-func New(baseURL string) *Client {
+func New(baseURL, appID, secret string) *Client {
 	return &Client{
-		BaseURL: strings.TrimRight(baseURL, "/"),
-		HTTP:    &http.Client{Timeout: 30 * time.Second},
+		Base: base.Base{BaseUrl: strings.TrimRight(baseURL, "/"), Appid: appID, Secret: secret},
+		HTTP: &http.Client{Timeout: 30 * time.Second},
 	}
 }
 
@@ -52,12 +54,15 @@ func (c *Client) call(ctx context.Context, token, route string, body any, out an
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.BaseURL+route, bytes.NewReader(data))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.BaseUrl+"/zpk/document/openapi"+route, bytes.NewReader(data))
 	if err != nil {
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-W7Panel-Access-Token", token)
+	if err := c.Base.Sign(req); err != nil {
+		return err
+	}
 	response, err := c.HTTP.Do(req)
 	if err != nil {
 		return fmt.Errorf("文档服务不可用: %w", err)

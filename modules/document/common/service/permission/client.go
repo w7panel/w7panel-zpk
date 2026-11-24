@@ -10,15 +10,18 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/w7panel/w7panel-zpk/modules/document/common/service/app"
 )
 
 type Client struct {
 	ServerURL string
 	HTTP      *http.Client
+	Signer    *app.Client
 }
 
-func New(serverURL string) *Client {
-	return &Client{ServerURL: strings.TrimRight(strings.TrimSpace(serverURL), "/"), HTTP: &http.Client{Timeout: 15 * time.Second}}
+func New(serverURL string, signer *app.Client) *Client {
+	return &Client{ServerURL: strings.TrimRight(strings.TrimSpace(serverURL), "/"), HTTP: &http.Client{Timeout: 15 * time.Second}, Signer: signer}
 }
 
 func (c *Client) call(ctx context.Context, path string, payload interface{}, output interface{}) error {
@@ -29,11 +32,14 @@ func (c *Client) call(ctx context.Context, path string, payload interface{}, out
 	if err != nil {
 		return err
 	}
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, c.ServerURL+path, bytes.NewReader(data))
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, c.ServerURL+"/zpk/v2/openapi/permission"+path, bytes.NewReader(data))
 	if err != nil {
 		return err
 	}
 	request.Header.Set("Content-Type", "application/json")
+	if err := c.Signer.Sign(request); err != nil {
+		return err
+	}
 	response, err := c.HTTP.Do(request)
 	if err != nil {
 		return fmt.Errorf("权限服务不可用: %w", err)

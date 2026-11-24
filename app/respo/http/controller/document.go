@@ -7,7 +7,7 @@ import (
 	"github.com/w7panel/w7panel-zpk/app/respo/logic"
 	"github.com/w7panel/w7panel-zpk/app/respo/logic/formula"
 	userlogic "github.com/w7panel/w7panel-zpk/common/logic"
-	documentsdk "github.com/w7panel/w7panel-zpk/common/service/document"
+	documentsdk "github.com/w7panel/w7panel-zpk/common/service/w7/document"
 )
 
 // FormulaDocument adapts artifact requests to the independent document service.

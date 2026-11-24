@@ -34,12 +34,12 @@ func (p Provider) registerRoutes(httpServer *httpserver.Server) {
 		root.Any("/registry/auth", controller.Auth{}.Auth)
 		root.Any("/registry/webhook", controller.WebHook{}.Hook)
 
-		permissionService := root.Group("/api/permission")
+		permissionService := root.Group("/openapi/permission", middleware.App{}.Process)
 		permissionService.POST("/check", openapi.ResourcePermission{}.Check)
 		permissionService.POST("/set", openapi.ResourcePermission{}.Set)
 		permissionService.POST("/get", openapi.ResourcePermission{}.Get)
 
-		namespaceService := root.Group("/api/namespace")
+		namespaceService := root.Group("/openapi/namespace", middleware.App{}.Process)
 		namespaceService.POST("/get", openapi.NamespaceService{}.Get)
 		namespaceService.POST("/create", openapi.NamespaceService{}.Create)
 		namespaceService.POST("/rename", openapi.NamespaceService{}.Rename)

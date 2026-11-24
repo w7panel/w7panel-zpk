@@ -16,7 +16,7 @@ import (
 	"github.com/w7panel/w7panel-zpk/common/accessor"
 	"github.com/w7panel/w7panel-zpk/common/dao"
 	"github.com/w7panel/w7panel-zpk/common/entity"
-	"github.com/w7panel/w7panel-zpk/common/service"
+	"github.com/w7panel/w7panel-zpk/common/service/w7"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/console"
 )
@@ -60,7 +60,7 @@ func (MigrateDocuments) run(cmd *cobra.Command, _ []string) error {
 			return err
 		}
 	}
-	user, err := service.DocumentSdk.CurrentUser(cmd.Context(), token)
+	user, err := w7.DocumentSdk.CurrentUser(cmd.Context(), token)
 	if err != nil {
 		return err
 	}
@@ -131,7 +131,7 @@ func migrateFormulaDocuments(ctx context.Context, token string, item *entity.For
 	}
 	sort.Strings(filenames)
 	if len(filenames) > 0 {
-		tree, err := service.DocumentSdk.Tree(ctx, token, reference)
+		tree, err := w7.DocumentSdk.Tree(ctx, token, reference)
 		if err != nil {
 			return err
 		}
@@ -148,11 +148,11 @@ func migrateFormulaDocuments(ctx context.Context, token string, item *entity.For
 				continue
 			}
 			title := strings.TrimSuffix(documentPath, path.Ext(documentPath))
-			if err := service.DocumentSdk.Save(ctx, token, reference, documentPath, title, assets[filename]); err != nil {
+			if err := w7.DocumentSdk.Save(ctx, token, reference, documentPath, title, assets[filename]); err != nil {
 				return err
 			}
 		}
-		tree, err = service.DocumentSdk.Tree(ctx, token, reference)
+		tree, err = w7.DocumentSdk.Tree(ctx, token, reference)
 		if err != nil {
 			return err
 		}
@@ -178,7 +178,7 @@ func migrateFormulaDocuments(ctx context.Context, token string, item *entity.For
 		for _, file := range tree.Files {
 			appendPath(file.Path)
 		}
-		if err := service.DocumentSdk.Order(ctx, token, reference, order); err != nil {
+		if err := w7.DocumentSdk.Order(ctx, token, reference, order); err != nil {
 			return err
 		}
 	}

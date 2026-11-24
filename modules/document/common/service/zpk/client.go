@@ -11,6 +11,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/w7panel/w7panel-zpk/modules/document/common/service/app"
 )
 
 var ErrUnauthenticated = errors.New("用户身份无效")
@@ -25,6 +27,7 @@ type User struct {
 type Client struct {
 	BaseURL string
 	HTTP    *http.Client
+	Signer  *app.Client
 }
 
 type ResponseError struct {
@@ -34,8 +37,8 @@ type ResponseError struct {
 
 func (e *ResponseError) Error() string { return e.Message }
 
-func New(baseURL string) *Client {
-	return &Client{BaseURL: strings.TrimRight(strings.TrimSpace(baseURL), "/"), HTTP: &http.Client{Timeout: 15 * time.Second}}
+func New(baseURL string, signer *app.Client) *Client {
+	return &Client{BaseURL: strings.TrimRight(strings.TrimSpace(baseURL), "/"), HTTP: &http.Client{Timeout: 15 * time.Second}, Signer: signer}
 }
 
 func (c *Client) CurrentUser(ctx context.Context, accessToken string) (User, error) {
@@ -66,14 +69,16 @@ func (c *Client) call(ctx context.Context, token, route string, payload, output 
 	if err != nil {
 		return err
 	}
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, c.BaseURL+route, bytes.NewReader(data))
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, c.BaseURL+"/zpk"+route, bytes.NewReader(data))
 	if err != nil {
 		return err
 	}
+	request.Header.Set("Content-Type", "application/json")
 	if token != "" {
 		request.Header.Set("X-W7Panel-Access-Token", token)
+	} else if err := c.Signer.Sign(request); err != nil {
+		return err
 	}
-	request.Header.Set("Content-Type", "application/json")
 	response, err := c.HTTP.Do(request)
 	if err != nil {
 		return fmt.Errorf("ZPK 服务不可用: %w", err)

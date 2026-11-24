@@ -26,9 +26,9 @@ func (Session) SaveUserInfo(ctx *gin.Context, user zpk.User) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	maxAge := facade.GetConfig().GetInt("session.max_age")
-	if maxAge <= 0 {
-		return "", errors.New("文档会话有效期未配置")
+	tokenTTLSeconds := facade.GetConfig().GetInt("auth.token_ttl_seconds")
+	if tokenTTLSeconds <= 0 {
+		return "", errors.New("文档 token 有效期未配置")
 	}
 	random := make([]byte, 32)
 	if _, err := rand.Read(random); err != nil {
@@ -38,7 +38,7 @@ func (Session) SaveUserInfo(ctx *gin.Context, user zpk.User) (string, error) {
 	digest := sha256.Sum256([]byte(token))
 	err = dao.Q.DocumentSession.WithContext(ctx.Request.Context()).Create(&entity.DocumentSession{
 		ID: hex.EncodeToString(digest[:]), UserInfo: string(content),
-		ExpiresAt: time.Now().Add(time.Duration(maxAge) * time.Second),
+		ExpiresAt: time.Now().Add(time.Duration(tokenTTLSeconds) * time.Second),
 	})
 	if err != nil {
 		return "", err

@@ -11,8 +11,8 @@ import (
 	"github.com/w7panel/w7panel-zpk/common/dao"
 	"github.com/w7panel/w7panel-zpk/common/entity"
 	userlogic "github.com/w7panel/w7panel-zpk/common/logic"
-	"github.com/w7panel/w7panel-zpk/common/service"
-	documentsdk "github.com/w7panel/w7panel-zpk/common/service/document"
+	"github.com/w7panel/w7panel-zpk/common/service/w7"
+	documentsdk "github.com/w7panel/w7panel-zpk/common/service/w7/document"
 )
 
 // FormulaDocument is the artifact-side integration. All document operations go through its SDK.
@@ -25,7 +25,7 @@ func (l FormulaDocument) Initialize(ctx context.Context, token string, formula *
 	}
 	reference := "app/" + formula.Name
 	homepage := "# " + title + "\n\n应用标识：" + formula.Name + "\n"
-	err := service.DocumentSdk.Create(ctx, token, documentsdk.CreateLibrary{
+	err := w7.DocumentSdk.Create(ctx, token, documentsdk.CreateLibrary{
 		Ref: reference, Name: title, OwnerID: formula.UserID, Protected: 1,
 		Files: []documentsdk.FileContent{{File: documentsdk.File{Path: "index.md", Title: "首页", Protected: 1}, Content: homepage}},
 	})
@@ -37,14 +37,14 @@ func (l FormulaDocument) Initialize(ctx context.Context, token string, formula *
 		return "", err
 	}
 	// A previous document creation may have succeeded before saving its reference.
-	library, infoErr := service.DocumentSdk.Info(ctx, token, reference)
+	library, infoErr := w7.DocumentSdk.Info(ctx, token, reference)
 	if infoErr != nil {
 		return "", infoErr
 	}
 	if library.UserID != formula.UserID || library.Protected != 1 {
 		return "", err
 	}
-	tree, treeErr := service.DocumentSdk.Tree(ctx, token, reference)
+	tree, treeErr := w7.DocumentSdk.Tree(ctx, token, reference)
 	if treeErr != nil {
 		return "", treeErr
 	}
@@ -62,7 +62,7 @@ func isDocumentMarkdownPath(filename string) bool {
 
 // Files returns library-relative paths without mixing in artifact assets.
 func (l FormulaDocument) Files(ctx context.Context, token, reference string) (map[string]string, error) {
-	tree, err := service.DocumentSdk.Tree(ctx, token, reference)
+	tree, err := w7.DocumentSdk.Tree(ctx, token, reference)
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +72,7 @@ func (l FormulaDocument) Files(ctx context.Context, token, reference string) (ma
 		if !isDocumentMarkdownPath(file.Path) {
 			continue
 		}
-		content, err := service.DocumentSdk.Read(ctx, token, reference, file.Path)
+		content, err := w7.DocumentSdk.Read(ctx, token, reference, file.Path)
 		if err != nil {
 			return nil, err
 		}
@@ -88,7 +88,7 @@ func (l FormulaDocument) Save(ctx context.Context, token, reference, filename, c
 		return errors.New("不支持的制品文档路径")
 	}
 	if filename == ".order" {
-		tree, err := service.DocumentSdk.Tree(ctx, token, reference)
+		tree, err := w7.DocumentSdk.Tree(ctx, token, reference)
 		if err != nil {
 			return err
 		}
@@ -96,10 +96,10 @@ func (l FormulaDocument) Save(ctx context.Context, token, reference, filename, c
 	}
 	// The artifact editor uses empty content to request deletion.
 	if content == "" {
-		return service.DocumentSdk.Delete(ctx, token, reference, filename)
+		return w7.DocumentSdk.Delete(ctx, token, reference, filename)
 	}
 	title := strings.TrimSuffix(filename, path.Ext(filename))
-	return service.DocumentSdk.Save(ctx, token, reference, filename, title, content)
+	return w7.DocumentSdk.Save(ctx, token, reference, filename, title, content)
 }
 
 func (l FormulaDocument) orderDocuments(ctx context.Context, token, reference, content string, tree documentsdk.FileTree) error {
@@ -128,7 +128,7 @@ func (l FormulaDocument) orderDocuments(ctx context.Context, token, reference, c
 			order = append(order, file.Path)
 		}
 	}
-	return service.DocumentSdk.Order(ctx, token, reference, order)
+	return w7.DocumentSdk.Order(ctx, token, reference, order)
 }
 
 func (l FormulaDocument) Ensure(ctx context.Context, token, identifie string, user *entity.RegistryUser) (string, error) {

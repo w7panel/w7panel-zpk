@@ -133,8 +133,8 @@ func (hc *HelmPack) getPluginShellJobContainerValues() map[string]interface{} {
 		"env":        []v1.EnvVar{},
 		"resources":  v1.ResourceRequirements{},
 		"volumeMounts": []v1.VolumeMount{
-			{Name: traditionStorageVolumeName, MountPath: "/www/wwwroot", SubPath: "www/server/{{ include \"plugin.traditionReleaseName\" . }}/wwwroot"},
-			{Name: traditionStorageVolumeName, MountPath: pluginInstallerDataMount, SubPath: "www/server/{{ include \"plugin.traditionReleaseName\" . }}/tradition-plugin"},
+			{Name: traditionStorageVolumeName, MountPath: "/www/wwwroot", SubPath: "www/{{ include \"plugin.traditionReleaseName\" . }}/wwwroot"},
+			{Name: traditionStorageVolumeName, MountPath: pluginInstallerDataMount, SubPath: "www/{{ include \"plugin.traditionReleaseName\" . }}/server/tradition-plugin"},
 		},
 		"securityContext": map[string]interface{}{},
 	}

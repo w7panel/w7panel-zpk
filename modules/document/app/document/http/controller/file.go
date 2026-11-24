@@ -9,89 +9,85 @@ type File struct{ Abstract }
 
 func (c File) List(ctx *gin.Context) {
 	type ParamsValidate struct {
-		Ref string `json:"ref" binding:"required"`
+		Ref string `json:"ref" binding:"required,document_ref"`
 	}
 	params := ParamsValidate{}
-	if !c.Bind(ctx, &params) {
+	if !c.Validate(ctx, &params) {
 		return
 	}
-	result, e := logic.Document{}.Files(ctx.Request.Context(), actor(ctx), params.Ref)
+	result, e := logic.File{}.List(ctx.Request.Context(), currentUser(ctx), params.Ref)
 	c.Respond(ctx, result, e)
 }
 
 func (c File) Read(ctx *gin.Context) {
 	type ParamsValidate struct {
-		Ref  string `json:"ref" binding:"required"`
-		Path string `json:"path" binding:"required"`
+		Ref  string `json:"ref" binding:"required,document_ref"`
+		Path string `json:"path" binding:"required,document_path"`
 	}
 	params := ParamsValidate{}
-	if !c.Bind(ctx, &params) {
+	if !c.Validate(ctx, &params) {
 		return
 	}
-	f, b, e := logic.Document{}.Read(ctx.Request.Context(), actor(ctx), params.Ref, params.Path)
+	f, b, e := logic.File{}.Read(ctx.Request.Context(), currentUser(ctx), params.Ref, params.Path)
 	if e != nil {
 		c.Respond(ctx, nil, e)
 		return
 	}
-	c.Respond(ctx, gin.H{"path": f.Path, "title": f.Title, "revision": f.Revision, "content": string(b)}, nil)
+	c.Respond(ctx, gin.H{"path": f.Path, "title": f.Title, "content": string(b)}, nil)
 }
 
 func (c File) Save(ctx *gin.Context) {
 	type ParamsValidate struct {
-		Ref      string `json:"ref" binding:"required"`
-		Path     string `json:"path" binding:"required"`
-		Title    string `json:"title"`
-		Content  string `json:"content"`
-		Revision int32  `json:"revision"`
+		Ref     string `json:"ref" binding:"required,document_ref"`
+		Path    string `json:"path" binding:"required,document_path"`
+		Title   string `json:"title" binding:"maxbytes=255"`
+		Content string `json:"content" binding:"maxbytes=4194304"`
 	}
 	params := ParamsValidate{}
-	if !c.Bind(ctx, &params) {
+	if !c.Validate(ctx, &params) {
 		return
 	}
-	f, e := logic.Document{}.Save(ctx.Request.Context(), actor(ctx), params.Ref, params.Path, params.Title, []byte(params.Content), params.Revision)
+	f, e := logic.File{}.Save(ctx.Request.Context(), currentUser(ctx), params.Ref, params.Path, params.Title, []byte(params.Content))
 	if e != nil {
 		c.Respond(ctx, nil, e)
 		return
 	}
-	c.Respond(ctx, gin.H{"path": f.Path, "revision": f.Revision}, nil)
+	c.Respond(ctx, gin.H{"path": f.Path}, nil)
 }
 
 func (c File) Rename(ctx *gin.Context) {
 	type ParamsValidate struct {
-		Ref      string `json:"ref" binding:"required"`
-		Path     string `json:"path" binding:"required"`
-		Title    string `json:"title" binding:"required"`
-		Revision int32  `json:"revision" binding:"required"`
+		Ref   string `json:"ref" binding:"required,document_ref"`
+		Path  string `json:"path" binding:"required,document_path"`
+		Title string `json:"title" binding:"required,notblank,maxbytes=255"`
 	}
 	params := ParamsValidate{}
-	if !c.Bind(ctx, &params) {
+	if !c.Validate(ctx, &params) {
 		return
 	}
-	c.Respond(ctx, nil, logic.Document{}.Rename(ctx.Request.Context(), actor(ctx), params.Ref, params.Path, params.Title, params.Revision))
+	c.Respond(ctx, nil, logic.File{}.Rename(ctx.Request.Context(), currentUser(ctx), params.Ref, params.Path, params.Title))
 }
 
 func (c File) Delete(ctx *gin.Context) {
 	type ParamsValidate struct {
-		Ref      string `json:"ref" binding:"required"`
-		Path     string `json:"path" binding:"required"`
-		Revision int32  `json:"revision" binding:"required"`
+		Ref  string `json:"ref" binding:"required,document_ref"`
+		Path string `json:"path" binding:"required,document_path"`
 	}
 	params := ParamsValidate{}
-	if !c.Bind(ctx, &params) {
+	if !c.Validate(ctx, &params) {
 		return
 	}
-	c.Respond(ctx, nil, logic.Document{}.DeleteFile(ctx.Request.Context(), actor(ctx), params.Ref, params.Path, params.Revision))
+	c.Respond(ctx, nil, logic.File{}.Delete(ctx.Request.Context(), currentUser(ctx), params.Ref, params.Path))
 }
 
 func (c File) Order(ctx *gin.Context) {
 	type ParamsValidate struct {
-		Ref      string   `json:"ref" binding:"required"`
-		Paths    []string `json:"paths"`
-		Revision int32    `json:"revision" binding:"required"`
+		Ref   string   `json:"ref" binding:"required,document_ref"`
+		Paths []string `json:"paths" binding:"max=10000,unique,dive,document_path"`
 	}
 	params := ParamsValidate{}
-	if !c.Bind(ctx, &params) {
+	if !c.Validate(ctx, &params) {
 		return
 	}
-	c.Respond(ctx, nil, logic.Document{}.Order(ctx.Request.Context(), actor(ctx), params.Ref, params.Paths, params.Revision))
+	c.Respond(ctx, nil, logic.File{}.Order(ctx.Request.Context(), currentUser(ctx), params.Ref, params.Paths))
 }

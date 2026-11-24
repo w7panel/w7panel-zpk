@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/viper"
 	opencloud "github.com/w7corp/sdk-open-cloud-go"
 	w7 "github.com/w7corp/sdk-open-cloud-go"
+	"github.com/w7panel/w7panel-zpk/common/service"
 	"github.com/w7panel/w7panel-zpk/common/service/w7/base"
 	"github.com/w7panel/w7panel-zpk/common/service/w7/cloudapi"
 	"github.com/w7panel/w7panel-zpk/common/service/w7/devcenter"
@@ -85,6 +86,7 @@ func InitW7Sdk(config *viper.Viper) error {
 	OpenCloudSdk = opencloud.NewClient(credential.Appid, credential.Secret, w7.Option{
 		ApiUrl: "http://api.w7.cc",
 	})
+	service.InitDocumentSdk(config)
 
 	return nil
 }

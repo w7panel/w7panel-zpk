@@ -131,7 +131,7 @@ func (c Repository) Info(ctx *gin.Context) {
 
 	respInfo := RepositoryRespInfo{
 		RegistryRepository: *curRepository,
-		CanEdit:            logic.Permission{}.IsCanOperate(ctx, curRepository.UserID),
+		CanEdit:            logic.ResourcePermission{}.IsCanOperate(ctx, curRepository.UserID),
 	}
 
 	c.JsonResponseWithoutError(ctx, respInfo)
@@ -191,7 +191,7 @@ func (c Repository) List(ctx *gin.Context) {
 
 		respInfo := RepositoryRespInfo{
 			RegistryRepository: *item,
-			CanEdit:            logic.Permission{}.IsCanOperate(ctx, item.UserID),
+			CanEdit:            logic.ResourcePermission{}.IsCanOperate(ctx, item.UserID),
 		}
 
 		retLst = append(retLst, respInfo)

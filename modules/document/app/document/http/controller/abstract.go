@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/w7panel/w7panel-zpk/modules/document/app/document/logic"
 	"github.com/w7panel/w7panel-zpk/modules/document/common/service/permission"
+	"github.com/w7panel/w7panel-zpk/modules/document/common/service/zpk"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 	"gorm.io/gorm"
 )
@@ -15,14 +16,8 @@ type Abstract struct {
 	controller.Abstract
 }
 
-func actor(c *gin.Context) logic.Actor { return c.MustGet("document.actor").(logic.Actor) }
-func (c Abstract) Bind(ctx *gin.Context, params any) bool {
-	ctx.Request.Body = http.MaxBytesReader(ctx.Writer, ctx.Request.Body, 6<<20)
-	if e := ctx.ShouldBindJSON(params); e != nil {
-		c.Respond(ctx, nil, logic.ErrInvalid)
-		return false
-	}
-	return true
+func currentUser(ctx *gin.Context) zpk.User {
+	return ctx.MustGet("user").(zpk.User)
 }
 
 func (c Abstract) Respond(ctx *gin.Context, data any, e error) {
@@ -30,16 +25,21 @@ func (c Abstract) Respond(ctx *gin.Context, data any, e error) {
 		c.JsonResponseWithoutError(ctx, data)
 		return
 	}
-	status := 503
+	status := http.StatusServiceUnavailable
+	var remoteError *zpk.ResponseError
 	switch {
+	case errors.Is(e, zpk.ErrUnauthenticated):
+		status = http.StatusUnauthorized
 	case errors.Is(e, permission.ErrDenied):
-		status = 403
+		status = http.StatusForbidden
 	case errors.Is(e, gorm.ErrRecordNotFound):
-		status = 404
+		status = http.StatusNotFound
 	case errors.Is(e, logic.ErrInvalid):
-		status = 400
+		status = http.StatusBadRequest
 	case errors.Is(e, logic.ErrConflict):
-		status = 409
+		status = http.StatusConflict
+	case errors.As(e, &remoteError) && (remoteError.StatusCode == 400 || remoteError.StatusCode == 404 || remoteError.StatusCode == 409):
+		status = remoteError.StatusCode
 	}
 	c.JsonResponseWithError(ctx, e, status)
 }

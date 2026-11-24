@@ -53,7 +53,7 @@ func (c Auth) Auth(ctx *gin.Context) {
 		c.JsonResponseWithServerError(ctx, err)
 		return
 	}
-	err = logic.Permission{}.CheckUserScopes(user, scopes)
+	err = logic.RegistryPermission{}.CheckRegistryScopes(ctx.Request.Context(), user, scopes)
 	if err != nil {
 		c.JsonResponseWithError(ctx, err, 401)
 		return
@@ -68,7 +68,7 @@ func (c Auth) Auth(ctx *gin.Context) {
 		}
 	}
 
-	token, err := logic.Permission{}.CreateToken(user, scopes)
+	token, err := logic.RegistryPermission{}.CreateToken(user, scopes)
 	if err != nil {
 		c.JsonResponseWithServerError(ctx, err)
 		return

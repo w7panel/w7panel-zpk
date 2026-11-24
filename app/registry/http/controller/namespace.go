@@ -28,6 +28,7 @@ func (c Namespace) Create(ctx *gin.Context) {
 	type ParamsValidate struct {
 		Name        string `json:"name" binding:"required"`
 		VisibleType uint8  `json:"visible_type" binding:"required,oneof=1 2 4"`
+		Visible     *bool  `json:"visible"`
 	}
 	params := ParamsValidate{}
 	if !c.Validate(ctx, &params) {
@@ -42,13 +43,19 @@ func (c Namespace) Create(ctx *gin.Context) {
 
 	user := logic2.User{}.GetUser(ctx)
 	err := dao.Q.Transaction(func(tx *dao.Query) error {
-		err := tx.RegistryNamespace.Create(&entity.RegistryNamespace{
+		namespace := &entity.RegistryNamespace{
 			Name:        params.Name,
 			VisibleType: int32(params.VisibleType),
 			UserID:      logic2.User{}.GetUser(ctx).ID,
-		})
+		}
+		err := tx.RegistryNamespace.Create(namespace)
 		if err != nil {
 			return err
+		}
+		if params.Visible != nil && !*params.Visible {
+			if _, err := tx.RegistryNamespace.Where(tx.RegistryNamespace.ID.Eq(namespace.ID)).Update(tx.RegistryNamespace.Visible, false); err != nil {
+				return err
+			}
 		}
 
 		if user != nil && !(logic2.User{}.IsAdminUser(user)) {
@@ -80,24 +87,21 @@ func (c Namespace) Info(ctx *gin.Context) {
 	if !c.Validate(ctx, &params) {
 		return
 	}
-
 	user := logic2.User{}.GetUser(ctx)
 	curNamespace, _ := logic.Namespace{}.GetByIdWithUserPermission(params.Id, user)
 	if curNamespace == nil {
 		c.JsonResponseWithServerError(ctx, errors.New("namespace 不存在"))
 		return
 	}
-
-	respInfo := NamespaceRespInfo{
+	c.JsonResponseWithoutError(ctx, NamespaceRespInfo{
 		RegistryNamespace: *curNamespace,
-		CanEdit:           logic.Permission{}.IsCanOperate(ctx, curNamespace.UserID),
-	}
-
-	c.JsonResponseWithoutError(ctx, respInfo)
+		CanEdit:           logic.ResourcePermission{}.IsCanOperate(ctx, curNamespace.UserID),
+	})
 }
 
 func (c Namespace) List(ctx *gin.Context) {
 	query := dao.Q.RegistryNamespace.Order(dao.Q.RegistryNamespace.CreatedAt.Desc())
+	query = query.Where(dao.Q.RegistryNamespace.Visible.Is(true))
 	user := logic2.User{}.GetUser(ctx)
 	if user != nil && !(logic2.User{}.IsAdminUser(user)) {
 		namespacePermissions, _ := dao.Q.RegistryUserPermission.
@@ -127,7 +131,7 @@ func (c Namespace) List(ctx *gin.Context) {
 		}
 		info := NamespaceRespInfo{
 			RegistryNamespace: *item,
-			CanEdit:           logic.Permission{}.IsCanOperate(ctx, item.UserID),
+			CanEdit:           logic.ResourcePermission{}.IsCanOperate(ctx, item.UserID),
 		}
 		respList = append(respList, info)
 	}
@@ -170,7 +174,7 @@ func (c Namespace) SubNamespaceList(ctx *gin.Context) {
 
 	user := logic2.User{}.GetUser(ctx)
 	if user != nil && !(logic2.User{}.IsAdminUser(user)) {
-		exists := logic.Permission{}.UserHasPermissionByResource(int(user.ID), params.Namespace, logic.PermissionResourceTypeNamespace)
+		exists := logic.ResourcePermission{}.UserHasPermissionByResource(int(user.ID), params.Namespace, logic.PermissionResourceTypeNamespace)
 		if !exists {
 			c.JsonResponseWithServerError(ctx, errors.New("user no permission"))
 			return
@@ -193,6 +197,7 @@ func (c Namespace) Edit(ctx *gin.Context) {
 		Id          int    `json:"id" binding:"required"`
 		Name        string `json:"name" binding:"required"`
 		VisibleType uint8  `json:"visible_type" binding:"required,oneof=1 2 4"`
+		Visible     *bool  `json:"visible"`
 	}
 	params := ParamsValidate{}
 	if !c.Validate(ctx, &params) {
@@ -220,6 +225,9 @@ func (c Namespace) Edit(ctx *gin.Context) {
 		curNamespace.Name = params.Name
 	}
 	curNamespace.VisibleType = int32(params.VisibleType)
+	if params.Visible != nil {
+		curNamespace.Visible = *params.Visible
+	}
 
 	err := dao.Q.Transaction(func(tx *dao.Query) error {
 		if namespaceRenamed {
@@ -255,7 +263,11 @@ func (c Namespace) Edit(ctx *gin.Context) {
 			}
 		}
 
-		return tx.RegistryNamespace.Save(curNamespace)
+		query := tx.RegistryNamespace
+		_, err := query.Where(query.ID.Eq(curNamespace.ID)).Select(query.Name, query.VisibleType, query.Visible).Updates(entity.RegistryNamespace{
+			Name: curNamespace.Name, VisibleType: curNamespace.VisibleType, Visible: curNamespace.Visible,
+		})
+		return err
 	})
 	if err != nil {
 		c.JsonResponseWithServerError(ctx, errors.New("namespace 保存失败, err: "+err.Error()))
@@ -289,7 +301,7 @@ func (c Namespace) Delete(ctx *gin.Context) {
 		if err != nil {
 			return err
 		}
-		return logic.Permission{}.DelPermissionByResource(tx, curNamespace.Name, logic.PermissionResourceTypeNamespace)
+		return logic.ResourcePermission{}.DelPermissionByResource(tx, curNamespace.Name, logic.PermissionResourceTypeNamespace)
 	})
 	if err != nil {
 		c.JsonResponseWithServerError(ctx, err)

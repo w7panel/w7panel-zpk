@@ -210,7 +210,7 @@ const tags = new Set(
         ' '
     )
 );
-export function sanitizeMarkdown(html) {
+function sanitizeMarkdown(html) {
     const parsed = new DOMParser().parseFromString(String(html), 'text/html');
     const clean = (node) => {
         [...node.children].forEach((child) => {

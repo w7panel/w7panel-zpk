@@ -4,24 +4,40 @@ import (
 	"context"
 	"errors"
 	"slices"
-	"strings"
-	"sync"
 
+	"github.com/gin-gonic/gin"
 	"github.com/w7panel/w7panel-zpk/common/accessor"
 	"github.com/w7panel/w7panel-zpk/common/dao"
 	"github.com/w7panel/w7panel-zpk/common/entity"
 	userlogic "github.com/w7panel/w7panel-zpk/common/logic"
+	"github.com/w7panel/w7panel-zpk/common/types/registry"
+	"gorm.io/gorm"
+)
+
+type PermissionResourceType string
+
+const (
+	PermissionResourceTypeNamespace  PermissionResourceType = "namespace"
+	PermissionResourceTypeRepository PermissionResourceType = "repository"
+)
+
+type PermissionActionType string
+
+const (
+	PermissionActionTypePush PermissionActionType = "push"
+	PermissionActionTypePull PermissionActionType = "pull"
 )
 
 type ResourcePermissionResource struct {
-	Type  string `json:"type"`
-	Value string `json:"value"`
+	Type          string   `json:"type" binding:"required,max=64,excludesall= \t\x00\r\n"`
+	Value         string   `json:"value" binding:"required,max=512,excludesall=\x00\r\n"`
+	PublicActions []string `json:"-"`
 }
 
 type ResourcePermissionGrant struct {
-	UserID   int32                      `json:"user_id"`
-	Resource ResourcePermissionResource `json:"resource"`
-	Actions  []string                   `json:"actions"`
+	UserID   int32                      `json:"user_id" binding:"min=0"`
+	Resource ResourcePermissionResource `json:"resource" binding:"required"`
+	Actions  []string                   `json:"actions" binding:"dive,required,max=64,excludesall= \t\x00\r\n"`
 }
 
 type ResourcePermissionDecision struct {
@@ -29,177 +45,189 @@ type ResourcePermissionDecision struct {
 	Explicit bool `json:"explicit"`
 }
 
-type ResourcePermission struct{}
-
-var resourcePermissionMu sync.Mutex
-var resourcePermissionActions = []string{"read", "write", "create", "delete", "manage_permissions", "push", "pull"}
-
-func validResourcePermissionResource(resource ResourcePermissionResource) bool {
-	return slices.Contains([]string{"namespace", "repository", "document_category", "document_library", "document_file"}, resource.Type) && resource.Value != "" && len(resource.Value) <= 512 && !strings.ContainsAny(resource.Value, "\x00\r\n")
+type ResourcePermission struct {
+	Admin bool
 }
 
-func (l ResourcePermission) Check(ctx context.Context, user *entity.RegistryUser, resources []ResourcePermissionResource, action string) (ResourcePermissionDecision, error) {
-	if user == nil || !slices.Contains(resourcePermissionActions, action) || len(resources) == 0 || len(resources) > 3 {
-		return ResourcePermissionDecision{}, errors.New("无效权限请求")
+var ErrResourcePermissionInvalid = errors.New("无效权限请求")
+
+// CheckPermission 只校验准备好的公共动作和用户授权，不查询或继承其他资源权限。
+func (l ResourcePermission) CheckPermission(resource ResourcePermissionResource, permission *entity.RegistryUserPermission, actions []string) ResourcePermissionDecision {
+	if l.Admin {
+		return ResourcePermissionDecision{Allowed: true}
 	}
-	for _, resource := range resources {
-		if !validResourcePermissionResource(resource) {
-			return ResourcePermissionDecision{}, errors.New("无效资源类型或标识")
-		}
+	if len(actions) > 0 && validatePermissionActions(actions, resource.PublicActions) {
+		return ResourcePermissionDecision{Allowed: true}
 	}
-	if (userlogic.User{}).IsAdminUser(user) {
-		return ResourcePermissionDecision{Allowed: true}, nil
+	if permission == nil {
+		return ResourcePermissionDecision{}
 	}
-	query := dao.Q.RegistryUserPermission
-	for _, resource := range resources {
-		permissions, err := query.WithContext(ctx).Where(query.ResourceType.Eq(resource.Type), query.ResourceValue.Eq(resource.Value)).Find()
-		if err != nil {
-			return ResourcePermissionDecision{}, err
-		}
-		if len(permissions) == 0 {
-			continue
-		}
-		for _, item := range permissions {
-			if (item.UserID == user.ID || item.UserID == 0) && item.Action != nil && slices.Contains(*item.Action, action) {
-				return ResourcePermissionDecision{Allowed: true, Explicit: true}, nil
-			}
-		}
-		return ResourcePermissionDecision{Explicit: true}, nil
+	return ResourcePermissionDecision{
+		Allowed:  permission.Action != nil && validatePermissionActions(actions, *permission.Action),
+		Explicit: true,
 	}
-	return ResourcePermissionDecision{}, nil
 }
 
-func (l ResourcePermission) Replace(ctx context.Context, grants []ResourcePermissionGrant) error {
-	if len(grants) == 0 || len(grants) > 500 {
-		return errors.New("无效授权请求")
+// CheckResource 按资源完整路径组合精确授权和 namespace 授权。
+func (l ResourcePermission) CheckResource(ctx context.Context, user *entity.RegistryUser, resource ResourcePermissionResource, actions []string) (ResourcePermissionDecision, error) {
+	if l.Admin || user == nil || (len(actions) > 0 && validatePermissionActions(actions, resource.PublicActions)) {
+		return l.CheckPermission(resource, nil, actions), nil
 	}
-	for _, grant := range grants {
-		if grant.UserID < 0 || !validResourcePermissionResource(grant.Resource) {
-			return errors.New("无效授权资源")
-		}
-		for _, action := range grant.Actions {
-			if !slices.Contains(resourcePermissionActions, action) {
-				return errors.New("无效授权动作")
-			}
-		}
-	}
-	resourcePermissionMu.Lock()
-	defer resourcePermissionMu.Unlock()
-	return dao.Q.Transaction(func(tx *dao.Query) error {
-		query := tx.RegistryUserPermission
-		for _, grant := range grants {
-			if _, err := query.WithContext(ctx).Where(query.UserID.Eq(grant.UserID), query.ResourceType.Eq(grant.Resource.Type), query.ResourceValue.Eq(grant.Resource.Value)).Delete(); err != nil {
-				return err
-			}
-			actions := accessor.PermissionActionOption(grant.Actions)
-			if err := query.WithContext(ctx).Create(&entity.RegistryUserPermission{UserID: grant.UserID, ResourceType: grant.Resource.Type, ResourceValue: grant.Resource.Value, Action: &actions}); err != nil {
-				return err
-			}
-		}
-		return nil
-	})
-}
-
-// Initialize replaces all grants on newly allocated resource identities, clearing grants left by deleted files.
-func (l ResourcePermission) Initialize(ctx context.Context, grants []ResourcePermissionGrant) error {
-	if len(grants) == 0 || len(grants) > 500 {
-		return errors.New("无效授权请求")
-	}
-	for _, grant := range grants {
-		if !validResourcePermissionResource(grant.Resource) || grant.UserID < 0 {
-			return errors.New("无效资源")
-		}
-		for _, action := range grant.Actions {
-			if !slices.Contains(resourcePermissionActions, action) {
-				return errors.New("无效操作")
-			}
-		}
-	}
-	resourcePermissionMu.Lock()
-	defer resourcePermissionMu.Unlock()
-	return dao.Q.Transaction(func(tx *dao.Query) error {
-		query := tx.RegistryUserPermission
-		cleared := map[ResourcePermissionResource]bool{}
-		for _, grant := range grants {
-			if !cleared[grant.Resource] {
-				if _, err := query.WithContext(ctx).Where(query.ResourceType.Eq(grant.Resource.Type), query.ResourceValue.Eq(grant.Resource.Value)).Delete(); err != nil {
-					return err
-				}
-				cleared[grant.Resource] = true
-			}
-			actions := accessor.PermissionActionOption(grant.Actions)
-			if err := query.WithContext(ctx).Create(&entity.RegistryUserPermission{UserID: grant.UserID, ResourceType: grant.Resource.Type, ResourceValue: grant.Resource.Value, Action: &actions}); err != nil {
-				return err
-			}
-		}
-		return nil
-	})
-}
-
-type ResourcePermissionRequest struct {
-	Resources []ResourcePermissionResource `json:"resources"`
-	Action    string                       `json:"action"`
-}
-
-// CheckBatch loads the grants once, so listing a library does not issue a query per file/action.
-func (l ResourcePermission) CheckBatch(ctx context.Context, user *entity.RegistryUser, requests []ResourcePermissionRequest) ([]ResourcePermissionDecision, error) {
-	if user == nil || len(requests) == 0 || len(requests) > 500 {
-		return nil, errors.New("无效批量权限请求")
-	}
-	types := []string{}
-	values := []string{}
-	seenTypes := map[string]bool{}
-	seenValues := map[string]bool{}
-	for _, request := range requests {
-		if !slices.Contains(resourcePermissionActions, request.Action) || len(request.Resources) == 0 || len(request.Resources) > 3 {
-			return nil, errors.New("无效权限动作或资源")
-		}
-		for _, resource := range request.Resources {
-			if !validResourcePermissionResource(resource) {
-				return nil, errors.New("无效权限资源")
-			}
-			if !seenTypes[resource.Type] {
-				types = append(types, resource.Type)
-				seenTypes[resource.Type] = true
-			}
-			if !seenValues[resource.Value] {
-				values = append(values, resource.Value)
-				seenValues[resource.Value] = true
-			}
-		}
-	}
-	decisions := make([]ResourcePermissionDecision, len(requests))
-	if (userlogic.User{}).IsAdminUser(user) {
-		for index := range decisions {
-			decisions[index].Allowed = true
-		}
-		return decisions, nil
-	}
-	query := dao.Q.RegistryUserPermission
-	rows, err := query.WithContext(ctx).Where(query.ResourceType.In(types...), query.ResourceValue.In(values...)).Find()
+	permission, err := l.GetUserPermission(ctx, user.ID, resource)
 	if err != nil {
-		return nil, err
+		return ResourcePermissionDecision{}, err
 	}
-	grants := map[ResourcePermissionResource][]*entity.RegistryUserPermission{}
-	for _, row := range rows {
-		resource := ResourcePermissionResource{Type: row.ResourceType, Value: row.ResourceValue}
-		grants[resource] = append(grants[resource], row)
+	if permission == nil && resource.Type != string(PermissionResourceTypeNamespace) {
+		// 任何精确授权都会阻止 push 使用 namespace 兜底，pull 保持原有规则。
+		configured := false
+		if slices.Contains(actions, string(PermissionActionTypePush)) {
+			query := dao.Q.RegistryUserPermission
+			grant, err := query.WithContext(ctx).Select(query.ID).Where(query.ResourceType.Eq(resource.Type), query.ResourceValue.Eq(resource.Value)).First()
+			if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+				return ResourcePermissionDecision{}, err
+			}
+			configured = grant != nil
+		}
+		if !configured {
+			_, namespace := userlogic.ParseRepositoryNameAndNamespace(resource.Value)
+			permission, err = l.GetUserPermission(ctx, user.ID, ResourcePermissionResource{Type: string(PermissionResourceTypeNamespace), Value: namespace})
+			if err != nil {
+				return ResourcePermissionDecision{}, err
+			}
+		}
 	}
-	for index, request := range requests {
-		for _, resource := range request.Resources {
-			entries := grants[resource]
-			if len(entries) == 0 {
+	return l.CheckPermission(resource, permission, actions), nil
+}
+
+func (l ResourcePermission) GetUserPermission(ctx context.Context, userID int32, resource ResourcePermissionResource) (*entity.RegistryUserPermission, error) {
+	query := dao.Q.RegistryUserPermission
+	permission, err := query.WithContext(ctx).Where(query.UserID.Eq(userID), query.ResourceType.Eq(resource.Type), query.ResourceValue.Eq(resource.Value)).First()
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	return permission, err
+}
+
+func validatePermissionActions(requested, permitted []string) bool {
+	for _, action := range requested {
+		if !slices.Contains(permitted, action) {
+			return false
+		}
+	}
+	return true
+}
+
+func (l ResourcePermission) Get(ctx context.Context, resource ResourcePermissionResource) ([]*entity.RegistryUserPermission, error) {
+	query := dao.Q.RegistryUserPermission
+	return query.WithContext(ctx).Where(query.ResourceType.Eq(resource.Type), query.ResourceValue.Eq(resource.Value)).Order(query.ID).Find()
+}
+
+// Set replaces the complete grants for one resource.
+func (l ResourcePermission) Set(ctx context.Context, grants []ResourcePermissionGrant) error {
+	resource := grants[0].Resource
+	seen := map[int32]bool{}
+	for _, grant := range grants {
+		if grant.Resource.Type != resource.Type || grant.Resource.Value != resource.Value || seen[grant.UserID] {
+			return ErrResourcePermissionInvalid
+		}
+		seen[grant.UserID] = true
+	}
+	return dao.Q.Transaction(func(tx *dao.Query) error {
+		query := tx.RegistryUserPermission
+		if _, err := query.WithContext(ctx).Where(query.ResourceType.Eq(resource.Type), query.ResourceValue.Eq(resource.Value)).Delete(); err != nil {
+			return err
+		}
+		for _, grant := range grants {
+			if len(grant.Actions) == 0 {
 				continue
 			}
-			decisions[index].Explicit = true
-			for _, entry := range entries {
-				if (entry.UserID == user.ID || entry.UserID == 0) && entry.Action != nil && slices.Contains(*entry.Action, request.Action) {
-					decisions[index].Allowed = true
-					break
-				}
+			actions := accessor.PermissionActionOption(grant.Actions)
+			if err := query.WithContext(ctx).Create(&entity.RegistryUserPermission{UserID: grant.UserID, ResourceType: resource.Type, ResourceValue: resource.Value, Action: &actions}); err != nil {
+				return err
 			}
-			break
 		}
+		return nil
+	})
+}
+
+func (l ResourcePermission) UserHasPermissionByResource(userId int, resourceValue string, resourceType PermissionResourceType) bool {
+	exists, _ := dao.Q.RegistryUserPermission.
+		Where(dao.Q.RegistryUserPermission.UserID.Eq(int32(userId))).
+		Where(dao.Q.RegistryUserPermission.ResourceType.Eq(string(resourceType))).
+		Where(dao.Q.RegistryUserPermission.ResourceValue.Eq(resourceValue)).First()
+
+	return exists != nil
+}
+
+func (l ResourcePermission) AddUserPermission(userId int32, resourceValue string, resourceType PermissionResourceType, actions accessor.PermissionActionOption) error {
+	return dao.Q.RegistryUserPermission.Create(&entity.RegistryUserPermission{
+		UserID:        userId,
+		ResourceType:  string(resourceType),
+		ResourceValue: resourceValue,
+		Action:        &actions,
+	})
+}
+
+func (l ResourcePermission) DelUserPermission(userId int32, resourceValue string, resourceType PermissionResourceType) error {
+	_, err := dao.Q.RegistryUserPermission.
+		Where(dao.Q.RegistryUserPermission.UserID.Eq(userId)).
+		Where(dao.Q.RegistryUserPermission.ResourceType.Eq(string(resourceType))).
+		Where(dao.Q.RegistryUserPermission.ResourceValue.Eq(resourceValue)).Delete()
+	return err
+}
+
+func (l ResourcePermission) ClearUserPermission(userId int32) error {
+	_, err := dao.Q.RegistryUserPermission.
+		Where(dao.Q.RegistryUserPermission.UserID.Eq(userId)).Delete()
+	return err
+}
+
+func (l ResourcePermission) DelPermissionByResource(tx *dao.Query, resourceValue string, resourceType PermissionResourceType) error {
+	_, err := tx.RegistryUserPermission.
+		Where(tx.RegistryUserPermission.ResourceType.Eq(string(resourceType))).
+		Where(tx.RegistryUserPermission.ResourceValue.Eq(resourceValue)).Delete()
+	return err
+}
+
+func (l ResourcePermission) GetNamespacePermissions(namespace string) ([]*entity.RegistryUserPermission, error) {
+	return dao.Q.RegistryUserPermission.
+		Where(dao.Q.RegistryUserPermission.ResourceType.Eq(string(PermissionResourceTypeNamespace))).
+		Where(dao.Q.RegistryUserPermission.ResourceValue.Eq(namespace)).
+		Find()
+}
+
+func (l ResourcePermission) ReplaceNamespacePermissions(namespace string, permissions []registry.NamespacePermissionItem) error {
+	return dao.Q.Transaction(func(tx *dao.Query) error {
+		_, err := tx.RegistryUserPermission.
+			Where(tx.RegistryUserPermission.ResourceType.Eq(string(PermissionResourceTypeNamespace))).
+			Where(tx.RegistryUserPermission.ResourceValue.Eq(namespace)).
+			Delete()
+		if err != nil {
+			return err
+		}
+
+		if len(permissions) == 0 {
+			return nil
+		}
+
+		userPermissions := make([]*entity.RegistryUserPermission, 0, len(permissions))
+		for _, item := range permissions {
+			userPermissions = append(userPermissions, &entity.RegistryUserPermission{
+				UserID:        int32(item.UserID),
+				ResourceValue: namespace,
+				ResourceType:  string(PermissionResourceTypeNamespace),
+				Action:        (*accessor.PermissionActionOption)(&item.Actions),
+			})
+		}
+
+		return tx.RegistryUserPermission.CreateInBatches(userPermissions, 10)
+	})
+}
+
+func (l ResourcePermission) IsCanOperate(ctx *gin.Context, curUid int32) bool {
+	user := userlogic.User{}.GetUser(ctx)
+	if user == nil || (userlogic.User{}.IsAdminUser(user)) || curUid == user.ID {
+		return true
 	}
-	return decisions, nil
+	return false
 }

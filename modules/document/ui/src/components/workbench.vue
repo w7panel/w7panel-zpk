@@ -1,6 +1,6 @@
 <template>
-    <div id="zpk-description" class="description-page">
-        <a-spin :loading="loading || saving" class="description-spin">
+    <div class="document-workbench">
+        <a-spin :loading="loading || saving" class="workbench-spin">
             <div class="document-actions">
                 <span class="document-reference">{{ libraryRef }}</span>
                 <a-button @click="linksVisible = true">整体下载地址</a-button>
@@ -102,27 +102,15 @@
                     </div>
 
                     <div class="editor-body">
-                        <mavon-editor
-                            v-if="activeDoc?.can_write"
-                            ref="descriptionEditor"
+                        <markdown-editor
                             v-model="mdtxt"
-                            class="mavon-description-editor"
-                            :subfield="false"
-                            :toolbarsFlag="true"
-                            defaultOpen="preview"
-                            previewBackground="#ffffff"
-                            boxShadowStyle=""
-                            :xssOptions="false"
-                            placeholder="请输入文档内容"
-                            :toolbars="editorToolbars"
-                            @click.capture="handleMavonToolbarClick"
-                            @change="patchMavonMarkdown"
+                            :readonly="!activeDoc?.can_write"
+                            :disabled="saving || !activeDoc?.loaded"
                         />
-                        <div v-else class="markdown-body document-readonly" v-html="markdownToHtml(mdtxt)"></div>
                     </div>
                 </div>
                 <div v-else class="editor-empty">
-                    <a-empty description="暂无应用文档">
+                    <a-empty description="暂无文档">
                         <a-button type="primary" :disabled="saving || !canCreate" @click="openCreateDialog">
                             <template #icon><icon-plus /></template>
                             添加文档
@@ -175,21 +163,14 @@
 <script>
 import { IconDelete, IconEdit, IconPlus } from '@arco-design/web-vue/es/icon';
 import { Message } from '@arco-design/web-vue';
-import { renderMarkdown } from '../utils/markdown';
+import MarkdownEditor from './markdown-editor.vue';
 
-const DOCS_DIR = 'docs';
-const MAVON_ALIGN_TYPES = {
-    alignleft: 'left',
-    aligncenter: 'center',
-    alignright: 'right',
-};
-const patchedMavonEditors = new WeakSet();
 const normalizePath = (path = '') =>
     path.replace(/\\/g, '/').replace(/^\/+/, '').replace(/\/+/g, '/').replace(/\/+$/, '');
 const isDocMarkdownPath = (path = '') => /\.md$/i.test(normalizePath(path));
 export default {
     name: 'DocumentWorkbench',
-    components: { IconDelete, IconEdit, IconPlus },
+    components: { IconDelete, IconEdit, IconPlus, MarkdownEditor },
     props: {
         client: { type: Object, required: true },
         libraryRef: { type: String, required: true },
@@ -197,7 +178,6 @@ export default {
     data() {
         return {
             loading: false,
-            libraryRevision: 0,
             canCreate: false,
             selectionVersion: 0,
             disposed: false,
@@ -218,37 +198,6 @@ export default {
             },
             mdtxt: '',
             savingPath: '',
-            editorToolbars: {
-                bold: true,
-                italic: true,
-                header: true,
-                underline: true,
-                strikethrough: true,
-                mark: true,
-                superscript: true,
-                subscript: true,
-                quote: true,
-                ol: true,
-                ul: true,
-                link: true,
-                imagelink: false,
-                code: false,
-                table: true,
-                undo: true,
-                redo: true,
-                trash: false,
-                save: false,
-                alignleft: true,
-                aligncenter: true,
-                alignright: true,
-                navigation: false,
-                subfield: false,
-                fullscreen: false,
-                readmodel: false,
-                htmlcode: false,
-                help: false,
-                preview: true,
-            },
         };
     },
     computed: {
@@ -264,9 +213,6 @@ export default {
     },
     mounted() {
         this.getFiles().catch((error) => Message.error(error.message));
-        this.$nextTick(() => {
-            this.patchMavonMarkdown();
-        });
     },
     beforeUnmount() {
         this.disposed = true;
@@ -278,14 +224,14 @@ export default {
             try {
                 const result = await this.client.post('/file/list', { ref: this.libraryRef });
                 if (this.disposed) return;
+                this.persistEditorContent();
                 const cache = new Map(this.docsFiles.map((file) => [file.path, file]));
-                this.libraryRevision = result.revision;
                 this.canCreate = result.can_create;
                 this.docsFiles = (result.files || [])
                     .filter((file) => isDocMarkdownPath(file.path))
                     .map((file) => {
                         const previous = cache.get(file.path);
-                        return previous && (previous.revision === file.revision || previous.dirty)
+                        return previous && previous.dirty
                             ? { ...file, ...previous, can_write: file.can_write, can_delete: file.can_delete }
                             : { ...file, loaded: false, dirty: false };
                     });
@@ -309,9 +255,7 @@ export default {
                 await this.client.post('/file/order', {
                     ref: this.libraryRef,
                     paths: this.docsFiles.map((file) => file.path),
-                    revision: this.libraryRevision,
                 });
-                this.libraryRevision++;
                 Message.success('排序已保存');
             } catch (error) {
                 Message.error(error.message);
@@ -380,12 +324,10 @@ export default {
                     if (this.disposed || version !== this.selectionVersion) return;
                     file.content = result.content;
                     file.baseContent = result.content;
-                    file.revision = result.revision;
                     file.loaded = true;
                 }
                 if (version !== this.selectionVersion) return;
                 this.mdtxt = file.content || '';
-                this.$nextTick(() => this.patchMavonMarkdown());
             } catch (error) {
                 Message.error(error.message);
             }
@@ -411,11 +353,15 @@ export default {
                 return;
             }
             if (this.saving || !this.canCreate) return;
+            const path = title.trim().replace(/\.md$/i, '').trim() + '.md';
+            if (this.docsFiles.some((file) => file.path === path)) {
+                Message.warning('同名文档已存在');
+                return;
+            }
             this.persistEditorContent();
             this.saving = true;
-            const path = DOCS_DIR + '/' + title.trim().replace(/\.md$/i, '').trim() + '.md';
             try {
-                await this.client.post('/file/save', { ref: this.libraryRef, path, title, content: '', revision: 0 });
+                await this.client.post('/file/save', { ref: this.libraryRef, path, title, content: '' });
                 this.createDialog.show = false;
                 await this.getFiles();
                 await this.selectDoc(path);
@@ -436,10 +382,8 @@ export default {
                     ref: this.libraryRef,
                     path: file.path,
                     title,
-                    revision: file.revision,
                 });
                 file.title = title;
-                file.revision++;
                 this.renameDialog.show = false;
                 await this.getFiles();
                 Message.success('修改成功');
@@ -454,7 +398,7 @@ export default {
             if (!file?.can_delete || this.saving) return;
             this.saving = true;
             try {
-                await this.client.post('/file/delete', { ref: this.libraryRef, path, revision: file.revision });
+                await this.client.post('/file/delete', { ref: this.libraryRef, path });
                 this.docsFiles = this.docsFiles.filter((item) => item.path !== path);
                 if (this.activeDocPath === path) this.activeDocPath = '';
                 await this.getFiles();
@@ -472,80 +416,6 @@ export default {
                 file.dirty = file.content !== file.baseContent;
             }
         },
-        markdownToHtml: renderMarkdown,
-        handleMavonToolbarClick(event) {
-            let target = event?.target;
-            if (!target?.classList) {
-                return;
-            }
-
-            let alignType = '';
-            if (target.classList.contains('fa-mavon-align-left')) {
-                alignType = 'alignleft';
-            } else if (target.classList.contains('fa-mavon-align-center')) {
-                alignType = 'aligncenter';
-            } else if (target.classList.contains('fa-mavon-align-right')) {
-                alignType = 'alignright';
-            }
-            if (!alignType) {
-                return;
-            }
-
-            event.preventDefault();
-            event.stopPropagation();
-            event.stopImmediatePropagation && event.stopImmediatePropagation();
-            this.insertMavonAlignBlock(alignType);
-        },
-        insertMavonAlignBlock(type) {
-            let align = MAVON_ALIGN_TYPES[type];
-            let editor = this.$refs.descriptionEditor;
-            let textarea = editor?.getTextareaDom?.();
-            if (!align || !editor || !textarea || this.saving) {
-                return;
-            }
-
-            editor.insertText(textarea, {
-                prefix: '<div align="' + align + '">',
-                subfix: '</div>',
-                str: '',
-                type,
-            });
-            this.mdtxt = editor.d_value || textarea.value || this.mdtxt;
-            this.$nextTick(() => {
-                this.patchMavonMarkdown();
-            });
-        },
-        patchMavonToolbar(editor = this.$refs.descriptionEditor) {
-            if (!editor || patchedMavonEditors.has(editor) || typeof editor.toolbar_left_click !== 'function') {
-                return;
-            }
-            let originalToolbarClick = editor.toolbar_left_click.bind(editor);
-            try {
-                editor.toolbar_left_click = (type) => {
-                    if (MAVON_ALIGN_TYPES[type]) {
-                        this.insertMavonAlignBlock(type);
-                        return;
-                    }
-                    originalToolbarClick(type);
-                };
-                patchedMavonEditors.add(editor);
-            } catch (error) {
-                patchedMavonEditors.add(editor);
-            }
-        },
-        patchMavonMarkdown() {
-            let editor = this.$refs.descriptionEditor;
-            if (!editor) {
-                return;
-            }
-            this.patchMavonToolbar(editor);
-            let markdownIt = editor.markdownIt;
-            if (markdownIt && !markdownIt.__githubPreviewPatched) {
-                markdownIt.render = (src = '') => this.markdownToHtml(src);
-                markdownIt.__githubPreviewPatched = true;
-            }
-            editor.d_render = this.markdownToHtml(editor.d_value || this.mdtxt || '');
-        },
         async saveDoc(path) {
             const file = this.docsFiles.find((item) => item.path === path);
             if (!file?.can_write || !file.loaded || this.saving) return;
@@ -553,14 +423,12 @@ export default {
             this.saving = true;
             this.savingPath = path;
             try {
-                const result = await this.client.post('/file/save', {
+                await this.client.post('/file/save', {
                     ref: this.libraryRef,
                     path,
                     title: file.title,
                     content: file.content || '',
-                    revision: file.revision,
                 });
-                file.revision = result.revision;
                 file.baseContent = file.content;
                 file.dirty = false;
                 await this.getFiles();
@@ -608,19 +476,12 @@ export default {
     margin-right: auto;
 }
 
-.document-readonly {
-    padding: 24px;
-    overflow: auto;
-    height: 100%;
-    box-sizing: border-box;
-}
-
-.description-page {
+.document-workbench {
     min-height: 100vh;
     background: #fff;
 }
 
-.description-spin {
+.workbench-spin {
     display: block;
 }
 
@@ -791,124 +652,6 @@ export default {
     position: relative;
     display: flex;
     flex-direction: column;
-}
-
-.mavon-description-editor {
-    flex: 1;
-    min-height: 640px;
-    border: 0;
-    z-index: 1;
-}
-
-.mavon-description-editor :deep(.v-note-op) {
-    display: flex !important;
-    align-items: center;
-    flex-wrap: nowrap;
-    min-height: 36px;
-    padding: 0 8px;
-    overflow-x: auto;
-    overflow-y: visible;
-    white-space: nowrap;
-}
-
-.mavon-description-editor :deep(.op-icon) {
-    width: 24px;
-    min-width: 24px;
-    height: 28px;
-    padding: 6px 4px;
-    margin: 0 1px;
-}
-
-.mavon-description-editor :deep(.op-icon-divider) {
-    display: none !important;
-}
-
-.mavon-description-editor :deep(.v-left-item),
-.mavon-description-editor :deep(.v-right-item) {
-    float: none !important;
-    display: flex !important;
-    align-items: center;
-    flex-wrap: nowrap;
-    flex: 0 0 auto;
-    height: 100%;
-    min-height: 36px;
-    padding: 0 !important;
-}
-
-.mavon-description-editor :deep(.v-right-item) {
-    margin-left: 4px;
-}
-
-.mavon-description-editor :deep(.v-note-panel) {
-    min-height: 580px;
-}
-
-.mavon-description-editor :deep([align='left']) {
-    text-align: left;
-}
-
-.mavon-description-editor :deep([align='center']) {
-    text-align: center;
-}
-
-.mavon-description-editor :deep([align='right']) {
-    text-align: right;
-}
-
-.mavon-description-editor :deep([align='justify']) {
-    text-align: justify;
-}
-
-.mavon-description-editor :deep(.markdown-alert) {
-    padding: 8px 16px;
-    border-left-width: 4px;
-    color: #303133;
-    background: #fff;
-}
-
-.mavon-description-editor :deep(.markdown-alert-title) {
-    margin: 0 0 8px;
-    font-weight: 600;
-}
-
-.mavon-description-editor :deep(.markdown-alert-note) {
-    border-left-color: #0969da;
-}
-
-.mavon-description-editor :deep(.markdown-alert-note .markdown-alert-title) {
-    color: #0969da;
-}
-
-.mavon-description-editor :deep(.markdown-alert-tip) {
-    border-left-color: #1a7f37;
-}
-
-.mavon-description-editor :deep(.markdown-alert-tip .markdown-alert-title) {
-    color: #1a7f37;
-}
-
-.mavon-description-editor :deep(.markdown-alert-important) {
-    border-left-color: #8250df;
-}
-
-.mavon-description-editor :deep(.markdown-alert-important .markdown-alert-title) {
-    color: #8250df;
-}
-
-.mavon-description-editor :deep(.markdown-alert-warning) {
-    border-left-color: #9a6700;
-}
-
-.mavon-description-editor :deep(.markdown-alert-warning .markdown-alert-title) {
-    color: #9a6700;
-}
-
-.mavon-description-editor :deep(.markdown-alert-caution) {
-    border-left-color: #cf222e;
-}
-
-.mavon-description-editor :deep(.markdown-alert-caution .markdown-alert-title) {
-    color: #cf222e;
 }
 
 .form-row {

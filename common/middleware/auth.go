@@ -26,7 +26,7 @@ func (m Auth) Process(ctx *gin.Context) {
 		return
 	}
 
-	sessionUser, err := logic.Session{}.GetUserInfo(ctx, zpkToken)
+	sessionUser, err := logic.Session{}.GetUserInfo(ctx)
 	if err != nil {
 		m.JsonResponseWithServerError(ctx, err)
 		ctx.Abort()

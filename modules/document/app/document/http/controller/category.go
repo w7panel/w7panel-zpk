@@ -1,72 +1,55 @@
 package controller
 
 import (
-	"errors"
-	"net/http"
-
 	"github.com/gin-gonic/gin"
 	"github.com/w7panel/w7panel-zpk/modules/document/app/document/logic"
-	"github.com/w7panel/w7panel-zpk/modules/document/common/service/permission"
-	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 )
 
 type Category struct {
-	controller.Abstract
+	Abstract
 }
 
 func (c Category) List(ctx *gin.Context) {
-	result, e := logic.Category{}.Categories(ctx.Request.Context(), actor(ctx))
-	c.respond(ctx, result, e)
+	result, e := logic.Category{}.Categories(ctx.Request.Context())
+	c.Respond(ctx, result, e)
 }
 
 func (c Category) Create(ctx *gin.Context) {
 	type ParamsValidate struct {
-		Identifie   string `json:"identifie" binding:"required"`
-		Name        string `json:"name" binding:"required"`
-		Description string `json:"description"`
+		Identifie   string `json:"identifie" binding:"required,document_identifie"`
+		Name        string `json:"name" binding:"required,notblank,maxbytes=255"`
+		Description string `json:"description" binding:"maxbytes=4096"`
 	}
 	params := ParamsValidate{}
 	if !c.Validate(ctx, &params) {
 		return
 	}
-	e := logic.Category{}.CreateCategory(ctx.Request.Context(), actor(ctx), params.Identifie, params.Name, params.Description)
-	c.respond(ctx, nil, e)
+	e := logic.Category{}.CreateCategory(ctx.Request.Context(), currentUser(ctx).ID, params.Identifie, params.Name, params.Description)
+	c.Respond(ctx, nil, e)
 }
 
 func (c Category) Edit(ctx *gin.Context) {
 	type ParamsValidate struct {
-		Identifie   string `json:"identifie" binding:"required"`
-		Name        string `json:"name" binding:"required"`
-		Description string `json:"description"`
-		Revision    int32  `json:"revision" binding:"required"`
+		Identifie    string `json:"identifie" binding:"required,document_identifie"`
+		NewIdentifie string `json:"new_identifie" binding:"required,document_identifie"`
+		Name         string `json:"name" binding:"required,notblank,maxbytes=255"`
+		Description  string `json:"description" binding:"maxbytes=4096"`
 	}
 	params := ParamsValidate{}
 	if !c.Validate(ctx, &params) {
 		return
 	}
-	e := logic.Category{}.EditCategory(ctx.Request.Context(), actor(ctx), params.Identifie, params.Name, params.Description, params.Revision)
-	c.respond(ctx, nil, e)
+	e := logic.Category{}.EditCategory(ctx.Request.Context(), params.Identifie, params.NewIdentifie, params.Name, params.Description)
+	c.Respond(ctx, nil, e)
 }
 
 func (c Category) Delete(ctx *gin.Context) {
 	type ParamsValidate struct {
-		Identifie string `json:"identifie" binding:"required"`
+		Identifie string `json:"identifie" binding:"required,document_identifie"`
 	}
 	params := ParamsValidate{}
 	if !c.Validate(ctx, &params) {
 		return
 	}
-	c.respond(ctx, nil, logic.Category{}.DeleteCategory(ctx.Request.Context(), actor(ctx), params.Identifie))
-}
-
-func (c Category) respond(ctx *gin.Context, data interface{}, err error) {
-	if err == nil {
-		c.JsonResponseWithoutError(ctx, data)
-		return
-	}
-	status := http.StatusBadRequest
-	if errors.Is(err, permission.ErrDenied) {
-		status = http.StatusForbidden
-	}
-	c.JsonResponseWithError(ctx, err, status)
+	c.Respond(ctx, nil, logic.Category{}.DeleteCategory(ctx.Request.Context(), params.Identifie))
 }

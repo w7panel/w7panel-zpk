@@ -34,7 +34,8 @@ func newDocumentFile(db *gorm.DB, opts ...gen.DOOption) documentFile {
 	_documentFile.StorageKey = field.NewString(tableName, "storage_key")
 	_documentFile.Size = field.NewInt64(tableName, "size")
 	_documentFile.Position = field.NewInt32(tableName, "position")
-	_documentFile.Revision = field.NewInt32(tableName, "revision")
+	_documentFile.Protected = field.NewInt32(tableName, "protected")
+	_documentFile.DeletedAt = field.NewField(tableName, "deleted_at")
 	_documentFile.UpdatedAt = field.NewTime(tableName, "updated_at")
 
 	_documentFile.fillFieldMap()
@@ -53,7 +54,8 @@ type documentFile struct {
 	StorageKey field.String
 	Size       field.Int64
 	Position   field.Int32
-	Revision   field.Int32
+	Protected  field.Int32
+	DeletedAt  field.Field
 	UpdatedAt  field.Time
 
 	fieldMap map[string]field.Expr
@@ -78,7 +80,8 @@ func (d *documentFile) updateTableName(table string) *documentFile {
 	d.StorageKey = field.NewString(table, "storage_key")
 	d.Size = field.NewInt64(table, "size")
 	d.Position = field.NewInt32(table, "position")
-	d.Revision = field.NewInt32(table, "revision")
+	d.Protected = field.NewInt32(table, "protected")
+	d.DeletedAt = field.NewField(table, "deleted_at")
 	d.UpdatedAt = field.NewTime(table, "updated_at")
 
 	d.fillFieldMap()
@@ -96,7 +99,7 @@ func (d *documentFile) GetFieldByName(fieldName string) (field.OrderExpr, bool) 
 }
 
 func (d *documentFile) fillFieldMap() {
-	d.fieldMap = make(map[string]field.Expr, 9)
+	d.fieldMap = make(map[string]field.Expr, 10)
 	d.fieldMap["id"] = d.ID
 	d.fieldMap["library_id"] = d.LibraryID
 	d.fieldMap["path"] = d.Path
@@ -104,7 +107,8 @@ func (d *documentFile) fillFieldMap() {
 	d.fieldMap["storage_key"] = d.StorageKey
 	d.fieldMap["size"] = d.Size
 	d.fieldMap["position"] = d.Position
-	d.fieldMap["revision"] = d.Revision
+	d.fieldMap["protected"] = d.Protected
+	d.fieldMap["deleted_at"] = d.DeletedAt
 	d.fieldMap["updated_at"] = d.UpdatedAt
 }
 

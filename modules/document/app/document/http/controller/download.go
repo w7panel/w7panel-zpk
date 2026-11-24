@@ -13,7 +13,14 @@ import (
 type Download struct{ Abstract }
 
 func (c Download) Export(ctx *gin.Context) {
-	f, e := logic.Document{}.Export(ctx.Request.Context(), actor(ctx), ctx.Query("ref"))
+	type ParamsValidate struct {
+		Ref string `form:"ref" binding:"required,document_ref"`
+	}
+	params := ParamsValidate{}
+	if !c.Validate(ctx, &params) {
+		return
+	}
+	f, e := logic.Download{}.Export(ctx.Request.Context(), currentUser(ctx), params.Ref)
 	if e != nil {
 		c.Respond(ctx, nil, e)
 		return

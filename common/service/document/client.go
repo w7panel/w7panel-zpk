@@ -79,20 +79,39 @@ func (c *Client) call(ctx context.Context, token, route string, body any, out an
 	return nil
 }
 
-func (c *Client) Initialize(ctx context.Context, token, identifie, title string, ownerID int32) (string, error) {
-	ref := "applications/" + identifie
-	err := c.call(ctx, token, "/library/initialize", map[string]any{"ref": ref, "name": title, "owner_id": ownerID, "homepage": "# " + title + "\n\n应用标识：" + identifie + "\n"}, nil)
-	return ref, err
+type CreateLibrary struct {
+	Ref         string        `json:"ref"`
+	Name        string        `json:"name"`
+	Description string        `json:"description"`
+	OwnerID     int32         `json:"owner_id"`
+	Public      int32         `json:"public"`
+	Protected   int32         `json:"protected"`
+	Files       []FileContent `json:"files"`
 }
 
-func (c *Client) Save(ctx context.Context, token, ref, path, title, content string, revision int32) error {
-	return c.call(ctx, token, "/file/save", map[string]any{"ref": ref, "path": path, "title": title, "content": content, "revision": revision}, nil)
+type Library struct {
+	UserID    int32 `json:"user_id"`
+	Protected int32 `json:"protected"`
+}
+
+func (c *Client) Create(ctx context.Context, token string, params CreateLibrary) error {
+	return c.call(ctx, token, "/library/create", params, nil)
+}
+
+func (c *Client) Info(ctx context.Context, token, ref string) (Library, error) {
+	var library Library
+	err := c.call(ctx, token, "/library/info", map[string]string{"ref": ref}, &library)
+	return library, err
+}
+
+func (c *Client) Save(ctx context.Context, token, ref, path, title, content string) error {
+	return c.call(ctx, token, "/file/save", map[string]any{"ref": ref, "path": path, "title": title, "content": content}, nil)
 }
 
 type File struct {
-	Path     string `json:"path"`
-	Title    string `json:"title"`
-	Revision int32  `json:"revision"`
+	Path      string `json:"path"`
+	Title     string `json:"title"`
+	Protected int32  `json:"protected"`
 }
 
 type FileContent struct {
@@ -101,8 +120,7 @@ type FileContent struct {
 }
 
 type FileTree struct {
-	Files    []File `json:"files"`
-	Revision int32  `json:"revision"`
+	Files []File `json:"files"`
 }
 
 func (c *Client) Tree(ctx context.Context, token, reference string) (FileTree, error) {
@@ -111,8 +129,8 @@ func (c *Client) Tree(ctx context.Context, token, reference string) (FileTree, e
 	return result, err
 }
 
-func (c *Client) Order(ctx context.Context, token, reference string, paths []string, revision int32) error {
-	return c.call(ctx, token, "/file/order", map[string]interface{}{"ref": reference, "paths": paths, "revision": revision}, nil)
+func (c *Client) Order(ctx context.Context, token, reference string, paths []string) error {
+	return c.call(ctx, token, "/file/order", map[string]interface{}{"ref": reference, "paths": paths}, nil)
 }
 
 func (c *Client) Read(ctx context.Context, token, reference, path string) (FileContent, error) {
@@ -121,6 +139,6 @@ func (c *Client) Read(ctx context.Context, token, reference, path string) (FileC
 	return result, err
 }
 
-func (c *Client) Delete(ctx context.Context, token, reference, path string, revision int32) error {
-	return c.call(ctx, token, "/file/delete", map[string]any{"ref": reference, "path": path, "revision": revision}, nil)
+func (c *Client) Delete(ctx context.Context, token, reference, path string) error {
+	return c.call(ctx, token, "/file/delete", map[string]any{"ref": reference, "path": path}, nil)
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/w7panel/w7panel-zpk/app/registry/command"
 	"github.com/w7panel/w7panel-zpk/app/registry/http/controller"
+	"github.com/w7panel/w7panel-zpk/app/registry/http/controller/openapi"
 	"github.com/w7panel/w7panel-zpk/app/registry/logic"
 	respologic "github.com/w7panel/w7panel-zpk/app/system/logic"
 	workflowmodule "github.com/w7panel/w7panel-zpk/app/workflow"
@@ -34,24 +35,27 @@ func (p Provider) registerRoutes(httpServer *httpserver.Server) {
 		root.Any("/registry/webhook", controller.WebHook{}.Hook)
 
 		permissionService := root.Group("/api/permission")
-		permissionService.POST("/evaluate", controller.ResourcePermission{}.Evaluate)
-		permissionService.POST("/evaluate-batch", controller.ResourcePermission{}.EvaluateBatch)
-		permissionAuth := permissionService.Group("", middleware.Auth{}.Process)
-		permissionAuth.POST("/check", controller.ResourcePermission{}.Check)
-		permissionAuth.POST("/check-batch", controller.ResourcePermission{}.CheckBatch)
-		permissionAuth.POST("/replace", controller.ResourcePermission{}.Replace)
-		permissionAuth.POST("/initialize", controller.ResourcePermission{}.Initialize)
+		permissionService.POST("/check", openapi.ResourcePermission{}.Check)
+		permissionService.POST("/set", openapi.ResourcePermission{}.Set)
+		permissionService.POST("/get", openapi.ResourcePermission{}.Get)
+
+		namespaceService := root.Group("/api/namespace")
+		namespaceService.POST("/get", openapi.NamespaceService{}.Get)
+		namespaceService.POST("/create", openapi.NamespaceService{}.Create)
+		namespaceService.POST("/rename", openapi.NamespaceService{}.Rename)
+		namespaceService.POST("/delete", openapi.NamespaceService{}.Delete)
+
+		namespaces := root.Group("/api/namespace", middleware.Cors{}.Process, middleware.DenyDomainReq{}.Process, middleware.Auth{}.Process)
+		namespaces.POST("/add", controller.Namespace{}.Create)
+		namespaces.POST("/info", controller.Namespace{}.Info)
+		namespaces.POST("/list", controller.Namespace{}.List)
+		namespaces.POST("/sub_namespace/list", controller.Namespace{}.SubNamespaceList)
+		namespaces.POST("/edit", controller.Namespace{}.Edit)
+		namespaces.POST("/del", controller.Namespace{}.Delete)
 
 		api := root.Group("/api", middleware.Cors{}.Process, middleware.DenyDomainReq{}.Process, middleware.Auth{}.Process)
-		api.POST("/permission/namespace/set", middleware.AdminUser{}.Process, controller.Permission{}.SetNamespacePermission)
-		api.POST("/permission/namespace/get", middleware.AdminUser{}.Process, controller.Permission{}.GetNamespacePermission)
-
-		api.POST("/namespace/add", controller.Namespace{}.Create)
-		api.POST("/namespace/info", controller.Namespace{}.Info)
-		api.POST("/namespace/list", controller.Namespace{}.List)
-		api.POST("/namespace/sub_namespace/list", controller.Namespace{}.SubNamespaceList)
-		api.POST("/namespace/edit", controller.Namespace{}.Edit)
-		api.POST("/namespace/del", controller.Namespace{}.Delete)
+		api.POST("/permission/namespace/set", middleware.AdminUser{}.Process, controller.RegistryPermission{}.SetNamespacePermission)
+		api.POST("/permission/namespace/get", middleware.AdminUser{}.Process, controller.RegistryPermission{}.GetNamespacePermission)
 
 		api.POST("/repository/add", controller.Repository{}.Create)
 		api.POST("/repository/info", controller.Repository{}.Info)
@@ -72,9 +76,9 @@ func (p Provider) registerEvent() {
 	_ = facade.GetEvent().Subscribe(registry.RegistryRepositoryPulledEvent, logic.Repository{}.OnRepositoryPulled)
 	_ = facade.GetEvent().Subscribe(registry.RegistryRepositoryAfterPushedEvent, logic.Deploy{}.OnRepositoryPushed)
 	_ = facade.GetEvent().Subscribe(registry.UpdateRepositoryEvent, logic.Repository{}.OnUpdateRepositoryEvent)
-	_ = facade.GetEvent().Subscribe(registry.ClearUserPermissionEvent, logic.Permission{}.OnClearUserPermissionEvent)
-	_ = facade.GetEvent().Subscribe(registry.AddUserPermissionEvent, logic.Permission{}.OnAddUserPermissionEvent)
-	_ = facade.GetEvent().Subscribe(registry.DeleteUserPermissionEvent, logic.Permission{}.OnDelUserPermissionEvent)
+	_ = facade.GetEvent().Subscribe(registry.ClearUserPermissionEvent, logic.RegistryPermission{}.OnClearUserPermissionEvent)
+	_ = facade.GetEvent().Subscribe(registry.AddUserPermissionEvent, logic.RegistryPermission{}.OnAddUserPermissionEvent)
+	_ = facade.GetEvent().Subscribe(registry.DeleteUserPermissionEvent, logic.RegistryPermission{}.OnDelUserPermissionEvent)
 }
 
 func (p Provider) initJwtCert() {

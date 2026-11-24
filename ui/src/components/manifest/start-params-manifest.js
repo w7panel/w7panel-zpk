@@ -395,12 +395,6 @@ export const startParamsManifestMethods = {
     },
     markStartParamsForEditor(params = []) {
         params.forEach((item, index) => {
-            // TODO: 临时兼容旧制品用 | 分隔候选项，下个版本移除。
-            if (!Array.isArray(item.options) && (!item.type || ['text', 'select'].includes(item.type)) && /^([^|]+\|)+[^|]+$/.test(item.values_text || '')) {
-                item.options = item.values_text.split('|');
-                item.values_text = item.options[0];
-                item.type = 'select';
-            }
             item.options = item.options || [];
             if (item.module_name == 'w7_mysql' || item.module_name == 'w7_mysql5') {
                 item.mark = item.module_name == 'w7_mysql' ? 'mysql8' : 'mysql5';

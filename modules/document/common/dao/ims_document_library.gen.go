@@ -33,10 +33,9 @@ func newDocumentLibrary(db *gorm.DB, opts ...gen.DOOption) documentLibrary {
 	_documentLibrary.Name = field.NewString(tableName, "name")
 	_documentLibrary.Description = field.NewString(tableName, "description")
 	_documentLibrary.UserID = field.NewInt32(tableName, "user_id")
-	_documentLibrary.Revision = field.NewInt32(tableName, "revision")
-	_documentLibrary.Ready = field.NewInt32(tableName, "ready")
 	_documentLibrary.Public = field.NewInt32(tableName, "public")
 	_documentLibrary.Protected = field.NewInt32(tableName, "protected")
+	_documentLibrary.DeletedAt = field.NewField(tableName, "deleted_at")
 	_documentLibrary.CreatedAt = field.NewTime(tableName, "created_at")
 	_documentLibrary.UpdatedAt = field.NewTime(tableName, "updated_at")
 
@@ -55,10 +54,9 @@ type documentLibrary struct {
 	Name        field.String
 	Description field.String
 	UserID      field.Int32
-	Revision    field.Int32
-	Ready       field.Int32
 	Public      field.Int32
 	Protected   field.Int32
+	DeletedAt   field.Field
 	CreatedAt   field.Time
 	UpdatedAt   field.Time
 
@@ -83,10 +81,9 @@ func (d *documentLibrary) updateTableName(table string) *documentLibrary {
 	d.Name = field.NewString(table, "name")
 	d.Description = field.NewString(table, "description")
 	d.UserID = field.NewInt32(table, "user_id")
-	d.Revision = field.NewInt32(table, "revision")
-	d.Ready = field.NewInt32(table, "ready")
 	d.Public = field.NewInt32(table, "public")
 	d.Protected = field.NewInt32(table, "protected")
+	d.DeletedAt = field.NewField(table, "deleted_at")
 	d.CreatedAt = field.NewTime(table, "created_at")
 	d.UpdatedAt = field.NewTime(table, "updated_at")
 
@@ -105,17 +102,16 @@ func (d *documentLibrary) GetFieldByName(fieldName string) (field.OrderExpr, boo
 }
 
 func (d *documentLibrary) fillFieldMap() {
-	d.fieldMap = make(map[string]field.Expr, 12)
+	d.fieldMap = make(map[string]field.Expr, 11)
 	d.fieldMap["id"] = d.ID
 	d.fieldMap["category"] = d.Category
 	d.fieldMap["identifie"] = d.Identifie
 	d.fieldMap["name"] = d.Name
 	d.fieldMap["description"] = d.Description
 	d.fieldMap["user_id"] = d.UserID
-	d.fieldMap["revision"] = d.Revision
-	d.fieldMap["ready"] = d.Ready
 	d.fieldMap["public"] = d.Public
 	d.fieldMap["protected"] = d.Protected
+	d.fieldMap["deleted_at"] = d.DeletedAt
 	d.fieldMap["created_at"] = d.CreatedAt
 	d.fieldMap["updated_at"] = d.UpdatedAt
 }

@@ -163,6 +163,6 @@ func (l Repository) Delete(ctx context.Context, repository *entity.RegistryRepos
 		if _, err := tx.RegistryRepository.WithContext(ctx).Delete(repository); err != nil {
 			return err
 		}
-		return (Permission{}).DelPermissionByResource(tx, name, PermissionResourceTypeRepository)
+		return (ResourcePermission{}).DelPermissionByResource(tx, name, PermissionResourceTypeRepository)
 	})
 }

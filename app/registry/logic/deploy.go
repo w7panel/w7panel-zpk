@@ -61,7 +61,7 @@ func (Deploy) OnRepositoryPushed(payload registry.RegistryRepositoryWebHookPayLo
 		slog.Error("identify image workflow", "error", err)
 		return
 	}
-	event.RegistryToken, err = (Permission{}).CreateToken(&entity.RegistryUser{Username: workflow.WorkflowBuildActorPrefix + runID}, []registry.PermissionScope{{Type: "repository", Name: event.Repository, Actions: []string{"pull", "push"}}})
+	event.RegistryToken, err = (RegistryPermission{}).CreateToken(&entity.RegistryUser{Username: workflow.WorkflowBuildActorPrefix + runID}, []registry.PermissionScope{{Type: "repository", Name: event.Repository, Actions: []string{"pull", "push"}}})
 	if err != nil {
 		slog.Error("create workflow registry token", "error", err)
 		return

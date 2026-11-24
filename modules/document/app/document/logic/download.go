@@ -3,6 +3,7 @@ package logic
 import (
 	"archive/zip"
 	"context"
+	"database/sql"
 	"errors"
 	"io"
 	"os"
@@ -11,48 +12,45 @@ import (
 	"github.com/w7panel/w7panel-zpk/modules/document/common/entity"
 	"github.com/w7panel/w7panel-zpk/modules/document/common/service"
 	"github.com/w7panel/w7panel-zpk/modules/document/common/service/permission"
-	"gorm.io/gorm"
+	"github.com/w7panel/w7panel-zpk/modules/document/common/service/zpk"
 )
+
+type Download struct{}
 
 type Snapshot struct {
 	Library entity.DocumentLibrary
 	Files   []*entity.DocumentFile
 }
 
-// Immutable blob keys plus a library revision check form a stable content snapshot.
-func (d Document) snapshot(ctx context.Context, ref string) (Snapshot, error) {
-	for i := 0; i < 3; i++ {
-		c, e := d.Library(ctx, ref)
+// Read metadata in one transaction; immutable blob keys keep the snapshot stable.
+func (d Download) snapshot(ctx context.Context, ref string) (Snapshot, error) {
+	category, identifie := SplitRef(ref)
+	var snapshot Snapshot
+	err := dao.Q.Transaction(func(tx *dao.Query) error {
+		library := tx.DocumentLibrary
+		c, e := library.WithContext(ctx).Where(library.Category.Eq(category), library.Identifie.Eq(identifie)).First()
 		if e != nil {
-			return Snapshot{}, e
+			return e
 		}
-		if c.Ready != 1 {
-			return Snapshot{}, gorm.ErrRecordNotFound
-		}
-		q := dao.Q.DocumentFile
+		q := tx.DocumentFile
 		rows, e := q.WithContext(ctx).Where(q.LibraryID.Eq(c.ID)).Order(q.Position, q.ID).Find()
 		if e != nil {
-			return Snapshot{}, e
+			return e
 		}
-		next, e := d.Library(ctx, ref)
-		if e != nil {
-			return Snapshot{}, e
-		}
-		if next.Revision == c.Revision {
-			return Snapshot{*c, rows}, nil
-		}
-	}
-	return Snapshot{}, ErrConflict
+		snapshot = Snapshot{Library: *c, Files: rows}
+		return nil
+	}, &sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true})
+	return snapshot, err
 }
 
 // Export spools a ZIP snapshot to disk before sending headers.
-func (d Document) Export(ctx context.Context, a Actor, ref string) (*os.File, error) {
+func (d Download) Export(ctx context.Context, user zpk.User, ref string) (*os.File, error) {
 	s, e := d.snapshot(ctx, ref)
 	if e != nil {
 		return nil, e
 	}
-	if !permission.CanRead(a.Principal, s.Library) {
-		return nil, permission.ErrDenied
+	if err := permission.Require(service.PermissionSdk.CanRead(ctx, user, s.Library)); err != nil {
+		return nil, err
 	}
 	files := s.Files
 	var total int64
@@ -94,12 +92,12 @@ func (d Document) Export(ctx context.Context, a Actor, ref string) (*os.File, er
 	}
 
 	// Recheck current visibility and deletion after preparing the snapshot.
-	current, e := d.Library(ctx, ref)
+	current, e := (Library{}).Get(ctx, ref)
 	if e != nil {
 		return nil, e
 	}
-	if !permission.CanRead(a.Principal, *current) {
-		return nil, permission.ErrDenied
+	if err := permission.Require(service.PermissionSdk.CanRead(ctx, user, *current)); err != nil {
+		return nil, err
 	}
 	if _, e = output.Seek(0, io.SeekStart); e != nil {
 		return nil, e
@@ -108,7 +106,7 @@ func (d Document) Export(ctx context.Context, a Actor, ref string) (*os.File, er
 	return output, nil
 }
 
-func (d Document) copyBlob(ctx context.Context, w io.Writer, f *entity.DocumentFile) error {
+func (d Download) copyBlob(ctx context.Context, w io.Writer, f *entity.DocumentFile) error {
 	r, e := service.DocumentStorage.Open(ctx, f.StorageKey)
 	if e != nil {
 		return e

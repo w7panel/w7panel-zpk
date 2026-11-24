@@ -3,47 +3,85 @@ package document
 
 import (
 	"context"
+	"errors"
+	"path"
+	"regexp"
+	"strconv"
+	"strings"
 
-	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
+	"github.com/go-playground/validator/v10"
 	"github.com/w7panel/w7panel-zpk/modules/document/app/document/http/controller"
+	"github.com/w7panel/w7panel-zpk/modules/document/app/document/http/middleware"
 	"github.com/w7panel/w7panel-zpk/modules/document/app/document/logic"
 	"github.com/w7panel/w7panel-zpk/modules/document/common/dao"
 	"github.com/w7panel/w7panel-zpk/modules/document/common/entity"
-	"github.com/w7panel/w7panel-zpk/modules/document/common/middleware"
-	"github.com/w7panel/w7panel-zpk/modules/document/common/service"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	httpserver "github.com/we7coreteam/w7-rangine-go/v2/src/http/server"
-	"gorm.io/gorm/clause"
+	"gorm.io/gorm"
 )
 
 type Provider struct{}
 
-func (p *Provider) initDb() {
-	if facade.GetConfig().GetBool("document.read_only") {
-		return
+func (p *Provider) registerValidator() {
+	engine := binding.Validator.Engine().(*validator.Validate)
+	identifiePattern := regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,95}$`)
+	rules := map[string]validator.Func{
+		"document_identifie": func(field validator.FieldLevel) bool {
+			return identifiePattern.MatchString(field.Field().String())
+		},
+		"document_ref": func(field validator.FieldLevel) bool {
+			category, identifie, found := strings.Cut(field.Field().String(), "/")
+			return found && identifiePattern.MatchString(category) && identifiePattern.MatchString(identifie)
+		},
+		"document_path": func(field validator.FieldLevel) bool {
+			value := field.Field().String()
+			return value != "" && len(value) <= 240 && !strings.ContainsAny(value, "\\\x00\r\n") && !path.IsAbs(value) && path.Clean(value) == value && value != "." && value != ".." && !strings.HasPrefix(value, "../")
+		},
+		"notblank": func(field validator.FieldLevel) bool {
+			return strings.TrimSpace(field.Field().String()) != ""
+		},
+		"maxbytes": func(field validator.FieldLevel) bool {
+			limit, err := strconv.Atoi(field.Param())
+			return err == nil && len(field.Field().String()) <= limit
+		},
 	}
+	for name, rule := range rules {
+		if err := engine.RegisterValidation(name, rule); err != nil {
+			panic(err)
+		}
+	}
+}
+
+func (p *Provider) initDb() {
 	db, err := facade.GetDbFactory().Channel("default")
 	if err != nil {
 		panic(err)
 	}
-	if err := db.AutoMigrate(&entity.DocumentCategory{}, &entity.DocumentLibrary{}, &entity.DocumentFile{}); err != nil {
+	if err := db.AutoMigrate(&entity.DocumentCategory{}, &entity.DocumentLibrary{}, &entity.DocumentFile{}, &entity.DocumentSession{}); err != nil {
 		panic(err)
 	}
-	if err := dao.Q.DocumentCategory.WithContext(context.Background()).Clauses(clause.OnConflict{DoNothing: true}).Create(&entity.DocumentCategory{Identifie: "applications", Name: "制品文档", Revision: 1}); err != nil {
+	query := dao.Q.DocumentCategory
+	_, err = query.WithContext(context.Background()).Unscoped().Where(query.Identifie.Eq("app")).First()
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		err = (logic.Category{}).CreateCategory(context.Background(), 0, "app", "制品文档", "")
+	}
+	if err != nil {
 		panic(err)
 	}
 }
 
 func (p *Provider) Register(httpServer *httpserver.Server) {
+	p.registerValidator()
 	p.initDb()
 	httpServer.RegisterRouters(p.registerRoutes)
 }
 
 func (p *Provider) registerRoutes(engine *gin.Engine) {
-	root := engine.Group("/zpk/document", sessions.Sessions(logic.SessionName, service.SessionStore))
+	root := engine.Group("/zpk/document")
 	root.POST("/login", controller.Login{}.FromPanel)
-	read := root.Group("", middleware.Auth{Optional: true}.Process)
+	read := root.Group("", middleware.OptionalAuth{}.Process)
 	read.POST("/file/list", controller.File{}.List)
 	read.POST("/file/read", controller.File{}.Read)
 	read.GET("/download", controller.Download{}.Export)
@@ -51,12 +89,13 @@ func (p *Provider) registerRoutes(engine *gin.Engine) {
 	auth.POST("/user", controller.Login{}.CurrentUser)
 	categoryRoutes := auth.Group("/category")
 	categoryRoutes.POST("/list", controller.Category{}.List)
-	categoryRoutes.POST("/create", controller.Category{}.Create)
-	categoryRoutes.POST("/edit", controller.Category{}.Edit)
-	categoryRoutes.POST("/delete", controller.Category{}.Delete)
+	categoryAdmin := categoryRoutes.Group("", middleware.Admin{}.Process)
+	categoryAdmin.POST("/create", controller.Category{}.Create)
+	categoryAdmin.POST("/edit", controller.Category{}.Edit)
+	categoryAdmin.POST("/delete", controller.Category{}.Delete)
 	auth.POST("/library/list", controller.Library{}.List)
+	auth.POST("/library/info", controller.Library{}.Info)
 	auth.POST("/library/create", controller.Library{}.Create)
-	auth.POST("/library/initialize", controller.Library{}.Initialize)
 	auth.POST("/library/edit", controller.Library{}.Edit)
 	auth.POST("/library/delete", controller.Library{}.Delete)
 	auth.POST("/file/save", controller.File{}.Save)

@@ -5,6 +5,7 @@
             <h3>分类管理</h3>
             <a-button type="primary" @click="openCreate">新建分类</a-button>
         </div>
+        <a-alert class="category-notice">分类关联公共命名空间。新空间默认从镜像列表隐藏；标识修改和删除会同步到公共命名空间。</a-alert>
         <a-table :data="categories" :loading="loading" :pagination="false" row-key="id">
             <template #columns>
                 <a-table-column data-index="name" title="分类名称" /><a-table-column
@@ -16,17 +17,17 @@
                     ><template #cell="{ record }">
                         <a-button type="text" @click="openEdit(record)">编辑</a-button>
                         <a-popconfirm
-                            content="仅允许删除空分类，确认删除？"
+                            content="确认删除分类及对应公共命名空间？仅允许删除没有资源的空间。"
                             position="lt"
                             type="warning"
                             content-class="document-delete-popconfirm"
                             ok-text="确定"
                             cancel-text="取消"
-                            :disabled="record.identifie === 'applications'"
+                            :disabled="record.identifie === 'app'"
                             :ok-button-props="{ status: 'danger' }"
                             :cancel-button-props="{ type: 'secondary' }"
                             @ok="remove(record)"
-                            ><a-button type="text" status="danger" :disabled="record.identifie === 'applications'"
+                            ><a-button type="text" status="danger" :disabled="record.identifie === 'app'"
                                 >删除</a-button
                             ></a-popconfirm
                         >
@@ -36,10 +37,10 @@
         </a-table>
         <a-modal v-model:visible="form.visible" :title="form.edit ? '编辑分类' : '新建分类'" :footer="false">
             <a-form :model="form" layout="vertical">
-                <a-form-item label="分类标识"
+                <a-form-item label="命名空间标识"
                     ><a-input
                         v-model="form.identifie"
-                        :disabled="form.edit"
+                        :disabled="form.edit && form.originalIdentifie === 'app'"
                         placeholder="小写字母、数字、下划线或短横线"
                 /></a-form-item>
                 <a-form-item label="分类名称"><a-input v-model="form.name" /></a-form-item>
@@ -88,7 +89,7 @@ export default {
             this.form = { visible: true, edit: false, identifie: '', name: '', description: '' };
         },
         openEdit(record) {
-            this.form = { ...record, edit: true, visible: true };
+            this.form = { ...record, originalIdentifie: record.identifie, edit: true, visible: true };
         },
         async save() {
             if (this.saving) return;
@@ -99,10 +100,10 @@ export default {
             this.saving = true;
             try {
                 await this.client.post('/category/' + (this.form.edit ? 'edit' : 'create'), {
-                    identifie: this.form.identifie,
+                    identifie: this.form.edit ? this.form.originalIdentifie : this.form.identifie,
+                    ...(this.form.edit ? { new_identifie: this.form.identifie } : {}),
                     name: this.form.name.trim(),
                     description: this.form.description || '',
-                    revision: this.form.revision,
                 });
                 this.form.visible = false;
                 await this.load();
@@ -121,7 +122,6 @@ export default {
                 Message.error(error.message);
             }
         },
-
     },
 };
 </script>
@@ -141,5 +141,8 @@ export default {
 .category-header h3 {
     margin: 0 auto 0 0;
     font-size: 18px;
+}
+.category-notice {
+    margin-bottom: 20px;
 }
 </style>

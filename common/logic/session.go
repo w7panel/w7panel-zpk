@@ -3,18 +3,16 @@ package logic
 import (
 	"encoding/json"
 	"errors"
-	"net/http"
-	"strings"
 	"time"
 
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
+	"github.com/w7panel/w7panel-zpk/common/service/session"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
-	ranginesession "github.com/we7coreteam/w7-rangine-go/v2/src/http/session"
 	"golang.org/x/sync/singleflight"
 )
 
-const ZpkTokenHeader = "X-Zpk-Token"
+const ZpkTokenHeader = session.TokenHeader
 
 const sessionRefreshAtKey = "zpk_session_refresh_at"
 const defaultSessionRefreshIntervalSeconds = 300
@@ -41,16 +39,14 @@ func (l Session) SaveUserInfo(ctx *gin.Context, user UserSession) (string, error
 	if err := l.writeUserSession(ctx, user); err != nil {
 		return "", err
 	}
-	token := l.responseSessionToken(ctx)
+	token := ctx.Writer.Header().Get(ZpkTokenHeader)
 	if token == "" {
 		return "", errors.New("session token is empty")
 	}
 	return token, nil
 }
 
-func (l Session) GetUserInfo(ctx *gin.Context, token string) (*UserSession, error) {
-	l.injectRequestToken(ctx, token)
-
+func (l Session) GetUserInfo(ctx *gin.Context) (*UserSession, error) {
 	curSession := sessions.Default(ctx)
 
 	val := curSession.Get("user")
@@ -58,8 +54,12 @@ func (l Session) GetUserInfo(ctx *gin.Context, token string) (*UserSession, erro
 		return nil, nil
 	}
 
+	content, ok := val.(string)
+	if !ok {
+		return nil, errors.New("invalid session user")
+	}
 	user := UserSession{}
-	err := json.Unmarshal([]byte(val.(string)), &user)
+	err := json.Unmarshal([]byte(content), &user)
 	if err != nil {
 		return nil, err
 	}
@@ -94,11 +94,11 @@ func (l Session) RefreshExpire(ctx *gin.Context) (string, error) {
 		}
 
 		curSession.Set(sessionRefreshAtKey, now)
-		curSession.Options(ranginesession.BuildOptions(facade.GetConfig()))
+		curSession.Options(sessions.Options{MaxAge: facade.GetConfig().GetInt("session.max_age")})
 		if err := curSession.Save(); err != nil {
 			return "", err
 		}
-		return l.responseSessionToken(ctx), nil
+		return ctx.Writer.Header().Get(ZpkTokenHeader), nil
 	})
 	if err != nil {
 		return "", err
@@ -113,49 +113,4 @@ func sessionRefreshAt(value interface{}) int64 {
 		return 0
 	}
 	return v
-}
-
-func (l Session) responseSessionToken(ctx *gin.Context) string {
-	sessionName := l.SessionName()
-	for _, rawCookie := range ctx.Writer.Header().Values("Set-Cookie") {
-		nameValue := strings.SplitN(rawCookie, ";", 2)[0]
-		name, value, ok := strings.Cut(nameValue, "=")
-		if ok && name == sessionName {
-			return value
-		}
-	}
-	return ""
-}
-
-func (l Session) injectRequestToken(ctx *gin.Context, token string) {
-	token = strings.TrimSpace(token)
-	if token == "" {
-		return
-	}
-	replaceRequestCookie(ctx.Request, &http.Cookie{
-		Name:  l.SessionName(),
-		Value: token,
-	})
-}
-
-// replaceRequestCookie ensures Request.Cookie returns the supplied value even
-// when the client sent an older cookie with the same name.
-func replaceRequestCookie(request *http.Request, replacement *http.Cookie) {
-	cookies := request.Cookies()
-	request.Header.Del("Cookie")
-	for _, cookie := range cookies {
-		if cookie.Name == replacement.Name {
-			continue
-		}
-		request.AddCookie(cookie)
-	}
-	request.AddCookie(replacement)
-}
-
-func (l Session) SessionName() string {
-	name := facade.GetConfig().GetString("session.name")
-	if name == "" {
-		name = "SESSION_ID"
-	}
-	return name
 }

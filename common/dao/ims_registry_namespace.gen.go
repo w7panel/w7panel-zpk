@@ -7,6 +7,7 @@ package dao
 import (
 	"context"
 
+	"github.com/w7panel/w7panel-zpk/common/entity"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 	"gorm.io/gorm/schema"
@@ -15,8 +16,6 @@ import (
 	"gorm.io/gen/field"
 
 	"gorm.io/plugin/dbresolver"
-
-	"github.com/w7panel/w7panel-zpk/common/entity"
 )
 
 func newRegistryNamespace(db *gorm.DB, opts ...gen.DOOption) registryNamespace {
@@ -34,6 +33,7 @@ func newRegistryNamespace(db *gorm.DB, opts ...gen.DOOption) registryNamespace {
 	_registryNamespace.CreatedAt = field.NewTime(tableName, "created_at")
 	_registryNamespace.UpdatedAt = field.NewTime(tableName, "updated_at")
 	_registryNamespace.DeletedAt = field.NewField(tableName, "deleted_at")
+	_registryNamespace.Visible = field.NewBool(tableName, "visible")
 
 	_registryNamespace.fillFieldMap()
 
@@ -51,6 +51,7 @@ type registryNamespace struct {
 	CreatedAt   field.Time
 	UpdatedAt   field.Time
 	DeletedAt   field.Field
+	Visible     field.Bool
 
 	fieldMap map[string]field.Expr
 }
@@ -74,6 +75,7 @@ func (r *registryNamespace) updateTableName(table string) *registryNamespace {
 	r.CreatedAt = field.NewTime(table, "created_at")
 	r.UpdatedAt = field.NewTime(table, "updated_at")
 	r.DeletedAt = field.NewField(table, "deleted_at")
+	r.Visible = field.NewBool(table, "visible")
 
 	r.fillFieldMap()
 
@@ -90,7 +92,7 @@ func (r *registryNamespace) GetFieldByName(fieldName string) (field.OrderExpr, b
 }
 
 func (r *registryNamespace) fillFieldMap() {
-	r.fieldMap = make(map[string]field.Expr, 7)
+	r.fieldMap = make(map[string]field.Expr, 8)
 	r.fieldMap["id"] = r.ID
 	r.fieldMap["user_id"] = r.UserID
 	r.fieldMap["name"] = r.Name
@@ -98,6 +100,7 @@ func (r *registryNamespace) fillFieldMap() {
 	r.fieldMap["created_at"] = r.CreatedAt
 	r.fieldMap["updated_at"] = r.UpdatedAt
 	r.fieldMap["deleted_at"] = r.DeletedAt
+	r.fieldMap["visible"] = r.Visible
 }
 
 func (r registryNamespace) clone(db *gorm.DB) registryNamespace {

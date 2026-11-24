@@ -6,24 +6,25 @@ package entity
 
 import (
 	"time"
+
+	"gorm.io/gorm"
 )
 
 const TableNameDocumentLibrary = "ims_document_library"
 
 // DocumentLibrary mapped from table <ims_document_library>
 type DocumentLibrary struct {
-	ID          int32     `gorm:"column:id;primaryKey;autoIncrement:true" json:"id"`
-	Category    string    `gorm:"column:category;type:varchar(96);not null;index:document_library_ref,unique" json:"category"`
-	Identifie   string    `gorm:"column:identifie;type:varchar(96);not null;index:document_library_ref,unique" json:"identifie"`
-	Name        string    `gorm:"column:name;type:varchar(255);not null" json:"name"`
-	Description string    `gorm:"column:description;type:text;not null" json:"description"`
-	UserID      int32     `gorm:"column:user_id;not null;index:document_library_owner" json:"user_id"`
-	Revision    int32     `gorm:"column:revision;not null;default:1" json:"revision"`
-	Ready       int32     `gorm:"column:ready;not null" json:"ready"`
-	Public      int32     `gorm:"column:public;not null;default:0" json:"public"`
-	Protected   int32     `gorm:"column:protected;not null;default:0" json:"protected"`
-	CreatedAt   time.Time `gorm:"column:created_at;not null;default:CURRENT_TIMESTAMP" json:"created_at"`
-	UpdatedAt   time.Time `gorm:"column:updated_at;not null;default:CURRENT_TIMESTAMP" json:"updated_at"`
+	ID          int32          `gorm:"column:id;primaryKey;autoIncrement:true" json:"id"`
+	Category    string         `gorm:"column:category;type:varchar(96);not null;index:document_library_ref,unique" json:"category"`
+	Identifie   string         `gorm:"column:identifie;type:varchar(96);not null;index:document_library_ref,unique" json:"identifie"`
+	Name        string         `gorm:"column:name;type:varchar(255);not null" json:"name"`
+	Description string         `gorm:"column:description;type:text;not null" json:"description"`
+	UserID      int32          `gorm:"column:user_id;not null;index:document_library_owner" json:"user_id"`
+	Public      int32          `gorm:"column:public;not null;default:0" json:"public"`
+	Protected   int32          `gorm:"column:protected;not null;default:0" json:"protected"`
+	DeletedAt   gorm.DeletedAt `gorm:"column:deleted_at;index:document_library_deleted_at" json:"deleted_at"`
+	CreatedAt   time.Time      `gorm:"column:created_at;not null;default:CURRENT_TIMESTAMP" json:"created_at"`
+	UpdatedAt   time.Time      `gorm:"column:updated_at;not null;default:CURRENT_TIMESTAMP" json:"updated_at"`
 }
 
 // TableName DocumentLibrary's table name

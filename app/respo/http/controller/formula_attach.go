@@ -10,13 +10,11 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	respologic "github.com/w7panel/w7panel-zpk/app/respo/logic"
 	attachlogic "github.com/w7panel/w7panel-zpk/app/respo/logic/attach"
 	formulalogic "github.com/w7panel/w7panel-zpk/app/respo/logic/formula"
 	"github.com/w7panel/w7panel-zpk/common/dao"
 	"github.com/w7panel/w7panel-zpk/common/entity"
 	logic2 "github.com/w7panel/w7panel-zpk/common/logic"
-	documentsdk "github.com/w7panel/w7panel-zpk/common/service/document"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"sigs.k8s.io/yaml"
 )
@@ -199,20 +197,6 @@ func (c FormulaAttach) SaveAssetFile(ctx *gin.Context) {
 		c.JsonResponseWithError(ctx, fmt.Errorf("share-file 接口不支持 manifest 文件: %s", params.Filename), 500)
 		return
 	}
-	if respologic.IsFormulaDocumentPath(params.Filename) {
-		documents := respologic.FormulaDocument{}
-		token := (logic2.Session{}).PanelAccessToken(ctx)
-		reference, err := documents.Ensure(ctx.Request.Context(), token, params.Identifie, logic2.User{}.GetUser(ctx))
-		if err == nil {
-			err = documents.Save(ctx.Request.Context(), token, reference, params.Filename, sanitizeFormulaAttachContent(params.Content))
-		}
-		if err != nil {
-			c.documentError(ctx, err)
-			return
-		}
-		c.JsonSuccessResponse(ctx)
-		return
-	}
 
 	depot := c.getDepot()
 	formula, err := depot.GetFormula(params.Identifie, "", logic2.User{}.GetUser(ctx))
@@ -248,29 +232,10 @@ func (c FormulaAttach) AssetFiles(ctx *gin.Context) {
 		c.JsonResponseWithError(ctx, err, 500)
 		return
 	}
-	documents := respologic.FormulaDocument{}
-	token := (logic2.Session{}).PanelAccessToken(ctx)
-	reference, err := documents.Ensure(ctx.Request.Context(), token, params.Identifie, logic2.User{}.GetUser(ctx))
-	if err == nil {
-		fileList, err = documents.Files(ctx.Request.Context(), token, reference, fileList)
-	}
-	if err != nil {
-		c.documentError(ctx, err)
-		return
-	}
 
 	c.JsonResponseWithoutError(ctx, gin.H{
 		"list": fileList,
 	})
-}
-
-func (c FormulaAttach) documentError(ctx *gin.Context, err error) {
-	status := 503
-	var responseError *documentsdk.ResponseError
-	if errors.As(err, &responseError) {
-		status = responseError.StatusCode
-	}
-	c.JsonResponseWithError(ctx, err, status)
 }
 
 func (c FormulaAttach) EditIcon(ctx *gin.Context) {

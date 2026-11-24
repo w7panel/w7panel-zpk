@@ -10,12 +10,13 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	respologic "github.com/w7panel/w7panel-zpk/app/respo/logic"
 	"github.com/w7panel/w7panel-zpk/app/respo/logic/formula"
 	systemlogic "github.com/w7panel/w7panel-zpk/app/system/logic"
 	"github.com/w7panel/w7panel-zpk/common/accessor"
 	"github.com/w7panel/w7panel-zpk/common/dao"
 	"github.com/w7panel/w7panel-zpk/common/entity"
-	documentsdk "github.com/w7panel/w7panel-zpk/common/service/document"
+	"github.com/w7panel/w7panel-zpk/common/service"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/console"
 )
@@ -59,8 +60,7 @@ func (MigrateDocuments) run(cmd *cobra.Command, _ []string) error {
 			return err
 		}
 	}
-	client := documentsdk.New(config.GetString("setting.document.base_url"))
-	user, err := client.CurrentUser(cmd.Context(), token)
+	user, err := service.DocumentSdk.CurrentUser(cmd.Context(), token)
 	if err != nil {
 		return err
 	}
@@ -95,7 +95,7 @@ func (MigrateDocuments) run(cmd *cobra.Command, _ []string) error {
 			if err != nil {
 				return fmt.Errorf("读取制品 %s 旧文档失败: %w", item.Name, err)
 			}
-			if err := migrateFormulaDocuments(cmd.Context(), client, token, item, assets); err != nil {
+			if err := migrateFormulaDocuments(cmd.Context(), token, item, assets); err != nil {
 				return fmt.Errorf("迁移制品 %s 失败（可重试，已复制正文不会覆盖）: %w", item.Name, err)
 			}
 			fmt.Fprintf(cmd.OutOrStdout(), "制品 %s 文档迁移完成\n", item.Name)
@@ -111,18 +111,14 @@ func (MigrateDocuments) run(cmd *cobra.Command, _ []string) error {
 }
 
 // Migration stays in this one-off command rather than the normal request flow.
-func migrateFormulaDocuments(ctx context.Context, client *documentsdk.Client, token string, item *entity.Formula, assets map[string]string) error {
+func migrateFormulaDocuments(ctx context.Context, token string, item *entity.Formula, assets map[string]string) error {
 	reference := ""
 	if item.Setting != nil {
 		reference = item.Setting.DocumentRef
 	}
 	if reference == "" {
-		title := item.Title
-		if title == "" {
-			title = item.Name
-		}
 		var err error
-		reference, err = client.Initialize(ctx, token, item.Name, title, item.UserID)
+		reference, err = (respologic.FormulaDocument{}).Initialize(ctx, token, item)
 		if err != nil {
 			return err
 		}
@@ -135,7 +131,7 @@ func migrateFormulaDocuments(ctx context.Context, client *documentsdk.Client, to
 	}
 	sort.Strings(filenames)
 	if len(filenames) > 0 {
-		tree, err := client.Tree(ctx, token, reference)
+		tree, err := service.DocumentSdk.Tree(ctx, token, reference)
 		if err != nil {
 			return err
 		}
@@ -144,15 +140,19 @@ func migrateFormulaDocuments(ctx context.Context, client *documentsdk.Client, to
 			existing[file.Path] = true
 		}
 		for _, filename := range filenames {
-			if existing[filename] {
+			documentPath := strings.TrimPrefix(filename, "docs/")
+			if documentPath == "index.md" {
+				return errors.New("旧文档 docs/index.md 与默认首页冲突，请先重命名旧文档后再迁移")
+			}
+			if existing[documentPath] {
 				continue
 			}
-			title := strings.TrimSuffix(strings.TrimPrefix(filename, "docs/"), path.Ext(filename))
-			if err := client.Save(ctx, token, reference, filename, title, assets[filename], 0); err != nil {
+			title := strings.TrimSuffix(documentPath, path.Ext(documentPath))
+			if err := service.DocumentSdk.Save(ctx, token, reference, documentPath, title, assets[filename]); err != nil {
 				return err
 			}
 		}
-		tree, err = client.Tree(ctx, token, reference)
+		tree, err = service.DocumentSdk.Tree(ctx, token, reference)
 		if err != nil {
 			return err
 		}
@@ -170,15 +170,15 @@ func migrateFormulaDocuments(ctx context.Context, client *documentsdk.Client, to
 		}
 		appendPath("index.md")
 		for _, filename := range strings.Split(assets["docs/.order"], ",") {
-			appendPath(strings.TrimSpace(filename))
+			appendPath(strings.TrimPrefix(strings.TrimSpace(filename), "docs/"))
 		}
 		for _, filename := range filenames {
-			appendPath(filename)
+			appendPath(strings.TrimPrefix(filename, "docs/"))
 		}
 		for _, file := range tree.Files {
 			appendPath(file.Path)
 		}
-		if err := client.Order(ctx, token, reference, order, tree.Revision); err != nil {
+		if err := service.DocumentSdk.Order(ctx, token, reference, order); err != nil {
 			return err
 		}
 	}

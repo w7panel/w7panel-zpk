@@ -103,9 +103,6 @@ body {
     justify-content: center;
     background: #f7f8fa;
 }
-.mt-16 {
-    margin-top: 16px;
-}
 .document-delete-popconfirm .arco-popconfirm-footer {
     display: flex;
     flex-direction: row-reverse;

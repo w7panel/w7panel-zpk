@@ -82,8 +82,6 @@ spec:
               value: /home/zpk-storage
             - name: DEPOT_MARKET_DOMAIN
               value: https://api.zm.w7.com
-            - name: SESSION_COOKIE_DOMAIN
-              value: {{ .Values.global.DOMAIN }}
             {{- if .Values.global.oidc.enabled }}
             - name: SYSTEM_OIDC_BASE_URL
               value: {{ .Values.global.oidc.baseURL | quote }}

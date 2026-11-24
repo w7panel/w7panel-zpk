@@ -14,11 +14,6 @@ import (
 	"strings"
 )
 
-type Store interface {
-	Put(context.Context, []byte) (string, error)
-	Open(context.Context, string) (io.ReadCloser, error)
-}
-
 type Local struct{ root *os.Root }
 
 func NewLocal(dir string) (*Local, error) {

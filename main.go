@@ -12,6 +12,7 @@ import (
 	"github.com/w7panel/w7panel-zpk/app/system"
 	systemLogic "github.com/w7panel/w7panel-zpk/app/system/logic"
 	"github.com/w7panel/w7panel-zpk/common/dao"
+	"github.com/w7panel/w7panel-zpk/common/service/session"
 	"github.com/w7panel/w7panel-zpk/common/service/w7"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	app "github.com/we7coreteam/w7-rangine-go/v2/src"
@@ -20,7 +21,6 @@ import (
 	ranginehttp "github.com/we7coreteam/w7-rangine-go/v2/src/http"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/middleware"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/response"
-	"github.com/we7coreteam/w7-rangine-go/v2/src/http/session"
 )
 
 //go:embed config.yaml
@@ -45,7 +45,7 @@ func main() {
 	httpServer := new(ranginehttp.Provider).Register(app.GetConfig(), app.GetConsole(), app.GetServerManager()).Export()
 	// 注册一些全局中间件，路由或是其它一些全局操作
 	httpServer.Use(middleware.GetPanicHandlerMiddleware())
-	httpServer.Use(middleware.GetSessionMiddleware(app.GetConfig(), session.GetGormStore, []byte("secret")))
+	httpServer.Use(middleware.GetSessionMiddleware(app.GetConfig(), session.GetStore, []byte("secret")))
 	httpServer.Use(func(ctx *gin.Context) {
 		if ctx.Request.Method == nethttp.MethodGet || ctx.Request.Method == nethttp.MethodHead || ctx.Request.Method == nethttp.MethodOptions {
 			ctx.Next()

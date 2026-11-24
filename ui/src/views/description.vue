@@ -119,8 +119,7 @@ import myAxios from '@/utils';
 import { IconDelete, IconEdit, IconPlus } from '@arco-design/web-vue/es/icon';
 import { messageError, messageSuccess, messageWarning } from '@/utils/ui-feedback';
 
-const DOCS_DIR = 'docs';
-const DOCS_ORDER_PATH = DOCS_DIR + '/.order';
+const DOCS_ORDER_PATH = '.order';
 const MAVON_ALIGN_TYPES = {
     alignleft: 'left',
     aligncenter: 'center',
@@ -287,12 +286,12 @@ const renderMarkdownWithGithubAlerts = (content = '') => {
     return markdownParser.render(output.join('\n'));
 };
 const normalizePath = (path = '') => path.replace(/\\/g, '/').replace(/^\/+/, '').replace(/\/+/g, '/').replace(/\/+$/, '');
-const isDocMarkdownPath = (path = '') => /^docs\/[^/]+\.md$/i.test(normalizePath(path));
+const isDocMarkdownPath = (path = '') => /\.md$/i.test(normalizePath(path)) && normalizePath(path) !== 'index.md';
 const createDocFile = (title, content = '') => {
     let cleanTitle = (title || '').trim().replace(/\.md$/i, '').trim();
     return {
         title: cleanTitle,
-        path: DOCS_DIR + '/' + cleanTitle + '.md',
+        path: cleanTitle + '.md',
         content,
     };
 };
@@ -386,7 +385,7 @@ export default {
 
             this.loading = true;
             try {
-                let res = await myAxios.post('/respo/share-file/path-tree', {
+                let res = await myAxios.post('/respo/document/path-tree', {
                     identifie: this.formulaIdentifie,
                 });
                 let list = res?.data?.data?.list || {};
@@ -423,7 +422,7 @@ export default {
             orderedPaths = [...orderedPaths, ...unorderedPaths];
 
             return orderedPaths.map(path => {
-                let title = path.replace(/^docs\//, '').replace(/\.md$/i, '');
+                let title = path.split('/').pop().replace(/\.md$/i, '');
                 return {
                     title,
                     path,
@@ -441,7 +440,7 @@ export default {
             return files.map(item => normalizePath(item.path)).filter(Boolean).join(',');
         },
         postDocsOrderFile(content = this.getDocsOrderContent()) {
-            return myAxios.post('/respo/share-file/file', {
+            return myAxios.post('/respo/document/file', {
                 identifie: this.formulaIdentifie,
                 filename: DOCS_ORDER_PATH,
                 content,
@@ -549,7 +548,7 @@ export default {
             if (this.saving) { return }
             this.saving = true;
             try {
-                let latest = await myAxios.post('/respo/share-file/path-tree', {
+                let latest = await myAxios.post('/respo/document/path-tree', {
                     identifie: this.formulaIdentifie,
                 });
                 let latestList = latest?.data?.data?.list || {};
@@ -560,7 +559,7 @@ export default {
                     return;
                 }
 
-                await myAxios.post('/respo/share-file/file', {
+                await myAxios.post('/respo/document/file', {
                     identifie: this.formulaIdentifie,
                     filename: file.path,
                     content: ' ',
@@ -602,6 +601,7 @@ export default {
             }
 
             let targetFile = createDocFile(title, current.content || '');
+            targetFile.path = oldPath.slice(0, oldPath.lastIndexOf('/') + 1) + targetFile.path;
             let targetPath = normalizePath(targetFile.path);
             if (targetPath === oldPath) {
                 this.renameDialog.show = false;
@@ -623,7 +623,7 @@ export default {
             this.saving = true;
             this.savingPath = oldPath;
             try {
-                let latest = await myAxios.post('/respo/share-file/path-tree', {
+                let latest = await myAxios.post('/respo/document/path-tree', {
                     identifie: this.formulaIdentifie,
                 });
                 let latestList = latest?.data?.data?.list || {};
@@ -637,12 +637,12 @@ export default {
                     return;
                 }
 
-                await myAxios.post('/respo/share-file/file', {
+                await myAxios.post('/respo/document/file', {
                     identifie: this.formulaIdentifie,
                     filename: targetFile.path,
                     content: current?.content || '',
                 });
-                await myAxios.post('/respo/share-file/file', {
+                await myAxios.post('/respo/document/file', {
                     identifie: this.formulaIdentifie,
                     filename: oldPath,
                     content: '',
@@ -782,7 +782,7 @@ export default {
                 let uniqueDeletePaths = deletePaths.filter((path, index, list) => path && list.indexOf(path) === index);
 
                 if (currentDoc) {
-                    await myAxios.post('/respo/share-file/file', {
+                    await myAxios.post('/respo/document/file', {
                         identifie: this.formulaIdentifie,
                         filename: currentDoc.path,
                         content: currentDoc.content || '',
@@ -790,7 +790,7 @@ export default {
                 }
 
                 for (let i = 0; i < uniqueDeletePaths.length; i++) {
-                    await myAxios.post('/respo/share-file/file', {
+                    await myAxios.post('/respo/document/file', {
                         identifie: this.formulaIdentifie,
                         filename: uniqueDeletePaths[i],
                         content: '',

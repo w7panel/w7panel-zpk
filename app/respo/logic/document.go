@@ -3,6 +3,7 @@ package logic
 import (
 	"context"
 	"errors"
+	"net/http"
 	"path"
 	"strings"
 
@@ -10,94 +11,104 @@ import (
 	"github.com/w7panel/w7panel-zpk/common/dao"
 	"github.com/w7panel/w7panel-zpk/common/entity"
 	userlogic "github.com/w7panel/w7panel-zpk/common/logic"
+	"github.com/w7panel/w7panel-zpk/common/service"
 	documentsdk "github.com/w7panel/w7panel-zpk/common/service/document"
-	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 )
 
 // FormulaDocument is the artifact-side integration. All document operations go through its SDK.
 type FormulaDocument struct{}
 
-func documentClient() *documentsdk.Client {
-	config := facade.GetConfig()
-	return documentsdk.New(config.GetString("setting.document.base_url"))
+func (l FormulaDocument) Initialize(ctx context.Context, token string, formula *entity.Formula) (string, error) {
+	title := formula.Title
+	if title == "" {
+		title = formula.Name
+	}
+	reference := "app/" + formula.Name
+	homepage := "# " + title + "\n\n应用标识：" + formula.Name + "\n"
+	err := service.DocumentSdk.Create(ctx, token, documentsdk.CreateLibrary{
+		Ref: reference, Name: title, OwnerID: formula.UserID, Protected: 1,
+		Files: []documentsdk.FileContent{{File: documentsdk.File{Path: "index.md", Title: "首页", Protected: 1}, Content: homepage}},
+	})
+	if err == nil {
+		return reference, nil
+	}
+	var responseError *documentsdk.ResponseError
+	if !errors.As(err, &responseError) || responseError.StatusCode != http.StatusConflict {
+		return "", err
+	}
+	// A previous document creation may have succeeded before saving its reference.
+	library, infoErr := service.DocumentSdk.Info(ctx, token, reference)
+	if infoErr != nil {
+		return "", infoErr
+	}
+	if library.UserID != formula.UserID || library.Protected != 1 {
+		return "", err
+	}
+	tree, treeErr := service.DocumentSdk.Tree(ctx, token, reference)
+	if treeErr != nil {
+		return "", treeErr
+	}
+	for _, file := range tree.Files {
+		if file.Path == "index.md" && file.Protected == 1 {
+			return reference, nil
+		}
+	}
+	return "", err
 }
 
-func IsFormulaDocumentPath(filename string) bool {
-	return filename == "docs/.order" || strings.HasPrefix(filename, "docs/") && strings.HasSuffix(strings.ToLower(filename), ".md")
+func isDocumentMarkdownPath(filename string) bool {
+	return filename != "index.md" && strings.HasSuffix(strings.ToLower(filename), ".md")
 }
 
-// Files preserves the shared-file response consumed by the existing artifact editor.
-// Legacy documents are removed before adding the files readable in the document service.
-func (l FormulaDocument) Files(ctx context.Context, token, reference string, assets map[string]string) (map[string]string, error) {
-	return documentFiles(ctx, documentClient(), token, reference, assets)
-}
-
-func documentFiles(ctx context.Context, client *documentsdk.Client, token, reference string, assets map[string]string) (map[string]string, error) {
-	tree, err := client.Tree(ctx, token, reference)
+// Files returns library-relative paths without mixing in artifact assets.
+func (l FormulaDocument) Files(ctx context.Context, token, reference string) (map[string]string, error) {
+	tree, err := service.DocumentSdk.Tree(ctx, token, reference)
 	if err != nil {
 		return nil, err
 	}
-	files := make(map[string]string, len(assets)+len(tree.Files))
-	for filename, content := range assets {
-		if !IsFormulaDocumentPath(filename) {
-			files[filename] = content
-		}
-	}
+	files := make(map[string]string, len(tree.Files)+1)
 	order := make([]string, 0, len(tree.Files))
 	for _, file := range tree.Files {
-		if file.Path == "docs/.order" || !IsFormulaDocumentPath(file.Path) {
+		if !isDocumentMarkdownPath(file.Path) {
 			continue
 		}
-		content, err := client.Read(ctx, token, reference, file.Path)
+		content, err := service.DocumentSdk.Read(ctx, token, reference, file.Path)
 		if err != nil {
 			return nil, err
 		}
 		files[file.Path] = content.Content
 		order = append(order, file.Path)
 	}
-	files["docs/.order"] = strings.Join(order, ",")
+	files[".order"] = strings.Join(order, ",")
 	return files, nil
 }
 
 func (l FormulaDocument) Save(ctx context.Context, token, reference, filename, content string) error {
-	return saveDocument(ctx, documentClient(), token, reference, filename, content)
-}
-
-func saveDocument(ctx context.Context, client *documentsdk.Client, token, reference, filename, content string) error {
-	if !IsFormulaDocumentPath(filename) {
+	if filename != ".order" && !isDocumentMarkdownPath(filename) {
 		return errors.New("不支持的制品文档路径")
 	}
-	tree, err := client.Tree(ctx, token, reference)
-	if err != nil {
-		return err
-	}
-	if filename == "docs/.order" {
-		return orderDocuments(ctx, client, token, reference, content, tree)
-	}
-	var revision int32
-	for _, file := range tree.Files {
-		if file.Path == filename {
-			revision = file.Revision
-			break
+	if filename == ".order" {
+		tree, err := service.DocumentSdk.Tree(ctx, token, reference)
+		if err != nil {
+			return err
 		}
+		return l.orderDocuments(ctx, token, reference, content, tree)
 	}
-	// The original shared-file protocol uses empty content to request deletion.
+	// The artifact editor uses empty content to request deletion.
 	if content == "" {
-		if revision == 0 {
-			return errors.New("文档不存在或无读取权限")
-		}
-		return client.Delete(ctx, token, reference, filename, revision)
+		return service.DocumentSdk.Delete(ctx, token, reference, filename)
 	}
-	title := strings.TrimSuffix(strings.TrimPrefix(filename, "docs/"), path.Ext(filename))
-	return client.Save(ctx, token, reference, filename, title, content, revision)
+	title := strings.TrimSuffix(filename, path.Ext(filename))
+	return service.DocumentSdk.Save(ctx, token, reference, filename, title, content)
 }
 
-func orderDocuments(ctx context.Context, client *documentsdk.Client, token, reference, content string, tree documentsdk.FileTree) error {
+func (l FormulaDocument) orderDocuments(ctx context.Context, token, reference, content string, tree documentsdk.FileTree) error {
 	existing := make(map[string]bool, len(tree.Files))
 	order := make([]string, 0, len(tree.Files))
 	for _, file := range tree.Files {
-		existing[file.Path] = true
-		if !IsFormulaDocumentPath(file.Path) {
+		if isDocumentMarkdownPath(file.Path) {
+			existing[file.Path] = true
+		} else {
 			order = append(order, file.Path)
 		}
 	}
@@ -105,7 +116,7 @@ func orderDocuments(ctx context.Context, client *documentsdk.Client, token, refe
 	if content != "" {
 		for _, filename := range strings.Split(content, ",") {
 			filename = strings.TrimSpace(filename)
-			if filename == "docs/.order" || !IsFormulaDocumentPath(filename) || !existing[filename] || seen[filename] {
+			if !existing[filename] || seen[filename] {
 				return errors.New("文档排序包含无效、重复或不可读的路径")
 			}
 			order = append(order, filename)
@@ -113,17 +124,14 @@ func orderDocuments(ctx context.Context, client *documentsdk.Client, token, refe
 		}
 	}
 	for _, file := range tree.Files {
-		if IsFormulaDocumentPath(file.Path) && !seen[file.Path] {
+		if isDocumentMarkdownPath(file.Path) && !seen[file.Path] {
 			order = append(order, file.Path)
 		}
 	}
-	return client.Order(ctx, token, reference, order, tree.Revision)
+	return service.DocumentSdk.Order(ctx, token, reference, order)
 }
 
 func (l FormulaDocument) Ensure(ctx context.Context, token, identifie string, user *entity.RegistryUser) (string, error) {
-	if user == nil {
-		return "", errors.New("未登录")
-	}
 	query := dao.Q.Formula
 	formula, err := query.WithContext(ctx).Where(query.Name.Eq(strings.ReplaceAll(identifie, "_", "-"))).First()
 	if err != nil {
@@ -135,12 +143,7 @@ func (l FormulaDocument) Ensure(ctx context.Context, token, identifie string, us
 	if formula.Setting != nil && formula.Setting.DocumentRef != "" {
 		return formula.Setting.DocumentRef, nil
 	}
-	client := documentClient()
-	title := formula.Title
-	if title == "" {
-		title = formula.Name
-	}
-	reference, err := client.Initialize(ctx, token, formula.Name, title, formula.UserID)
+	reference, err := l.Initialize(ctx, token, formula)
 	if err != nil {
 		return "", err
 	}

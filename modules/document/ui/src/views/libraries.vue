@@ -192,7 +192,6 @@ export default {
                     name: this.form.name.trim(),
                     description: this.form.description || '',
                     public: this.form.public || 0,
-                    revision: this.form.revision,
                 });
                 this.form.visible = false;
                 await this.loadLibraries(1);
@@ -211,7 +210,6 @@ export default {
                 Message.error(error.message);
             }
         },
-
     },
 };
 </script>

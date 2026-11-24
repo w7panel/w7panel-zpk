@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-export function documentBaseURL() {
+function documentBaseURL() {
     const props = window.$wujie?.props || {};
     const frontend = props.frontend_props || props.frontendProps || {};
     const roles = Object.values(props.roleConfig || {});
@@ -15,9 +15,9 @@ export function documentBaseURL() {
     if (/\/document$/.test(base)) return base;
     return /\/zpk$/.test(base) ? base + '/document' : base + '/zpk/document';
 }
-export function createDocumentClient(request, baseURL = documentBaseURL()) {
-    async function post(path, params = {}, options = {}) {
-        const response = await request({ method: 'POST', url: path, data: params, ...options });
+function createDocumentClient(request, baseURL) {
+    async function post(path, params = {}) {
+        const response = await request({ method: 'POST', url: path, data: params });
         if (!response || response.status !== 200 || response.data?.error)
             throw new Error(response?.data?.error || '文档请求未成功');
         return response.data?.data;
@@ -31,7 +31,7 @@ export function createDocumentClient(request, baseURL = documentBaseURL()) {
     };
 }
 
-// An independent login session for the document frontend. A host can instead inject its authenticated transport.
+// An independent login session for the document frontend.
 export function createStandaloneClient(baseURL = documentBaseURL()) {
     const transport = axios.create({ baseURL, timeout: 30000 });
     const storageKey = 'document-token:' + new URL(baseURL, location.origin).href;

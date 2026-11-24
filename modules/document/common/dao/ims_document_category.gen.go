@@ -32,7 +32,7 @@ func newDocumentCategory(db *gorm.DB, opts ...gen.DOOption) documentCategory {
 	_documentCategory.Name = field.NewString(tableName, "name")
 	_documentCategory.Description = field.NewString(tableName, "description")
 	_documentCategory.UserID = field.NewInt32(tableName, "user_id")
-	_documentCategory.Revision = field.NewInt32(tableName, "revision")
+	_documentCategory.DeletedAt = field.NewField(tableName, "deleted_at")
 	_documentCategory.CreatedAt = field.NewTime(tableName, "created_at")
 	_documentCategory.UpdatedAt = field.NewTime(tableName, "updated_at")
 
@@ -50,7 +50,7 @@ type documentCategory struct {
 	Name        field.String
 	Description field.String
 	UserID      field.Int32
-	Revision    field.Int32
+	DeletedAt   field.Field
 	CreatedAt   field.Time
 	UpdatedAt   field.Time
 
@@ -74,7 +74,7 @@ func (d *documentCategory) updateTableName(table string) *documentCategory {
 	d.Name = field.NewString(table, "name")
 	d.Description = field.NewString(table, "description")
 	d.UserID = field.NewInt32(table, "user_id")
-	d.Revision = field.NewInt32(table, "revision")
+	d.DeletedAt = field.NewField(table, "deleted_at")
 	d.CreatedAt = field.NewTime(table, "created_at")
 	d.UpdatedAt = field.NewTime(table, "updated_at")
 
@@ -99,7 +99,7 @@ func (d *documentCategory) fillFieldMap() {
 	d.fieldMap["name"] = d.Name
 	d.fieldMap["description"] = d.Description
 	d.fieldMap["user_id"] = d.UserID
-	d.fieldMap["revision"] = d.Revision
+	d.fieldMap["deleted_at"] = d.DeletedAt
 	d.fieldMap["created_at"] = d.CreatedAt
 	d.fieldMap["updated_at"] = d.UpdatedAt
 }

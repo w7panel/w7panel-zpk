@@ -27,14 +27,9 @@ database:
     show_sql: false
 zpk:
   base_url: ${DOCUMENT_ZPK_URL-http://127.0.0.1:8000/zpk}
+permission:
+  server_url: ${DOCUMENT_PERMISSION_SERVER_URL-http://127.0.0.1:8000/zpk/v2/api/permission}
 session:
-  secret: ${DOCUMENT_SESSION_SECRET-document-session-secret}
-cookie:
-  path: /zpk/document
-  http_only: true
-  secure: ${DOCUMENT_COOKIE_SECURE-true}
-  expires: ${DOCUMENT_SESSION_MAX_AGE-86400}
-  same_site: lax
+  max_age: ${DOCUMENT_SESSION_MAX_AGE-86400}
 document:
   storage_path: ${DOCUMENT_STORAGE_PATH-/tmp/document/objects}
-  read_only: ${DOCUMENT_READ_ONLY-false}

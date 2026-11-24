@@ -68,7 +68,7 @@ func (l Repository) GetByIdWithUserPermission(id int, user *entity.RegistryUser)
 		return nil, nil
 	}
 	if user != nil && !(logic.User{}.IsAdminUser(user)) && model.UserID != user.ID {
-		exists := Permission{}.UserHasPermissionByResource(int(user.ID), model.Namespace, PermissionResourceTypeNamespace)
+		exists := ResourcePermission{}.UserHasPermissionByResource(int(user.ID), model.Namespace, PermissionResourceTypeNamespace)
 		if !exists {
 			return nil, errors.New("user no permission")
 		}

@@ -7,21 +7,13 @@ import (
 	"github.com/w7panel/w7panel-zpk/modules/document/app/document/logic"
 	"github.com/w7panel/w7panel-zpk/modules/document/common/service"
 	"github.com/w7panel/w7panel-zpk/modules/document/common/service/zpk"
-	"github.com/w7panel/w7panel-zpk/modules/document/common/types"
 )
 
-type Auth struct {
-	Optional bool
-}
+type Auth struct{}
 
 func (m Auth) Process(c *gin.Context) {
 	token := c.GetHeader(logic.TokenHeader)
 	accessToken := c.GetHeader("X-W7Panel-Access-Token")
-	if token == "" && accessToken == "" && m.Optional {
-		c.Set("document.actor", types.Actor{})
-		c.Next()
-		return
-	}
 	if token == "" && accessToken == "" {
 		c.AbortWithStatusJSON(401, gin.H{"code": 401, "error": "token 错误"})
 		return
@@ -29,7 +21,7 @@ func (m Auth) Process(c *gin.Context) {
 	var principal zpk.User
 	var err error
 	if token != "" {
-		principal, err = (logic.Session{}).GetUserInfo(c, token)
+		principal, err = (logic.Session{}).GetUserInfo(c)
 	} else {
 		principal, err = service.ZPKSdk.CurrentUser(c.Request.Context(), accessToken)
 	}
@@ -45,6 +37,17 @@ func (m Auth) Process(c *gin.Context) {
 		c.AbortWithStatusJSON(status, gin.H{"code": status, "error": message})
 		return
 	}
-	c.Set("document.actor", types.Actor{Principal: principal})
+	c.Set("user", principal)
 	c.Next()
+}
+
+type OptionalAuth struct{}
+
+func (OptionalAuth) Process(c *gin.Context) {
+	if c.GetHeader(logic.TokenHeader) == "" && c.GetHeader("X-W7Panel-Access-Token") == "" {
+		c.Set("user", zpk.User{})
+		c.Next()
+		return
+	}
+	Auth{}.Process(c)
 }

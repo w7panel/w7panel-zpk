@@ -2,12 +2,12 @@ const OFFICIAL_ZPK_ORIGINS = new Set([
     'https://zpk.w7.cc',
     'https://api.zm.w7.com',
 ]);
-const ZPK_AUTH_HEADERS = ['X-Zpk-Token'];
+const ZPK_AUTH_HEADERS = ['X-Zpk-Token', 'X-W7Panel-Access-Token'];
 
 function getRequestUrl(config = {}) {
     const url = String(config.url || '');
 
-    if (/^https?:\/\//i.test(url)) {
+    if (/^(?:[a-z][a-z\d+.-]*:)?\/\//i.test(url)) {
         return url;
     }
 
@@ -20,6 +20,18 @@ function getRequestUrl(config = {}) {
 export function isOfficialZpkRequest(config = {}) {
     try {
         return OFFICIAL_ZPK_ORIGINS.has(new URL(getRequestUrl(config), window.location.origin).origin);
+    } catch {
+        return false;
+    }
+}
+
+export function isOwnZpkRequest(config, baseURL) {
+    try {
+        const target = new URL(getRequestUrl(config), window.location.origin);
+        const base = new URL(baseURL, window.location.origin);
+        const basePath = base.pathname.replace(/\/+$/, '');
+        return target.origin === base.origin
+            && (target.pathname === basePath || target.pathname.startsWith(`${basePath}/`));
     } catch {
         return false;
     }

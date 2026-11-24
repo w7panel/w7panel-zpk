@@ -21,7 +21,7 @@ func (m Auth) Process(c *gin.Context) {
 	var principal zpk.User
 	var err error
 	if token != "" {
-		principal, err = (logic.Session{}).GetUserInfo(c)
+		principal, err = (logic.Login{}).GetUserInfo(c)
 	} else {
 		principal, err = service.ZPKSdk.CurrentUser(c.Request.Context(), accessToken)
 	}

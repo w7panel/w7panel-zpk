@@ -59,7 +59,7 @@ func (p *Provider) initDb() {
 	if err != nil {
 		panic(err)
 	}
-	if err := db.AutoMigrate(&entity.DocumentCategory{}, &entity.DocumentLibrary{}, &entity.DocumentFile{}, &entity.DocumentSession{}); err != nil {
+	if err := db.AutoMigrate(&entity.DocumentCategory{}, &entity.DocumentLibrary{}, &entity.DocumentFile{}); err != nil {
 		panic(err)
 	}
 	query := dao.Q.DocumentCategory

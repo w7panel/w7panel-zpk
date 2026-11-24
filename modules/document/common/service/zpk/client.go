@@ -46,8 +46,10 @@ func (c *Client) CurrentUser(ctx context.Context, accessToken string) (User, err
 	if accessToken == "" {
 		return User{}, ErrUnauthenticated
 	}
-	var user User
-	err := c.call(ctx, accessToken, "/v2/api/user/current", struct{}{}, &user)
+	var result struct {
+		User User `json:"user"`
+	}
+	err := c.call(ctx, accessToken, "/v2/openapi/user/current", struct{}{}, &result)
 	var responseError *ResponseError
 	if errors.As(err, &responseError) && (responseError.StatusCode == http.StatusUnauthorized || responseError.StatusCode == http.StatusForbidden) {
 		return User{}, ErrUnauthenticated
@@ -55,6 +57,7 @@ func (c *Client) CurrentUser(ctx context.Context, accessToken string) (User, err
 	if err != nil {
 		return User{}, err
 	}
+	user := result.User
 	if user.ID <= 0 || user.Username == "" || user.Role == "" {
 		return User{}, errors.New("ZPK 用户信息无效")
 	}

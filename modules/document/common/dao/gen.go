@@ -20,7 +20,6 @@ var (
 	DocumentCategory *documentCategory
 	DocumentFile     *documentFile
 	DocumentLibrary  *documentLibrary
-	DocumentSession  *documentSession
 )
 
 func SetDefault(db *gorm.DB, opts ...gen.DOOption) {
@@ -28,7 +27,6 @@ func SetDefault(db *gorm.DB, opts ...gen.DOOption) {
 	DocumentCategory = &Q.DocumentCategory
 	DocumentFile = &Q.DocumentFile
 	DocumentLibrary = &Q.DocumentLibrary
-	DocumentSession = &Q.DocumentSession
 }
 
 func Use(db *gorm.DB, opts ...gen.DOOption) *Query {
@@ -37,7 +35,6 @@ func Use(db *gorm.DB, opts ...gen.DOOption) *Query {
 		DocumentCategory: newDocumentCategory(db, opts...),
 		DocumentFile:     newDocumentFile(db, opts...),
 		DocumentLibrary:  newDocumentLibrary(db, opts...),
-		DocumentSession:  newDocumentSession(db, opts...),
 	}
 }
 
@@ -47,7 +44,6 @@ type Query struct {
 	DocumentCategory documentCategory
 	DocumentFile     documentFile
 	DocumentLibrary  documentLibrary
-	DocumentSession  documentSession
 }
 
 func (q *Query) Available() bool { return q.db != nil }
@@ -58,7 +54,6 @@ func (q *Query) clone(db *gorm.DB) *Query {
 		DocumentCategory: q.DocumentCategory.clone(db),
 		DocumentFile:     q.DocumentFile.clone(db),
 		DocumentLibrary:  q.DocumentLibrary.clone(db),
-		DocumentSession:  q.DocumentSession.clone(db),
 	}
 }
 
@@ -76,7 +71,6 @@ func (q *Query) ReplaceDB(db *gorm.DB) *Query {
 		DocumentCategory: q.DocumentCategory.replaceDB(db),
 		DocumentFile:     q.DocumentFile.replaceDB(db),
 		DocumentLibrary:  q.DocumentLibrary.replaceDB(db),
-		DocumentSession:  q.DocumentSession.replaceDB(db),
 	}
 }
 
@@ -84,7 +78,6 @@ type queryCtx struct {
 	DocumentCategory IDocumentCategoryDo
 	DocumentFile     IDocumentFileDo
 	DocumentLibrary  IDocumentLibraryDo
-	DocumentSession  IDocumentSessionDo
 }
 
 func (q *Query) WithContext(ctx context.Context) *queryCtx {
@@ -92,7 +85,6 @@ func (q *Query) WithContext(ctx context.Context) *queryCtx {
 		DocumentCategory: q.DocumentCategory.WithContext(ctx),
 		DocumentFile:     q.DocumentFile.WithContext(ctx),
 		DocumentLibrary:  q.DocumentLibrary.WithContext(ctx),
-		DocumentSession:  q.DocumentSession.WithContext(ctx),
 	}
 }
 

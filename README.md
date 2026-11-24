@@ -150,3 +150,14 @@ HTTPS 默认验证证书，自签名证书可用 `--ca /path/to/ca.pem`；
 ## 数据库结构自动补齐
 
 非 debug 环境启动时，respo、registry 和 workflow Provider 对 SQLite、MySQL 均执行各自的结构补齐，不再跳过 MySQL。数据库切换禁写期间跳过自动结构变更；结构处理失败会阻止正常启动。此行为沿用各模块已有迁移方式，不需要额外执行迁移命令。
+
+
+## 登录 JWT
+
+ZPK 与独立文档服务均不保存服务端 Session。OIDC 登录返回的 `data.token` 为 JWT，分别通过 `X-Zpk-Token`、`X-Document-Token` 发送，沿用原接口与响应头，不使用 Cookie 或会话表。ZPK 仍根据 token 的用户 ID 查询现有用户表，未变更镜像 Registry 的 token 协议。
+
+两边配置 `auth.token_ttl_seconds`，环境变量分别为 `ZPK_TOKEN_TTL_SECONDS`、`DOCUMENT_TOKEN_TTL_SECONDS`，默认 86400 秒。ZPK 在有效期后半段通过响应头续发 token；文档到期后使用宿主面板凭据重新登录。签名密钥从现有 AppSecret 按各自用途派生，同时校验 HS256、issuer、AppID audience 和时间字段，两个服务的登录 token 不能互换。
+
+JWT 不包含面板 access token。制品前端对自有 ZPK origin/path 额外携带宿主 `X-W7Panel-Access-Token`，供后端代调文档；第三方和跳过认证的请求不携带这些凭据。调用制品创建、文档接口的其他客户端也需提供该面板凭据。
+
+切换后旧 Session token 失效，需重新登录；不自动删除已有数据库中的历史会话表。无状态 token 在到期前无法单独撤销，轮换 AppSecret 会使旧 token 失效。文档 token 中的身份与角色在重新登录时更新。

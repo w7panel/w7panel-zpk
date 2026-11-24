@@ -46,6 +46,7 @@ func (m Cors) getAllowHeader() string {
 		"uid",
 		"uuid",
 		"X-Zpk-Token",
+		"X-W7Panel-Access-Token",
 	}
 	return strings.Join(allowHeader, ",")
 }

@@ -26,26 +26,25 @@ func (m Auth) Process(ctx *gin.Context) {
 		return
 	}
 
-	sessionUser, err := logic.Session{}.GetUserInfo(ctx)
+	loginUser, err := logic.Login{}.GetUserInfo(ctx)
 	if err != nil {
-		m.JsonResponseWithServerError(ctx, err)
-		ctx.Abort()
-		return
-	}
-	if sessionUser == nil || sessionUser.UserID <= 0 {
-		m.JsonResponseWithError(ctx, errors.New("token 错误"), 401)
+		if errors.Is(err, logic.ErrInvalidToken) {
+			m.JsonResponseWithError(ctx, err, 401)
+		} else {
+			m.JsonResponseWithServerError(ctx, err)
+		}
 		ctx.Abort()
 		return
 	}
 
-	user, err := logic.User{}.GetById(int(sessionUser.UserID))
+	user, err := logic.User{}.GetById(int(loginUser.UserID))
 	if err != nil || user == nil {
 		m.JsonResponseWithError(ctx, errors.New("用户不存在"), 401)
 		ctx.Abort()
 		return
 	}
 
-	nextToken, err := (logic.Session{}).RefreshExpire(ctx)
+	nextToken, err := (logic.Login{}).RefreshExpire(ctx)
 	if err != nil {
 		m.JsonResponseWithServerError(ctx, err)
 		ctx.Abort()
@@ -55,8 +54,7 @@ func (m Auth) Process(ctx *gin.Context) {
 		ctx.Header(logic.ZpkTokenHeader, nextToken)
 	}
 
-	ctx.Set("console_uid", sessionUser.ConsoleUid)
-	ctx.Set("panel_access_token", sessionUser.PanelAccessToken)
+	ctx.Set("console_uid", loginUser.ConsoleUid)
 	ctx.Set("user", user)
 	ctx.Next()
 }

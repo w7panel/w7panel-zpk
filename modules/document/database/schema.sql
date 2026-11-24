@@ -40,13 +40,3 @@ CREATE TABLE ims_document_file (
 );
 CREATE UNIQUE INDEX document_file_path ON ims_document_file(library_id,path);
 CREATE INDEX document_file_deleted_at ON ims_document_file(deleted_at);
-CREATE TABLE ims_document_session (
- id varchar(64) PRIMARY KEY NOT NULL,
- user_info text NOT NULL,
- expires_at datetime NOT NULL,
- deleted_at datetime,
- created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
- updated_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-CREATE INDEX document_session_expires_at ON ims_document_session(expires_at);
-CREATE INDEX document_session_deleted_at ON ims_document_session(deleted_at);

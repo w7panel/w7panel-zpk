@@ -22,7 +22,7 @@ func (c FormulaDocument) Files(ctx *gin.Context) {
 		return
 	}
 	documents := logic.FormulaDocument{}
-	token := (userlogic.Session{}).PanelAccessToken(ctx)
+	token := (userlogic.Login{}).PanelAccessToken(ctx)
 	reference, err := documents.Ensure(ctx.Request.Context(), token, params.Identifie, (userlogic.User{}).GetUser(ctx))
 	if err != nil {
 		c.documentError(ctx, err)
@@ -52,7 +52,7 @@ func (c FormulaDocument) Save(ctx *gin.Context) {
 		return
 	}
 	documents := logic.FormulaDocument{}
-	token := (userlogic.Session{}).PanelAccessToken(ctx)
+	token := (userlogic.Login{}).PanelAccessToken(ctx)
 	reference, err := documents.Ensure(ctx.Request.Context(), token, params.Identifie, (userlogic.User{}).GetUser(ctx))
 	if err == nil {
 		err = documents.Save(ctx.Request.Context(), token, reference, filename, sanitizeFormulaAttachContent(params.Content))

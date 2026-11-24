@@ -2,7 +2,7 @@ import axios from "axios";
 import { alert, message } from './ui-feedback';
 import { getPanelToken, getWujieAccessToken, getZpkToken, setZpkToken } from './panel-token';
 import { getMicroAppProxyBase, getZpkBaseURL } from './request-base';
-import { isOfficialZpkRequest, removeZpkAuthHeaders } from './request-auth';
+import { isOfficialZpkRequest, isOwnZpkRequest, removeZpkAuthHeaders } from './request-auth';
 
 const proxyBase = getMicroAppProxyBase();
 const myAxios = axios.create({
@@ -123,18 +123,21 @@ myAxios.interceptors.request.use(config => {
         setRequestHeader(config.headers, 'X-W7Panel-Token', getPanelToken());
     }
 
-    if (isOfficialZpkRequest(config) || config._skipZpkAuth
+    if (!isOwnZpkRequest(config, myAxios.defaults.baseURL) || isOfficialZpkRequest(config) || config._skipZpkAuth
         || config._skipZpkTokenRefresh || isZpkLoginRequest(config)) {
         removeZpkAuthHeaders(config.headers);
         return config;
     }
 
     setRequestHeader(config.headers, 'X-Zpk-Token', getZpkToken());
+    setRequestHeader(config.headers, 'X-W7Panel-Access-Token', getWujieAccessToken());
     return config
 }, err => Promise.reject(err))
 
 myAxios.interceptors.response.use(res => {
-    setZpkToken(res.headers?.['x-zpk-token']);
+    if (isOwnZpkRequest(res.config, myAxios.defaults.baseURL) && !isOfficialZpkRequest(res.config)) {
+        setZpkToken(res.headers?.['x-zpk-token']);
+    }
     if (res.status >= 200 && res.status < 300 && res) {
         return Promise.resolve(res)
     }
@@ -142,6 +145,9 @@ myAxios.interceptors.response.use(res => {
     const requestConfig = error?.config;
     if (isZpkTokenError(error)
         && requestConfig
+        && isOwnZpkRequest(requestConfig, myAxios.defaults.baseURL)
+        && !isOfficialZpkRequest(requestConfig)
+        && !requestConfig._skipZpkAuth
         && !requestConfig._zpkTokenRetried
         && !requestConfig._skipZpkTokenRefresh
         && !isZpkLoginRequest(requestConfig)

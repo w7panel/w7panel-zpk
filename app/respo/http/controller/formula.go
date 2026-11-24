@@ -40,7 +40,7 @@ func formulaRuntimeContextResponse(title string, dynamicValues map[string]interf
 }
 
 func (c Formula) Add(ctx *gin.Context) {
-	if (logic2.Session{}).PanelAccessToken(ctx) == "" {
+	if (logic2.Login{}).PanelAccessToken(ctx) == "" {
 		c.JsonResponseWithError(ctx, errors.New("token 错误，请通过面板重新登录"), http.StatusUnauthorized)
 		return
 	}
@@ -66,7 +66,7 @@ func (c Formula) Add(ctx *gin.Context) {
 		return
 	}
 
-	reference, err := (logic.FormulaDocument{}).Ensure(ctx.Request.Context(), (logic2.Session{}).PanelAccessToken(ctx), params.Identifie, (logic2.User{}).GetUser(ctx))
+	reference, err := (logic.FormulaDocument{}).Ensure(ctx.Request.Context(), (logic2.Login{}).PanelAccessToken(ctx), params.Identifie, (logic2.User{}).GetUser(ctx))
 	if err != nil {
 		c.JsonResponseWithError(ctx, fmt.Errorf("制品已创建，默认文档初始化未完成，请重试：%w", err), 503)
 		return

@@ -63,11 +63,10 @@ func (c OIDC) LoginFromW7panel(ctx *gin.Context) {
 		return
 	}
 
-	token, err := (commonlogic.Session{}).SaveUserInfo(ctx, commonlogic.UserSession{
-		UserID:           user.ID,
-		ConsoleUid:       info.ConsoleUID,
-		Username:         user.Username,
-		PanelAccessToken: params.AccessToken,
+	token, err := (commonlogic.Login{}).SaveUserInfo(ctx, commonlogic.LoginUser{
+		UserID:     user.ID,
+		ConsoleUid: info.ConsoleUID,
+		Username:   user.Username,
 	})
 	if err != nil {
 		c.JsonResponseWithServerError(ctx, err)

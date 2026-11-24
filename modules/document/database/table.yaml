@@ -1,23 +1,4 @@
 relation:
-  - table: document_session
-    column:
-      id:
-        tag:
-          gorm:
-            type: "varchar(64)"
-      user_info:
-        tag:
-          gorm:
-            type: "text"
-      expires_at:
-        tag:
-          gorm:
-            index: "document_session_expires_at"
-      deleted_at:
-        type: gorm.DeletedAt
-        tag:
-          gorm:
-            index: "document_session_deleted_at"
   - table: document_category
     column:
       deleted_at:

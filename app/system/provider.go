@@ -18,8 +18,8 @@ func (provider *Provider) Register(httpServer *http_server.Server) {
 		cors := root.Group("/", middleware.Cors{}.Process)
 		oidc := cors.Group("/oidc", middleware.Cors{}.Process, middleware.DenyDomainReq{}.Process)
 		oidc.Match([]string{"POST", "OPTIONS"}, "/w7panel/login", controller.OIDC{}.LoginFromW7panel)
-		userAPI := root.Group("/v2/api/user", middleware.Cors{}.Process, middleware.DenyDomainReq{}.Process)
-		userAPI.POST("/current", systemmiddleware.OIDC{}.Process, controller.User{}.CurrentUser)
+		userAPI := root.Group("/v2/openapi/user")
+		userAPI.POST("/current", systemmiddleware.OIDC{}.Process, controller.User{}.CurUserInfo)
 
 		group := cors.Group("/system", middleware.Cors{}.Process, middleware.DenyDomainReq{}.Process, middleware.Auth{}.Process, middleware.AdminUser{}.Process)
 

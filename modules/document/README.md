@@ -34,7 +34,7 @@ Chart 只保留 Sidecar 调用位置和 values 占位，`_w7panel-sidecars.tpl` 
 
 ### GitHub 发布流程
 
-推送 `v*` 标签触发主 `Release` workflow，由其调用 `.github/workflows/release-document.yml`。文档子 workflow 使用相同标签构建 Linux 镜像，推送到 `zpk.w7.cc/public/zpk-document`，生成对应版本的 `w7-zpkdocument-<版本>.tgz` 和 `document-ui.zip`，通过 GitHub Actions artifact 返回主流程。镜像推送复用仓库已有的 `ZPK_DOCKER_USERNAME`、`ZPK_DOCKER_PASSWORD` secrets，账号需有该镜像仓库的推送权限。
+推送 `v*` 标签触发主 `Release` workflow，由其调用 `.github/workflows/release-document.yml`。文档子 workflow 使用相同标签构建 Linux 镜像，沿用主流程的 `IMAGE_PUSH_REGISTRY`（默认 `ghcr.io`），推送到 `<推送仓库>/<小写 GitHub owner/repo>-document:<标签>`，通过 `GITHUB_TOKEN` 登录，不再向 ZPK 镜像仓库推送。Helm 包沿用 `HELM_PACKAGE_IMAGE_REGISTRY`（默认 `ghcr.registry.cdn.w7.cc`）作为镜像拉取地址，Makefile 通过 `HELM_PACKAGE_IMAGE_REPOSITORY` 接收该地址。生成对应版本的 `w7-zpkdocument-<版本>.tgz` 和 `document-ui.zip`，通过 GitHub Actions artifact 返回主流程。
 
 主流程等待文档构建成功后，拉取现有 `w7-zpkv2` 制品，通过 CLI 的 `app update --app=w7-zpkdocument` 更新已添加子应用的 Helm 和前端附件，与主应用附件一起推送并发起发布。根 manifest 的依赖、子应用的菜单、bindings、单次安装配置及 manifest 版本保持已有值；缺少该子应用时终止，不推送这次主制品。版本处理与 ZPK 主项目一致：镜像 tag 和 Helm appVersion 使用 Git 标签，Chart version 去掉标签前缀 `v`，制品版本由现有 `app push --publish` 流程分配，不额外修改子应用 manifest。文档构建不会单独发布远端 `w7-zpkdocument` 制品，最终后台 Helm 打包状态仍需在制品管理端确认。
 

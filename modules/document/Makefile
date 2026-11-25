@@ -7,6 +7,7 @@ IMAGE_REPOSITORY ?= $(shell awk '$$1=="repository:" {print $$2; exit}' $(CHART_D
 IMAGE_TAG ?= $(shell awk '$$1=="appVersion:" {gsub(/"/, "", $$2); print $$2; exit}' $(CHART_DIR)/Chart.yaml)
 LOCAL_IMAGE ?= $(PROJECT_NAME):$(IMAGE_TAG)
 PUBLISH_IMAGE := $(IMAGE_REPOSITORY):$(IMAGE_TAG)
+HELM_PACKAGE_IMAGE_REPOSITORY ?= $(IMAGE_REPOSITORY)
 HELM_CHART_VERSION ?= $(shell awk '$$1=="version:" {print $$2; exit}' $(CHART_DIR)/Chart.yaml)
 HELM_APP_VERSION ?= $(IMAGE_TAG)
 BETA_SUFFIX ?=
@@ -44,7 +45,7 @@ chart:
 	@chart_dir=$$(mktemp -d); \
 	trap 'rm -rf "$$chart_dir"' EXIT; \
 	cp -R "$(CHART_DIR)" "$$chart_dir/w7-zpkdocument"; \
-	awk -v repository="$(IMAGE_REPOSITORY)" -v tag="$(IMAGE_TAG)" ' \
+	awk -v repository="$(HELM_PACKAGE_IMAGE_REPOSITORY)" -v tag="$(IMAGE_TAG)" ' \
 		/^image:/ { in_image=1; print; next } \
 		in_image && /^[^[:space:]]/ { in_image=0 } \
 		in_image && /^[[:space:]]*repository:/ { sub(/repository:.*/, "repository: " repository) } \

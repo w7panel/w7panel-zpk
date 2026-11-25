@@ -2,18 +2,18 @@ name: Release document
 
 on:
   workflow_call:
-    secrets:
-      ZPK_DOCKER_USERNAME:
-        required: true
-      ZPK_DOCKER_PASSWORD:
-        required: true
 
 permissions:
   contents: read
+  packages: write
 
 jobs:
   publish:
     runs-on: ubuntu-latest
+
+    env:
+      IMAGE_PUSH_REGISTRY: ${{ vars.IMAGE_PUSH_REGISTRY || 'ghcr.io' }}
+      HELM_PACKAGE_IMAGE_REGISTRY: ${{ vars.HELM_PACKAGE_IMAGE_REGISTRY || 'ghcr.registry.cdn.w7.cc' }}
 
     steps:
       - name: Checkout
@@ -38,12 +38,12 @@ jobs:
       - name: Install build dependencies
         run: sudo apt-get update && sudo apt-get install -y musl-tools zip
 
-      - name: Login to ZPK Registry
+      - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
         with:
-          registry: zpk.w7.cc
-          username: ${{ secrets.ZPK_DOCKER_USERNAME }}
-          password: ${{ secrets.ZPK_DOCKER_PASSWORD }}
+          registry: ${{ env.IMAGE_PUSH_REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install frontend dependencies
         run: make -C modules/document ui-deps
@@ -54,12 +54,15 @@ jobs:
 
           RELEASE_TAG="${GITHUB_REF_NAME}"
           RELEASE_VERSION="${RELEASE_TAG#v}"
+          IMAGE_NAME="${GITHUB_REPOSITORY,,}-document"
 
           make -C modules/document publish \
             BUILD_CC=musl-gcc \
             BUILD_CXX=g++ \
+            IMAGE_REPOSITORY="${IMAGE_PUSH_REGISTRY}/${IMAGE_NAME}" \
             IMAGE_TAG="${RELEASE_TAG}" \
             LOCAL_IMAGE="w7-zpkdocument:${RELEASE_TAG}" \
+            HELM_PACKAGE_IMAGE_REPOSITORY="${HELM_PACKAGE_IMAGE_REGISTRY}/${IMAGE_NAME}" \
             HELM_CHART_VERSION="${RELEASE_VERSION}" \
             HELM_APP_VERSION="${RELEASE_TAG}"
 

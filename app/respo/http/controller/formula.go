@@ -373,6 +373,12 @@ func (c Formula) Info(ctx *gin.Context) {
 			if !hasStorageDevice {
 				startParams = ensurePVCNameStartParam(startParams, item.Platform.Volumes)
 			}
+			// TODO: 移除旧安装端通过 values_text 读取候选项的临时兼容。
+			for index := range startParams {
+				if len(startParams[index].Options) > 0 {
+					startParams[index].ValuesText = strings.Join(startParams[index].Options, "|")
+				}
+			}
 			if startParams == nil {
 				startParams = make([]logic2.StartParams, 0)
 			}

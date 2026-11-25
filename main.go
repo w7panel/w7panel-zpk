@@ -11,6 +11,7 @@ import (
 	"github.com/w7panel/w7panel-zpk/app/respo"
 	"github.com/w7panel/w7panel-zpk/app/system"
 	systemLogic "github.com/w7panel/w7panel-zpk/app/system/logic"
+	"github.com/w7panel/w7panel-zpk/app/workflow"
 	"github.com/w7panel/w7panel-zpk/common/dao"
 	"github.com/w7panel/w7panel-zpk/common/service/w7"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
@@ -79,6 +80,7 @@ func main() {
 	// 注册业务 provider，此模块中需要使用 http server 和 console
 	new(respo.Provider).Register(httpServer, app.GetConsole())
 	new(registry2.Provider).Register(httpServer, app.GetConsole())
+	new(workflow.Provider).Register(httpServer)
 	new(system.Provider).Register(httpServer)
 
 	app.RunConsole()

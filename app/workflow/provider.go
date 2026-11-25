@@ -14,8 +14,7 @@ import (
 
 type Provider struct{}
 
-// Register accepts caller-owned access checks.
-func (p Provider) Register(server *httpserver.Server, access func(*gin.Context, int32) error) {
+func (p Provider) Register(server *httpserver.Server) {
 	if facade.GetConfig().GetString("app.env") != "debug" && !systemlogic.ShouldBlockWrites(facade.GetConfig()) {
 		db, err := facade.GetDbFactory().Channel("default")
 		if err != nil {
@@ -24,25 +23,24 @@ func (p Provider) Register(server *httpserver.Server, access func(*gin.Context, 
 		if err = p.initDatabase(db); err != nil {
 			panic(err)
 		}
+		if err = (logic.Workflow{}).MigrateWorkflowRules(); err != nil {
+			panic(err)
+		}
 	}
 	server.RegisterRouters(func(engine *gin.Engine) {
-		api := engine.Group("/zpk/v2/api/repository", middleware.Cors{}.Process, middleware.DenyDomainReq{}.Process, middleware.Auth{}.Process)
-		workflow := controller.Workflow{Access: access}
-		deploy := controller.Deploy{Access: access}
-		api.POST("/workflow/get", workflow.Get)
-		api.POST("/workflow/save", workflow.Save)
-		api.POST("/workflow/runs", workflow.Runs)
-		api.POST("/workflow/logs", workflow.Logs)
-		api.Any("/deploy_rule/k8s/proxy/*path", middleware.AdminUser{}.Process, deploy.K8sProxy)
-		api.POST("/deploy_rule/k8s/namespaces", deploy.GetK8sNamespace)
-		api.POST("/deploy_rule/k8s/apps", deploy.GetK8sApps)
-		api.POST("/deploy_rule/k8s/app-containers", deploy.GetK8sAppContainers)
-		api.POST("/deploy_rule/add", deploy.AddRule)
-		api.POST("/deploy_rule/info", deploy.QueryRule)
-		api.POST("/deploy_rule/list", deploy.ListRule)
-		api.POST("/deploy_rule/edit", deploy.EditRule)
-		api.POST("/deploy_rule/del", deploy.DelRule)
-		api.POST("/deploy_rule/deploy-log", deploy.RuleDeployLog)
+		api := engine.Group("/zpk/v2/api/workflow", middleware.Cors{}.Process, middleware.DenyDomainReq{}.Process, middleware.Auth{}.Process)
+		workflow := controller.Workflow{}
+		api.POST("/run", workflow.Run)
+		api.POST("/get", workflow.Get)
+		api.POST("/save", workflow.Save)
+		api.POST("/runs", workflow.Runs)
+		api.POST("/logs", workflow.Logs)
+		cluster := engine.Group("/zpk/v2/api/repository/deploy_rule/k8s", middleware.Cors{}.Process, middleware.DenyDomainReq{}.Process, middleware.Auth{}.Process)
+		deploy := controller.Deploy{}
+		cluster.Any("/proxy/*path", middleware.AdminUser{}.Process, deploy.K8sProxy)
+		cluster.POST("/namespaces", deploy.GetK8sNamespace)
+		cluster.POST("/apps", deploy.GetK8sApps)
+		cluster.POST("/app-containers", deploy.GetK8sAppContainers)
 	})
 	logic.InitExecutor()
 }
@@ -54,7 +52,7 @@ func (Provider) initDatabase(db *gorm.DB) error {
 		model  interface{}
 		fields []string
 	}{
-		{&entity.RegistryRepositoryDeployRule{}, []string{"WorkflowTaskKey", "ExecutionOrder", "TaskAction", "ImageSource", "SourceBuildTaskKey", "DockerfileInstructions", "OutputTagSuffix", "TaskName"}},
+		{&entity.RegistryRepositoryDeployRule{}, []string{"RegistryUsername", "RegistryPassword", "UserID", "RepositoryName", "ImageRepository", "ImageHost", "PlainHTTP", "WorkflowTaskKey", "ExecutionOrder", "TaskAction", "ImageSource", "SourceBuildTaskKey", "DockerfileInstructions", "OutputTagSuffix", "TaskName"}},
 		{&entity.RegistryRepositoryDeployRuleMatchLog{}, []string{"WorkflowRunID", "WorkflowTaskKey", "RepositoryID", "TriggerRepository", "TriggerTag", "TriggerDigest", "ExecutionStatus", "FailureReason", "EncryptedConfigSnapshot", "UpdatedAt", "BuildOutputTag", "BuildOutputDigest"}},
 	}
 	for _, table := range tables {
@@ -73,7 +71,7 @@ func (Provider) initDatabase(db *gorm.DB) error {
 		}
 	}
 	log := &entity.RegistryRepositoryDeployRuleMatchLog{}
-	indexes := []string{"workflow_run_task", "RepositoryID", "ExecutionStatus", "BuildOutputTag"}
+	indexes := []string{"workflow_run_task", "RepositoryID", "TriggerRepository", "ExecutionStatus", "BuildOutputTag"}
 	for _, index := range indexes {
 		if !db.Migrator().HasIndex(log, index) {
 			if err := db.Migrator().CreateIndex(log, index); err != nil {

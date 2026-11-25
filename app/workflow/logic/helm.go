@@ -3,13 +3,12 @@ package logic
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
 	"embed"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/w7panel/w7panel-zpk/common/entity"
 	"helm.sh/helm/v3/pkg/action"
+	"helm.sh/helm/v3/pkg/kube"
 	"helm.sh/helm/v3/pkg/release"
 	"helm.sh/helm/v3/pkg/storage/driver"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -22,330 +21,54 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"log/slog"
-	"os"
-	"path"
-	"path/filepath"
-	"regexp"
 	"slices"
-	"strconv"
 	"strings"
 	"text/template"
 	"time"
 
-	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
-
 	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/chart/loader"
-	"helm.sh/helm/v3/pkg/chartutil"
 	"sigs.k8s.io/yaml"
 )
 
 //go:embed helm_templates/*.tpl
 var helmTemplateFS embed.FS
 
-var workflowChartPathPattern = regexp.MustCompile(`^workflow/[1-9][0-9]*/(workflow\.tgz|runs/[0-9a-f]{32}\.tgz)$`)
-var workflowRunIDPattern = regexp.MustCompile(`^[0-9a-f]{32}$`)
-
-const workflowConfigAnnotation = "w7.cc/workflow-config-sha256"
-
 type Helm struct{}
 
-// GenerateChart is called when configuration changes, never for individual triggers.
-func (h Helm) GenerateChart(config Config) ([]byte, error) {
+// GenerateChart builds an in-memory chart from the immutable execution snapshot.
+func (h Helm) GenerateChart(config Config) (*chart.Chart, error) {
 	if err := config.Validate(); err != nil {
 		return nil, err
 	}
-	directory, err := os.MkdirTemp("", "zpk-workflow-chart-")
+	values, err := h.generateValuesYaml(config)
 	if err != nil {
 		return nil, err
 	}
-	defer os.RemoveAll(directory)
-	rootDir := filepath.Join(directory, "workflow")
-	if err := os.MkdirAll(filepath.Join(rootDir, "templates"), 0o755); err != nil {
-		return nil, err
-	}
-	if err := h.generateChartYaml(rootDir); err != nil {
-		return nil, err
-	}
-	if err := h.generateValuesYaml(rootDir, config); err != nil {
-		return nil, err
-	}
-	for _, generate := range []func(string) error{
-		h.generateServiceAccountYaml,
-		h.generateConfigMapYaml,
-		h.generateRoleYaml,
-		h.generateRoleBindingYaml,
-		h.generateSecretYaml,
-		h.generateJobYaml,
-	} {
-		if err := generate(rootDir); err != nil {
-			return nil, err
-		}
-	}
-	workflowChart, err := loader.LoadDir(rootDir)
+	files := []*loader.BufferedFile{{Name: "values.yaml", Data: values}}
+	entries, err := helmTemplateFS.ReadDir("helm_templates")
 	if err != nil {
 		return nil, err
 	}
-	configDigest, err := h.configDigest(config)
-	if err != nil {
-		return nil, err
-	}
-	if workflowChart.Metadata.Annotations == nil {
-		workflowChart.Metadata.Annotations = map[string]string{}
-	}
-	workflowChart.Metadata.Annotations[workflowConfigAnnotation] = configDigest
-	chartArchivePath, err := chartutil.Save(workflowChart, directory)
-	if err != nil {
-		return nil, err
-	}
-	return os.ReadFile(chartArchivePath)
-}
-
-// ChartPath is stable for a repository; only saving configuration replaces this file.
-func (h Helm) ChartPath(repositoryID int32) (string, error) {
-	if repositoryID < 1 {
-		return "", errors.New("仓库 ID 无效")
-	}
-	return fmt.Sprintf("workflow/%d/workflow.tgz", repositoryID), nil
-}
-
-// RunChartPath is derived from the run ID, never persisted in the database.
-func (h Helm) RunChartPath(repositoryID int32, runID string) (string, error) {
-	if repositoryID < 1 || !workflowRunIDPattern.MatchString(runID) {
-		return "", errors.New("工作流执行标识无效")
-	}
-	return fmt.Sprintf("workflow/%d/runs/%s.tgz", repositoryID, runID), nil
-}
-
-// The digest checks that the current package agrees with the transaction's rules.
-// It is not used as a directory name. Runtime credentials are excluded.
-func (h Helm) configDigest(config Config) (string, error) {
-	tasks := append([]Task(nil), config.Tasks...)
-	for i := range tasks {
-		tasks[i].K8sConfig = ""
-		if tasks[i].Name == "" {
-			tasks[i].Name = tasks[i].K8sAppName
-		}
-		if tasks[i].DeployType == 0 {
-			tasks[i].DeployType = 1
-		}
-	}
-	slices.SortFunc(tasks, func(a, b Task) int { return strings.Compare(a.ID, b.ID) })
-	content, err := json.Marshal(struct {
-		Version string `json:"version"`
-		Tasks   []Task `json:"tasks"`
-	}{Version: "workflow-explicit-cluster-auth-v5", Tasks: tasks})
-	if err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("%x", sha256.Sum256(content)), nil
-}
-
-func (h Helm) SaveChart(repositoryID int32, config Config) (string, error) {
-	relative, err := h.ChartPath(repositoryID)
-	if err != nil {
-		return "", err
-	}
-	content, err := h.GenerateChart(config)
-	if err != nil {
-		return "", err
-	}
-	if err := h.writeChart(relative, content, true); err != nil {
-		return "", err
-	}
-	return relative, nil
-}
-
-// writeChart atomically publishes a complete file. Run packages must never be overwritten.
-func (h Helm) writeChart(relativeChartPath string, content []byte, replaceExisting bool) error {
-	filename, err := h.chartFilePath(relativeChartPath)
-	if err != nil {
-		return err
-	}
-	if err := os.MkdirAll(filepath.Dir(filename), 0o755); err != nil {
-		return err
-	}
-	file, err := os.CreateTemp(filepath.Dir(filename), ".workflow-*.tgz")
-	if err != nil {
-		return err
-	}
-	temporary := file.Name()
-	defer os.Remove(temporary)
-	if _, err := file.Write(content); err != nil {
-		file.Close()
-		return err
-	}
-	if err := file.Sync(); err != nil {
-		file.Close()
-		return err
-	}
-	if err := file.Close(); err != nil {
-		return err
-	}
-	if replaceExisting {
-		return os.Rename(temporary, filename)
-	}
-	return os.Link(temporary, filename)
-}
-
-// PinChart copies the saved package, without regenerating it, before enqueuing a run.
-func (h Helm) PinChart(repositoryID int32, runID string, config Config) error {
-	runChartPath, err := h.RunChartPath(repositoryID, runID)
-	if err != nil {
-		return err
-	}
-	if runChart, err := h.LoadChart(runChartPath); err == nil {
-		return h.checkChartConfig(runChart, config)
-	} else if !errors.Is(err, os.ErrNotExist) {
-		return err
-	}
-	currentChartPath, err := h.ChartPath(repositoryID)
-	if err != nil {
-		return err
-	}
-	currentChartFile, err := h.chartFilePath(currentChartPath)
-	if err != nil {
-		return err
-	}
-	chartArchiveBytes, err := os.ReadFile(currentChartFile)
-	if err != nil {
-		return fmt.Errorf("读取当前工作流 Helm 包，请重新保存任务配置: %w", err)
-	}
-	workflowChart, err := loader.LoadArchive(bytes.NewReader(chartArchiveBytes))
-	if err != nil {
-		return fmt.Errorf("读取工作流 Helm 包: %w", err)
-	}
-	if err := h.checkChartConfig(workflowChart, config); err != nil {
-		return err
-	}
-	if err := h.writeChart(runChartPath, chartArchiveBytes, false); err != nil {
-		if !errors.Is(err, os.ErrExist) {
-			return err
-		}
-		runChart, err := h.LoadChart(runChartPath)
-		if err != nil {
-			return err
-		}
-		return h.checkChartConfig(runChart, config)
-	}
-	return nil
-}
-
-func (h Helm) checkChartConfig(workflowChart *chart.Chart, config Config) error {
-	expectedConfigDigest, err := h.configDigest(config)
-	if err != nil {
-		return err
-	}
-	if workflowChart.Metadata.Annotations[workflowConfigAnnotation] != expectedConfigDigest {
-		return errors.New("工作流 Helm 包与任务配置不一致，请重新保存任务配置")
-	}
-	return nil
-}
-
-func (h Helm) RemoveRunChart(repositoryID int32, runID string) error {
-	relative, err := h.RunChartPath(repositoryID, runID)
-	if err != nil {
-		return err
-	}
-	filename, err := h.chartFilePath(relative)
-	if err != nil {
-		return err
-	}
-	if err := os.Remove(filename); err != nil && !errors.Is(err, os.ErrNotExist) {
-		return err
-	}
-	return nil
-}
-
-type runChartFile struct {
-	RepositoryID int32
-	RunID        string
-	ModifiedAt   time.Time
-}
-
-// runCharts lists only temporary execution packages, leaving current and legacy packages alone.
-func (h Helm) runCharts() ([]runChartFile, error) {
-	base := facade.GetConfig().GetString("setting.depot.storage.local.path")
-	if strings.TrimSpace(base) == "" {
-		return nil, errors.New("未配置制品本地存储目录")
-	}
-	root := filepath.Join(base, "Helm", "workflow")
-	entries, err := os.ReadDir(root)
-	if errors.Is(err, os.ErrNotExist) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	var files []runChartFile
 	for _, entry := range entries {
-		if !entry.IsDir() {
+		name := entry.Name()
+		if name == "values.yaml.tpl" {
 			continue
 		}
-		id, err := strconv.ParseInt(entry.Name(), 10, 32)
-		if err != nil || id < 1 || strconv.FormatInt(id, 10) != entry.Name() {
-			continue
-		}
-		runs, err := os.ReadDir(filepath.Join(root, entry.Name(), "runs"))
-		if errors.Is(err, os.ErrNotExist) {
-			continue
-		}
+		content, err := helmTemplateFS.ReadFile("helm_templates/" + name)
 		if err != nil {
 			return nil, err
 		}
-		for _, run := range runs {
-			if run.IsDir() || !strings.HasSuffix(run.Name(), ".tgz") {
-				continue
-			}
-			runID := strings.TrimSuffix(run.Name(), ".tgz")
-			if !workflowRunIDPattern.MatchString(runID) {
-				continue
-			}
-			info, err := run.Info()
-			if err != nil {
-				if errors.Is(err, os.ErrNotExist) {
-					continue
-				}
-				return nil, err
-			}
-			files = append(files, runChartFile{RepositoryID: int32(id), RunID: runID, ModifiedAt: info.ModTime()})
+		name = strings.TrimSuffix(name, ".tpl")
+		if name != "Chart.yaml" {
+			name = "templates/" + name
 		}
+		files = append(files, &loader.BufferedFile{Name: name, Data: content})
 	}
-	return files, nil
+	return loader.LoadFiles(files)
 }
 
-func (h Helm) chartFilePath(relative string) (string, error) {
-	if !workflowChartPathPattern.MatchString(relative) {
-		return "", fmt.Errorf("工作流 Helm 包路径无效")
-	}
-	base := facade.GetConfig().GetString("setting.depot.storage.local.path")
-	if strings.TrimSpace(base) == "" {
-		return "", fmt.Errorf("未配置制品本地存储目录")
-	}
-	return filepath.Join(base, "Helm", filepath.FromSlash(relative)), nil
-}
-
-func (h Helm) LoadChart(relative string) (*chart.Chart, error) {
-	filename, err := h.chartFilePath(relative)
-	if err != nil {
-		return nil, err
-	}
-	content, err := os.ReadFile(filename)
-	if err != nil {
-		return nil, fmt.Errorf("读取工作流 Helm 包: %w", err)
-	}
-	workflowChart, err := loader.LoadArchive(bytes.NewReader(content))
-	if err != nil {
-		return nil, fmt.Errorf("读取任务 Helm 包: %w", err)
-	}
-	return workflowChart, nil
-}
-
-func (h Helm) generateChartYaml(rootDir string) error {
-	return h.writeTemplateFile(rootDir, "Chart.yaml", "Chart.yaml.tpl")
-}
-
-func (h Helm) generateValuesYaml(rootDir string, config Config) error {
+func (h Helm) generateValuesYaml(config Config) ([]byte, error) {
 	stages := []int{}
 	for _, task := range config.Tasks {
 		if !slices.Contains(stages, task.Stage) {
@@ -359,7 +82,7 @@ func (h Helm) generateValuesYaml(rootDir string, config Config) error {
 	}
 	content, err := helmTemplateFS.ReadFile("helm_templates/values.yaml.tpl")
 	if err != nil {
-		return err
+		return nil, err
 	}
 	valuesTemplate, err := template.New("values.yaml.tpl").Funcs(template.FuncMap{
 		"toYaml": func(value interface{}) (string, error) {
@@ -372,52 +95,21 @@ func (h Helm) generateValuesYaml(rootDir string, config Config) error {
 		},
 	}).Parse(string(content))
 	if err != nil {
-		return fmt.Errorf("解析工作流 values.yaml: %w", err)
+		return nil, fmt.Errorf("解析工作流 values.yaml: %w", err)
 	}
 	var buffer bytes.Buffer
 	if err := valuesTemplate.Execute(&buffer, struct {
-		Tasks  []Task
-		Stages []int
-	}{Tasks: tasks, Stages: stages}); err != nil {
-		return fmt.Errorf("生成工作流 values.yaml: %w", err)
+		Tasks      []Task
+		Stages     []int
+		Repository RepositoryConfig
+	}{Tasks: tasks, Stages: stages, Repository: config.Repository}); err != nil {
+		return nil, fmt.Errorf("生成工作流 values.yaml: %w", err)
 	}
-	return os.WriteFile(filepath.Join(rootDir, "values.yaml"), buffer.Bytes(), 0o600)
-}
-
-func (h Helm) generateServiceAccountYaml(rootDir string) error {
-	return h.writeTemplateFile(filepath.Join(rootDir, "templates"), "serviceaccount.yaml", "serviceaccount.yaml.tpl")
-}
-
-func (h Helm) generateConfigMapYaml(rootDir string) error {
-	return h.writeTemplateFile(filepath.Join(rootDir, "templates"), "configmap.yaml", "configmap.yaml.tpl")
-}
-
-func (h Helm) generateRoleYaml(rootDir string) error {
-	return h.writeTemplateFile(filepath.Join(rootDir, "templates"), "role.yaml", "role.yaml.tpl")
-}
-
-func (h Helm) generateRoleBindingYaml(rootDir string) error {
-	return h.writeTemplateFile(filepath.Join(rootDir, "templates"), "rolebinding.yaml", "rolebinding.yaml.tpl")
-}
-
-func (h Helm) generateSecretYaml(rootDir string) error {
-	return h.writeTemplateFile(filepath.Join(rootDir, "templates"), "secret.yaml", "secret.yaml.tpl")
-}
-
-func (h Helm) generateJobYaml(rootDir string) error {
-	return h.writeTemplateFile(filepath.Join(rootDir, "templates"), "job.yaml", "job.yaml.tpl")
-}
-
-func (h Helm) writeTemplateFile(rootDir, name, templateName string) error {
-	content, err := helmTemplateFS.ReadFile(path.Join("helm_templates", templateName))
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(filepath.Join(rootDir, name), content, 0o600)
+	return buffer.Bytes(), nil
 }
 
 // Install owns the release lifecycle; collect runs before Helm removes its resources.
-func (h Helm) Install(ctx context.Context, run entity.RegistryRepositoryDeployRuleMatchLog, config Config, values map[string]interface{}, collectTaskResults func(kubernetes.Interface, *release.Release) error) error {
+func (h Helm) Install(ctx context.Context, run entity.RegistryRepositoryDeployRuleMatchLog, config Config, values map[string]interface{}, collectTaskResults func(kubernetes.Interface, *release.Release, bool) error) error {
 	// Use the service account, never the operator's local kubeconfig.
 	restConfig, err := rest.InClusterConfig()
 	if err != nil {
@@ -425,17 +117,12 @@ func (h Helm) Install(ctx context.Context, run entity.RegistryRepositoryDeployRu
 	}
 	clusterConfigGetter := &clusterGetter{config: restConfig, namespace: executionNamespace}
 	helmConfig := new(action.Configuration)
-	if err = helmConfig.Init(clusterConfigGetter, executionNamespace, "secret", func(format string, args ...interface{}) { slog.Debug(fmt.Sprintf(format, args...)) }); err != nil {
+	if err = helmConfig.Init(clusterConfigGetter, executionNamespace, "memory", func(format string, args ...interface{}) { slog.Debug(fmt.Sprintf(format, args...)) }); err != nil {
 		return err
 	}
 	releaseName := "wf-" + run.WorkflowRunID
-	if _, err = helmConfig.Releases.Last(releaseName); err == nil {
-		return errors.New("执行实例已经存在，拒绝重放")
-	} else if !errors.Is(err, driver.ErrReleaseNotFound) {
-		return err
-	}
-	// Regular resources and Helm release metadata are transient. Hook Jobs retain
-	// logs for their TTL; execution snapshots remain in the existing log table.
+	// Release state stays in memory; ordinary resources are removed after results
+	// are collected. Hook Jobs are removed by their short Kubernetes TTL.
 	defer func() {
 		uninstall := action.NewUninstall(helmConfig)
 		uninstall.Timeout = time.Minute
@@ -449,22 +136,21 @@ func (h Helm) Install(ctx context.Context, run entity.RegistryRepositoryDeployRu
 	}
 	var helmRelease *release.Release
 	if collectTaskResults != nil {
+		helmConfig.KubeClient = &workflowKubeClient{
+			Client: helmConfig.KubeClient.(*kube.Client),
+			collectTaskResults: func() error {
+				return collectTaskResults(client, nil, false)
+			},
+		}
 		defer func() {
-			if err := collectTaskResults(client, helmRelease); err != nil {
+			if err := collectTaskResults(client, helmRelease, true); err != nil {
 				slog.Error("collect workflow task results", "run", run.WorkflowRunID, "error", err)
 			}
 		}()
 	}
 
-	chartPath, err := h.RunChartPath(run.RepositoryID, run.WorkflowRunID)
+	workflowChart, err := h.GenerateChart(config)
 	if err != nil {
-		return err
-	}
-	workflowChart, err := h.LoadChart(chartPath)
-	if err != nil {
-		return err
-	}
-	if err := h.checkChartConfig(workflowChart, config); err != nil {
 		return err
 	}
 	install := action.NewInstall(helmConfig)
@@ -480,6 +166,20 @@ func (h Helm) Install(ctx context.Context, run entity.RegistryRepositoryDeployRu
 		if cleanupErr := client.BatchV1().Jobs(executionNamespace).DeleteCollection(cleanupCtx, metav1.DeleteOptions{}, metav1.ListOptions{LabelSelector: "w7.cc/workflow-run=" + releaseName}); cleanupErr != nil {
 			slog.Error("stop timed out workflow", "run", run.WorkflowRunID, "error", cleanupErr)
 		}
+	}
+	return err
+}
+
+// Collect each completed stage before later stages can outlive its Job TTL.
+type workflowKubeClient struct {
+	*kube.Client
+	collectTaskResults func() error
+}
+
+func (c *workflowKubeClient) WatchUntilReady(resources kube.ResourceList, timeout time.Duration) error {
+	err := c.Client.WatchUntilReady(resources, timeout)
+	if collectErr := c.collectTaskResults(); collectErr != nil {
+		slog.Error("collect workflow stage results", "error", collectErr)
 	}
 	return err
 }

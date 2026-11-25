@@ -4,6 +4,9 @@ tasks:
 stages:
 {{ toYaml .Stages | indent 2 }}
 
+repository:
+{{ toYaml .Repository | indent 2 }}
+
 run:
   original: ""
   repository: ""
@@ -14,7 +17,8 @@ run:
 selected: {}
 remote: {}
 kubeconfigs: {}
-registryToken: ""
+registryUsername: ""
+registryPassword: ""
 
 buildImage: ccr.ccs.tencentyun.com/afan-public/kaniko:w7console-new5-26
 deployImage: registry.cdn.w7.cc/alpine/k8s:1.33.0

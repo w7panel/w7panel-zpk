@@ -12,7 +12,15 @@ const TableNameRegistryRepositoryDeployRule = "ims_registry_repository_deploy_ru
 
 // RegistryRepositoryDeployRule mapped from table <ims_registry_repository_deploy_rule>
 type RegistryRepositoryDeployRule struct {
-	ID                     int32      `gorm:"column:id;primaryKey;autoIncrement:true" json:"id"`
+	ID              int32  `gorm:"column:id;primaryKey;autoIncrement:true" json:"id"`
+	UserID          int32  `gorm:"column:user_id;index" json:"user_id"`
+	RepositoryName  string `gorm:"column:repository_name;size:255" json:"repository_name"`
+	ImageRepository string `gorm:"column:image_repository;size:512;index" json:"image_repository"`
+	ImageHost       string `gorm:"column:image_host;size:255" json:"image_host"`
+	PlainHTTP       bool   `gorm:"column:plain_http;default:false" json:"plain_http"`
+
+	RegistryUsername       string     `gorm:"column:registry_username;size:255" json:"-"`
+	RegistryPassword       string     `gorm:"column:registry_password;type:text" json:"-"`
 	RepositoryID           int32      `gorm:"column:repository_id;not null" json:"repository_id"`
 	DeployType             int32      `gorm:"column:deploy_type;not null;default:1" json:"deploy_type"`
 	MatchType              int32      `gorm:"column:match_type;not null" json:"match_type"`

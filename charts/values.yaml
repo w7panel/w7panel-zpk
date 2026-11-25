@@ -113,6 +113,8 @@ global:
 
 # Temporary Jobs used by image automatic tasks.
 workflow:
+  concurrency: 2
+  queueSize: 100
   enabled: true
   buildImage: ccr.ccs.tencentyun.com/afan-public/kaniko:w7console-new5-26
   deployImage: registry.cdn.w7.cc/alpine/k8s:1.33.0

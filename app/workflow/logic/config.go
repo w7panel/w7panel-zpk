@@ -12,17 +12,25 @@ import (
 )
 
 const (
-	executionNamespace       = "default"
-	ActionBuild              = "build"
-	ActionDeploy             = "deploy"
-	SourceOriginal           = "original"
-	SourceTask               = "task"
-	WorkflowBuildActorPrefix = "zpk-workflow-"
+	executionNamespace = "default"
+	ActionBuild        = "build"
+	ActionDeploy       = "deploy"
+	SourceOriginal     = "original"
+	SourceTask         = "task"
 )
 
 type Config struct {
-	Namespace string `json:"namespace"`
-	Tasks     []Task `json:"tasks"`
+	Tasks      []Task           `json:"tasks"`
+	Repository RepositoryConfig `json:"repository"`
+}
+
+// RepositoryConfig is captured when rules are first saved, not resolved at execution time.
+type RepositoryConfig struct {
+	Username string       `json:"-"`
+	Password string       `json:"-"`
+	UserID   int32        `json:"user_id"`
+	Name     string       `json:"name"`
+	Image    ImageContext `json:"image"`
 }
 type Task struct {
 	ID                string `json:"id"`
@@ -44,9 +52,6 @@ type Task struct {
 }
 
 func (c Config) Validate() error {
-	if c.Namespace != executionNamespace {
-		return errors.New("工作流固定在 default 命名空间执行")
-	}
 	if len(c.Tasks) > 32 {
 		return errors.New("每个工作流最多配置 32 个任务")
 	}
@@ -174,7 +179,6 @@ func (t Task) Matches(tag string, eventType int) bool {
 func (c Config) SelectMatchingTasks(tag string, eventType int) ([]Task, error) {
 	matchedTasks := []Task{}
 	matchedTasksByID := map[string]Task{}
-	outputs := map[string]Task{}
 	for _, task := range c.Tasks {
 		if !task.Matches(tag, eventType) {
 			continue
@@ -182,6 +186,34 @@ func (c Config) SelectMatchingTasks(tag string, eventType int) ([]Task, error) {
 		matchedTasks = append(matchedTasks, task)
 		matchedTasksByID[task.ID] = task
 	}
+	return c.validateSelectedTasks(tag, matchedTasks, matchedTasksByID)
+}
+
+// SelectManualTasks runs the entire trigger group without matching push events.
+func (c Config) SelectManualTasks(tag, taskID string) ([]Task, error) {
+	var selectedTask *Task
+	for _, task := range c.Tasks {
+		if task.ID == taskID {
+			selectedTask = &task
+			break
+		}
+	}
+	if selectedTask == nil {
+		return nil, errors.New("任务不存在，请刷新配置")
+	}
+	selected := []Task{}
+	selectedByID := map[string]Task{}
+	for _, task := range c.Tasks {
+		if task.SameTrigger(*selectedTask) {
+			selected = append(selected, task)
+			selectedByID[task.ID] = task
+		}
+	}
+	return c.validateSelectedTasks(tag, selected, selectedByID)
+}
+
+func (c Config) validateSelectedTasks(tag string, matchedTasks []Task, matchedTasksByID map[string]Task) ([]Task, error) {
+	outputs := map[string]Task{}
 	slices.SortStableFunc(matchedTasks, func(a, b Task) int { return a.Stage - b.Stage })
 	for _, task := range matchedTasks {
 		if task.Source == SourceTask {

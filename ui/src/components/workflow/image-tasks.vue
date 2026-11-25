@@ -14,9 +14,10 @@
                     <a-table-column title="执行时机" :width="240">
                         <template #cell="{ record }">{{ timingLabel(record) }}</template>
                     </a-table-column>
-                    <a-table-column title="操作" :width="240">
+                    <a-table-column title="操作" :width="320">
                         <template #cell="{ record }">
                             <a-button type="text" @click="editTask(record)" :disabled="saving || loading">修改</a-button>
+                            <a-button type="text" @click="openManualRun(record)" :disabled="saving || loading || running">手动执行</a-button>
                             <a-button type="text" @click="showRuns(record)">执行记录</a-button>
                             <a-popconfirm content="确认删除此任务？" type="warning" ok-text="确定" cancel-text="取消"
                                 content-class="zpk-delete-popconfirm" :ok-button-props="{ status: 'danger', loading: saving }"
@@ -26,6 +27,20 @@
                 </template>
             </a-table>
         </a-spin>
+        <a-modal v-model:visible="manualVisible" :title="`${manualTask?.name || ''} · 手动执行`" :width="560" :footer="false"
+            :mask-closable="false" :closable="!running" :esc-to-close="!running" @close="closeManualRun">
+            <a-form :model="manualForm" layout="vertical">
+                <a-form-item label="镜像地址" required>
+                    <a-input v-model="manualForm.image" placeholder="例如 oowy/systemd:debian-bookworm" :disabled="running" />
+                </a-form-item>
+                <a-form-item label="本次执行任务">{{ manualTasks.map(task => task.name).join('、') }}</a-form-item>
+            </a-form>
+            <a-alert>执行同一触发条件下的整组任务，按原有阶段顺序运行。构建结果推送到当前仓库，tag 使用输入镜像的版本加任务后缀；后缀为空时覆盖对应版本。</a-alert>
+            <div class="dialog-footer">
+                <a-button :disabled="running" @click="manualVisible = false">取消</a-button>
+                <a-button type="primary" :loading="running" :disabled="!manualForm.image.trim()" @click="runManualTask">执行</a-button>
+            </div>
+        </a-modal>
         <a-modal v-model:visible="orderVisible" title="调整执行顺序" :width="960" :footer="false" :mask-closable="false" :closable="!saving" :esc-to-close="!saving">
             <section v-for="group in orderGroups" :key="group.key" class="workflow-order-group">
                 <div class="workflow-order-trigger">{{ triggerLabel(group.tasks[0]) }}</div>
@@ -54,6 +69,10 @@
                 <a-table-column title="操作"><template #cell="{ record }"><a-button type="text" @click="showLogs(record)">任务日志</a-button></template></a-table-column>
             </template>
         </a-table>
+        <div class="workflow-runs-pagination">
+            <a-pagination :current="runsPage.page" :page-size="runsPage.pageSize" :total="runsPage.total" show-total show-page-size
+                @change="changeRunsPage" @page-size-change="changeRunsPageSize" />
+        </div>
         </a-modal>
         <a-modal v-model:visible="visible" :title="editing ? '修改自动任务' : '新增自动任务'" :width="800" :footer="false" :mask-closable="false" :closable="!saving" :esc-to-close="!saving">
             <a-form :model="form" layout="vertical" :disabled="saving">
@@ -138,14 +157,15 @@ const taskDefaults = () => ({ id: '', name: '', stage: 1, action: 'build', deplo
 export default {
     mixins: [userMixin],
     components: { IconFullscreen, IconFullscreenExit, IconClose },
-    props: { repositoryId: { type: Number, required: true } },
+    props: { imageRepository: { type: String, required: true } },
     data() {
         return {
-            config: { namespace: 'default', tasks: [] }, loading: false, saving: false, loaded: false,
+            config: { tasks: [] }, loading: false, saving: false, loaded: false,
             namespaces: [], apps: [], containers: [], loadingTargets: false, targetSequence: 0,
             targetCluster: 'remote', targetLoaded: {}, targetRequest: '', importingConfig: false,
             visible: false, editing: false, form: taskDefaults(), orderVisible: false, orderTasks: [], runs: [], loadingRuns: false,
-            runsVisible: false, runsTask: null, runSequence: 0,
+            manualVisible: false, manualTask: null, manualForm: { image: '' }, running: false,
+            runsVisible: false, runsTask: null, runSequence: 0, runsPage: { page: 1, pageSize: 10, total: 0 },
             logsFullscreen: false, logStatus: '', logTerminal: null, logFit: null,
             logsVisible: false, logs: '', loadingLogs: false, disposed: false, logSequence: 0,
             logTailLines: 100, logFollow: true, logArchived: false, logTruncated: false,
@@ -179,6 +199,7 @@ export default {
             return [...groups.values()];
         },
         orderError() { return this.imageDependencyError(this.orderTasks); },
+        manualTasks() { return this.manualTask ? this.orderedTasks.filter(task => this.sameTrigger(task, this.manualTask)) : []; },
     },
     mounted() { this.load(); },
     beforeUnmount() { this.disposed = true; this.closeLogs(); this.targetSequence++; this.runSequence++; },
@@ -237,7 +258,7 @@ export default {
             return '';
         },
         async request(action, params = {}, options = {}) {
-            const response = await myAxios.post(`/v2/api/repository/workflow/${action}`, { repository_id: this.repositoryId, ...params }, options);
+            const response = await myAxios.post(`/v2/api/workflow/${action}`, { image_repository: this.imageRepository, ...params }, options);
             if (!response || !response.data || response.data.error || (response.data.code !== undefined && ![0, 200, '0', '200'].includes(response.data.code))) throw new Error(response?.data?.error || '请求未成功，请重试');
             return response.data.data;
         },
@@ -247,11 +268,39 @@ export default {
             catch (error) { if (!this.disposed) messageError(error?.response?.data?.error || error.message || '请求失败'); }
             finally { if (!this.disposed) this.loading = false; }
         },
+        openManualRun(task) {
+            if (this.running || this.loading || this.saving) return;
+            this.manualTask = { ...task };
+            this.manualForm = { image: '' };
+            this.manualVisible = true;
+        },
+        closeManualRun() { this.manualTask = null; this.manualForm = { image: '' }; },
+        async runManualTask() {
+            if (this.running || !this.manualTask) return;
+            const image = this.manualForm.image.trim();
+            if (!image) { messageError('请填写镜像地址'); return; }
+            const task = this.manualTask;
+            this.running = true;
+            try {
+                await this.request('run', { task_id: task.id, image });
+                if (this.disposed) return;
+                messageSuccess('任务已加入执行队列');
+                this.manualVisible = false;
+                this.showRuns(task);
+            } catch (error) {
+                if (!this.disposed) messageError(error?.response?.data?.error || error.message || '执行任务失败');
+            } finally {
+                if (!this.disposed) this.running = false;
+            }
+        },
         showRuns(task) {
             this.runsTask = { id: task.id, name: task.name }; this.runs = []; this.runsVisible = true;
-            this.closeLogs(); this.loadRuns();
+            this.runsPage.page = 1; this.runsPage.total = 0;
+            this.closeLogs(); return this.loadRuns();
         },
         closeRuns() { this.runSequence++; this.loadingRuns = false; this.runsVisible = false; },
+        changeRunsPage(page) { this.runsPage.page = page; return this.loadRuns(); },
+        changeRunsPageSize(pageSize) { this.runsPage.pageSize = pageSize; this.runsPage.page = 1; return this.loadRuns(); },
         stopLogRequest() {
             this.logSequence++; clearTimeout(this.logTimer); this.logTimer = null;
             this.logController?.abort(); this.logController = null;
@@ -261,7 +310,10 @@ export default {
             if (!this.runsTask || !this.runsVisible) return;
             const sequence = ++this.runSequence;
             this.loadingRuns = true;
-            try { const data = await this.request('runs', { task_id: this.runsTask.id }); if (!this.disposed && sequence === this.runSequence) this.runs = data.list || []; }
+            try {
+                const data = await this.request('runs', { task_id: this.runsTask.id, page: this.runsPage.page, page_size: this.runsPage.pageSize });
+                if (!this.disposed && sequence === this.runSequence) { this.runs = data.list || []; this.runsPage.total = data.total || 0; }
+            }
             catch (error) { if (!this.disposed && sequence === this.runSequence) messageError(error?.response?.data?.error || error.message || '请求失败'); }
             finally { if (!this.disposed && sequence === this.runSequence) this.loadingRuns = false; }
         },
@@ -440,6 +492,7 @@ export default {
 .workflow-order-footer { display: flex; justify-content: flex-end; margin-top: 20px; }
 .workflow-toolbar { margin-bottom: 16px; }
 .workflow-run-id { font-family: ui-monospace, monospace; }
+.workflow-runs-pagination { display: flex; justify-content: flex-end; margin-top: 16px; }
 .workflow-log-title { position: relative; width: 100%; min-height: 32px; display: flex; align-items: center; justify-content: center; }
 .workflow-log-actions { position: absolute; right: 0; }
 .workflow-log-summary { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; overflow-wrap: anywhere; }

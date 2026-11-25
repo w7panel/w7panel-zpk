@@ -15,14 +15,15 @@ require (
 	github.com/gin-gonic/gin v1.10.0
 	github.com/go-resty/resty/v2 v2.16.5
 	github.com/go-sql-driver/mysql v1.8.1
-	github.com/golobby/container/v3 v3.0.2
 	github.com/golang-jwt/jwt/v5 v5.3.0
+	github.com/golobby/container/v3 v3.0.2
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-version v1.8.0
 	github.com/mattn/go-sqlite3 v1.14.22
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/image-spec v1.1.1
 	github.com/otiai10/copy v1.14.1
+	github.com/panjf2000/ants/v2 v2.11.3
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.19.0
 	github.com/w7corp/sdk-open-cloud-go v1.0.8

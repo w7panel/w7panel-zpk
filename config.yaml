@@ -89,6 +89,8 @@ zpk:
   appid: ${APP_ID}
   secret: ${APP_SECRET}
 workflow:
+  concurrency: ${WORKFLOW_CONCURRENCY-2}
+  queue_size: ${WORKFLOW_QUEUE_SIZE-100}
   enabled: ${WORKFLOW_ENABLED-true}
   build_image: ${WORKFLOW_BUILD_IMAGE-ccr.ccs.tencentyun.com/afan-public/kaniko:w7console-new5-26}
   deploy_image: ${WORKFLOW_DEPLOY_IMAGE-registry.cdn.w7.cc/alpine/k8s:1.33.0}

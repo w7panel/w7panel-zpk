@@ -3,8 +3,6 @@ package logic
 import (
 	"encoding/json"
 	"fmt"
-	"net/url"
-	"strings"
 	"time"
 
 	"github.com/w7panel/w7panel-zpk/common/dao"
@@ -19,16 +17,11 @@ import (
 func (l Workflow) MigrateWorkflowRules() error {
 	query := dao.Q.RegistryRepositoryDeployRule
 	rules, err := query.Where(query.RepositoryID.Gt(0)).Order(query.ID).Find()
-	if err != nil || len(rules) == 0 {
-		return err
-	}
-	host := strings.TrimRight(facade.GetConfig().GetString("registry_cli.default.external_domain"), "/")
-	registryURL, err := url.Parse(facade.GetConfig().GetString("registry_cli.default.url"))
 	if err != nil {
 		return err
 	}
-	if host == "" {
-		return fmt.Errorf("迁移工作流需要配置镜像仓库地址")
+	if len(rules) == 0 {
+		return l.migrateWorkflowRepositoryPaths()
 	}
 	grouped := map[int32][]*entity.RegistryRepositoryDeployRule{}
 	for _, rule := range rules {
@@ -40,7 +33,7 @@ func (l Workflow) MigrateWorkflowRules() error {
 			return fmt.Errorf("迁移仓库 %d 的工作流：%w", repositoryID, err)
 		}
 		name := commonlogic.BuildRepositoryName(repository.Name, repository.Namespace)
-		image := host + "/" + name
+		image := name
 		ids := make([]int32, 0, len(group))
 		for _, rule := range group {
 			ids = append(ids, rule.ID)
@@ -60,7 +53,7 @@ func (l Workflow) MigrateWorkflowRules() error {
 				rule.TaskName = rule.K8sAppName
 			}
 
-			if _, err := query.Where(query.ID.Eq(rule.ID)).Select(query.UserID, query.RepositoryName, query.ImageRepository, query.ImageHost, query.PlainHTTP, query.WorkflowTaskKey, query.ExecutionOrder, query.TaskAction, query.ImageSource, query.TaskName).Updates(entity.RegistryRepositoryDeployRule{WorkflowTaskKey: rule.WorkflowTaskKey, ExecutionOrder: rule.ExecutionOrder, TaskAction: rule.TaskAction, ImageSource: rule.ImageSource, TaskName: rule.TaskName, UserID: repository.UserID, RepositoryName: name, ImageRepository: image, ImageHost: host, PlainHTTP: registryURL.Scheme == "http"}); err != nil {
+			if _, err := query.Where(query.ID.Eq(rule.ID)).Select(query.UserID, query.RepositoryName, query.WorkflowTaskKey, query.ExecutionOrder, query.TaskAction, query.ImageSource, query.TaskName).Updates(entity.RegistryRepositoryDeployRule{WorkflowTaskKey: rule.WorkflowTaskKey, ExecutionOrder: rule.ExecutionOrder, TaskAction: rule.TaskAction, ImageSource: rule.ImageSource, TaskName: rule.TaskName, UserID: repository.UserID, RepositoryName: name}); err != nil {
 				return err
 			}
 		}
@@ -79,7 +72,29 @@ func (l Workflow) MigrateWorkflowRules() error {
 			return err
 		}
 	}
-	return nil
+	return l.migrateWorkflowRepositoryPaths()
+}
+
+// Convert the old full-address lookup keys once; task settings and snapshots are preserved.
+func (l Workflow) migrateWorkflowRepositoryPaths() error {
+	return dao.Q.Transaction(func(tx *dao.Query) error {
+		logs := tx.RegistryRepositoryDeployRuleMatchLog
+		// Historical run keys contain the old host. Strip only that component.
+		runs, err := logs.Where(logs.WorkflowTaskKey.Eq("")).Find()
+		if err != nil {
+			return err
+		}
+		for _, run := range runs {
+			name := repositoryPath(run.TriggerRepository)
+			if name == run.TriggerRepository {
+				continue
+			}
+			if _, err := logs.Where(logs.WorkflowRunID.Eq(run.WorkflowRunID), logs.TriggerRepository.Eq(run.TriggerRepository)).Update(logs.TriggerRepository, name); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 func migrateWorkflowLogs(image string, config Config, ruleIDs []int32) error {

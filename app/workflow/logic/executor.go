@@ -133,12 +133,24 @@ func (l *Executor) processRun(taskCtx context.Context, id int32) {
 	}
 }
 
+// Resolve local endpoints when execution begins, leaving external manual inputs pinned.
+func (snapshot executionSnapshot) runtimeImage() ImageContext {
+	image := snapshot.Image
+	target := currentRepositoryImage(snapshot.Repository.Name)
+	if strings.HasPrefix(image.Reference, image.Repository+"@") {
+		image.Reference = target.Repository + strings.TrimPrefix(image.Reference, image.Repository)
+	}
+	image.Repository, image.Host, image.PlainHTTP = target.Repository, target.Host, target.PlainHTTP
+	return image
+}
+
 func (l *Executor) Execute(ctx context.Context, run entity.RegistryRepositoryDeployRuleMatchLog) error {
 	executionSnapshot, err := l.decodeExecutionSnapshot(run.EncryptedConfigSnapshot)
 	if err != nil {
 		return err
 	}
-	config, sourceImage := executionSnapshot.Config, executionSnapshot.Image
+	config, sourceImage := executionSnapshot.Config, executionSnapshot.runtimeImage()
+	config.Repository.Image = currentRepositoryImage(config.Repository.Name)
 	if sourceImage.Reference == "" || sourceImage.Repository == "" || sourceImage.Host == "" {
 		return errors.New("执行记录缺少源镜像信息，请重新触发")
 	}

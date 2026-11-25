@@ -35,7 +35,7 @@ func (c Workflow) repository(ctx *gin.Context, imageRepository string) (workflow
 		if parseErr != nil || !reference.IsNameOnly(named) || named.Name() != imageRepository {
 			return workflow.RepositoryConfig{}, errors.New("请提供完整镜像仓库地址，不包含 tag 或 digest")
 		}
-		return workflow.RepositoryConfig{UserID: user.ID, Name: reference.Path(named), Image: workflow.ImageContext{Repository: named.Name(), Host: reference.Domain(named)}}, nil
+		return workflow.RepositoryConfig{UserID: user.ID, Name: reference.Path(named)}, nil
 	}
 	if err != nil {
 		return workflow.RepositoryConfig{}, err

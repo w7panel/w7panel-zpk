@@ -6,7 +6,7 @@ logic 沿用 respo 的结构体方法风格：`Workflow` 管理配置、触发�
 
 workflow Provider 在主服务 `main.go` 中独立注册，放在 registry Provider 之后，沿用其初始化的仓库及签名配置；注册不传入业务回调。
 
-registry 通过 `ImagePushed` 向 `Workflow.OnImagePushed` 传递仓库名、tag、digest 等推送事件；workflow 根据自身规则读取保存的完整镜像配置。workflow 只维护规则、执行记录和构建结果日志，返回 `ImagePushResult.Rebuilt`，由 registry 单独更新镜像版本的重构标记。事件入口不包裹整体数据库事务；工作流入队保留短事务，Helm 安装在后台执行。规则保存时固定完整镜像地址、Host、HTTP 配置及默认仓库账号密码，密码加密存储且不返回前端。触发时将这些保存值写入加密执行快照；执行不重新读取默认配置，不签发专用令牌。没有 `Source` 适配器或仓库锁注入。保存和入队不加仓库锁；调度器在短事务内锁定本仓库最早的工作流协调记录，再检查运行状态并领取任务，保证同仓库流程串行，Helm 执行期间不持锁。镜像表及 `IsRebuilt` 的迁移归 registry Provider，workflow Provider 只处理规则和执行日志。旧规则已在启动时迁移为工作流，内部构建回推不再次触发。
+registry 通过 `ImagePushed` 向 `Workflow.OnImagePushed` 传递仓库名、tag、digest 等推送事件；workflow 根据自身规则读取仓库路径和任务配置。workflow 只维护规则、执行记录和构建结果日志，返回 `ImagePushResult.Rebuilt`，由 registry 单独更新镜像版本的重构标记。事件入口不包裹整体数据库事务；工作流入队保留短事务，Helm 安装在后台执行。规则保存时固定仓库路径及默认仓库账号密码，密码加密存储且不返回前端。触发时写入加密执行快照；执行时动态读取当前仓库域名及 HTTP 配置，凭据继续使用快照中的保存值，不签发专用令牌。没有 `Source` 适配器或仓库锁注入。保存和入队不加仓库锁；调度器在短事务内锁定本仓库最早的工作流协调记录，再检查运行状态并领取任务，保证同仓库流程串行，Helm 执行期间不持锁。镜像表及 `IsRebuilt` 的迁移归 registry Provider，workflow Provider 只处理规则和执行日志。旧规则已在启动时迁移为工作流，内部构建回推不再次触发。
 
 Helm 包根文件由 `helm_templates/Chart.yaml.tpl` 和 `values.yaml.tpl` 在执行阶段根据快照生成，默认镜像及运行参数结构统一在 values 模板维护；`serviceaccount.yaml.tpl`、`configmap.yaml.tpl`、`role.yaml.tpl`、`rolebinding.yaml.tpl`、`secret.yaml.tpl`、`job.yaml.tpl` 原样打包到 Chart 的 `templates/`，在触发安装时由 Helm 使用本轮 values 渲染。`GenerateChart` 将内置模板和生成的 values 直接组合为内存 Chart，交给 Helm 安装，不再生成或缓存本地 tgz 文件。
 
@@ -37,6 +37,10 @@ Helm 包根文件由 `helm_templates/Chart.yaml.tpl` 和 `values.yaml.tpl` 在�
 构建参考面板现有 Kaniko 执行镜像，直接挂载 Dockerfile 片段，不要求源码压缩包。第一版不提供 `FROM`、`ONBUILD`、`ADD`、`COPY`，不提供自定义脚本动作。按当前约定不再执行镜像来源预检：不检查多平台索引，也不检查排队期间原 tag 是否发生变化。构建始终使用触发时的 digest；构建过程与外部上传之间没有跨系统事务，覆盖原 tag 时仍需避免并发外部上传。
 
 ## 数据职责
+
+规则与执行记录以不包含域名的仓库路径关联，例如 `cache/oowy/systemd`；`default` 命名空间按 Registry 协议省略。接口仍接受完整镜像地址，但只取路径作为查询标识。访问镜像仓库时动态读取 `registry_cli.default.external_domain` 与 URL 协议，不依赖规则中旧的域名。排队期间修改域名，执行时也使用当前域名；手动指定的外部源镜像地址保持原样。账号密码仍在保存规则时固定，不随域名动态获取。
+
+规则表仅保留 `repository_name` 作为仓库标识，不再保存 `image_repository`、`image_host`、`plain_http`；现有数据库中的旧列不主动删除，也不再读写。启动迁移会将旧运行记录的完整地址查询键转为路径，保留原规则、日志 ID 和任务配置，不改写历史加密快照。已迁移且 RepositoryID 已清零的数据同样处理，重复启动不会新增记录。
 
 规则表保存动作、执行分组顺序和来源引用，不保存 Helm 包路径或二进制。旧规则在 workflow 初始化数据库后迁移，补齐所属用户、镜像配置和任务标识、顺序、动作、来源、名称，保留原规则 ID 并转换为部署任务；日常读写不再为旧字段补默认值。旧日志保留原 ID 和正文，历史结果标记为 unknown。迁移全部成功后清空旧 RepositoryID 关联；失败保留迁移标记供下次启动重试。旧规则增删改查接口和运行时旧部署分支已移除。
 

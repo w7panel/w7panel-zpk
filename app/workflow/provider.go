@@ -52,7 +52,7 @@ func (Provider) initDatabase(db *gorm.DB) error {
 		model  interface{}
 		fields []string
 	}{
-		{&entity.RegistryRepositoryDeployRule{}, []string{"RegistryUsername", "RegistryPassword", "UserID", "RepositoryName", "ImageRepository", "ImageHost", "PlainHTTP", "WorkflowTaskKey", "ExecutionOrder", "TaskAction", "ImageSource", "SourceBuildTaskKey", "DockerfileInstructions", "OutputTagSuffix", "TaskName"}},
+		{&entity.RegistryRepositoryDeployRule{}, []string{"RegistryUsername", "RegistryPassword", "UserID", "RepositoryName", "WorkflowTaskKey", "ExecutionOrder", "TaskAction", "ImageSource", "SourceBuildTaskKey", "DockerfileInstructions", "OutputTagSuffix", "TaskName"}},
 		{&entity.RegistryRepositoryDeployRuleMatchLog{}, []string{"WorkflowRunID", "WorkflowTaskKey", "RepositoryID", "TriggerRepository", "TriggerTag", "TriggerDigest", "ExecutionStatus", "FailureReason", "EncryptedConfigSnapshot", "UpdatedAt", "BuildOutputTag", "BuildOutputDigest"}},
 	}
 	for _, table := range tables {
@@ -68,6 +68,12 @@ func (Provider) initDatabase(db *gorm.DB) error {
 					return err
 				}
 			}
+		}
+	}
+	rule := &entity.RegistryRepositoryDeployRule{}
+	if !db.Migrator().HasIndex(rule, "RepositoryName") {
+		if err := db.Migrator().CreateIndex(rule, "RepositoryName"); err != nil {
+			return err
 		}
 	}
 	log := &entity.RegistryRepositoryDeployRuleMatchLog{}

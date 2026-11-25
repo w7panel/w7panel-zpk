@@ -18,7 +18,7 @@ make test
 
 镜像构建只复制文档二进制，前端 ZIP 作为独立的制品前端附件上传。`make publish` 会构建这些产物并推送镜像；`make beta BETA_SUFFIX=beta1` 在版本后添加后缀。镜像仓库和版本可通过 `IMAGE_REPOSITORY`、`IMAGE_TAG` 覆盖，Chart 版本可通过 `HELM_CHART_VERSION` 覆盖；这些目标不自动向 ZPK 上传制品附件。首次使用前需要发布实际镜像，默认的 `zpk.w7.cc/public/zpk-document:v0.1.0` 仅为构建发布目标。
 
-`charts/` 是文档后端自己的独立 application Chart，默认单副本、Recreate 升级，SQLite 与正文共同保存在 `/home/document/data` 的 PVC 中。`persistence.existingClaim` 可使用已有 PVC；`persistence.storageClass` 留空使用集群默认 StorageClass，`-` 表示显式不使用 StorageClass。不要让多个文档实例共用同一个 SQLite 文件。
+`charts/` 是文档后端自己的独立 application Chart，默认单副本、Recreate 升级，SQLite 与正文共同保存在 `/home/document/data` 的 PVC 中。`persistence.existingClaim` 可使用已有 PVC；`persistence.storageClass` 留空使用集群默认 StorageClass，`-` 表示显式不使用 StorageClass。不要让多个文档实例共用同一个 SQLite 文件。 Deployment 的 `affinity` 使用 `tpl` 渲染，支持 ZPK 打包器为共享存储注入的 `{{ .Release.Name }}` 等表达式，安装时转换为实际 Release 名称。
 
 ZPK 制品标识为 `w7-zpkv2`，按单次安装规则使用相同的 Release 名，当前 Chart 的 Service 名也是 `w7-zpkv2`，端口为 8000。按部署在 default 命名空间的约定，`zpk.baseURL` 和 `permission.serverURL` 均默认使用完整地址 `http://w7-zpkv2.default.svc.cluster.local:8000`，不需要安装时传入 `--set`。地址仅包含 origin，接口路径由 SDK 拼接；若单独部署或修改了 ZPK 的命名空间、Service 名或端口，可在 values 中调整。权限服务当前由 ZPK 提供，`permission.serverURL` 显式留空时跟随 `zpk.baseURL`。`service.port` 为文档 Service 端口，后端容器固定监听 8001。Chart 不直接提供前端静态服务或手写 MicroApp，前端安装与菜单由制品的前端附件、bindings 和平台生成的 MicroApp 负责。
 

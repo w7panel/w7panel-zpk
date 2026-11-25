@@ -20,6 +20,6 @@ metadata:
   name: {{ $.Release.Name }}-auth-{{ .id }}
 type: Opaque
 data:
-  config.json: {{ dict "auths" (dict $.Values.run.host (dict "registrytoken" (required "构建任务镜像仓库令牌不能为空" $.Values.registryToken))) | toJson | b64enc | quote }}
+  config.json: {{ dict "auths" (dict $.Values.run.host (dict "auth" (printf "%s:%s" (required "镜像仓库用户名不能为空" $.Values.registryUsername) (required "镜像仓库密码不能为空" $.Values.registryPassword) | b64enc))) | toJson | b64enc | quote }}
 {{- end }}
 {{- end }}

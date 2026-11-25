@@ -23,6 +23,7 @@ require (
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/image-spec v1.1.1
 	github.com/otiai10/copy v1.14.1
+	github.com/panjf2000/ants/v2 v2.11.3
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.19.0
 	github.com/w7corp/sdk-open-cloud-go v1.0.8

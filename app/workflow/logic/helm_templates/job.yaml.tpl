@@ -20,7 +20,7 @@ metadata:
 spec:
   backoffLimit: 0
   activeDeadlineSeconds: {{ $.Values.deadlineSeconds }}
-  ttlSecondsAfterFinished: 86400
+  ttlSecondsAfterFinished: 60
   template:
     metadata:
       labels:

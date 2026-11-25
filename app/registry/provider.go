@@ -10,7 +10,6 @@ import (
 	"github.com/w7panel/w7panel-zpk/app/registry/http/controller"
 	"github.com/w7panel/w7panel-zpk/app/registry/logic"
 	respologic "github.com/w7panel/w7panel-zpk/app/system/logic"
-	workflowmodule "github.com/w7panel/w7panel-zpk/app/workflow"
 	"github.com/w7panel/w7panel-zpk/common/accessor"
 	"github.com/w7panel/w7panel-zpk/common/dao"
 	"github.com/w7panel/w7panel-zpk/common/entity"
@@ -224,8 +223,4 @@ func (p Provider) Register(httpServer *httpserver.Server, console console.Consol
 
 	p.initDefaultNamespace()
 	p.initSuperAdmin()
-	workflowmodule.Provider{}.Register(httpServer, func(ctx *gin.Context, repositoryID int32) error {
-		_, err := (logic.Repository{}).GetByIdWithUser(int(repositoryID), logic2.User{}.GetUser(ctx))
-		return err
-	})
 }

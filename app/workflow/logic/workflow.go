@@ -8,38 +8,37 @@ import (
 	"errors"
 	"fmt"
 	"github.com/distribution/reference"
+	"github.com/google/uuid"
 	systemlogic "github.com/w7panel/w7panel-zpk/app/system/logic"
 	"github.com/w7panel/w7panel-zpk/common/dao"
 	"github.com/w7panel/w7panel-zpk/common/entity"
 	"github.com/w7panel/w7panel-zpk/common/function"
-	commonlogic "github.com/w7panel/w7panel-zpk/common/logic"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"gorm.io/gen"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
-	"helm.sh/helm/v3/pkg/release"
 	"io"
-	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"log/slog"
-	"sigs.k8s.io/yaml"
+	"net/url"
+	"oras.land/oras-go/v2/registry/remote"
+	"oras.land/oras-go/v2/registry/remote/auth"
+	"oras.land/oras-go/v2/registry/remote/retry"
 	"strings"
 	"time"
 )
 
 type ImageContext struct {
+	// Reference is the pinned input; the other fields describe the output repository.
 	Reference  string `json:"reference"`
 	Repository string `json:"repository"`
 	Host       string `json:"host"`
 	PlainHTTP  bool   `json:"plain_http"`
 }
 
-type Workflow struct {
-	commonlogic.Logic
-}
+type Workflow struct{}
 
 func (l Workflow) checkWritesAllowed() error {
 	if systemlogic.ShouldBlockWrites(facade.GetConfig()) {
@@ -57,52 +56,71 @@ func (l Workflow) decryptConfigSnapshot(encryptedSnapshot string) (string, error
 	return function.AesDecrypt(encryptedSnapshot, key)
 }
 
-func (l Workflow) readTaskConfig(q *dao.Query, repositoryID int32) (Config, []entity.RegistryRepositoryDeployRule, error) {
+func (l Workflow) readTaskConfig(q *dao.Query, imageRepository string) (Config, []entity.RegistryRepositoryDeployRule, error) {
 	var rules []entity.RegistryRepositoryDeployRule
 	query := q.RegistryRepositoryDeployRule
-	if err := query.Where(query.RepositoryID.Eq(repositoryID)).Order(query.ID).Scan(&rules); err != nil {
+	if err := query.Where(query.ImageRepository.Eq(imageRepository)).Order(query.ID).Scan(&rules); err != nil {
 		return Config{}, nil, err
 	}
-	config := Config{Namespace: executionNamespace, Tasks: []Task{}}
+	config := Config{Tasks: []Task{}}
 	for _, rule := range rules {
-		key := rule.WorkflowTaskKey
-		if key == "" {
-			key = fmt.Sprintf("rule-%d", rule.ID)
-		}
 		kubeConfig, err := (Deploy{}).DecryptK8sConfig(rule.K8sConfig)
 		if err != nil {
 			return Config{}, nil, err
 		}
 
-		stage := int(rule.ExecutionOrder)
-		if stage < 1 {
-			stage = 1
+		config.Tasks = append(config.Tasks, Task{ID: rule.WorkflowTaskKey, Name: rule.TaskName, Stage: int(rule.ExecutionOrder), Action: rule.TaskAction, DeployType: int(rule.DeployType), MatchType: int(rule.MatchType), TagName: rule.TagName, Source: rule.ImageSource, SourceTask: rule.SourceBuildTaskKey, Dockerfile: rule.DockerfileInstructions, TagSuffix: rule.OutputTagSuffix, K8sConfig: kubeConfig, K8sNamespace: rule.K8sNamespace, K8sControllerType: rule.K8sControllerType, K8sAppName: rule.K8sAppName, K8sContainerName: rule.K8sContainerName})
+	}
+	if len(rules) > 0 {
+		config.Repository = repositoryConfig(rules[0])
+		if rules[0].RegistryPassword != "" {
+			password, err := l.decryptConfigSnapshot(rules[0].RegistryPassword)
+			if err != nil {
+				return Config{}, nil, err
+			}
+			config.Repository.Password = password
 		}
-		action := rule.TaskAction
-		if action == "" {
-			action = ActionDeploy
-		}
-		source := rule.ImageSource
-		if source == "" {
-			source = SourceOriginal
-		}
-		name := rule.TaskName
-		if name == "" {
-			name = rule.K8sAppName
-		}
-		config.Tasks = append(config.Tasks, Task{ID: key, Name: name, Stage: stage, Action: action, DeployType: int(rule.DeployType), MatchType: int(rule.MatchType), TagName: rule.TagName, Source: source, SourceTask: rule.SourceBuildTaskKey, Dockerfile: rule.DockerfileInstructions, TagSuffix: rule.OutputTagSuffix, K8sConfig: kubeConfig, K8sNamespace: rule.K8sNamespace, K8sControllerType: rule.K8sControllerType, K8sAppName: rule.K8sAppName, K8sContainerName: rule.K8sContainerName})
 	}
 	return config, rules, nil
 }
-func (l Workflow) Get(repositoryID int32) (Config, error) {
-	config, _, err := l.readTaskConfig(dao.Q, repositoryID)
+func (l Workflow) Get(imageRepository string) (Config, error) {
+	config, _, err := l.readTaskConfig(dao.Q, imageRepository)
 	return config, err
+}
+
+func repositoryConfig(rule entity.RegistryRepositoryDeployRule) RepositoryConfig {
+	return RepositoryConfig{Username: rule.RegistryUsername, UserID: rule.UserID, Name: rule.RepositoryName,
+		Image: ImageContext{Repository: rule.ImageRepository, Host: rule.ImageHost, PlainHTTP: rule.PlainHTTP}}
+}
+
+func (l Workflow) Rule(imageRepository string) (*entity.RegistryRepositoryDeployRule, error) {
+	query := dao.Q.RegistryRepositoryDeployRule
+	return query.Where(query.ImageRepository.Eq(imageRepository), query.WorkflowTaskKey.Neq("")).Order(query.ID).First()
+}
+
+// SavedRepository retains history ownership even after all tasks have been removed.
+func (l Workflow) SavedRepository(imageRepository string) (RepositoryConfig, error) {
+	rule, err := l.Rule(imageRepository)
+	if err == nil {
+		return repositoryConfig(*rule), nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return RepositoryConfig{}, err
+	}
+	query := dao.Q.RegistryRepositoryDeployRuleMatchLog
+	run, err := query.Where(query.TriggerRepository.Eq(imageRepository), query.WorkflowTaskKey.Eq("")).Order(query.ID.Desc()).First()
+	if err != nil {
+		return RepositoryConfig{}, err
+	}
+	config, err := l.decodeSnapshotConfig(run.EncryptedConfigSnapshot)
+	return config.Repository, err
 }
 
 type executionSnapshot struct {
 	Config
-	Image         ImageContext `json:"image"`
-	RegistryToken string       `json:"registry_token"`
+	Image            ImageContext `json:"image"`
+	RegistryUsername string       `json:"registry_username"`
+	RegistryPassword string       `json:"registry_password"`
 }
 
 func (l Workflow) decodeExecutionSnapshot(content string) (executionSnapshot, error) {
@@ -125,26 +143,50 @@ func (l Workflow) decodeSnapshotConfig(content string) (Config, error) {
 	return config, err
 }
 
-func (l Workflow) Save(repositoryID int32, config Config) error {
+func (l Workflow) Save(imageRepository string, config Config) error {
 	if err := l.checkWritesAllowed(); err != nil {
 		return err
 	}
-	config.Namespace = executionNamespace
+	config.Repository.Image.Repository = imageRepository
 	if err := config.Validate(); err != nil {
 		return err
 	}
-	return dao.Q.Transaction(func(tx *dao.Query) error {
-		_, rules, err := l.readTaskConfig(tx, repositoryID)
+	err := dao.Q.Transaction(func(tx *dao.Query) error {
+		ruleQuery := tx.RegistryRepositoryDeployRule
+		rules, err := ruleQuery.Select(ruleQuery.ID, ruleQuery.RepositoryID, ruleQuery.WorkflowTaskKey, ruleQuery.UserID, ruleQuery.RepositoryName, ruleQuery.ImageRepository, ruleQuery.ImageHost, ruleQuery.PlainHTTP, ruleQuery.CreatedAt, ruleQuery.LatestTriggerAt).Where(ruleQuery.ImageRepository.Eq(imageRepository)).Order(ruleQuery.ID).Find()
 		if err != nil {
 			return err
 		}
-		existingRulesByTaskID := map[string]entity.RegistryRepositoryDeployRule{}
-		for _, rule := range rules {
-			taskID := rule.WorkflowTaskKey
-			if taskID == "" {
-				taskID = fmt.Sprintf("rule-%d", rule.ID)
+		if len(rules) > 0 {
+			config.Repository = repositoryConfig(*rules[0])
+		}
+		if len(rules) == 0 {
+			registryURL, err := url.Parse(facade.GetConfig().GetString("registry_cli.default.url"))
+			if err != nil {
+				return err
 			}
-			existingRulesByTaskID[taskID] = rule
+			config.Repository.Image.PlainHTTP = registryURL.Scheme == "http"
+		}
+		// Credentials are captured only when configuration is saved.
+		config.Repository.Username = facade.GetConfig().GetString("registry_cli.default.username")
+		config.Repository.Password = facade.GetConfig().GetString("registry_cli.default.password")
+		encryptedPassword := ""
+		for _, task := range config.Tasks {
+			if task.Action != ActionBuild {
+				continue
+			}
+			if config.Repository.Username == "" || config.Repository.Password == "" {
+				return errors.New("未配置默认镜像仓库管理员账号密码")
+			}
+			encryptedPassword, err = l.encryptConfigSnapshot(config.Repository.Password)
+			if err != nil {
+				return err
+			}
+			break
+		}
+		existingRulesByTaskID := map[string]*entity.RegistryRepositoryDeployRule{}
+		for _, rule := range rules {
+			existingRulesByTaskID[rule.WorkflowTaskKey] = rule
 		}
 		savedRuleIDs := []int32{}
 		for _, task := range config.Tasks {
@@ -154,36 +196,72 @@ func (l Workflow) Save(repositoryID int32, config Config) error {
 			}
 
 			existingRule := existingRulesByTaskID[task.ID]
-			savedRule := entity.RegistryRepositoryDeployRule{ID: existingRule.ID, RepositoryID: repositoryID, DeployType: int32(task.DeployType), MatchType: int32(task.MatchType), TagName: task.TagName, K8sConfig: kubeConfig, K8sNamespace: task.K8sNamespace, K8sControllerType: task.K8sControllerType, K8sAppName: task.K8sAppName, K8sContainerName: task.K8sContainerName, CreatedAt: existingRule.CreatedAt, LatestTriggerAt: existingRule.LatestTriggerAt, WorkflowTaskKey: task.ID, TaskName: task.Name, ExecutionOrder: int32(task.Stage), TaskAction: task.Action, ImageSource: task.Source, SourceBuildTaskKey: task.SourceTask, DockerfileInstructions: task.Dockerfile, OutputTagSuffix: task.TagSuffix}
+			if existingRule == nil {
+				existingRule = &entity.RegistryRepositoryDeployRule{}
+			}
+			savedRule := entity.RegistryRepositoryDeployRule{
+				ID:                     existingRule.ID,
+				RepositoryID:           existingRule.RepositoryID,
+				UserID:                 config.Repository.UserID,
+				RegistryUsername:       config.Repository.Username,
+				RegistryPassword:       encryptedPassword,
+				RepositoryName:         config.Repository.Name,
+				ImageRepository:        config.Repository.Image.Repository,
+				ImageHost:              config.Repository.Image.Host,
+				PlainHTTP:              config.Repository.Image.PlainHTTP,
+				DeployType:             int32(task.DeployType),
+				MatchType:              int32(task.MatchType),
+				TagName:                task.TagName,
+				K8sConfig:              kubeConfig,
+				K8sNamespace:           task.K8sNamespace,
+				K8sControllerType:      task.K8sControllerType,
+				K8sAppName:             task.K8sAppName,
+				K8sContainerName:       task.K8sContainerName,
+				CreatedAt:              existingRule.CreatedAt,
+				LatestTriggerAt:        existingRule.LatestTriggerAt,
+				WorkflowTaskKey:        task.ID,
+				TaskName:               task.Name,
+				ExecutionOrder:         int32(task.Stage),
+				TaskAction:             task.Action,
+				ImageSource:            task.Source,
+				SourceBuildTaskKey:     task.SourceTask,
+				DockerfileInstructions: task.Dockerfile,
+				OutputTagSuffix:        task.TagSuffix,
+			}
 			if err := tx.RegistryRepositoryDeployRule.Save(&savedRule); err != nil {
 				return err
 			}
+
 			savedRuleIDs = append(savedRuleIDs, savedRule.ID)
 		}
-		ruleQuery := tx.RegistryRepositoryDeployRule
-		query := ruleQuery.Where(ruleQuery.RepositoryID.Eq(repositoryID))
+		query := ruleQuery.Where(ruleQuery.ImageRepository.Eq(imageRepository))
 		if len(savedRuleIDs) > 0 {
 			query = query.Where(ruleQuery.ID.NotIn(savedRuleIDs...))
 		}
 		if _, err = query.Delete(); err != nil {
 			return err
 		}
-		_, err = (Helm{}).SaveChart(repositoryID, config)
-		return err
+		return nil
 	})
+	return err
 }
-func (l Workflow) Runs(repositoryID int32, taskID string) ([]entity.RegistryRepositoryDeployRuleMatchLog, error) {
+func (l Workflow) Runs(imageRepository string, taskID string, page, pageSize int) ([]entity.RegistryRepositoryDeployRuleMatchLog, int64, error) {
 	runs := []entity.RegistryRepositoryDeployRuleMatchLog{}
 	query := dao.Q.RegistryRepositoryDeployRuleMatchLog
-	err := query.Where(query.RepositoryID.Eq(repositoryID), query.WorkflowTaskKey.Eq(taskID), query.WorkflowRunID.IsNotNull()).Order(query.CreatedAt.Desc(), query.ID.Desc()).Limit(50).Scan(&runs)
-	return runs, err
+	filtered := query.Where(query.TriggerRepository.Eq(imageRepository), query.WorkflowTaskKey.Eq(taskID), query.WorkflowRunID.IsNotNull())
+	total, err := filtered.Count()
+	if err != nil {
+		return nil, 0, err
+	}
+	err = filtered.Order(query.CreatedAt.Desc(), query.ID.Desc()).Offset((page - 1) * pageSize).Limit(pageSize).Scan(&runs)
+	return runs, total, err
 }
 
 // selectedTaskIDs derives the trigger's task selection from its immutable task records.
 func (l Workflow) selectedTaskIDs(ctx context.Context, run entity.RegistryRepositoryDeployRuleMatchLog) (map[string]bool, error) {
 	var taskIDs []string
 	query := dao.Q.RegistryRepositoryDeployRuleMatchLog
-	if err := query.WithContext(ctx).Where(query.RepositoryID.Eq(run.RepositoryID), query.WorkflowRunID.Eq(run.WorkflowRunID), query.WorkflowTaskKey.Neq("")).Pluck(query.WorkflowTaskKey, &taskIDs); err != nil {
+	if err := query.WithContext(ctx).Where(query.WorkflowRunID.Eq(run.WorkflowRunID), query.WorkflowTaskKey.Neq("")).Pluck(query.WorkflowTaskKey, &taskIDs); err != nil {
 		return nil, err
 	}
 	selectedTaskIDs := make(map[string]bool, len(taskIDs))
@@ -195,65 +273,78 @@ func (l Workflow) selectedTaskIDs(ctx context.Context, run entity.RegistryReposi
 
 // identifyWorkflowBuildPush verifies the signed run subject and output tag against selected build tasks.
 // Current rebuild state belongs to the tag; logs retain immutable output information.
-func (l Workflow) identifyWorkflowBuildPush(repositoryID int32, repository, tag, digest, pushActor string) (bool, error) {
+func (l Workflow) identifyWorkflowBuildPush(imageRepository, tag, digest, pushActor string) (bool, error) {
 	if err := l.checkWritesAllowed(); err != nil {
 		return false, err
 	}
-	runID, taskID, _ := strings.Cut(strings.TrimPrefix(pushActor, WorkflowBuildActorPrefix), "--")
-	isWorkflowBuildPush := false
-	if strings.HasPrefix(pushActor, WorkflowBuildActorPrefix) && workflowRunIDPattern.MatchString(runID) {
-		query := dao.Q.RegistryRepositoryDeployRuleMatchLog
-		run, err := query.Where(query.WorkflowRunID.Eq(runID), query.WorkflowTaskKey.Eq(""), query.RepositoryID.Eq(repositoryID), query.TriggerRepository.Eq(repository)).First()
-		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-			return false, err
-		}
-		if err == nil {
-			config, err := l.decodeSnapshotConfig(run.EncryptedConfigSnapshot)
-			if err != nil {
-				return false, err
-			}
-			selectedTaskIDs, err := l.selectedTaskIDs(context.Background(), *run)
-			if err != nil {
-				return false, err
-			}
-			matchedBuildTaskIDs := []string{}
-			for _, task := range config.Tasks {
-				if (taskID == "" || task.ID == taskID) && selectedTaskIDs[task.ID] && task.Action == ActionBuild && tag == run.TriggerTag+task.TagSuffix {
-					matchedBuildTaskIDs = append(matchedBuildTaskIDs, task.ID)
-				}
-			}
-			isWorkflowBuildPush = len(matchedBuildTaskIDs) > 0
-			if len(matchedBuildTaskIDs) == 1 {
-				taskID = matchedBuildTaskIDs[0]
-			} else {
-				taskID = ""
-			}
-		}
-	}
-	return isWorkflowBuildPush, l.recordBuildOutputFromPush(repositoryID, tag, digest, runID, taskID, isWorkflowBuildPush)
-}
-
-func (l Workflow) recordBuildOutputFromPush(repositoryID int32, tag, digest, runID, taskID string, isWorkflowBuildPush bool) error {
-	if !isWorkflowBuildPush || taskID == "" {
-		return nil
+	if pushActor == "" {
+		return false, nil
 	}
 	query := dao.Q.RegistryRepositoryDeployRuleMatchLog
-	_, err := query.Where(query.WorkflowRunID.Eq(runID), query.WorkflowTaskKey.Eq(taskID), query.RepositoryID.Eq(repositoryID)).UpdateSimple(query.UpdatedAt.Value(time.Now()), query.BuildOutputTag.Value(tag), query.BuildOutputDigest.Value(digest))
-	return err
+	// Completed output records also cover webhook delivery after the task has finished.
+	outputs, err := query.Where(query.TriggerRepository.Eq(imageRepository), query.BuildOutputTag.Eq(tag), query.BuildOutputDigest.Eq(digest), query.WorkflowTaskKey.Neq("")).Order(query.ID.Desc()).Limit(1).Find()
+	if err != nil {
+		return false, err
+	}
+	if len(outputs) > 0 {
+		run, err := query.Where(query.WorkflowRunID.Eq(outputs[0].WorkflowRunID), query.WorkflowTaskKey.Eq("")).First()
+		if err != nil {
+			return false, err
+		}
+		snapshot, err := l.decodeExecutionSnapshot(run.EncryptedConfigSnapshot)
+		if err != nil {
+			return false, err
+		}
+		if snapshot.RegistryUsername == pushActor {
+			return true, nil
+		}
+	}
+	runs, err := query.Where(query.TriggerRepository.Eq(imageRepository), query.WorkflowTaskKey.Eq(""), query.ExecutionStatus.Eq("running")).Find()
+	if err != nil {
+		return false, err
+	}
+	for _, run := range runs {
+		snapshot, err := l.decodeExecutionSnapshot(run.EncryptedConfigSnapshot)
+		if err != nil {
+			return false, err
+		}
+		if pushActor != snapshot.RegistryUsername {
+			continue
+		}
+		selected, err := l.selectedTaskIDs(context.Background(), *run)
+		if err != nil {
+			return false, err
+		}
+		for _, task := range snapshot.Tasks {
+			if !selected[task.ID] || task.Action != ActionBuild || tag != run.TriggerTag+task.TagSuffix {
+				continue
+			}
+			taskLog, err := query.Where(query.WorkflowRunID.Eq(run.WorkflowRunID), query.WorkflowTaskKey.Eq(task.ID)).First()
+			if err != nil {
+				return false, err
+			}
+			if taskLog.ExecutionStatus != "running" {
+				continue
+			}
+			_, err = query.Where(query.ID.Eq(taskLog.ID)).UpdateSimple(query.UpdatedAt.Value(time.Now()), query.BuildOutputTag.Value(tag), query.BuildOutputDigest.Value(digest))
+			return true, err
+		}
+	}
+	return false, nil
 }
 
-// Trigger snapshots the saved Chart. Unconverted legacy rules continue on their old path.
-func (l Workflow) Trigger(repositoryID int32, repository, tag, digest, eventID string, eventType int, image ImageContext, registryToken string) error {
+// Trigger stores task configuration and input in an immutable execution snapshot.
+func (l Workflow) Trigger(imageRepository string, repository, tag, digest, eventID string, eventType int, image ImageContext) error {
 	if err := l.checkWritesAllowed(); err != nil {
 		return err
 	}
 	return dao.Q.Transaction(func(tx *dao.Query) error {
-		return l.enqueueImageWorkflow(tx, repositoryID, repository, tag, digest, eventID, eventType, image, registryToken)
+		return l.enqueueImageWorkflow(tx, imageRepository, repository, tag, digest, eventID, eventType, image)
 	})
 }
 
-func (l Workflow) enqueueImageWorkflow(tx *dao.Query, repositoryID int32, repository, tag, digest, eventID string, eventType int, image ImageContext, registryToken string) error {
-	config, rules, err := l.readTaskConfig(tx, repositoryID)
+func (l Workflow) enqueueImageWorkflow(tx *dao.Query, imageRepository string, repository, tag, digest, eventID string, eventType int, image ImageContext) error {
+	config, rules, err := l.readTaskConfig(tx, imageRepository)
 	if err != nil {
 		return err
 	}
@@ -272,24 +363,77 @@ func (l Workflow) enqueueImageWorkflow(tx *dao.Query, repositoryID int32, reposi
 	if len(tasks) == 0 && taskMatchErr == nil {
 		return nil
 	}
-	if eventID == "" {
+	event := ImagePushed{Repository: repository, Tag: tag, Digest: digest, EventID: eventID, Image: image}
+	return l.enqueueTasks(tx, config, rules, tasks, taskMatchErr, event)
+}
+
+// TriggerManual uses the same saved Chart, queue and execution snapshots as push triggers.
+func (l Workflow) TriggerManual(event ImagePushed, taskID string, admin bool) (string, error) {
+	if err := l.checkWritesAllowed(); err != nil {
+		return "", err
+	}
+	if !facade.GetConfig().GetBool("workflow.enabled") {
+		return "", errors.New("镜像自动任务执行器未启用")
+	}
+	runID, err := event.RunID()
+	if err != nil {
+		return "", err
+	}
+	err = dao.Q.Transaction(func(tx *dao.Query) error {
+		config, rules, err := l.readTaskConfig(tx, event.Image.Repository)
+		if err != nil {
+			return err
+		}
+		tasks, err := config.SelectManualTasks(event.Tag, taskID)
+		if err != nil {
+			return err
+		}
+		for _, task := range tasks {
+			if task.Action == ActionDeploy && task.K8sConfig == "" && !admin {
+				return errors.New("当前集群部署仅管理员可执行")
+			}
+		}
+		return l.enqueueTasks(tx, config, rules, tasks, nil, event)
+	})
+	if err != nil {
+		return "", err
+	}
+	return runID, nil
+}
+
+func (l Workflow) enqueueTasks(tx *dao.Query, config Config, rules []entity.RegistryRepositoryDeployRule, tasks []Task, taskMatchErr error, event ImagePushed) error {
+	if config.Repository.Name != "" {
+		event.Image.Repository = config.Repository.Image.Repository
+		event.Image.Host = config.Repository.Image.Host
+		event.Image.PlainHTTP = config.Repository.Image.PlainHTTP
+	}
+	if event.EventID == "" {
 		return errors.New("镜像推送事件缺少唯一 ID")
 	}
-	if !validDigest(digest) {
+	if !validDigest(event.Digest) {
 		return errors.New("镜像 digest 无效")
 	}
-	runID, err := (ImagePushed{RepositoryID: repositoryID, EventID: eventID}).RunID()
+	runID, err := event.RunID()
 	if err != nil {
 		return err
 	}
 	matchedTaskIDs := map[string]bool{}
 	for _, task := range tasks {
-		if task.Action == ActionBuild && registryToken == "" {
-			return fmt.Errorf("任务 %s 缺少调用方提供的镜像仓库令牌", task.Name)
-		}
 		matchedTaskIDs[task.ID] = true
 	}
-	snapshotJSON, err := json.Marshal(executionSnapshot{Config: config, Image: image, RegistryToken: registryToken})
+	snapshot := executionSnapshot{Config: config, Image: event.Image}
+	for _, task := range tasks {
+		if task.Action != ActionBuild {
+			continue
+		}
+		snapshot.RegistryUsername = config.Repository.Username
+		snapshot.RegistryPassword = config.Repository.Password
+		if snapshot.RegistryUsername == "" || snapshot.RegistryPassword == "" {
+			return errors.New("未配置默认镜像仓库管理员账号密码")
+		}
+		break
+	}
+	snapshotJSON, err := json.Marshal(snapshot)
 	if err != nil {
 		return err
 	}
@@ -297,7 +441,7 @@ func (l Workflow) enqueueImageWorkflow(tx *dao.Query, repositoryID int32, reposi
 	if err != nil {
 		return err
 	}
-	run := entity.RegistryRepositoryDeployRuleMatchLog{WorkflowRunID: runID, RepositoryID: repositoryID, TriggerRepository: repository, TriggerTag: tag, TriggerDigest: digest, ImageName: repository + "@" + digest, ExecutionStatus: "pending", EncryptedConfigSnapshot: encryptedSnapshot}
+	run := entity.RegistryRepositoryDeployRuleMatchLog{WorkflowRunID: runID, TriggerRepository: event.Image.Repository, TriggerTag: event.Tag, TriggerDigest: event.Digest, ImageName: event.Image.Reference, ExecutionStatus: "pending", EncryptedConfigSnapshot: encryptedSnapshot}
 	if taskMatchErr != nil {
 		run.ExecutionStatus = "failed"
 		run.FailureReason = taskMatchErr.Error()
@@ -309,16 +453,12 @@ func (l Workflow) enqueueImageWorkflow(tx *dao.Query, repositoryID int32, reposi
 	if insertResult.RowsAffected == 0 {
 		return nil
 	}
-	if taskMatchErr == nil {
-		if err := (Helm{}).PinChart(repositoryID, runID, config); err != nil {
-			return err
-		}
-	}
+
 	for _, rule := range rules {
 		if !matchedTaskIDs[rule.WorkflowTaskKey] {
 			continue
 		}
-		taskLog := entity.RegistryRepositoryDeployRuleMatchLog{WorkflowRunID: runID, WorkflowTaskKey: rule.WorkflowTaskKey, RuleID: rule.ID, RepositoryID: repositoryID, ImageName: run.ImageName, ExecutionStatus: run.ExecutionStatus, K8sLog: "Helm 执行实例 wf-" + runID, TriggerTag: tag, TriggerDigest: digest}
+		taskLog := entity.RegistryRepositoryDeployRuleMatchLog{WorkflowRunID: runID, WorkflowTaskKey: rule.WorkflowTaskKey, RuleID: rule.ID, TriggerRepository: event.Image.Repository, ImageName: run.ImageName, ExecutionStatus: run.ExecutionStatus, K8sLog: "Helm 执行实例 wf-" + runID, TriggerTag: event.Tag, TriggerDigest: event.Digest}
 		if err := tx.RegistryRepositoryDeployRuleMatchLog.Create(&taskLog); err != nil {
 			return err
 		}
@@ -336,57 +476,13 @@ func validDigest(value string) bool {
 	_, err := hex.DecodeString(strings.TrimPrefix(value, "sha256:"))
 	return err == nil
 }
-func (l Workflow) Status(repositoryID int32, runID string) (entity.RegistryRepositoryDeployRuleMatchLog, error) {
+func (l Workflow) Status(imageRepository string, runID string) (entity.RegistryRepositoryDeployRuleMatchLog, error) {
 	query := dao.Q.RegistryRepositoryDeployRuleMatchLog
-	run, err := query.Where(query.WorkflowRunID.Eq(runID), query.WorkflowTaskKey.Eq(""), query.RepositoryID.Eq(repositoryID)).First()
+	run, err := query.Where(query.WorkflowRunID.Eq(runID), query.WorkflowTaskKey.Eq(""), query.TriggerRepository.Eq(imageRepository)).First()
 	if err != nil {
 		return entity.RegistryRepositoryDeployRuleMatchLog{}, err
 	}
 	return *run, nil
-}
-func (l Workflow) ExpireInterrupted() error {
-	query := dao.Q.RegistryRepositoryDeployRuleMatchLog
-	_, err := query.Where(query.ExecutionStatus.Eq("running"), query.UpdatedAt.Lt(time.Now().Add(-3*time.Hour))).UpdateSimple(query.UpdatedAt.Value(time.Now()), query.ExecutionStatus.Value("failed"), query.FailureReason.Value("执行中断或超过最大执行时间，请检查集群资源后重新触发"))
-	return err
-}
-
-// cleanupRunCharts retries terminal cleanup and removes abandoned files only after a grace period.
-// Pending/running records are never removed, including while another replica executes them.
-func (l Workflow) cleanupRunCharts() error {
-	files, err := (Helm{}).runCharts()
-	if err != nil {
-		return err
-	}
-	query := dao.Q.RegistryRepositoryDeployRuleMatchLog
-	for _, file := range files {
-		run, err := query.Select(query.ExecutionStatus).Where(query.RepositoryID.Eq(file.RepositoryID), query.WorkflowRunID.Eq(file.RunID), query.WorkflowTaskKey.Eq("")).First()
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			if time.Since(file.ModifiedAt) < 3*time.Hour {
-				continue
-			}
-		} else if err != nil {
-			return err
-		} else if run.ExecutionStatus == "pending" || run.ExecutionStatus == "running" {
-			continue
-		}
-		if err := (Helm{}).RemoveRunChart(file.RepositoryID, file.RunID); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// CheckLegacyRuleWritable prevents old mutation endpoints from invalidating a cached workflow.
-func (l Workflow) CheckLegacyRuleWritable(repositoryID int32) error {
-	query := dao.Q.RegistryRepositoryDeployRule
-	count, err := query.Where(query.RepositoryID.Eq(repositoryID), query.WorkflowTaskKey.Neq("")).Count()
-	if err != nil {
-		return err
-	}
-	if count > 0 {
-		return errors.New("该仓库已启用镜像自动任务，请通过工作流配置编辑")
-	}
-	return nil
 }
 
 type LogResult struct {
@@ -400,28 +496,34 @@ func (l Workflow) Logs(ctx context.Context, run entity.RegistryRepositoryDeployR
 	if tailLines < 1 || tailLines > 2000 {
 		return LogResult{}, errors.New("日志行数必须在 1 到 2000 之间")
 	}
-	config, err := rest.InClusterConfig()
-	if err != nil {
-		return LogResult{}, err
-	}
-	client, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		return LogResult{}, err
-	}
-	return l.readLogs(ctx, client, run, tailLines, taskID)
+	return l.readLogs(ctx, nil, run, tailLines, taskID)
 }
 
 func (l Workflow) readLogs(ctx context.Context, client kubernetes.Interface, run entity.RegistryRepositoryDeployRuleMatchLog, tailLines int64, taskID string) (LogResult, error) {
 	query := dao.Q.RegistryRepositoryDeployRuleMatchLog
-	taskLog, err := query.WithContext(ctx).Where(query.RepositoryID.Eq(run.RepositoryID), query.WorkflowRunID.Eq(run.WorkflowRunID), query.WorkflowTaskKey.Eq(taskID)).First()
+	taskLog, err := query.WithContext(ctx).Where(query.WorkflowRunID.Eq(run.WorkflowRunID), query.WorkflowTaskKey.Eq(taskID)).First()
 	if err != nil {
 		return LogResult{}, err
+	}
+	archived := taskLog.ExecutionStatus == "succeeded" || taskLog.ExecutionStatus == "failed" || (run.ExecutionStatus != "pending" && run.ExecutionStatus != "running")
+	if archived && (taskLog.K8sLog != "" || taskLog.FailureReason != "") {
+		return archivedTaskLogs(*taskLog, tailLines), nil
+	}
+	if client == nil {
+		config, err := rest.InClusterConfig()
+		if err != nil {
+			return LogResult{}, err
+		}
+		client, err = kubernetes.NewForConfig(config)
+		if err != nil {
+			return LogResult{}, err
+		}
 	}
 	pods, err := client.CoreV1().Pods(executionNamespace).List(ctx, metav1.ListOptions{LabelSelector: "w7.cc/workflow-run=wf-" + run.WorkflowRunID})
 	if err != nil {
 		return LogResult{}, err
 	}
-	logResult := LogResult{Status: taskLog.ExecutionStatus, Archived: run.ExecutionStatus != "pending" && run.ExecutionStatus != "running"}
+	logResult := LogResult{Status: taskLog.ExecutionStatus, Archived: archived}
 	var logText strings.Builder
 	logByteLimit := int64(1024 * 1024)
 	hasLivePod := false
@@ -470,161 +572,64 @@ func (l Workflow) readLogs(ctx context.Context, client kubernetes.Interface, run
 		}
 	}
 	if !hasLivePod {
-		lines := strings.Split(strings.TrimRight(taskLog.K8sLog, "\n"), "\n")
-		if int64(len(lines)) > tailLines {
-			lines = lines[len(lines)-int(tailLines):]
-		}
-		logText.WriteString(strings.Join(lines, "\n"))
-		if logText.Len() == 0 {
-			logText.WriteString(taskLog.FailureReason)
-		}
-		if logText.Len() == 0 {
-			logText.WriteString("暂无任务日志")
-		}
+		result := archivedTaskLogs(*taskLog, tailLines)
+		result.Archived = archived
+		return result, nil
 	}
 	logResult.Log = logText.String()
 	return logResult, nil
 }
 
-// persistTaskResults runs before ordinary release resources are removed. It keeps
-// bounded logs and distinguishes completed, failed and never-started tasks.
-func (l *Executor) persistTaskResults(client kubernetes.Interface, run entity.RegistryRepositoryDeployRuleMatchLog, helmRelease *release.Release) error {
-	if err := l.checkWritesAllowed(); err != nil {
-		return err
+func archivedTaskLogs(taskLog entity.RegistryRepositoryDeployRuleMatchLog, tailLines int64) LogResult {
+	lines := strings.Split(strings.TrimRight(taskLog.K8sLog, "\n"), "\n")
+	if int64(len(lines)) > tailLines {
+		lines = lines[len(lines)-int(tailLines):]
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	pods, podListErr := client.CoreV1().Pods(executionNamespace).List(ctx, metav1.ListOptions{LabelSelector: "w7.cc/workflow-run=wf-" + run.WorkflowRunID})
-	config, err := l.decodeSnapshotConfig(run.EncryptedConfigSnapshot)
-	if err != nil {
-		slog.Error("read workflow result configuration", "error", err)
-		return err
+	text := strings.Join(lines, "\n")
+	if text == "" {
+		text = taskLog.FailureReason
 	}
-	tasksByID := map[string]Task{}
-	for _, task := range config.Tasks {
-		tasksByID[task.ID] = task
+	if text == "" {
+		text = "暂无任务日志"
 	}
-	type taskExecutionResult struct{ status, logText, outputDigest, failureReason string }
-	resultsByTaskID := map[string]taskExecutionResult{}
-	// Helm records completed hooks before moving on to the next execution group.
-	// Keep those results even when completed Pods have disappeared or cannot be listed.
-	if helmRelease != nil {
-		for _, hook := range helmRelease.Hooks {
-			if hook.Kind != "Job" || hook.LastRun.Phase == release.HookPhaseUnknown || hook.LastRun.Phase == "" {
-				continue
-			}
-			var job batchv1.Job
-			if err := yaml.Unmarshal([]byte(hook.Manifest), &job); err != nil {
-				return err
-			}
-			for _, container := range job.Spec.Template.Spec.Containers {
-				taskResult := taskExecutionResult{status: "unknown", failureReason: "执行组已启动，但未获取到该任务的容器结果"}
-				if hook.LastRun.Phase == release.HookPhaseSucceeded {
-					taskResult.status = "succeeded"
-					taskResult.failureReason = ""
-				}
-				if previousResult, ok := resultsByTaskID[container.Name]; !ok || previousResult.status != "succeeded" {
-					resultsByTaskID[container.Name] = taskResult
-				}
-			}
-		}
-	}
-	tailLines, logByteLimit := int64(100), int64(16384)
-	if pods == nil {
-		pods = &corev1.PodList{}
-	}
-	for _, pod := range pods.Items {
-		for _, container := range pod.Spec.Containers {
-			taskResult := taskExecutionResult{status: "failed", logText: fmt.Sprintf("%s / %s\n", pod.Name, container.Name)}
-			for _, state := range pod.Status.ContainerStatuses {
-				if state.Name == container.Name && state.State.Terminated != nil {
-					if state.State.Terminated.ExitCode == 0 {
-						taskResult.status = "succeeded"
-					}
-					taskResult.logText += fmt.Sprintf("退出码: %d\n", state.State.Terminated.ExitCode)
-					if taskResult.status == "failed" {
-						taskResult.failureReason = fmt.Sprintf("%s：%s（退出码 %d）", state.State.Terminated.Reason, state.State.Terminated.Message, state.State.Terminated.ExitCode)
-					}
-					if tasksByID[container.Name].Action == ActionBuild {
-						_, digest, hasDigestSeparator := strings.Cut(strings.TrimSpace(state.State.Terminated.Message), "@")
-						if hasDigestSeparator && validDigest(digest) {
-							taskResult.outputDigest = digest
-						}
-					}
-				}
-				if state.Name == container.Name && state.State.Waiting != nil {
-					taskResult.failureReason = state.State.Waiting.Reason + ": " + state.State.Waiting.Message
-					taskResult.logText += taskResult.failureReason + "\n"
-				}
-			}
-			stream, err := client.CoreV1().Pods(executionNamespace).GetLogs(pod.Name, &corev1.PodLogOptions{Container: container.Name, TailLines: &tailLines, LimitBytes: &logByteLimit}).Stream(ctx)
-			if err == nil {
-				content, readErr := io.ReadAll(io.LimitReader(stream, logByteLimit))
-				stream.Close()
-				if readErr == nil {
-					taskResult.logText += string(content)
-				}
-			}
-			if previousResult, ok := resultsByTaskID[container.Name]; !ok || previousResult.status != "succeeded" || taskResult.status == "succeeded" {
-				resultsByTaskID[container.Name] = taskResult
-			}
-		}
-	}
-	var taskLogs []entity.RegistryRepositoryDeployRuleMatchLog
-	query := dao.Q.RegistryRepositoryDeployRuleMatchLog
-	if err := query.Where(query.WorkflowRunID.Eq(run.WorkflowRunID), query.WorkflowTaskKey.Neq("")).Scan(&taskLogs); err != nil {
-		slog.Error("read workflow task logs", "error", err)
-		return err
-	}
-	for _, taskLog := range taskLogs {
-		taskResult, ok := resultsByTaskID[taskLog.WorkflowTaskKey]
-		if !ok && (taskLog.ExecutionStatus == "succeeded" || taskLog.ExecutionStatus == "failed") {
-			continue
-		}
-		if !ok {
-			if podListErr != nil {
-				taskResult = taskExecutionResult{status: "unknown", failureReason: "未能读取容器状态：" + podListErr.Error()}
-			} else {
-				taskResult = taskExecutionResult{status: "skipped", failureReason: "前置执行组失败或流程未启动，本任务未执行"}
-			}
-		}
-		outputTag, outputDigest := taskLog.BuildOutputTag, taskLog.BuildOutputDigest
-		if taskResult.outputDigest != "" {
-			outputTag, outputDigest = run.TriggerTag+tasksByID[taskLog.WorkflowTaskKey].TagSuffix, taskResult.outputDigest
-		}
-		if _, err := query.Where(query.ID.Eq(taskLog.ID)).UpdateSimple(query.UpdatedAt.Value(time.Now()), query.ExecutionStatus.Value(taskResult.status), query.FailureReason.Value(taskResult.failureReason), query.K8sLog.Value(strings.TrimSpace(taskResult.logText)), query.BuildOutputTag.Value(outputTag), query.BuildOutputDigest.Value(outputDigest)); err != nil {
-			return err
-		}
-	}
-	return podListErr
+	return LogResult{Log: text, Status: taskLog.ExecutionStatus, Archived: true}
 }
 
 // OnImagePushed receives the source image and task credentials, then queues execution.
 // The caller owns repository coordination and applies Rebuilt to its tag metadata.
 type ImagePushed struct {
-	RepositoryID  int32
-	Repository    string
-	Tag           string
-	Digest        string
-	Actor         string
-	EventID       string
-	EventType     int
-	Image         ImageContext
-	RegistryToken string
+	Repository string
+	Tag        string
+	Digest     string
+	Actor      string
+	EventID    string
+	EventType  int
+	Image      ImageContext
 }
 
 type ImagePushResult struct{ Rebuilt bool }
 
 func (event ImagePushed) RunID() (string, error) {
-	if event.RepositoryID < 1 || event.EventID == "" {
+	if event.Image.Repository == "" || event.EventID == "" {
 		return "", errors.New("镜像推送缺少仓库或事件标识")
 	}
-	sum := sha256.Sum256([]byte(fmt.Sprintf("%d:%s", event.RepositoryID, event.EventID)))
+	sum := sha256.Sum256([]byte(fmt.Sprintf("%s:%s", event.Image.Repository, event.EventID)))
 	return hex.EncodeToString(sum[:16]), nil
 }
 
 func (l Workflow) OnImagePushed(event ImagePushed) (ImagePushResult, error) {
 	result := ImagePushResult{}
+	if event.Image.Repository == "" {
+		query := dao.Q.RegistryRepositoryDeployRule
+		rule, err := query.Where(query.RepositoryName.Eq(event.Repository), query.WorkflowTaskKey.Neq("")).Order(query.ID).First()
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return result, nil
+		}
+		if err != nil {
+			return result, err
+		}
+		event.Image = ImageContext{Host: rule.ImageHost, Repository: rule.ImageRepository, PlainHTTP: rule.PlainHTTP, Reference: rule.ImageRepository + "@" + event.Digest}
+	}
 	if event.Image.Host == "" || event.Image.Repository != event.Image.Host+"/"+event.Repository || event.Image.Reference != event.Image.Repository+"@"+event.Digest {
 		return result, errors.New("源镜像信息与推送事件不一致")
 	}
@@ -632,7 +637,7 @@ func (l Workflow) OnImagePushed(event ImagePushed) (ImagePushResult, error) {
 	if err != nil || reference.Domain(named) != event.Image.Host {
 		return result, errors.New("源镜像仓库地址无效")
 	}
-	isWorkflowBuildPush, err := l.identifyWorkflowBuildPush(event.RepositoryID, event.Repository, event.Tag, event.Digest, event.Actor)
+	isWorkflowBuildPush, err := l.identifyWorkflowBuildPush(event.Image.Repository, event.Tag, event.Digest, event.Actor)
 	if err != nil {
 		return result, err
 	}
@@ -640,6 +645,30 @@ func (l Workflow) OnImagePushed(event ImagePushed) (ImagePushResult, error) {
 	if isWorkflowBuildPush {
 		return result, nil
 	}
-	err = l.Trigger(event.RepositoryID, event.Repository, event.Tag, event.Digest, event.EventID, event.EventType, event.Image, event.RegistryToken)
+	err = l.Trigger(event.Image.Repository, event.Repository, event.Tag, event.Digest, event.EventID, event.EventType, event.Image)
 	return result, err
+}
+
+// ResolveManualImage resolves public inputs anonymously and pins the source digest.
+func (Workflow) ResolveManualImage(ctx context.Context, source reference.NamedTagged) (ImagePushed, error) {
+	repository, err := remote.NewRepository(source.Name())
+	if err != nil {
+		return ImagePushed{}, err
+	}
+	if repository.Reference.Registry == "docker.io" {
+		repository.Reference.Registry = "registry-1.docker.io"
+	}
+	repository.Client = &auth.Client{Client: retry.DefaultClient, Cache: auth.NewCache()}
+	resolveCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	descriptor, err := repository.Resolve(resolveCtx, source.Tag())
+	if err != nil {
+		return ImagePushed{}, fmt.Errorf("读取公共镜像失败：%w", err)
+	}
+	digest := descriptor.Digest.String()
+	return ImagePushed{
+		Tag: source.Tag(), Digest: digest,
+		EventID: "manual-" + uuid.NewString(),
+		Image:   ImageContext{Reference: source.Name() + "@" + digest},
+	}, nil
 }

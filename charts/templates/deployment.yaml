@@ -72,6 +72,10 @@ spec:
               value: /home/zpk/cert/registry-cert.pem
             - name: WEBHOOK_TOKEN
               value: {{ .Values.global.WEBHOOK_TOKEN }}
+            - name: WORKFLOW_CONCURRENCY
+              value: {{ .Values.workflow.concurrency | quote }}
+            - name: WORKFLOW_QUEUE_SIZE
+              value: {{ .Values.workflow.queueSize | quote }}
             - name: WORKFLOW_ENABLED
               value: {{ .Values.workflow.enabled | quote }}
             - name: WORKFLOW_BUILD_IMAGE

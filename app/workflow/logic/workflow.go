@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/distribution/reference"
-	"github.com/google/uuid"
 	systemlogic "github.com/w7panel/w7panel-zpk/app/system/logic"
 	"github.com/w7panel/w7panel-zpk/common/dao"
 	"github.com/w7panel/w7panel-zpk/common/entity"
@@ -23,15 +22,12 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"net/url"
-	"oras.land/oras-go/v2/registry/remote"
-	"oras.land/oras-go/v2/registry/remote/auth"
-	"oras.land/oras-go/v2/registry/remote/retry"
 	"strings"
 	"time"
 )
 
 type ImageContext struct {
-	// Reference is the pinned input; the other fields describe the output repository.
+	// Reference is the input image address; the other fields describe the output repository.
 	Reference  string `json:"reference"`
 	Repository string `json:"repository"`
 	Host       string `json:"host"`
@@ -369,11 +365,14 @@ func (l Workflow) enqueueImageWorkflow(tx *dao.Query, imageRepository string, re
 	if len(tasks) == 0 && taskMatchErr == nil {
 		return nil
 	}
+	if !validDigest(digest) {
+		return errors.New("镜像 digest 无效")
+	}
 	event := ImagePushed{Repository: repository, Tag: tag, Digest: digest, EventID: eventID, Image: image}
 	return l.enqueueTasks(tx, config, rules, tasks, taskMatchErr, event)
 }
 
-// TriggerManual uses the same saved Chart, queue and execution snapshots as push triggers.
+// TriggerManual snapshots the selected task group and queues it without contacting the source registry.
 func (l Workflow) TriggerManual(event ImagePushed, taskID string, admin bool) (string, error) {
 	if err := l.checkWritesAllowed(); err != nil {
 		return "", err
@@ -415,9 +414,6 @@ func (l Workflow) enqueueTasks(tx *dao.Query, config Config, rules []entity.Regi
 	}
 	if event.EventID == "" {
 		return errors.New("镜像推送事件缺少唯一 ID")
-	}
-	if !validDigest(event.Digest) {
-		return errors.New("镜像 digest 无效")
 	}
 	runID, err := event.RunID()
 	if err != nil {
@@ -654,28 +650,4 @@ func (l Workflow) OnImagePushed(event ImagePushed) (ImagePushResult, error) {
 	}
 	err = l.Trigger(event.Image.Repository, event.Repository, event.Tag, event.Digest, event.EventID, event.EventType, event.Image)
 	return result, err
-}
-
-// ResolveManualImage resolves public inputs anonymously and pins the source digest.
-func (Workflow) ResolveManualImage(ctx context.Context, source reference.NamedTagged) (ImagePushed, error) {
-	repository, err := remote.NewRepository(source.Name())
-	if err != nil {
-		return ImagePushed{}, err
-	}
-	if repository.Reference.Registry == "docker.io" {
-		repository.Reference.Registry = "registry-1.docker.io"
-	}
-	repository.Client = &auth.Client{Client: retry.DefaultClient, Cache: auth.NewCache()}
-	resolveCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-	descriptor, err := repository.Resolve(resolveCtx, source.Tag())
-	if err != nil {
-		return ImagePushed{}, fmt.Errorf("读取公共镜像失败：%w", err)
-	}
-	digest := descriptor.Digest.String()
-	return ImagePushed{
-		Tag: source.Tag(), Digest: digest,
-		EventID: "manual-" + uuid.NewString(),
-		Image:   ImageContext{Reference: source.Name() + "@" + digest},
-	}, nil
 }

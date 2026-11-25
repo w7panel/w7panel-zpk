@@ -580,7 +580,7 @@
                                     <template #columns>
                                         <manifest-config-table-column data-index="name" title="标识">
                                             <template #cell="{ record }">
-                                                <a-input :model-value="record.name" @change="value => changeStartParamName(record, value)"
+                                                <a-input :model-value="record.name" @update:model-value="value => changeStartParamName(record, value)"
                                                     :disabled="computedSpDisabled(record) && !canEditDomainParamName(record)" :spellcheck="false"
                                                     placeholder="配置标识"></a-input>
                                             </template>

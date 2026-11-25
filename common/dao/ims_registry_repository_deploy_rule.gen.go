@@ -30,9 +30,6 @@ func newRegistryRepositoryDeployRule(db *gorm.DB, opts ...gen.DOOption) registry
 	_registryRepositoryDeployRule.ID = field.NewInt32(tableName, "id")
 	_registryRepositoryDeployRule.UserID = field.NewInt32(tableName, "user_id")
 	_registryRepositoryDeployRule.RepositoryName = field.NewString(tableName, "repository_name")
-	_registryRepositoryDeployRule.ImageRepository = field.NewString(tableName, "image_repository")
-	_registryRepositoryDeployRule.ImageHost = field.NewString(tableName, "image_host")
-	_registryRepositoryDeployRule.PlainHTTP = field.NewBool(tableName, "plain_http")
 	_registryRepositoryDeployRule.RegistryUsername = field.NewString(tableName, "registry_username")
 	_registryRepositoryDeployRule.RegistryPassword = field.NewString(tableName, "registry_password")
 	_registryRepositoryDeployRule.RepositoryID = field.NewInt32(tableName, "repository_id")
@@ -67,9 +64,6 @@ type registryRepositoryDeployRule struct {
 	ID                     field.Int32
 	UserID                 field.Int32
 	RepositoryName         field.String
-	ImageRepository        field.String
-	ImageHost              field.String
-	PlainHTTP              field.Bool
 	RegistryUsername       field.String
 	RegistryPassword       field.String
 	RepositoryID           field.Int32
@@ -110,9 +104,6 @@ func (r *registryRepositoryDeployRule) updateTableName(table string) *registryRe
 	r.ID = field.NewInt32(table, "id")
 	r.UserID = field.NewInt32(table, "user_id")
 	r.RepositoryName = field.NewString(table, "repository_name")
-	r.ImageRepository = field.NewString(table, "image_repository")
-	r.ImageHost = field.NewString(table, "image_host")
-	r.PlainHTTP = field.NewBool(table, "plain_http")
 	r.RegistryUsername = field.NewString(table, "registry_username")
 	r.RegistryPassword = field.NewString(table, "registry_password")
 	r.RepositoryID = field.NewInt32(table, "repository_id")
@@ -150,13 +141,10 @@ func (r *registryRepositoryDeployRule) GetFieldByName(fieldName string) (field.O
 }
 
 func (r *registryRepositoryDeployRule) fillFieldMap() {
-	r.fieldMap = make(map[string]field.Expr, 27)
+	r.fieldMap = make(map[string]field.Expr, 24)
 	r.fieldMap["id"] = r.ID
 	r.fieldMap["user_id"] = r.UserID
 	r.fieldMap["repository_name"] = r.RepositoryName
-	r.fieldMap["image_repository"] = r.ImageRepository
-	r.fieldMap["image_host"] = r.ImageHost
-	r.fieldMap["plain_http"] = r.PlainHTTP
 	r.fieldMap["registry_username"] = r.RegistryUsername
 	r.fieldMap["registry_password"] = r.RegistryPassword
 	r.fieldMap["repository_id"] = r.RepositoryID

@@ -7,6 +7,7 @@ import (
 
 	"github.com/distribution/reference"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	workflow "github.com/w7panel/w7panel-zpk/app/workflow/logic"
 	commonlogic "github.com/w7panel/w7panel-zpk/common/logic"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
@@ -35,7 +36,7 @@ func (c Workflow) repository(ctx *gin.Context, imageRepository string) (workflow
 		if parseErr != nil || !reference.IsNameOnly(named) || named.Name() != imageRepository {
 			return workflow.RepositoryConfig{}, errors.New("请提供完整镜像仓库地址，不包含 tag 或 digest")
 		}
-		return workflow.RepositoryConfig{UserID: user.ID, Name: reference.Path(named), Image: workflow.ImageContext{Repository: named.Name(), Host: reference.Domain(named)}}, nil
+		return workflow.RepositoryConfig{UserID: user.ID, Name: reference.Path(named)}, nil
 	}
 	if err != nil {
 		return workflow.RepositoryConfig{}, err
@@ -156,17 +157,11 @@ func (c Workflow) Run(ctx *gin.Context) {
 	}
 	source := reference.TagNameOnly(named).(reference.NamedTagged)
 	user := commonlogic.User{}.GetUser(ctx)
-	event, err := (workflow.Workflow{}).ResolveManualImage(ctx.Request.Context(), source)
-	if err == nil {
-		event.Repository = repository.Name
-		event.Image.Repository = repository.Image.Repository
-		event.Image.Host = repository.Image.Host
-		event.Image.PlainHTTP = repository.Image.PlainHTTP
+	event := workflow.ImagePushed{
+		Repository: repository.Name, Tag: source.Tag(), EventID: "manual-" + uuid.NewString(),
+		Image: repository.Image,
 	}
-	if err != nil {
-		c.JsonResponseWithServerError(ctx, err)
-		return
-	}
+	event.Image.Reference = source.String()
 	runID, err := (workflow.Workflow{}).TriggerManual(event, params.TaskID, (commonlogic.User{}).IsAdminUser(user))
 	if err != nil {
 		c.JsonResponseWithServerError(ctx, err)

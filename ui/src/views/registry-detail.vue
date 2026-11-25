@@ -138,7 +138,7 @@
                     </a-spin>
                 </a-tab-pane>
                 <a-tab-pane key="build" title="镜像自动任务" v-if="hasAccess(data.user_id)">
-                    <image-tasks v-if="data.id" :key="data.id" :image-repository="`${data.registry}/${data.namespace}/${data.name}`" :user-info="userInfo" />
+                    <image-tasks v-if="data.id" :key="data.id" :image-repository="workflowImageRepository" :user-info="userInfo" />
                 </a-tab-pane>
             </a-tabs>
         </div>
@@ -221,6 +221,12 @@ export default {
 
 
         }
+    },
+    computed: {
+        workflowImageRepository() {
+            const repositoryName = this.data.namespace === 'default' ? this.data.name : `${this.data.namespace}/${this.data.name}`;
+            return `${String(this.data.registry || '').replace(/\/+$/, '')}/${repositoryName}`;
+        },
     },
     mixins: [userMixin],
     created() {

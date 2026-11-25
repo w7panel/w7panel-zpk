@@ -125,9 +125,7 @@ func (c Repository) Info(ctx *gin.Context) {
 		c.JsonResponseWithServerError(ctx, errors.New("repository 不存在"))
 		return
 	}
-	if curRepository.Registry == "" {
-		curRepository.Registry = facade.GetConfig().GetString("registry_cli.default.external_domain")
-	}
+	curRepository.Registry = facade.GetConfig().GetString("registry_cli.default.external_domain")
 
 	respInfo := RepositoryRespInfo{
 		RegistryRepository: *curRepository,
@@ -184,10 +182,8 @@ func (c Repository) List(ctx *gin.Context) {
 		if item.Namespace != "" && slices.Contains(ignoredNamespaces, item.Namespace) {
 			continue
 		}
-		if item.Registry == "" {
-			item.Registry = facade.GetConfig().GetString("registry_cli.default.external_domain")
-			list[index] = item
-		}
+		item.Registry = facade.GetConfig().GetString("registry_cli.default.external_domain")
+		list[index] = item
 
 		respInfo := RepositoryRespInfo{
 			RegistryRepository: *item,

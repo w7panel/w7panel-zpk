@@ -20,7 +20,6 @@ import (
 	"github.com/w7panel/w7panel-zpk/common/service/taskqueue"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 	"helm.sh/helm/v3/pkg/release"
 	"k8s.io/client-go/kubernetes"
 )
@@ -193,33 +192,24 @@ func (l *Executor) Execute(ctx context.Context, run entity.RegistryRepositoryDep
 
 func (l *Executor) claimRun(ctx context.Context, id int32) (entity.RegistryRepositoryDeployRuleMatchLog, error) {
 	var run entity.RegistryRepositoryDeployRuleMatchLog
-	// Claim at most one active run per repository using workflow records only.
+	// Atomically claim this run; other runs in the same repository may execute concurrently.
 	err := dao.Q.Transaction(func(tx *dao.Query) error {
 		query := tx.RegistryRepositoryDeployRuleMatchLog
-		candidate, err := query.WithContext(ctx).Where(query.ID.Eq(id), query.ExecutionStatus.Eq("pending"), query.WorkflowTaskKey.Eq("")).First()
-		if err != nil {
-			return err
-		}
-		run = *candidate
-
-		// All dispatchers for this repository lock the same workflow coordinator row.
-		// Locking reads below see committed state even under MySQL repeatable read.
-		if _, err := query.Clauses(clause.Locking{Strength: "UPDATE"}).Where(query.TriggerRepository.Eq(run.TriggerRepository), query.WorkflowTaskKey.Eq("")).Order(query.ID).First(); err != nil {
-			return err
-		}
-		activeRuns, err := query.Clauses(clause.Locking{Strength: "UPDATE"}).Where(query.TriggerRepository.Eq(run.TriggerRepository), query.WorkflowTaskKey.Eq(""), query.ExecutionStatus.Eq("running")).Limit(1).Find()
-		if err != nil {
-			return err
-		}
-		if len(activeRuns) > 0 {
-			return gorm.ErrRecordNotFound
-		}
-		claimResult, err := query.Where(query.WorkflowRunID.Eq(run.WorkflowRunID), query.ExecutionStatus.Eq("pending")).UpdateSimple(query.UpdatedAt.Value(time.Now()), query.ExecutionStatus.Value("running"))
+		now := time.Now()
+		claimResult, err := query.WithContext(ctx).Where(query.ID.Eq(id), query.ExecutionStatus.Eq("pending"), query.WorkflowTaskKey.Eq("")).UpdateSimple(query.UpdatedAt.Value(now), query.ExecutionStatus.Value("running"))
 		if err != nil {
 			return err
 		}
 		if claimResult.RowsAffected == 0 {
 			return gorm.ErrRecordNotFound
+		}
+		candidate, err := query.WithContext(ctx).Where(query.ID.Eq(id)).First()
+		if err != nil {
+			return err
+		}
+		run = *candidate
+		if _, err := query.WithContext(ctx).Where(query.WorkflowRunID.Eq(run.WorkflowRunID), query.WorkflowTaskKey.Neq(""), query.ExecutionStatus.Eq("pending")).UpdateSimple(query.UpdatedAt.Value(now), query.ExecutionStatus.Value("running")); err != nil {
+			return err
 		}
 		return nil
 	})

@@ -6,7 +6,7 @@ logic 沿用 respo 的结构体方法风格：`Workflow` 管理配置、触发�
 
 workflow Provider 在主服务 `main.go` 中独立注册，放在 registry Provider 之后，沿用其初始化的仓库及签名配置；注册不传入业务回调。
 
-registry 通过 `ImagePushed` 向 `Workflow.OnImagePushed` 传递仓库名、tag、digest 等推送事件；workflow 根据自身规则读取仓库路径和任务配置。workflow 只维护规则、执行记录和构建结果日志，返回 `ImagePushResult.Rebuilt`，由 registry 单独更新镜像版本的重构标记。事件入口不包裹整体数据库事务；工作流入队保留短事务，Helm 安装在后台执行。规则保存时固定仓库路径及默认仓库账号密码，密码加密存储且不返回前端。触发时写入加密执行快照；执行时动态读取当前仓库域名及 HTTP 配置，凭据继续使用快照中的保存值，不签发专用令牌。没有 `Source` 适配器或仓库锁注入。保存和入队不加仓库锁；调度器在短事务内锁定本仓库最早的工作流协调记录，再检查运行状态并领取任务，保证同仓库流程串行，Helm 执行期间不持锁。镜像表及 `IsRebuilt` 的迁移归 registry Provider，workflow Provider 只处理规则和执行日志。旧规则已在启动时迁移为工作流，内部构建回推不再次触发。
+registry 通过 `ImagePushed` 向 `Workflow.OnImagePushed` 传递仓库名、tag、digest 等推送事件；workflow 根据自身规则读取仓库路径和任务配置。workflow 只维护规则、执行记录和构建结果日志，返回 `ImagePushResult.Rebuilt`，由 registry 单独更新镜像版本的重构标记。事件入口不包裹整体数据库事务；工作流入队保留短事务，Helm 安装在后台执行。规则保存时固定仓库路径及默认仓库账号密码，密码加密存储且不返回前端。触发时写入加密执行快照；执行时动态读取当前仓库域名及 HTTP 配置，凭据继续使用快照中的保存值，不签发专用令牌。没有 `Source` 适配器或仓库锁注入。保存和入队不加仓库锁；调度器在短事务内按执行记录 ID 和 pending 状态领取任务，防止同一轮被重复执行；同一仓库的不同轮次允许并发，Helm 执行期间不持锁。镜像表及 `IsRebuilt` 的迁移归 registry Provider，workflow Provider 只处理规则和执行日志。旧规则已在启动时迁移为工作流，内部构建回推不再次触发。
 
 Helm 包根文件由 `helm_templates/Chart.yaml.tpl` 和 `values.yaml.tpl` 在执行阶段根据快照生成，默认镜像及运行参数结构统一在 values 模板维护；`serviceaccount.yaml.tpl`、`configmap.yaml.tpl`、`role.yaml.tpl`、`rolebinding.yaml.tpl`、`secret.yaml.tpl`、`job.yaml.tpl` 原样打包到 Chart 的 `templates/`，在触发安装时由 Helm 使用本轮 values 渲染。`GenerateChart` 将内置模板和生成的 values 直接组合为内存 Chart，交给 Helm 安装，不再生成或缓存本地 tgz 文件。
 
@@ -24,13 +24,13 @@ Helm 包根文件由 `helm_templates/Chart.yaml.tpl` 和 `values.yaml.tpl` 在�
 - 来源任务必须匹配本次事件；来源缺失会记录失败，不自动改用原镜像。
 - 构建目标为原始 tag 加自定义后缀；留空覆盖原 tag。后缀始终相对触发 tag 计算。
 - 同阶段不能写同一个 tag 或同一个部署容器；不同阶段可以连续修改同一 tag。
-- 每个工作流最多 32 个任务，单阶段最长 30 分钟，一轮执行最长 2 小时；每个服务进程默认同时运行两轮，可通过配置调整。同一仓库的执行记录通过数据库抢占串行推进。
+- 每个工作流最多 32 个任务，单阶段最长 30 分钟，一轮执行最长 2 小时；每个服务进程默认同时运行三轮，可通过配置调整。同一仓库的不同轮次可并发，数据库只负责防止同一轮被重复领取。
 
 例如：阶段 1 构建基础版；阶段 2 并行构建虚拟机版和开发版；阶段 3 的部署任务明确选择阶段 2 中某条任务的结果。
 
 保存规则只写入数据库。触发时在短事务中匹配任务，并保存加密的配置和凭据快照，不准备 Helm 文件。
 
-执行器参考售卖项目的 worker：分页扫描待执行记录的 ID，通过有界 channel 和 ants worker 池排队，进程内去重覆盖排队和执行。worker 真正开始时才按 ID 从数据库领取，数据库仍负责持久状态和同一镜像任务串行。`workflow.concurrency` 默认 2，`workflow.queue_size` 默认 100；环境变量为 `WORKFLOW_CONCURRENCY`、`WORKFLOW_QUEUE_SIZE`，服务 Chart 对应 `workflow.concurrency`、`workflow.queueSize`。这些设置控制每个进程的整轮执行并发，任务内的阶段与并行关系仍由规则控制。
+执行器参考售卖项目的 worker：分页扫描待执行记录的 ID，通过有界 channel 和 ants worker 池排队，进程内去重覆盖排队和执行。worker 真正开始时才按 ID 从数据库领取，数据库仍负责持久状态和同一执行记录的领取去重。`workflow.concurrency` 默认 3，`workflow.queue_size` 默认 100；环境变量为 `WORKFLOW_CONCURRENCY`、`WORKFLOW_QUEUE_SIZE`，服务 Chart 对应 `workflow.concurrency`、`workflow.queueSize`。这些设置控制每个进程的整轮执行并发，任务内的阶段与并行关系仍由规则控制。
 
 执行时直接按本轮数据库快照生成内存 Chart，不缓存本地包，不比较包摘要，也不扫描或清理本地运行包。
 

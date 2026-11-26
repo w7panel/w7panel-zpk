@@ -68,7 +68,7 @@ func (l User) GetOrCreatePanelUser(userId string, username string, userRole stri
 			return nil, err
 		}
 		if existing != nil {
-			return nil, errors.New("面板用户名已绑定其他用户")
+			w7panelUser = existing
 		}
 	}
 	if w7panelUser != nil {

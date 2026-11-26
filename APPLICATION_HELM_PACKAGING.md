@@ -258,9 +258,39 @@ Job 默认 `backoffLimit: 2`、完成 60 秒后清理。安装前/删除后的 J
 - `GetFormula` 会加载同一公式下所有 `*/manifest.yaml` 到 `AllManifest`。
 - `NewHelmPack` 按应用标识建立子 manifest map；`generateSubCharts` 递归为每个子应用生成 `charts/<identify>/`。
 - 根 `Chart.yaml` 扫描 `charts/` 下每个目录的 `Chart.yaml`，登记成 `file://./charts/<dir>` dependency，并合并用户原有 dependencies。
-- 如果父、子 manifest 都声明了任意 PVC volume，子 Workload 会加 required pod affinity，按同一 Helm release 的 `w7.cc/group-name` 和父应用 `w7.cc/identifie` 调度到同一节点。这是对 RWO 场景的保守处理，并不会查询真实 PVC access mode。
-- 如果该子应用是用户 Helm 包，打包器只把相同规则合并到子 Chart `values.yaml` 的顶层 `affinity`；其中包含基于 `.Release.Name` 的模板值，因此子 Chart 的 Workload 模板需要使用 `tpl (toYaml .Values.affinity) $` 渲染。子 Chart 内部的 Job 应自行复用或派生其 Workload 亲和性。
+- 普通生成型应用和用户 Helm 包均按声明的 PVC 共享关系决定是否追加 required 同节点约束，不再因主子关系或双方各有 PVC 自动添加。仅通过 Service 通信、使用独立 PVC 时不添加。
+- 普通应用只检查容器实际挂载的 PVC volume：应用之间相同的固定 `claimName`，或经启动参数引用另一个应用的 `PVC_NAME`，才视为共享。空 claim 默认使用各应用自己的 PVC_NAME；相同的可编辑默认值、两个空值、未挂载的 volume、StatefulSet 独立 claim template 均不视为共享。
+- 参数通过 `module_name` 引用包内应用且 `values_text: "%PVC_NAME%"` 时，亲和性指向实际来源，不再固定指向主应用；支持主子、兄弟子应用及多目标引用。支持实际应用标识和 `app[0]` / `app[1]`，直接复用已排序的 `AllManifest` 解析，不重建索引或重复排序，不回写 manifest。普通应用需挂载该参数对应的 volume；Helm 包可通过 PVC_NAME 或重命名的启动参数（如 `persistence.existingClaim`）声明引用。
+- 多目标分别生成 required term，要求与每个来源位于同节点，不使用一个含多个 identifie 值的 OR 选择器。自引用忽略，包外引用不推断；显式循环依赖在写入 Chart 或发起下载前报错。固定同名 PVC 按已有列表顺序选择跟随方向；若已有反向依赖路径，则不再补相反约束，避免相互等待。无需新增共享分组或锚点协议。
+- 整包检测仅在根 `NewHelmPack` 初始化时执行一次，保存目标列表及检测错误；子应用直接复用各自目标，`PackToHelm` 不重复检测，检测失败时在任何打包副作用前返回。
+- 用户 Helm 包的自动规则仅追加到顶层 `affinity.podAffinity.requiredDuringSchedulingIgnoredDuringExecution`，不覆盖作者原有 required / preferred、nodeAffinity 或 podAntiAffinity。冲突规则仍可能阻止调度，ZPK 不删除作者的约束。
+- 只希望同节点时，通过现有 `platform.helm.kv` 显式设置 preferred；确认共享 PVC 后自动规则使用 required，不能通过添加 preferred 消除该存储约束。打包不查询真实 PVC accessModes，对声明的共享关系按需要同节点保守处理；RWX 仍会受该约束，RWOP 不允许多个 Pod 同时挂载，不能靠亲和性解决。
+- required 规则的目标 Pod 必须实际存在，并在 `spec.template.metadata.labels` 上输出匹配的分组与应用标识（如 `w7.cc/group-name` 和 `w7.cc/identifie`）；仅给 Deployment 或 MicroApp 加标签无效。不要将 release 名称直接当作制品标识，也不要只匹配整个 release 导致选中错误的子应用。
+- Helm 包必须通过 `tpl` 消费顶层 affinity 才能使自动规则生效；使用组件专属 affinity 路径的 Chart 需作者接入或自行配置。ZPK 不扫描重写任意 Helm 模板来识别真实挂载，不自动补齐 Pod 标签；仅有启动参数声明也不能证明 Chart 最终消费了 PVC。Helm YAML 输入同样支持现有 values 覆盖入口。
+- 传统应用插件和生命周期 Job 的专用亲和性保持不变；本次调整针对主子应用 Workload 的自动存储亲和性。
+- 变更需重新生成制品 Helm 包并升级安装；已有 tgz 和已安装资源不会自动改变。
 - StatefulSet 的 `volumeClaimTemplates` 不会挂进 Shell Job；Job 只保留能在 `.Values.volumes` 找到的 mount。
+
+例如，子 Chart 支持顶层 `affinity` 且用 `tpl` 渲染时，可在子 manifest 中显式设置同节点偏好（`parent-artifact` 替换为主制品标识）：
+
+```yaml
+platform:
+  helm:
+    kv:
+      - name: affinity.podAffinity
+        value: |
+          requiredDuringSchedulingIgnoredDuringExecution: null
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    w7.cc/group-name: "{{ .Release.Name }}"
+                    w7.cc/identifie: parent-artifact
+```
+
+对自动检测范围外、必须共享同一个 RWO PVC 的场景，可将 preferred 设为 `null`，再用 required 配置 term 列表（直接填写 `topologyKey` 与 `labelSelector`，不含 `weight` / `podAffinityTerm` 包装）。这里沿用现有 values 深度合并规则；切换作者配置时显式清空另一策略。已检测到的主子共享会在 values 覆盖后追加 required。`nodeAffinity`、`podAntiAffinity` 等其他规则仍保留并参与调度。
 
 ### 4.7 MicroApp、前端包和 Site
 
@@ -499,7 +529,7 @@ tradition-tool 支持安装后切换网关：直接修改工具自身的镜像�
 
 ## 8. Helm/K8sYaml 应用（`helm`）
 
-该流程在 `helm_helmapp.go` 中维护，由 `packHelmApp` 顺序执行用户 Chart/YAML 处理和 Sidecar host 配置。来源下载、解包、values 路径解析及合并、附加 YAML、共享存储亲和性合并均在该文件中；`helm_pack.go` 保留入口分流和公共收尾。是否进入此流程仍由 `platform.helm` 配置判断，保持现有优先级。
+该流程在 `helm_helmapp.go` 中维护，由 `packHelmApp` 顺序执行用户 Chart/YAML 处理和 Sidecar host 配置。来源下载、解包、values 路径解析及合并、附加 YAML、确认共享 PVC 后的亲和性追加均在该文件中；`helm_pack.go` 保留入口分流和公共收尾。是否进入此流程仍由 `platform.helm` 配置判断，保持现有优先级。
 
 ### 8.1 三种输入组合
 
@@ -830,7 +860,7 @@ Registry 自己使用另一块 PVC，默认文件系统根为 `/var/lib/registry
 3. **资源限制不随生成型 Workload 下发**：`container-v2.resources` 在 Workload values 中被清空。
 4. **用户 Helm Chart 的 helper 契约是隐式的**：MicroApp bindings 依赖 `common.fullname`，sidecar 依赖 `w7panel.*` include；打包器不做完整静态校验。
 5. **不会自动补齐用户 Helm dependency**：没有执行 `helm dependency update`，离线安装前应确保依赖已 vendor 到 tgz 或能在安装环境解析。
-6. **共享 PVC affinity 是保守推断**：只要父子双方存在 PVC volume 就强制同节点，不区分 RWX/RWO/RWOP。
+6. **共享 PVC 亲和性依赖声明和 Chart 接入**：不查询实际 PVC accessModes；共享引用保守使用 required，用户 Helm 包须消费顶层 affinity 并提供目标应用 Pod 标签。
 7. **存储参数命名存在历史差异**：生成型 Chart 使用 `global.cluster.accessModes`，编辑器部分固定参数使用 `global.cluster.storageRWmode`，ZPK 自身部署 Chart又使用 `storageRWMode`；新增逻辑不应把三者视为天然等价。
 8. **点号启动参数会形成非法 env 名风险**：`global.cluster.*` 参数虽然用于嵌套 values，但当前 Workload/Job 模板仍会把原名写入 env；Kubernetes API 可能拒绝这些 env 名。
 9. **readinessProbe 当前没有进入 Workload 模板**：模型能读取 `readinessProbe`，values 使用历史字段名 `readinessProb`，但当前 `workload.yaml.tpl` 只渲染 liveness/startup probe。

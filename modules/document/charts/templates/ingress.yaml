@@ -1,9 +1,8 @@
 {{- if .Values.domainURL }}
-{{- $domain := urlParse .Values.domainURL }}
-{{- if or (not (has $domain.scheme (list "http" "https"))) (empty $domain.host) (not (empty $domain.userinfo)) (not (has $domain.path (list "" "/"))) (not (empty $domain.query)) (not (empty $domain.fragment)) }}
-{{- fail "domainURL must be an HTTP(S) origin without credentials, path, query or fragment" }}
+{{- $host := .Values.domainURL }}
+{{- if or (gt (len $host) 253) (not (regexMatch `^([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)*[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$` $host)) }}
+{{- fail "domainURL must be a domain without scheme, port or path" }}
 {{- end }}
-{{- $host := regexReplaceAll ":[0-9]+$" $domain.host "" | lower }}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -15,18 +14,14 @@ metadata:
     kubernetes.io/ingress.class: higress
     higress.io/resource-definer: higress
     higress.io/ssl-redirect: "false"
-    {{- if eq $domain.scheme "https" }}
     cert-manager.io/cluster-issuer: w7-letsencrypt-prod
     cert-manager.io/renew-before: 30m
-    {{- end }}
 spec:
   ingressClassName: higress
-  {{- if eq $domain.scheme "https" }}
   tls:
     - hosts:
         - {{ $host | quote }}
       secretName: {{ .Release.Name }}-tls-secret
-  {{- end }}
   rules:
     - host: {{ $host | quote }}
       http:

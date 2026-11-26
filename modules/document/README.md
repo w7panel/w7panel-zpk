@@ -50,7 +50,7 @@ Chart 只保留 Sidecar 调用位置和 values 占位，`_w7panel-sidecars.tpl` 
 
 分类管理、文档库管理页面及路由放在本目录 UI 内，面板菜单分别打开 `#/categories` 和 `#/documents`，页面直接展示对应内容，不再提供内部侧栏或手动登录表单。管理页面使用面板注入的 `access_token` 自动登录，认证失败时显示错误；公有文档的匿名阅读入口继续保留。ZPK 主 UI 不注册这些管理页面。
 
-文档库列表操作列提供“整体下载地址”及复制按钮。文档子应用通过启动参数引用 ZPK 主项目的 `DOMAIN_URL`，文档 Ingress 将该域名下的 `/doc` 直接转发到文档 Service，地址由文档自身生成，公私权限及打包也由文档服务处理；私有库需携带 `X-Document-Token` 或 `X-W7Panel-Access-Token`，地址不含凭据。未配置有效主域名时不创建文档 Ingress，获取下载地址报错，不影响列表加载。ZPK 不提供文档下载转发或查询地址接口。
+文档库列表操作列提供“整体下载地址”及复制按钮。文档子应用通过启动参数引用 ZPK 主项目的 `DOMAIN_URL`，文档 Ingress 将该域名下的 `/doc` 直接转发到文档 Service，地址由文档自身生成，公私权限及打包也由文档服务处理；私有库需携带 `X-Document-Token` 或 `X-W7Panel-Access-Token`，地址不含凭据。未配置主域名时不创建文档 Ingress，获取下载地址报错，不影响列表加载。ZPK 不提供文档下载转发或查询地址接口。
 
 文档子应用启动参数配置如下，`module_name` 指向主应用，`values_text` 按主应用现有的 `%DOMAIN_SSL_URL%` 域名占位符匹配，参数名无需与主应用相同：
 
@@ -58,7 +58,7 @@ Chart 只保留 Sidecar 调用位置和 values 占位，`_w7panel-sidecars.tpl` 
 { "name": "domainURL", "title": "主应用域名", "values_text": "%DOMAIN_SSL_URL%", "module_name": "w7-zpkv2", "hidden": true }
 ```
 
-`domainURL` 写入文档 Chart values，并由 Deployment 注入 `DOMAIN_URL`；独立运行可直接设置环境变量 `DOMAIN_URL=https://zpk.example.com`。值只包含协议、域名及可选端口，不包含路径。HTTPS 使用与主 Chart 一致的 `<Release.Name>-tls-secret`；Ingress class 为 `higress`，路径使用 Prefix 匹配，不重写路径。
+`domainURL` 接收面板传入的纯域名（例如 `zpk.example.com`），写入文档 Chart values，并由 Deployment 注入 `DOMAIN_URL`。文档 Ingress 和整体下载地址固定使用 HTTPS；独立运行可直接设置环境变量 `DOMAIN_URL=zpk.example.com`。只接收纯域名，不接收协议、端口、凭据、路径、查询参数或片段。HTTPS 使用与主 Chart 一致的 `<Release.Name>-tls-secret`；Ingress class 为 `higress`，路径使用 Prefix 匹配，不重写路径。
 
 `ui/src/components/workbench.vue` 是本系统文档库页面使用的文档操作台，新建文件直接使用库内根路径，不固定添加 `docs/`。ZPK 的 `description.vue` 通过 `/respo/document/path-tree` 和 `/respo/document/file` 请求制品后端，由调用方 SDK 转接读取、保存、删除及排序；ZPK UI 不引用本目录代码。文档路径直接使用 `guide.md`、`manual/guide.md` 等库内相对路径，不添加 `docs/` 前缀。`.order` 仅为制品编辑器的排序字段，由适配层转换成文档系统的排序请求；空内容沿用制品编辑器的删除语义。制品简介通过 `/respo/setting/get` 和 `/respo/setting/set` 读写制品表的 `readme` 字段，旧 `/respo/share-file/*` 接口已移除；文档库中的 `readme.md` 不会覆盖制品简介。默认 `index.md` 保留在文档库根目录，在文档系统 UI 查看，不映射成可编辑的制品文档。
 

@@ -6,7 +6,7 @@ module.exports = defineConfig({
     devServer: {
         port: 8081,
         proxy: process.env.VUE_PROXY_TARGET
-            ? { '/zpk/document': { target: process.env.VUE_PROXY_TARGET, changeOrigin: true } }
+            ? { '/doc': { target: process.env.VUE_PROXY_TARGET, changeOrigin: true } }
             : undefined,
     },
 });

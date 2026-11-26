@@ -3,6 +3,7 @@
         <template v-if="selectedRef">
             <div class="document-page-header">
                 <a-button @click="closeWorkbench">返回文档库</a-button>
+                <span class="document-reference">{{ selectedRef }}</span>
             </div>
             <workbench :key="selectedRef" :client="client" :library-ref="selectedRef" />
         </template>
@@ -46,6 +47,7 @@
                     </a-table-column>
                     <a-table-column title="操作"
                         ><template #cell="{ record }">
+                            <a-button type="text" @click="showDownloadURL(record)">整体下载地址</a-button>
                             <a-button type="text" @click="openEdit(record)">编辑</a-button>
                             <a-popconfirm
                                 content="确认删除文档库？"
@@ -72,6 +74,12 @@
                 @change="loadLibraries"
             />
         </template>
+        <a-modal v-model:visible="download.visible" title="整体下载地址" :footer="false">
+            <a-alert>公有文档库可直接下载；私有文档库需通过请求头携带所有者或创始人的登录凭据。</a-alert>
+            <a-input :model-value="download.url" readonly style="margin-top: 16px">
+                <template #append><a-button @click="copyDownloadURL">复制</a-button></template>
+            </a-input>
+        </a-modal>
         <a-modal v-model:visible="form.visible" :title="form.edit ? '编辑文档库' : '新建文档库'">
             <a-form :model="form" layout="vertical">
                 <a-form-item v-if="!form.edit" label="分类"
@@ -109,6 +117,7 @@ export default {
     data: () => ({
         categories: [],
         libraries: [],
+        download: { visible: false, url: '' },
         category: '',
         page: 1,
         total: 0,
@@ -142,6 +151,24 @@ export default {
         },
     },
     methods: {
+        async showDownloadURL(record) {
+            try {
+                const result = await this.client.post('/download-url');
+                const url = new URL(result.url);
+                url.searchParams.set('ref', this.reference(record));
+                this.download = { visible: true, url: url.href };
+            } catch (error) {
+                Message.error(error.message);
+            }
+        },
+        async copyDownloadURL() {
+            try {
+                await navigator.clipboard.writeText(this.download.url);
+                Message.success('下载地址已复制');
+            } catch {
+                Message.error('复制失败，请手动复制下载地址');
+            }
+        },
         categoryName(identifie) {
             return this.categories.find((category) => category.identifie === identifie)?.name || identifie;
         },
@@ -234,6 +261,9 @@ export default {
     align-items: center;
     gap: 12px;
     margin-bottom: 20px;
+}
+.document-reference {
+    color: #86909c;
 }
 .document-page-toolbar {
     display: flex;

@@ -5,8 +5,11 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"io"
+	"net/url"
 	"os"
+	"strings"
 
 	"github.com/w7panel/w7panel-zpk/modules/document/common/dao"
 	"github.com/w7panel/w7panel-zpk/modules/document/common/entity"
@@ -120,4 +123,14 @@ func (d Download) copyBlob(ctx context.Context, w io.Writer, f *entity.DocumentF
 		return errors.New("文档内容不完整")
 	}
 	return ctx.Err()
+}
+
+func (Download) URL() (string, error) {
+	domain, err := url.Parse(strings.TrimSpace(facade.GetConfig().GetString("document.domain_url")))
+	if err != nil || domain.Host == "" || (domain.Scheme != "http" && domain.Scheme != "https") || domain.User != nil || (domain.Path != "" && domain.Path != "/") || domain.RawQuery != "" || domain.Fragment != "" {
+		return "", errors.New("文档 DOMAIN_URL 未配置为有效的 HTTP(S) 域名地址")
+	}
+	domain.Path = "/doc/download"
+	domain.RawPath = ""
+	return domain.String(), nil
 }

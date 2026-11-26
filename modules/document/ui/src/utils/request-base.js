@@ -11,9 +11,8 @@ export function getDocumentBaseURL() {
     const props = window.$wujie?.props || {};
     const frontend = props.frontend_props || props.frontendProps || {};
     const base = trimTrailingSlash(frontend.document_url || getMicroAppProxyBase());
-    if (!base) return '/zpk/document';
-    if (/\/document$/.test(base)) return base;
-    return /\/zpk$/.test(base) ? base + '/document' : base + '/zpk/document';
+    if (!base) return '/doc';
+    return /\/doc$/.test(base) ? base : base + '/doc';
 }
 
 export function isBaseRequest(url, baseURL) {

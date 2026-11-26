@@ -66,7 +66,7 @@ func (p *Provider) Register(httpServer *httpserver.Server) {
 }
 
 func (p *Provider) registerRoutes(engine *gin.Engine) {
-	root := engine.Group("/zpk/document")
+	root := engine.Group("/doc")
 	root.POST("/login", controller.Login{}.FromPanel)
 	read := root.Group("", middleware.OptionalAuth{}.Process)
 	read.POST("/file/list", controller.File{}.List)
@@ -74,6 +74,7 @@ func (p *Provider) registerRoutes(engine *gin.Engine) {
 	read.GET("/download", controller.Download{}.Export)
 	auth := root.Group("", middleware.Auth{}.Process)
 	auth.POST("/user", controller.Login{}.CurrentUser)
+	auth.POST("/download-url", controller.Download{}.URL)
 	categoryRoutes := auth.Group("/category")
 	categoryRoutes.POST("/list", controller.Category{}.List)
 	categoryAdmin := categoryRoutes.Group("", middleware.Admin{}.Process)

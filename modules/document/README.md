@@ -50,11 +50,21 @@ Chart 只保留 Sidecar 调用位置和 values 占位，`_w7panel-sidecars.tpl` 
 
 分类管理、文档库管理页面及路由放在本目录 UI 内，面板菜单分别打开 `#/categories` 和 `#/documents`，页面直接展示对应内容，不再提供内部侧栏或手动登录表单。管理页面使用面板注入的 `access_token` 自动登录，认证失败时显示错误；公有文档的匿名阅读入口继续保留。ZPK 主 UI 不注册这些管理页面。
 
+文档库列表操作列提供“整体下载地址”及复制按钮。文档子应用通过启动参数引用 ZPK 主项目的 `DOMAIN_URL`，文档 Ingress 将该域名下的 `/doc` 直接转发到文档 Service，地址由文档自身生成，公私权限及打包也由文档服务处理；私有库需携带 `X-Document-Token` 或 `X-W7Panel-Access-Token`，地址不含凭据。未配置有效主域名时不创建文档 Ingress，获取下载地址报错，不影响列表加载。ZPK 不提供文档下载转发或查询地址接口。
+
+文档子应用启动参数配置如下，`module_name` 指向主应用，`values_text` 按主应用现有的 `%DOMAIN_SSL_URL%` 域名占位符匹配，参数名无需与主应用相同：
+
+```json
+{ "name": "domainURL", "title": "主应用域名", "values_text": "%DOMAIN_SSL_URL%", "module_name": "w7-zpkv2", "hidden": true }
+```
+
+`domainURL` 写入文档 Chart values，并由 Deployment 注入 `DOMAIN_URL`；独立运行可直接设置环境变量 `DOMAIN_URL=https://zpk.example.com`。值只包含协议、域名及可选端口，不包含路径。HTTPS 使用与主 Chart 一致的 `<Release.Name>-tls-secret`；Ingress class 为 `higress`，路径使用 Prefix 匹配，不重写路径。
+
 `ui/src/components/workbench.vue` 是本系统文档库页面使用的文档操作台，新建文件直接使用库内根路径，不固定添加 `docs/`。ZPK 的 `description.vue` 通过 `/respo/document/path-tree` 和 `/respo/document/file` 请求制品后端，由调用方 SDK 转接读取、保存、删除及排序；ZPK UI 不引用本目录代码。文档路径直接使用 `guide.md`、`manual/guide.md` 等库内相对路径，不添加 `docs/` 前缀。`.order` 仅为制品编辑器的排序字段，由适配层转换成文档系统的排序请求；空内容沿用制品编辑器的删除语义。制品简介通过 `/respo/setting/get` 和 `/respo/setting/set` 读写制品表的 `readme` 字段，旧 `/respo/share-file/*` 接口已移除；文档库中的 `readme.md` 不会覆盖制品简介。默认 `index.md` 保留在文档库根目录，在文档系统 UI 查看，不映射成可编辑的制品文档。
 
 操作台维护目录、草稿、文件切换、保存和下载状态，Markdown 编辑及预览由 `ui/src/components/markdown-editor.vue` 负责。后端文档库、文件和下载业务分别放在 `app/document/logic/library.go`、`file.go`、`download.go`，`document.go` 仅保留公共错误、内容大小常量和引用解析。请求参数的格式、长度、取值与路径校验统一由 controller 的 `Validate` 处理，自定义验证规则在 Provider 注册阶段显式注册；logic 保留权限、关联存在性与业务保护检查，不重复校验参数。
 
-文档系统只提供通用的 `POST /zpk/document/library/create`，接收库属性及可选的初始文件列表，不内置制品初始化流程或默认文件名。普通页面只提交标识、名称、描述和公有/私有设置，创建空库。制品端负责生成默认文档数据，通过 SDK 的服务入口 `POST /zpk/document/openapi/library/create` 提交相同数据：
+文档系统只提供通用的 `POST /doc/library/create`，接收库属性及可选的初始文件列表，不内置制品初始化流程或默认文件名。普通页面只提交标识、名称、描述和公有/私有设置，创建空库。制品端负责生成默认文档数据，通过 SDK 的服务入口 `POST /doc/openapi/library/create` 提交相同数据：
 
 ```json
 {
@@ -69,17 +79,17 @@ Chart 只保留 Sidecar 调用位置和 values 占位，`_w7panel-sidecars.tpl` 
 }
 ```
 
-库级 `protected=1` 表示库不可删除，文件级 `protected=1` 表示该文件在普通用户接口不可修改、改名或删除，两者独立，不绑定文件名。`owner_id` 省略时使用当前用户，仅管理员可为其他用户建库。新建时保存所有者用户名快照 `username`，当前用户建库取认证信息中的用户名；管理员代建时由调用方通过 `owner_name` 提供所有者用户名，制品推送从 ZPK 用户记录获取。用户名用于列表展示，权限仍按 `user_id` 判断。库与初始文件元数据在同一事务内创建，重复标识返回 409。制品端遇到库已存在时，直接通过 `POST /zpk/document/openapi/file/save` 更新本次推送的首页，不再查询库信息和文件列表作复用确认，不修改库的所有者、公私状态或其他文档。签名服务保存接口可显式传入 `protected` 维护受保护文件，仍校验用户对文档库的维护权限；普通保存接口不能通过传入该字段绕过保护。正文存储与数据库不共享事务，数据库失败时正文可能保留。
+库级 `protected=1` 表示库不可删除，文件级 `protected=1` 表示该文件在普通用户接口不可修改、改名或删除，两者独立，不绑定文件名。`owner_id` 省略时使用当前用户，仅管理员可为其他用户建库。新建时保存所有者用户名快照 `username`，当前用户建库取认证信息中的用户名；管理员代建时由调用方通过 `owner_name` 提供所有者用户名，制品推送从 ZPK 用户记录获取。用户名用于列表展示，权限仍按 `user_id` 判断。库与初始文件元数据在同一事务内创建，重复标识返回 409。制品端遇到库已存在时，直接通过 `POST /doc/openapi/file/save` 更新本次推送的首页，不再查询库信息和文件列表作复用确认，不修改库的所有者、公私状态或其他文档。签名服务保存接口可显式传入 `protected` 维护受保护文件，仍校验用户对文档库的维护权限；普通保存接口不能通过传入该字段绕过保护。正文存储与数据库不共享事务，数据库失败时正文可能保留。
 
 ## 调用边界
 
 - 数据模型和生成 DAO 放在本目录的 `common/entity`、`common/dao`，业务直接使用 DAO。模型定义由 `database/schema.sql`、`database/table.yaml` 驱动；在本目录运行 `go run ./tools/generate`，生成过程使用临时数据库。
 - ZPK 用户 SDK 在 `common/service/zpk`，携带前端提供的面板 `access_token` 请求 `POST /zpk/v2/openapi/user/current`，仅通过 OIDC 中间件验证面板凭据，不挂 App、CORS 或域名限制中间件；复用 `CurUserInfo`，在 `data.user` 中返回用户 ID、用户名、角色和管理员标记。文档直接使用返回结果建立独立会话，不再重复请求面板或计算角色。登录和 JWT 签发、验证逻辑统一在 `app/document/logic/login.go` 的 `Login` 中。ZPK SDK 由 `main.go` 调用 `service.InitSDK` 初始化，登录逻辑和认证中间件直接使用 `service.ZPKSdk`，不通过 Provider 传递，也不增加用户转发层。`common/service/permission` 是权限服务 SDK，公有/私有和所有者的操作权限均通过远程接口判断；文档只维护默认首页不可修改等业务保护规则。
-- ZPK 请求文档的 SDK 属于调用方，位于宿主 `common/service/w7/document`。宿主入口统一调用 `w7.InitW7Sdk`，其内部使用已有 AppID/AppSecret 初始化 `w7.DocumentSdk`，签名复用 `w7/base`。`app/respo/logic/document.go` 的 `FormulaDocument.Initialize` 先通过 SDK 调用通用 `POST /zpk/document/openapi/category/create` 创建 `app` 分类，已存在时复用且不覆盖分类设置；随后生成 `app/制品标识` 引用、文档名称、首页正文与保护标记，通过 SDK 的通用 `Create` 接口推送。分类创建失败时不继续建库，普通制品流程和一次性制品文档迁移命令共用这套规则。分类服务入口验证 App 签名和用户身份，管理页面创建分类仍要求管理员。SDK 不生成制品业务内容，文档系统没有 `Initialize` 接口或对应逻辑。
+- ZPK 请求文档的 SDK 属于调用方，位于宿主 `common/service/w7/document`。宿主入口统一调用 `w7.InitW7Sdk`，其内部使用已有 AppID/AppSecret 初始化 `w7.DocumentSdk`，签名复用 `w7/base`。`app/respo/logic/document.go` 的 `FormulaDocument.Initialize` 先通过 SDK 调用通用 `POST /doc/openapi/category/create` 创建 `app` 分类，已存在时复用且不覆盖分类设置；随后生成 `app/制品标识` 引用、文档名称、首页正文与保护标记，通过 SDK 的通用 `Create` 接口推送。分类创建失败时不继续建库，普通制品流程和一次性制品文档迁移命令共用这套规则。分类服务入口验证 App 签名和用户身份，管理页面创建分类仍要求管理员。SDK 不生成制品业务内容，文档系统没有 `Initialize` 接口或对应逻辑。
 - 文档库通过 `public` 字段设置公有（1）或私有（0，默认），库内所有文件继承。创建及修改可见性时，文档 SDK 将所有者的维护权限及公有库的匿名读取权限提交给 permission 服务；删除库时清除对应资源的权限。文件读取、编辑、删除、排序和整体下载均请求 permission 校验，不依据本地 `public` 或管理员标记绕过远程验证。公有库允许匿名查看及下载，私有库按用户授权及原有 namespace 兜底规则校验；默认仅向所有者授予维护动作，管理员沿用现有放行规则。分类关联公共命名空间；登录用户可选择文档本地已有分类新建自己的文档库。文档当前使用 `push/pull`：所有者拥有两者，公有库额外授予匿名用户 `pull`；文档内部将 `pull` 对应查看和下载，将 `push` 对应编辑、新建、删除等维护操作。权限接口按格式校验动作名称，允许业务后续增加细粒度动作，文档当前操作保持不变。授权验证沿用镜像的完整流程，namespace 兜底为内置规则；调用前准备公共动作：镜像根据现有 `visible_type` 及是否跟随 namespace，先算出最终公共 `actions`；文档直接使用保存的匿名授权动作。权限分两层：上层按资源完整路径解析 namespace，优先选择当前用户的资源授权；未命中时，push 在资源配置过任何精确授权后停止兜底，pull 仍可使用 namespace 用户授权。底层只校验准备好的公共动作和用户授权，不查询 namespace，也不读取可见性枚举。文档当前仅传文档库资源校验，文件继承库权限，文档库公私状态独立设置，用户授权按内置 namespace 规则兜底。
 - `protected` 是库和文件的通用保护属性，不记录来源，普通用户接口中创始人也遵循保护限制。制品端提交库及 `index.md` 的保护属性，通过签名服务保存接口维护首页；其他文件默认可正常维护，文档后端不对 `index.md` 作特殊处理。
 - 元数据保存在数据库，正文通过 `storage.Store` 接口访问，本版启动时选择本机文件驱动并采用不可变内容键。接口统一提供写入、读取和关闭，业务不依赖具体驱动。数据库和正文目录均需持久化、备份。
-- 整体下载统一提供固定 ZIP 地址：`GET /zpk/document/download?ref=分类%2F文档标识`，基于一致内容快照导出整个文档库。公有库直接访问；私有库请求需携带 `X-Document-Token` 文档会话凭据，服务端代调可使用 `X-W7Panel-Access-Token` 面板 OIDC 凭据。地址不包含凭据，改为私有后原地址立即按私有规则校验；不生成临时分享链接，不需要 `download_link` 表。
+- 整体下载统一提供固定 ZIP 地址：`GET /doc/download?ref=分类%2F文档标识`，基于一致内容快照导出整个文档库。公有库直接访问；私有库请求需携带 `X-Document-Token` 文档会话凭据，服务端代调可使用 `X-W7Panel-Access-Token` 面板 OIDC 凭据。地址不包含凭据，改为私有后原地址立即按私有规则校验；不生成临时分享链接，不需要 `download_link` 表。
 - 公有库可通过 UI 的 `#/documents?ref=分类%2F文档标识` 地址匿名阅读；管理列表仍保持普通用户仅看自己的、创始人查看全局。
 
 ## 验证
@@ -114,10 +124,10 @@ npm run build -- --dest /private/tmp/zpk-document-ui-check/dist
 
 ## 独立服务配置
 
-- ZPK Chart 默认注入 `DOCUMENT_BASE_URL=http://w7-zpkdocument.default.svc.cluster.local:8001`；直接运行后端时可通过此环境变量配置文档服务地址，未设置则使用开发默认值 `http://127.0.0.1:8001`。固定接口前缀 `/zpk/document/openapi` 由文档 SDK 拼接。
+- ZPK Chart 默认注入 `DOCUMENT_BASE_URL=http://w7-zpkdocument.default.svc.cluster.local:8001`；直接运行后端时可通过此环境变量配置文档服务地址，未设置则使用开发默认值 `http://127.0.0.1:8001`。固定接口前缀 `/doc/openapi` 由文档 SDK 拼接。
 - 文档服务配置 `DOCUMENT_ZPK_URL`（ZPK 服务地址，默认 `http://127.0.0.1:8000`，固定 `/zpk` 前缀由 ZPK SDK 拼接）、`DOCUMENT_DB_PATH` 和 `DOCUMENT_STORAGE_PATH`。面板认证地址由 ZPK 配置。
 - 权限服务配置 `permission.server_url`，环境变量为 `DOCUMENT_PERMISSION_SERVER_URL`，默认 `http://127.0.0.1:8000`，固定接口前缀 `/zpk/v2/openapi/permission` 由权限 SDK 拼接。权限系统目前仍部署在 ZPK，文档只通过 HTTP SDK 访问，可单独配置服务地址。
-- 文档前端独立维护请求工具：从宿主 frontend props / roleConfig 取得当前文档微应用的代理前缀，追加 `/zpk/document`。登录与业务请求均只在匹配该代理 origin/path 时携带 `X-W7Panel-Token`（宿主 paneltoken，缺省读取 localStorage）；宿主 access_token 通过登录请求体换取文档 JWT，业务请求只向文档服务路径发送 `X-Document-Token`。文档 token 失效时合并并发登录，原请求只重试一次；面板代理拒绝和登录失败不会递归触发登录。不引用主项目 UI 代码。前端请求回归测试：在 `ui/` 中执行 `npm test`。
+- 文档前端独立维护请求工具：从宿主 frontend props / roleConfig 取得当前文档微应用的代理前缀，追加 `/doc`。登录与业务请求均只在匹配该代理 origin/path 时携带 `X-W7Panel-Token`（宿主 paneltoken，缺省读取 localStorage）；宿主 access_token 通过登录请求体换取文档 JWT，业务请求只向文档服务路径发送 `X-Document-Token`。文档 token 失效时合并并发登录，原请求只重试一次；面板代理拒绝和登录失败不会递归触发登录。不引用主项目 UI 代码。前端请求回归测试：在 `ui/` 中执行 `npm test`。
 - 文档登录返回 JWT 格式的 `data.token`，后续请求通过 `X-Document-Token` 携带；不创建或查询会话表，不使用 Cookie。`auth.token_ttl_seconds` 配置 token 的有效期，环境变量为 `DOCUMENT_TOKEN_TTL_SECONDS`（默认 86400 秒），到期后由前端使用宿主面板凭据重新登录。JWT 只保存 ZPK 返回的用户身份和签发、到期等字段，不保存面板访问凭据。使用 HS256，由 cloudnoauth 提供的 AppSecret 按文档登录用途派生签名密钥，同时验证 issuer、AppID audience 和时间字段；ZPK 与文档使用不同用途密钥及 issuer，登录 token 不能互换。
 - 两个系统各自部署、各自持久化数据库，不共享 SQLite 文件或目录。分类、文档库的 `user_id` 仍为 ZPK 的整数用户 ID，不复制用户表、不新增文档用户表。ZPK 用户接口按面板稳定 `sub` 解析或创建现有用户，不接受客户端指定用户 ID 或角色。
 - 文档服务启动仅初始化数据表，不预建 `app` 分类。制品首次推送文档时由制品侧通过文档 SDK 创建分类，文档分类逻辑通过 ZPK SDK 确认或创建公共空间，成功后保存本地分类；该阶段需要 ZPK namespace 服务可用。分类已存在时直接复用，建库只检查本地分类关联，不反复请求远程 namespace；不调整制品 OCI 存储或历史包的定位。ZPK 不直接写入文档分类或权限表。
@@ -171,7 +181,7 @@ ZPK 的 OIDC 登录同样返回 JWT，不在服务端保存登录态。制品前
 
 | 调用方向 | 接口与校验 |
 | --- | --- |
-| ZPK → 文档 | 调用方 SDK 在 `common/service/w7/document`，复用 `w7/base.Base` 的签名；`/zpk/document/openapi` 的路由先验签，再执行原用户认证及文档业务授权 |
+| ZPK → 文档 | 调用方 SDK 在 `common/service/w7/document`，复用 `w7/base.Base` 的签名；`/doc/openapi` 的路由先验签，再执行原用户认证及文档业务授权 |
 | 文档 → ZPK | `/zpk/v2/openapi/user/current` 直接验证面板 access_token，不要求应用签名；公共 namespace 的 get/create/rename/delete 接口均验签 |
 | 文档 → 权限服务 | `/zpk/v2/openapi/permission/check`、`/set`、`/get` 均验签，业务数据中的 user_id 由已认证的文档服务提供 |
 

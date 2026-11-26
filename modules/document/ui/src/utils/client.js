@@ -3,7 +3,7 @@ import axios from 'axios';
 import { getDocumentBaseURL, getMicroAppProxyBase, isBaseRequest } from './request-base';
 import { getPanelToken, getWujieAccessToken } from './panel-token';
 
-function createDocumentClient(request, baseURL) {
+function createDocumentClient(request) {
     async function post(path, params = {}) {
         const response = await request({ method: 'POST', url: path, data: params });
         if (!response || response.status !== 200 || response.data?.error)
@@ -12,10 +12,6 @@ function createDocumentClient(request, baseURL) {
     }
     return {
         post,
-        downloadURL(reference) {
-            return new URL(baseURL.replace(/\/$/, '') + '/download?ref=' + encodeURIComponent(reference), location.origin)
-                .href;
-        },
     };
 }
 
@@ -70,7 +66,7 @@ export function createStandaloneClient(baseURL = getDocumentBaseURL()) {
         }
     }
     return {
-        ...createDocumentClient(request, baseURL),
+        ...createDocumentClient(request),
         async start() {
             if (getWujieAccessToken()) await login();
             return this.post('/user');

@@ -34,6 +34,9 @@ permission:
   # 留空时使用 zpk.baseURL。
   serverURL: "http://w7-zpkv2.default.svc.cluster.local:8000"
 
+# 通过文档子应用启动参数引用主应用的 %DOMAIN_SSL_URL%，包含 http(s)://。
+domainURL: ""
+
 auth:
   tokenTTLSeconds: 86400
 

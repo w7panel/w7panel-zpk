@@ -1,10 +1,6 @@
 <template>
     <div class="document-workbench">
         <a-spin :loading="loading || saving" class="workbench-spin">
-            <div class="document-actions">
-                <span class="document-reference">{{ libraryRef }}</span>
-                <a-button @click="linksVisible = true">整体下载地址</a-button>
-            </div>
             <div class="content-box">
                 <div class="sidebar df-s0">
                     <div class="sidebar-title df ai-c jc-b">
@@ -120,10 +116,6 @@
             </div>
         </a-spin>
 
-        <a-modal v-model:visible="linksVisible" title="整体下载地址" :footer="false">
-            <a-alert>公有文档库可直接下载；私有文档库需通过请求头携带所有者或创始人的登录凭据。</a-alert>
-            <a-input :model-value="client.downloadURL(libraryRef)" readonly class="mt-16" />
-        </a-modal>
         <a-modal v-model:visible="createDialog.show" title="添加文件" :width="560">
             <div class="create-form">
                 <div class="form-row">
@@ -181,7 +173,6 @@ export default {
             canCreate: false,
             selectionVersion: 0,
             disposed: false,
-            linksVisible: false,
             saving: false,
             docsFiles: [],
             activeDocPath: '',
@@ -462,18 +453,6 @@ export default {
 }
 .mt-16 {
     margin-top: 16px;
-}
-
-.document-actions {
-    display: flex;
-    gap: 10px;
-    align-items: center;
-    padding: 12px 0;
-    flex-wrap: wrap;
-}
-.document-reference {
-    color: #86909c;
-    margin-right: auto;
 }
 
 .document-workbench {

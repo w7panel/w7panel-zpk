@@ -54,7 +54,7 @@ func (c *Client) call(ctx context.Context, token, route string, body any, out an
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.BaseUrl+"/zpk/document/openapi"+route, bytes.NewReader(data))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.BaseUrl+"/doc/openapi"+route, bytes.NewReader(data))
 	if err != nil {
 		return err
 	}

@@ -45,3 +45,8 @@ func (c Download) send(ctx *gin.Context, f *os.File) {
 	ctx.Status(200)
 	_, _ = io.Copy(ctx.Writer, f)
 }
+
+func (c Download) URL(ctx *gin.Context) {
+	address, err := (logic.Download{}).URL()
+	c.Respond(ctx, gin.H{"url": address}, err)
+}

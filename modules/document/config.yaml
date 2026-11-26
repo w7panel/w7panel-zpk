@@ -32,4 +32,5 @@ permission:
 auth:
   token_ttl_seconds: ${DOCUMENT_TOKEN_TTL_SECONDS-86400}
 document:
+  domain_url: ${DOMAIN_URL-}
   storage_path: ${DOCUMENT_STORAGE_PATH-/tmp/document/objects}

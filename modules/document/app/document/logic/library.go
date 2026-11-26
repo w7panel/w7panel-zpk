@@ -65,7 +65,7 @@ func (l Library) Create(ctx context.Context, user zpk.User, library entity.Docum
 	if library.UserID != user.ID && !user.Admin {
 		return nil, permission.ErrDenied
 	}
-	if library.UserID == user.ID {
+	if library.UserID == user.ID && user.Username != "" {
 		library.Username = user.Username
 	}
 	initialFiles := make([]*entity.DocumentFile, 0, len(files))

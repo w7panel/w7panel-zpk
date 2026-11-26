@@ -91,14 +91,13 @@ func (p *Provider) registerRoutes(engine *gin.Engine) {
 	auth.POST("/file/delete", controller.File{}.Delete)
 	auth.POST("/file/order", controller.File{}.Order)
 
-	openapi := root.Group("/openapi", middleware.App{}.Process, middleware.Auth{}.Process)
-	openapi.POST("/user", controller.Login{}.CurrentUser)
+	openapi := root.Group("/openapi", middleware.App{}.Process, middleware.AppUser{}.Process)
+	openapi.POST("/file/save", controller.File{}.SaveFromApp)
 	openapi.POST("/category/create", controller.Category{}.Create)
 	openapi.POST("/library/info", controller.Library{}.Info)
 	openapi.POST("/library/create", controller.Library{}.Create)
 	openapi.POST("/file/list", controller.File{}.List)
 	openapi.POST("/file/read", controller.File{}.Read)
-	openapi.POST("/file/save", controller.File{}.SaveFromApp)
 	openapi.POST("/file/delete", controller.File{}.Delete)
 	openapi.POST("/file/order", controller.File{}.Order)
 }

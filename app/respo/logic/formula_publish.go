@@ -3,6 +3,7 @@ package logic
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -111,6 +112,9 @@ func (p FormulaPublish) PublishFormula(consoleUid int32, formula *formulalogic.F
 	}()
 	if helm.IsFormulaHelmPackPending(formula.Name, formula.Version) {
 		return nil
+	}
+	if err = (FormulaDocument{}).SyncHomepage(context.Background(), formula); err != nil {
+		return fmt.Errorf("同步默认文档首页失败：%w", err)
 	}
 	if packhelm {
 		depot, depotErr := formulalogic.NewDepot()

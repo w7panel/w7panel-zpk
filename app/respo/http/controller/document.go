@@ -22,13 +22,13 @@ func (c FormulaDocument) Files(ctx *gin.Context) {
 		return
 	}
 	documents := logic.FormulaDocument{}
-	token := (userlogic.Login{}).PanelAccessToken(ctx)
-	reference, err := documents.Ensure(ctx.Request.Context(), token, params.Identifie, (userlogic.User{}).GetUser(ctx))
+	user := (userlogic.User{}).GetUser(ctx)
+	reference, err := documents.Ensure(ctx.Request.Context(), params.Identifie, user)
 	if err != nil {
 		c.documentError(ctx, err)
 		return
 	}
-	files, err := documents.Files(ctx.Request.Context(), token, reference)
+	files, err := documents.Files(ctx.Request.Context(), user.ID, reference)
 	if err != nil {
 		c.documentError(ctx, err)
 		return
@@ -52,10 +52,10 @@ func (c FormulaDocument) Save(ctx *gin.Context) {
 		return
 	}
 	documents := logic.FormulaDocument{}
-	token := (userlogic.Login{}).PanelAccessToken(ctx)
-	reference, err := documents.Ensure(ctx.Request.Context(), token, params.Identifie, (userlogic.User{}).GetUser(ctx))
+	user := (userlogic.User{}).GetUser(ctx)
+	reference, err := documents.Ensure(ctx.Request.Context(), params.Identifie, user)
 	if err == nil {
-		err = documents.Save(ctx.Request.Context(), token, reference, filename, sanitizeFormulaAttachContent(params.Content))
+		err = documents.Save(ctx.Request.Context(), user.ID, reference, filename, sanitizeFormulaAttachContent(params.Content))
 	}
 	if err != nil {
 		c.documentError(ctx, err)

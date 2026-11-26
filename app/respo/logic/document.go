@@ -7,6 +7,7 @@ import (
 	"path"
 	"strings"
 
+	formulalogic "github.com/w7panel/w7panel-zpk/app/respo/logic/formula"
 	"github.com/w7panel/w7panel-zpk/common/accessor"
 	"github.com/w7panel/w7panel-zpk/common/dao"
 	"github.com/w7panel/w7panel-zpk/common/entity"
@@ -18,8 +19,8 @@ import (
 // FormulaDocument is the artifact-side integration. All document operations go through its SDK.
 type FormulaDocument struct{}
 
-func (l FormulaDocument) Initialize(ctx context.Context, token string, formula *entity.Formula) (string, error) {
-	if err := w7.DocumentSdk.CreateCategory(ctx, token, documentsdk.CreateCategory{Identifie: "app", Name: "制品文档"}); err != nil {
+func (l FormulaDocument) Initialize(ctx context.Context, formula *entity.Formula) (string, error) {
+	if err := w7.DocumentSdk.CreateCategory(ctx, formula.UserID, documentsdk.CreateCategory{Identifie: "app", Name: "制品文档"}); err != nil {
 		var responseError *documentsdk.ResponseError
 		if !errors.As(err, &responseError) || responseError.StatusCode != http.StatusConflict {
 			return "", err
@@ -30,13 +31,21 @@ func (l FormulaDocument) Initialize(ctx context.Context, token string, formula *
 		title = formula.Name
 	}
 	reference := "app/" + formula.Name
-	homepage := "# " + title + "\n\n应用标识：" + formula.Name + "\n"
+	depot, err := formulalogic.NewDepot()
+	if err != nil {
+		return "", err
+	}
+	item, err := depot.GetFormula(formula.Name, "", nil)
+	if err != nil {
+		return "", err
+	}
+	homepage := buildDocumentHomepage(item)
 	file := documentsdk.FileContent{File: documentsdk.File{Path: "index.md", Title: "首页", Protected: 1}, Content: homepage}
 	owner, err := (userlogic.User{}).GetById(int(formula.UserID))
 	if err != nil {
 		return "", err
 	}
-	err = w7.DocumentSdk.Create(ctx, token, documentsdk.CreateLibrary{
+	err = w7.DocumentSdk.Create(ctx, formula.UserID, documentsdk.CreateLibrary{
 		Ref: reference, Name: title, OwnerID: formula.UserID, OwnerName: owner.Username, Protected: 1,
 		Files: []documentsdk.FileContent{file},
 	})
@@ -47,7 +56,7 @@ func (l FormulaDocument) Initialize(ctx context.Context, token string, formula *
 	if !errors.As(err, &responseError) || responseError.StatusCode != http.StatusConflict {
 		return "", err
 	}
-	if err := w7.DocumentSdk.SaveFile(ctx, token, reference, file); err != nil {
+	if err := w7.DocumentSdk.SaveFile(ctx, formula.UserID, reference, file); err != nil {
 		return "", err
 	}
 	return reference, nil
@@ -58,8 +67,8 @@ func isDocumentMarkdownPath(filename string) bool {
 }
 
 // Files returns library-relative paths without mixing in artifact assets.
-func (l FormulaDocument) Files(ctx context.Context, token, reference string) (map[string]string, error) {
-	tree, err := w7.DocumentSdk.Tree(ctx, token, reference)
+func (l FormulaDocument) Files(ctx context.Context, userID int32, reference string) (map[string]string, error) {
+	tree, err := w7.DocumentSdk.Tree(ctx, userID, reference)
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +78,7 @@ func (l FormulaDocument) Files(ctx context.Context, token, reference string) (ma
 		if !isDocumentMarkdownPath(file.Path) {
 			continue
 		}
-		content, err := w7.DocumentSdk.Read(ctx, token, reference, file.Path)
+		content, err := w7.DocumentSdk.Read(ctx, userID, reference, file.Path)
 		if err != nil {
 			return nil, err
 		}
@@ -80,26 +89,26 @@ func (l FormulaDocument) Files(ctx context.Context, token, reference string) (ma
 	return files, nil
 }
 
-func (l FormulaDocument) Save(ctx context.Context, token, reference, filename, content string) error {
+func (l FormulaDocument) Save(ctx context.Context, userID int32, reference, filename, content string) error {
 	if filename != ".order" && !isDocumentMarkdownPath(filename) {
 		return errors.New("不支持的制品文档路径")
 	}
 	if filename == ".order" {
-		tree, err := w7.DocumentSdk.Tree(ctx, token, reference)
+		tree, err := w7.DocumentSdk.Tree(ctx, userID, reference)
 		if err != nil {
 			return err
 		}
-		return l.orderDocuments(ctx, token, reference, content, tree)
+		return l.orderDocuments(ctx, userID, reference, content, tree)
 	}
 	// The artifact editor uses empty content to request deletion.
 	if content == "" {
-		return w7.DocumentSdk.Delete(ctx, token, reference, filename)
+		return w7.DocumentSdk.Delete(ctx, userID, reference, filename)
 	}
 	title := strings.TrimSuffix(filename, path.Ext(filename))
-	return w7.DocumentSdk.Save(ctx, token, reference, filename, title, content)
+	return w7.DocumentSdk.Save(ctx, userID, reference, filename, title, content)
 }
 
-func (l FormulaDocument) orderDocuments(ctx context.Context, token, reference, content string, tree documentsdk.FileTree) error {
+func (l FormulaDocument) orderDocuments(ctx context.Context, userID int32, reference, content string, tree documentsdk.FileTree) error {
 	existing := make(map[string]bool, len(tree.Files))
 	order := make([]string, 0, len(tree.Files))
 	for _, file := range tree.Files {
@@ -125,10 +134,10 @@ func (l FormulaDocument) orderDocuments(ctx context.Context, token, reference, c
 			order = append(order, file.Path)
 		}
 	}
-	return w7.DocumentSdk.Order(ctx, token, reference, order)
+	return w7.DocumentSdk.Order(ctx, userID, reference, order)
 }
 
-func (l FormulaDocument) Ensure(ctx context.Context, token, identifie string, user *entity.RegistryUser) (string, error) {
+func (l FormulaDocument) Ensure(ctx context.Context, identifie string, user *entity.RegistryUser) (string, error) {
 	query := dao.Q.Formula
 	formula, err := query.WithContext(ctx).Where(query.Name.Eq(strings.ReplaceAll(identifie, "_", "-"))).First()
 	if err != nil {
@@ -140,7 +149,7 @@ func (l FormulaDocument) Ensure(ctx context.Context, token, identifie string, us
 	if formula.Setting != nil && formula.Setting.DocumentRef != "" {
 		return formula.Setting.DocumentRef, nil
 	}
-	reference, err := l.Initialize(ctx, token, formula)
+	reference, err := l.Initialize(ctx, formula)
 	if err != nil {
 		return "", err
 	}
@@ -158,4 +167,15 @@ func (l FormulaDocument) Ensure(ctx context.Context, token, identifie string, us
 		return "", err
 	}
 	return reference, nil
+}
+
+// SyncHomepage updates only an already linked library, leaving user documents untouched.
+func (FormulaDocument) SyncHomepage(ctx context.Context, item *formulalogic.Formula) error {
+	if item.Setting == nil || item.Setting.DocumentRef == "" {
+		return nil
+	}
+	file := documentsdk.FileContent{
+		File: documentsdk.File{Path: "index.md", Title: "首页", Protected: 1}, Content: buildDocumentHomepage(item),
+	}
+	return w7.DocumentSdk.SaveFile(ctx, item.UserId, item.Setting.DocumentRef, file)
 }

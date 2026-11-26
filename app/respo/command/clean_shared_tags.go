@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"strings"
 
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -59,7 +58,6 @@ func (CleanSharedTags) run(cmd *cobra.Command, _ []string) error {
 	if err != nil {
 		return err
 	}
-	token := strings.TrimSpace(os.Getenv("W7PANEL_ACCESS_TOKEN"))
 	query := dao.Q.Formula
 	var lastID int32
 	var found bool
@@ -94,7 +92,7 @@ func (CleanSharedTags) run(cmd *cobra.Command, _ []string) error {
 			if err != nil {
 				return err
 			}
-			if err := requireSharedFilesMigrated(cmd.Context(), token, item, files); err != nil {
+			if err := requireSharedFilesMigrated(cmd.Context(), item, files); err != nil {
 				return fmt.Errorf("制品 %s 不可清理: %w", item.Name, err)
 			}
 			if err := cleanSharedTag(cmd.Context(), repository, descriptor, dryRun); err != nil {
@@ -120,7 +118,7 @@ func (CleanSharedTags) run(cmd *cobra.Command, _ []string) error {
 	return nil
 }
 
-func requireSharedFilesMigrated(ctx context.Context, token string, item *entity.Formula, files map[string]string) error {
+func requireSharedFilesMigrated(ctx context.Context, item *entity.Formula, files map[string]string) error {
 	if item.Readme == nil {
 		return errors.New("请先运行 respo:migrate-documents 迁移简介和文档")
 	}
@@ -140,7 +138,7 @@ func requireSharedFilesMigrated(ctx context.Context, token string, item *entity.
 	if item.Setting == nil || item.Setting.DocumentRef == "" {
 		return errors.New("旧文档尚未迁移")
 	}
-	tree, err := w7.DocumentSdk.Tree(ctx, token, item.Setting.DocumentRef)
+	tree, err := w7.DocumentSdk.Tree(ctx, item.UserID, item.Setting.DocumentRef)
 	if err != nil {
 		return err
 	}

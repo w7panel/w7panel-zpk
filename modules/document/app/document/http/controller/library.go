@@ -39,7 +39,7 @@ func (c Library) Create(ctx *gin.Context) {
 		Path      string `json:"path" binding:"required,document_path"`
 		Title     string `json:"title" binding:"maxbytes=255"`
 		Content   string `json:"content" binding:"maxbytes=4194304"`
-		Protected int32  `json:"protected" binding:"oneof=0 1"`
+		Protected int32  `json:"protected" binding:"oneof=0 1 2"`
 	}
 	type ParamsValidate struct {
 		Ref         string               `json:"ref" binding:"required,document_ref"`

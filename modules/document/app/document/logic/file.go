@@ -52,8 +52,8 @@ func (l File) List(ctx context.Context, user zpk.User, ref string) (Tree, error)
 		return Tree{}, e
 	}
 	for _, file := range files {
-		canChange := out.CanCreate && file.Protected == 0
-		out.Files = append(out.Files, FileInfo{file.Path, file.Title, file.Size, file.Position, file.Protected, canChange, canChange})
+		canChange := out.CanCreate && file.Protected != 1
+		out.Files = append(out.Files, FileInfo{file.Path, file.Title, file.Size, file.Position, file.Protected, canChange, out.CanCreate && file.Protected == 0})
 	}
 	return out, nil
 }
@@ -178,7 +178,7 @@ func (l File) Delete(ctx context.Context, user zpk.User, ref, p string) error {
 		if err != nil {
 			return err
 		}
-		if file.Protected == 1 {
+		if file.Protected != 0 {
 			return permission.ErrDenied
 		}
 		r, err := q.WithContext(ctx).Where(q.ID.Eq(file.ID)).Delete()

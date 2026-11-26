@@ -8,6 +8,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"strings"
 
@@ -70,10 +71,6 @@ func (hc *HelmPack) processHelmPkg(rootDir string) error {
 			return err
 		}
 
-		if err = hc.applyHelmConfigOverrides(rootDir); err != nil {
-			return err
-		}
-
 		dependHelmYamlInHelm = true
 	}
 
@@ -107,7 +104,74 @@ func (hc *HelmPack) processHelmPkg(rootDir string) error {
 		}
 	}
 
+	if err := hc.applyHelmConfigOverrides(rootDir); err != nil {
+		return err
+	}
 	return hc.applyHelmPackageAffinity(rootDir)
+}
+
+// Append the confirmed storage constraint, preserving author affinity,
+// anti-affinity, node affinity, and any explicit values overrides.
+func (hc *HelmPack) applyHelmPackageAffinity(rootDir string) error {
+	storageTerms := hc.sharedStorageAffinityTerms()
+	if len(storageTerms) == 0 {
+		return nil
+	}
+	valuesPath := filepath.Join(rootDir, "values.yaml")
+	values := make(map[string]interface{})
+	if function.FileExists(valuesPath) {
+		data, err := os.ReadFile(valuesPath)
+		if err != nil {
+			return err
+		}
+		if err := yaml.Unmarshal(data, &values); err != nil {
+			return err
+		}
+	}
+	if values == nil {
+		values = make(map[string]interface{})
+	}
+	getMap := func(parent map[string]interface{}, key string) (map[string]interface{}, error) {
+		if parent[key] == nil {
+			parent[key] = make(map[string]interface{})
+		}
+		value, ok := parent[key].(map[string]interface{})
+		if !ok {
+			return nil, fmt.Errorf("共享 PVC 亲和性要求 %s 为对象", key)
+		}
+		return value, nil
+	}
+	affinity, err := getMap(values, "affinity")
+	if err != nil {
+		return err
+	}
+	podAffinity, err := getMap(affinity, "podAffinity")
+	if err != nil {
+		return err
+	}
+	const key = "requiredDuringSchedulingIgnoredDuringExecution"
+	var terms []interface{}
+	if podAffinity[key] != nil {
+		var ok bool
+		terms, ok = podAffinity[key].([]interface{})
+		if !ok {
+			return fmt.Errorf("共享 PVC 亲和性要求 %s 为列表", key)
+		}
+	}
+	for _, term := range storageTerms {
+		exists := false
+		for _, existing := range terms {
+			if reflect.DeepEqual(existing, term) {
+				exists = true
+				break
+			}
+		}
+		if !exists {
+			terms = append(terms, term)
+		}
+	}
+	podAffinity[key] = terms
+	return writeYAMLFile(valuesPath, values)
 }
 
 func (hc *HelmPack) applyHelmConfigOverrides(rootDir string) error {
@@ -123,16 +187,6 @@ func (hc *HelmPack) applyHelmConfigOverrides(rootDir string) error {
 		return nil
 	}
 	return mergeHelmValuesFile(rootDir, overrides)
-}
-
-func (hc *HelmPack) applyHelmPackageAffinity(rootDir string) error {
-	affinity := hc.getSharedStorageWorkloadAffinityValues()
-	if len(affinity) == 0 {
-		return nil
-	}
-	return mergeHelmValuesFile(rootDir, map[string]interface{}{
-		"affinity": affinity,
-	})
 }
 
 func mergeHelmValuesFile(rootDir string, overrides map[string]interface{}) error {

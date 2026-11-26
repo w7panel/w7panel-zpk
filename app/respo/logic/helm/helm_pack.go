@@ -68,6 +68,10 @@ type HelmPack struct {
 	ChartVersion           string
 	IsSubFormula           bool
 	SharedStorageTargetApp string
+	allManifest            []*logic2.Manifest
+	affinityDependencies   map[string][]string
+	affinityTargets        []string
+	affinityError          error
 	Sidecars               []HelmSidecar
 	sharedSidecarsDir      string
 	MicroAppPresentation   MicroAppPresentation
@@ -85,17 +89,30 @@ type helmValuesOptions struct {
 func NewHelmPack(manifest logic2.Manifest, subManifests []*logic2.Manifest, outputDir, chartVersion string, isSubFormula bool, sharedStorageTargetApp string) *HelmPack {
 	formulalogic.PopulateManifestStartParamsWithDependencyReleaseNames(&manifest)
 	subManifestMap := make(map[string]logic2.Manifest)
+	hasRoot := false
 	if subManifests != nil {
 		for _, item := range subManifests {
+			if item == nil {
+				continue
+			}
 			if item.Application.Identifie != manifest.Application.Identifie {
 				subManifestMap[item.Application.Identifie] = *item
+			} else {
+				hasRoot = true
 			}
 		}
 	}
 
-	return &HelmPack{
+	// Production passes the already sorted Formula.AllManifest. Keep that
+	// exact list for app[n] references rather than reconstructing it from a map.
+	allManifest := subManifests
+	if !hasRoot {
+		allManifest = append([]*logic2.Manifest{&manifest}, subManifests...)
+	}
+	packer := &HelmPack{
 		Manifest:               manifest,
 		SubManifest:            subManifestMap,
+		allManifest:            allManifest,
 		OutputDir:              outputDir,
 		ChartVersion:           chartVersion,
 		IngressNames:           make(map[string]string),
@@ -103,6 +120,11 @@ func NewHelmPack(manifest logic2.Manifest, subManifests []*logic2.Manifest, outp
 		IsSubFormula:           isSubFormula,
 		SharedStorageTargetApp: sharedStorageTargetApp,
 	}
+	if !isSubFormula {
+		packer.affinityDependencies, packer.affinityError = packer.detectAffinityDependencies()
+		packer.affinityTargets = packer.affinityDependencies[manifest.Application.Identifie]
+	}
+	return packer
 }
 
 func PackManifestToHelm(manifest logic2.Manifest, subManifest []*logic2.Manifest, outputDir string, isSubFormula bool, sharedStorageTargetApp string) error {
@@ -150,6 +172,9 @@ func PackFormulaToHelmAndPack(formula formulalogic.Formula, rePack bool) (string
 }
 
 func (hc *HelmPack) PackToHelm() error {
+	if hc.affinityError != nil {
+		return hc.affinityError
+	}
 	// 2. 创建主 Chart 目录结构
 	helmDir := filepath.Join(hc.OutputDir, hc.Manifest.Application.Identifie)
 	templatesDir := filepath.Join(helmDir, "templates")
@@ -249,7 +274,6 @@ func (hc *HelmPack) generateSubCharts(rootDir string) error {
 	if len(hc.SubManifest) == 0 {
 		return nil
 	}
-	mainChartName := hc.Manifest.Application.Identifie
 	for _, subManifest := range hc.SubManifest {
 		for _, sidecar := range hc.Sidecars {
 			if subManifest.Application.Identifie == sidecar.Chart {
@@ -263,7 +287,8 @@ func (hc *HelmPack) generateSubCharts(rootDir string) error {
 		if subManifest.Platform.Helm.Version != "" {
 			chartVersion = subManifest.Platform.Helm.Version
 		}
-		child := NewHelmPack(subManifest, nil, rootDir, chartVersion, true, mainChartName)
+		child := NewHelmPack(subManifest, nil, rootDir, chartVersion, true, "")
+		child.affinityTargets = hc.affinityDependencies[subManifest.Application.Identifie]
 		child.sharedSidecarsDir = rootDir
 		if subManifest.Application.Type != logic2.GatewayPluginApp {
 			child.Sidecars = append([]HelmSidecar(nil), hc.Sidecars...)
@@ -559,14 +584,24 @@ func (hc *HelmPack) generateValuesYaml(rootDir string, options helmValuesOptions
 	return writeYAMLFile(filePath, values)
 }
 
+func (hc *HelmPack) sharedStorageAffinityTerms() []interface{} {
+	targets := hc.affinityTargets
+	if len(targets) == 0 && hc.SharedStorageTargetApp != "" {
+		targets = []string{hc.SharedStorageTargetApp}
+	}
+	var terms []interface{}
+	for _, target := range targets {
+		terms = append(terms, podAffinityTermByGroupName("{{ .Release.Name }}", target))
+	}
+	return terms
+}
+
 func (hc *HelmPack) getSharedStorageWorkloadAffinityValues() map[string]interface{} {
-	if hc.SharedStorageTargetApp == "" {
+	terms := hc.sharedStorageAffinityTerms()
+	if len(terms) == 0 {
 		return nil
 	}
-	// SharedStorageTargetApp remains the parent artifact identifier. Add the
-	// current release group as an additional selector expression so repeated
-	// installations cannot satisfy each other's RWO PVC affinity.
-	return podAffinityByGroupName("{{ .Release.Name }}", hc.SharedStorageTargetApp)
+	return map[string]interface{}{"podAffinity": map[string]interface{}{"requiredDuringSchedulingIgnoredDuringExecution": terms}}
 }
 
 func (hc *HelmPack) getDefaultJobAffinityValues() map[string]interface{} {

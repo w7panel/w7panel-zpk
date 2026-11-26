@@ -162,6 +162,7 @@ const normalizePath = (path = '') =>
 const isDocMarkdownPath = (path = '') => /\.md$/i.test(normalizePath(path));
 export default {
     name: 'DocumentWorkbench',
+    emits: ['library-loaded'],
     components: { IconDelete, IconEdit, IconPlus, MarkdownEditor },
     props: {
         client: { type: Object, required: true },
@@ -215,6 +216,7 @@ export default {
             try {
                 const result = await this.client.post('/file/list', { ref: this.libraryRef });
                 if (this.disposed) return;
+                this.$emit('library-loaded', result.name);
                 this.persistEditorContent();
                 const cache = new Map(this.docsFiles.map((file) => [file.path, file]));
                 this.canCreate = result.can_create;

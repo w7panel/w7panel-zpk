@@ -1,11 +1,18 @@
 <template>
-    <main class="document-page">
+    <main class="document-page" :class="{ 'document-page-editing': selectedRef }">
         <template v-if="selectedRef">
             <div class="document-page-header">
-                <a-button @click="closeWorkbench">返回文档库</a-button>
-                <span class="document-reference">{{ selectedRef }}</span>
+                <button class="document-back" type="button" aria-label="返回文档库" @click="closeWorkbench">
+                    <icon-arrow-left />
+                </button>
+                <a-breadcrumb>
+                    <a-breadcrumb-item><a class="document-back-label" @click="closeWorkbench">文档库</a></a-breadcrumb-item>
+                    <a-breadcrumb-item>{{ selectedName }}</a-breadcrumb-item>
+                </a-breadcrumb>
             </div>
-            <workbench :key="selectedRef" :client="client" :library-ref="selectedRef" />
+            <div class="document-editor-content">
+                <workbench :key="selectedRef" :client="client" :library-ref="selectedRef" @library-loaded="selectedName = $event" />
+            </div>
         </template>
         <template v-else>
             <div class="document-page-toolbar">
@@ -29,11 +36,17 @@
             </div>
             <a-table :data="libraries" :loading="loading" :pagination="false" row-key="id">
                 <template #columns>
-                    <a-table-column title="文档库"
-                        ><template #cell="{ record }"
-                            ><a-link @click="selectedRef = reference(record)">{{ record.name }}</a-link></template
-                        ></a-table-column
-                    >
+                    <a-table-column title="文档库" :width="360">
+                        <template #cell="{ record }">
+                            <a-link @click="selectedRef = reference(record)">{{ record.name }}</a-link>
+                            <div v-if="downloadBaseURL" class="document-download-address">
+                                <span :title="downloadURL(record)">{{ downloadURL(record) }}</span>
+                                <a-button type="text" size="mini" aria-label="复制下载地址" @click="copyDownloadURL(record)">
+                                    <template #icon><icon-copy /></template>
+                                </a-button>
+                            </div>
+                        </template>
+                    </a-table-column>
                     <a-table-column title="分类">
                         <template #cell="{ record }">{{ categoryName(record.category) }}</template>
                     </a-table-column>
@@ -47,7 +60,6 @@
                     </a-table-column>
                     <a-table-column title="操作"
                         ><template #cell="{ record }">
-                            <a-button type="text" @click="showDownloadURL(record)">整体下载地址</a-button>
                             <a-button type="text" @click="openEdit(record)">编辑</a-button>
                             <a-popconfirm
                                 content="确认删除文档库？"
@@ -74,12 +86,6 @@
                 @change="loadLibraries"
             />
         </template>
-        <a-modal v-model:visible="download.visible" title="整体下载地址" :footer="false">
-            <a-alert>公有文档库可直接下载；私有文档库需通过请求头携带所有者或创始人的登录凭据。</a-alert>
-            <a-input :model-value="download.url" readonly style="margin-top: 16px">
-                <template #append><a-button @click="copyDownloadURL">复制</a-button></template>
-            </a-input>
-        </a-modal>
         <a-modal v-model:visible="form.visible" :title="form.edit ? '编辑文档库' : '新建文档库'">
             <a-form :model="form" layout="vertical">
                 <a-form-item v-if="!form.edit" label="分类"
@@ -109,21 +115,23 @@
 </template>
 <script>
 import { Message } from '@arco-design/web-vue';
+import { IconArrowLeft, IconCopy } from '@arco-design/web-vue/es/icon';
 import Workbench from '../components/workbench.vue';
 export default {
     name: 'DocumentLibraries',
-    components: { Workbench },
+    components: { Workbench, IconArrowLeft, IconCopy },
     props: { client: { type: Object, required: true }, user: { type: Object, default: () => ({}) } },
     data: () => ({
         categories: [],
         libraries: [],
-        download: { visible: false, url: '' },
+        downloadBaseURL: '',
         category: '',
         page: 1,
         total: 0,
         loading: false,
         saving: false,
         selectedRef: '',
+        selectedName: '',
         form: {},
     }),
     async mounted() {
@@ -143,6 +151,7 @@ export default {
             },
         },
         selectedRef(reference) {
+            this.selectedName = this.libraries.find((library) => this.reference(library) === reference)?.name || '';
             if (!this.$router || reference === String(this.$route.query.ref || '')) return;
             const query = { ...this.$route.query };
             if (reference) query.ref = reference;
@@ -151,19 +160,14 @@ export default {
         },
     },
     methods: {
-        async showDownloadURL(record) {
-            try {
-                const result = await this.client.post('/download-url');
-                const url = new URL(result.url);
-                url.searchParams.set('ref', this.reference(record));
-                this.download = { visible: true, url: url.href };
-            } catch (error) {
-                Message.error(error.message);
-            }
+        downloadURL(record) {
+            const url = new URL(this.downloadBaseURL);
+            url.searchParams.set('ref', this.reference(record));
+            return url.href;
         },
-        async copyDownloadURL() {
+        async copyDownloadURL(record) {
             try {
-                await navigator.clipboard.writeText(this.download.url);
+                await navigator.clipboard.writeText(this.downloadURL(record));
                 Message.success('下载地址已复制');
             } catch {
                 Message.error('复制失败，请手动复制下载地址');
@@ -186,6 +190,9 @@ export default {
                 this.libraries = result.list || [];
                 this.total = result.total;
                 this.page = page;
+                if (!this.downloadBaseURL) {
+                    this.downloadBaseURL = (await this.client.post('/download-url')).url;
+                }
             } catch (error) {
                 Message.error(error.message);
             } finally {
@@ -256,14 +263,59 @@ export default {
     min-height: calc(100vh - 2px);
     box-sizing: border-box;
 }
+.document-page-editing {
+    padding: 0;
+}
 .document-page-header {
     display: flex;
     align-items: center;
-    gap: 12px;
-    margin-bottom: 20px;
+    min-height: 56px;
+    padding: 0 24px;
+    box-sizing: border-box;
+    background: #fff;
 }
-.document-reference {
+.document-back {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    margin-right: 4px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #0052d9;
+    font-size: 20px;
+    cursor: pointer;
+}
+.document-back-label {
+    color: #999;
+    font-weight: 400;
+    cursor: pointer;
+}
+.document-page-header :deep(.arco-breadcrumb-item) {
+    color: #333;
+    font-weight: 400;
+}
+.document-editor-content {
+    padding: 0 20px 20px;
+}
+.document-download-address {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 4px;
     color: #86909c;
+    font-size: 12px;
+}
+.document-download-address span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.document-download-address .arco-btn {
+    flex-shrink: 0;
 }
 .document-page-toolbar {
     display: flex;

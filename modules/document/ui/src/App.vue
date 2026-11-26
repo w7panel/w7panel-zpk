@@ -14,6 +14,18 @@ export default {
         loading: true,
         error: '',
     }),
+    created() {
+        this.panelRouteBus = window.$wujie?.bus;
+        this.panelRouteBus?.$on('routeChange', this.onPanelRouteChange);
+    },
+    beforeUnmount() {
+        this.panelRouteBus?.$off('routeChange', this.onPanelRouteChange);
+    },
+    methods: {
+        onPanelRouteChange(path) {
+            this.$router.push(path);
+        },
+    },
     async mounted() {
         await this.$router.isReady();
         try {
@@ -35,6 +47,9 @@ export default {
 <style>
 body {
     margin: 0;
+    padding: 0;
+    font-size: 14px;
+    background: #ffffff;
     font-family: Arial, 'PingFang SC', 'Microsoft YaHei', sans-serif;
     color: #1d2129;
 }
@@ -46,6 +61,37 @@ body {
     flex: 1;
     min-width: 0;
 }
+.arco-table {
+	color: #1d2129;
+}
+
+.arco-table .arco-table-container,
+.arco-table-border .arco-table-container,
+.arco-table-border:not(.arco-table-border-cell) .arco-table-container {
+	border: 0 !important;
+}
+
+.arco-table .arco-table-th,
+.table-header .arco-table-th {
+	color: #1d2129 !important;
+	font-weight: 400 !important;
+	background: #f2f3f5 !important;
+	border-bottom: 1px solid #f2f3f5 !important;
+}
+
+.arco-table .arco-table-td {
+	color: #1d2129;
+	background: transparent;
+	border-bottom: 1px solid #f2f3f5 !important;
+}
+
+.arco-table .arco-table-cell {
+	min-height: 22px;
+	padding: 10px 16px !important;
+	line-height: 22px;
+	font-size: 14px;
+}
+
 .document-delete-popconfirm .arco-popconfirm-footer {
     display: flex;
     flex-direction: row-reverse;

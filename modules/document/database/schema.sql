@@ -17,6 +17,7 @@ CREATE TABLE ims_document_library (
  name varchar(255) NOT NULL,
  description text NOT NULL DEFAULT '',
  user_id integer NOT NULL,
+ username varchar(255) NOT NULL DEFAULT '',
  public integer NOT NULL DEFAULT 0,
  protected integer NOT NULL DEFAULT 0,
  deleted_at datetime,

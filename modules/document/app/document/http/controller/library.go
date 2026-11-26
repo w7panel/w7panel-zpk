@@ -46,6 +46,7 @@ func (c Library) Create(ctx *gin.Context) {
 		Name        string               `json:"name" binding:"required,notblank,maxbytes=255"`
 		Description string               `json:"description" binding:"maxbytes=4096"`
 		Public      int32                `json:"public" binding:"oneof=0 1"`
+		OwnerName   string               `json:"owner_name" binding:"maxbytes=255"`
 		OwnerID     int32                `json:"owner_id" binding:"min=0"`
 		Protected   int32                `json:"protected" binding:"oneof=0 1"`
 		Files       []FileParamsValidate `json:"files" binding:"max=10000,unique=Path,dive"`
@@ -55,7 +56,7 @@ func (c Library) Create(ctx *gin.Context) {
 		return
 	}
 	category, identifie := logic.SplitRef(params.Ref)
-	library := entity.DocumentLibrary{Category: category, Identifie: identifie, Name: params.Name, Description: params.Description, Public: params.Public, UserID: params.OwnerID, Protected: params.Protected}
+	library := entity.DocumentLibrary{Category: category, Identifie: identifie, Name: params.Name, Description: params.Description, Public: params.Public, UserID: params.OwnerID, Username: params.OwnerName, Protected: params.Protected}
 	files := make([]logic.CreateFile, 0, len(params.Files))
 	for _, file := range params.Files {
 		files = append(files, logic.CreateFile{Path: file.Path, Title: file.Title, Content: file.Content, Protected: file.Protected})

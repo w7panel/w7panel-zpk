@@ -20,6 +20,7 @@ type DocumentLibrary struct {
 	Name        string         `gorm:"column:name;type:varchar(255);not null" json:"name"`
 	Description string         `gorm:"column:description;type:text;not null" json:"description"`
 	UserID      int32          `gorm:"column:user_id;not null;index:document_library_owner" json:"user_id"`
+	Username    string         `gorm:"column:username;type:varchar(255);not null;default:''" json:"username"`
 	Public      int32          `gorm:"column:public;not null;default:0" json:"public"`
 	Protected   int32          `gorm:"column:protected;not null;default:0" json:"protected"`
 	DeletedAt   gorm.DeletedAt `gorm:"column:deleted_at;index:document_library_deleted_at" json:"deleted_at"`

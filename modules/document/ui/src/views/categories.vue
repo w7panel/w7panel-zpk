@@ -2,10 +2,8 @@
     <a-result v-if="!isAdmin" status="403" title="无分类管理权限" />
     <main v-else class="category-page">
         <div class="category-header">
-            <h3>分类管理</h3>
             <a-button type="primary" @click="openCreate">新建分类</a-button>
         </div>
-        <a-alert class="category-notice">分类关联公共命名空间。新空间默认从镜像列表隐藏；标识修改和删除会同步到公共命名空间。</a-alert>
         <a-table :data="categories" :loading="loading" :pagination="false" row-key="id">
             <template #columns>
                 <a-table-column data-index="name" title="分类名称" /><a-table-column
@@ -130,7 +128,8 @@ export default {
 </script>
 <style scoped>
 .category-page {
-    padding: 24px;
+    padding: 24px 30px;
+    border-top: 1px solid #eeeeee;
     min-height: calc(100vh - 2px);
     box-sizing: border-box;
     background: white;
@@ -139,13 +138,6 @@ export default {
     display: flex;
     align-items: center;
     gap: 12px;
-    margin-bottom: 24px;
-}
-.category-header h3 {
-    margin: 0 auto 0 0;
-    font-size: 18px;
-}
-.category-notice {
     margin-bottom: 20px;
 }
 </style>

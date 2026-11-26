@@ -51,6 +51,11 @@ relation:
         tag:
           gorm:
             index: "document_library_owner"
+      username:
+        tag:
+          gorm:
+            type: "varchar(255)"
+            default: "''"
       public:
         tag:
           gorm:

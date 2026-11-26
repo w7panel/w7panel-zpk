@@ -2,14 +2,11 @@
     <main class="document-page">
         <template v-if="selectedRef">
             <div class="document-page-header">
-                <a-button @click="closeWorkbench">返回文档库</a-button><span>{{ selectedRef }}</span>
+                <a-button @click="closeWorkbench">返回文档库</a-button>
             </div>
             <workbench :key="selectedRef" :client="client" :library-ref="selectedRef" />
         </template>
         <template v-else>
-            <div class="document-page-header">
-                <h3>文档库</h3>
-            </div>
             <div class="document-page-toolbar">
                 <div class="document-toolbar-left">
                     <a-button v-if="user.id" type="primary" @click="openCreate">新建文档库</a-button>
@@ -36,12 +33,17 @@
                             ><a-link @click="selectedRef = reference(record)">{{ record.name }}</a-link></template
                         ></a-table-column
                     >
+                    <a-table-column title="分类">
+                        <template #cell="{ record }">{{ categoryName(record.category) }}</template>
+                    </a-table-column>
                     <a-table-column title="标识"
                         ><template #cell="{ record }">{{ reference(record) }}</template></a-table-column
                     >
                     <a-table-column title="可见性"><template #cell="{ record }"><a-tag :color="record.public ? 'green' : 'gray'">{{ record.public ? '公有' : '私有' }}</a-tag></template></a-table-column>
-                    <a-table-column data-index="user_id" title="所有者 ID" />
-                    <a-table-column data-index="updated_at" title="更新时间" />
+                    <a-table-column data-index="username" title="所有者" />
+                    <a-table-column title="更新时间">
+                        <template #cell="{ record }">{{ new Date(record.updated_at).toLocaleString() }}</template>
+                    </a-table-column>
                     <a-table-column title="操作"
                         ><template #cell="{ record }">
                             <a-button type="text" @click="openEdit(record)">编辑</a-button>
@@ -140,6 +142,9 @@ export default {
         },
     },
     methods: {
+        categoryName(identifie) {
+            return this.categories.find((category) => category.identifie === identifie)?.name || identifie;
+        },
         reference(record) {
             return record.category + '/' + record.identifie;
         },
@@ -218,7 +223,8 @@ export default {
 </script>
 <style scoped>
 .document-page {
-    padding: 24px;
+    padding: 24px 30px;
+    border-top: 1px solid #eeeeee;
     background: white;
     min-height: calc(100vh - 2px);
     box-sizing: border-box;
@@ -227,11 +233,7 @@ export default {
     display: flex;
     align-items: center;
     gap: 12px;
-    margin-bottom: 24px;
-}
-.document-page-header h3 {
-    margin: 0 auto 0 0;
-    font-size: 18px;
+    margin-bottom: 20px;
 }
 .document-page-toolbar {
     display: flex;

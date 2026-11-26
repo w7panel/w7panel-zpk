@@ -32,8 +32,12 @@ func (l FormulaDocument) Initialize(ctx context.Context, token string, formula *
 	reference := "app/" + formula.Name
 	homepage := "# " + title + "\n\n应用标识：" + formula.Name + "\n"
 	file := documentsdk.FileContent{File: documentsdk.File{Path: "index.md", Title: "首页", Protected: 1}, Content: homepage}
-	err := w7.DocumentSdk.Create(ctx, token, documentsdk.CreateLibrary{
-		Ref: reference, Name: title, OwnerID: formula.UserID, Protected: 1,
+	owner, err := (userlogic.User{}).GetById(int(formula.UserID))
+	if err != nil {
+		return "", err
+	}
+	err = w7.DocumentSdk.Create(ctx, token, documentsdk.CreateLibrary{
+		Ref: reference, Name: title, OwnerID: formula.UserID, OwnerName: owner.Username, Protected: 1,
 		Files: []documentsdk.FileContent{file},
 	})
 	if err == nil {

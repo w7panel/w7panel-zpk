@@ -98,6 +98,7 @@ type CreateLibrary struct {
 	Ref         string        `json:"ref"`
 	Name        string        `json:"name"`
 	Description string        `json:"description"`
+	OwnerName   string        `json:"owner_name"`
 	OwnerID     int32         `json:"owner_id"`
 	Public      int32         `json:"public"`
 	Protected   int32         `json:"protected"`

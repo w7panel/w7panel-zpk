@@ -112,9 +112,9 @@ flowchart TD
 
 ### 普通仓库访问：标准 Registry 流程
 
-`checkFormulaPullPermission` 对源站管理员直接放行；其他请求通过 `PermissionSdk.Check` 检查 `{type:repository,value:app/制品OCI标识}` 的 `pull`。它使用本地用户身份（未登录为匿名）或请求中的 Registry Bearer token。
+`checkFormulaPullPermission` 区分本地登录和外部访问：源站管理员按业务规则放行；其他已登录 ZPK 用户通过 `PermissionSdk.Check` 校验自身的仓库 pull 授权（包括所有者初始化授权和既有 namespace 继承），保持制品库内部详情、编辑等请求可用。`X-Zpk-Token` 不作为 Registry token 使用。
 
-服务调用失败返回 503；权限不足返回 401，并附：
+匿名和外部 Registry Bearer 请求不调用权限 Check API，直接 GET `registry_cli.default.url` 下的 `/v2/<repository>/tags/list?n=1`，携带请求中的 Bearer token，由 Registry 验证对应仓库的 pull；不使用服务端默认仓库账号密码。该路径不依赖某个具体 tag（例如 latest）存在。Registry 返回 200 才放行；返回 401 时校验并透传其实际 `WWW-Authenticate`，realm、service 和 scope 不再由 info 拼接。网络失败、非 200/401 或无效 challenge 返回 503。权限不足的响应例如：
 
 ```http
 WWW-Authenticate: Bearer realm="https://registry.example.com/zpk/v2/registry/auth",service="docker-registry",scope="repository:app/w7_demo:pull"

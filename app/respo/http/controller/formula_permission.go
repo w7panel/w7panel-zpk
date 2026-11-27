@@ -2,10 +2,10 @@ package controller
 
 import (
 	"errors"
-	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/w7panel/w7panel-zpk/common/entity"
 	commonlogic "github.com/w7panel/w7panel-zpk/common/logic"
+	"github.com/w7panel/w7panel-zpk/common/service/registry"
 	"github.com/w7panel/w7panel-zpk/common/service/w7"
 	permissionsdk "github.com/w7panel/w7panel-zpk/common/service/w7/permission"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
@@ -19,15 +19,23 @@ func checkFormulaPullPermission(ctx *gin.Context, name string, user *entity.Regi
 	if user != nil && (commonlogic.User{}).IsAdminUser(user) {
 		return true
 	}
-	userID := int32(0)
+	// Local ZPK logins retain user grants; they are not Registry Bearer tokens.
 	if user != nil {
-		userID = user.ID
+		allowed, err := w7.PermissionSdk.Check(ctx.Request.Context(), user.ID, permissionsdk.Resource{Type: "repository", Value: repository}, "pull", "")
+		if err != nil {
+			ctx.AbortWithStatusJSON(http.StatusServiceUnavailable, gin.H{"code": 503, "error": err.Error()})
+			return false
+		}
+		if allowed {
+			return true
+		}
 	}
 	token := ""
 	if raw := ctx.GetHeader("Authorization"); strings.HasPrefix(raw, "Bearer ") {
 		token = strings.TrimPrefix(raw, "Bearer ")
 	}
-	allowed, err := w7.PermissionSdk.Check(ctx.Request.Context(), userID, permissionsdk.Resource{Type: "repository", Value: repository}, "pull", token)
+	// External access uses the Registry itself, without a second permission API check.
+	allowed, challenge, err := registry.CheckPull(ctx.Request.Context(), facade.GetConfig().GetString("registry_cli.default.url"), repository, token)
 	if err != nil {
 		ctx.AbortWithStatusJSON(http.StatusServiceUnavailable, gin.H{"code": 503, "error": err.Error()})
 		return false
@@ -35,8 +43,6 @@ func checkFormulaPullPermission(ctx *gin.Context, name string, user *entity.Regi
 	if allowed {
 		return true
 	}
-	domain := facade.GetConfig().GetString("setting.depot.external_domain")
-	challenge := fmt.Sprintf(`Bearer realm="https://%s/zpk/v2/registry/auth",service="docker-registry",scope="repository:%s:pull"`, domain, repository)
 	ctx.Header("WWW-Authenticate", challenge)
 	ctx.Header("Cache-Control", "no-store")
 	ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"code": "UNAUTHORIZED", "error": "需要源仓库 pull 权限", "errors": []gin.H{{"code": "UNAUTHORIZED", "message": "authentication required", "detail": []gin.H{{"Type": "repository", "Name": repository, "Action": "pull"}}}}})

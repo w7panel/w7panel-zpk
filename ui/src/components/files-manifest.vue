@@ -561,6 +561,17 @@
                         </a-form-item>
                     </div>
 
+
+                    <div v-if="form.type !== 'gateway-plugin'" class="bg-white">
+                        <a-form-item class="mt-16" label="资源配置">
+                            <div v-if="resourceStartParams().length">
+                                {{ resourceStartParams().map(item => `${item.title}：${item.values_text ? item.values_text + (item.unit || '') : '不限制'}`).join('，') }}
+                            </div>
+                            <div v-else>无</div>
+                            <span class="cursor c-blue ml-10" @click="openResourceSettings">编辑</span>
+                        </a-form-item>
+                    </div>
+
                     <div class="bg-white com-line mt-20 manifest-start-params-section">
                         <a-form-item v-if="form.type != 'gateway-plugin'" class="mt-16 manifest-start-param-editor" label="启动参数" field="startParams">
                             <div class="manifest-field-stack">
@@ -571,21 +582,8 @@
                                         <a-checkbox v-model="form.redis">redis</a-checkbox>
                                         <a-checkbox v-model="form.mongodb6">mongodb</a-checkbox>
                                     </div>
-                                    <a-button @click="openResourceSettings">资源配置</a-button>
                                     <a-button @click="openSpEdit">批量修改</a-button>
                                 </div>
-                                <a-button v-if="form.type === 'system-image'" @click="openResourceSettings">资源配置</a-button>
-                                <manifest-config-table v-if="resourceStartParams().length" class="mt-10" title="资源配置" :rows="resourceStartParams()">
-                                    <template #columns>
-                                        <manifest-config-table-column data-index="title" title="资源类型" />
-                                        <manifest-config-table-column title="默认值">
-                                            <template #cell="{ record }">{{ record.values_text || '不限制' }} {{ record.values_text ? record.unit : '' }}</template>
-                                        </manifest-config-table-column>
-                                        <manifest-config-table-column title="操作">
-                                            <template #cell><span class="c-blue cursor" @click="openResourceSettings">编辑</span></template>
-                                        </manifest-config-table-column>
-                                    </template>
-                                </manifest-config-table>
                                 <manifest-config-table v-for="section in startParamSections()" :key="section.key"
                                     class="mt-10" :title="section.title" :rows="section.rows"
                                     :add-text="section.key === 'custom' ? '添加启动参数' : ''"

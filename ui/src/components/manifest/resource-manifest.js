@@ -22,8 +22,9 @@ export function resourceQuantity(value, type) {
 
 export function containerResourceDefaults(containers = []) {
     const result = {};
+    if (!Array.isArray(containers)) return result;
     for (const container of containers) {
-        if (container.isInitContainer) continue;
+        if (!container || container.isInitContainer) continue;
         const limits = container.resources?.limits || {};
         for (const [type, key] of [['cpu', 'cpu'], ['memory', 'memory'], ['gpu', 'nvidia.com/gpu']]) {
             const value = resourceQuantity(limits[key], type);

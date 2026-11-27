@@ -39,7 +39,7 @@ func (l Library) Info(ctx context.Context, user zpk.User, ref string) (*entity.D
 	if err != nil {
 		return nil, err
 	}
-	if err := permission.Require(service.PermissionSdk.CanRead(ctx, user, *library)); err != nil {
+	if err := permission.Require((Library{}).CanRead(ctx, user, *library)); err != nil {
 		return nil, err
 	}
 	return library, nil
@@ -115,7 +115,7 @@ func (l Library) Edit(ctx context.Context, user zpk.User, ref, name, description
 		if err != nil {
 			return err
 		}
-		if err := permission.Require(service.PermissionSdk.CanManage(ctx, user, *library)); err != nil {
+		if err := permission.Require((Library{}).CanManage(ctx, user, *library)); err != nil {
 			return err
 		}
 		updates := entity.DocumentLibrary{Name: name, Description: description, UpdatedAt: time.Now()}
@@ -147,7 +147,7 @@ func (l Library) Delete(ctx context.Context, user zpk.User, ref string) error {
 		if library.Protected == 1 {
 			return permission.ErrDenied
 		}
-		if err := permission.Require(service.PermissionSdk.CanManage(ctx, user, *library)); err != nil {
+		if err := permission.Require((Library{}).CanManage(ctx, user, *library)); err != nil {
 			return err
 		}
 		result, err := query.WithContext(ctx).Where(query.ID.Eq(library.ID), query.Protected.Eq(0)).Delete()
@@ -181,4 +181,19 @@ func libraryVisibleType(public int32) int32 {
 		return permission.VisibleTypePublicRead
 	}
 	return permission.VisibleTypePrivate
+}
+
+// CanRead keeps document administrator privileges in the document business layer.
+func (Library) CanRead(ctx context.Context, user zpk.User, library entity.DocumentLibrary) (bool, error) {
+	if user.ID > 0 && user.Admin {
+		return true, nil
+	}
+	return service.PermissionSdk.Check(ctx, user.ID, permission.LibraryResource(library), "pull")
+}
+
+func (Library) CanManage(ctx context.Context, user zpk.User, library entity.DocumentLibrary) (bool, error) {
+	if user.ID > 0 && user.Admin {
+		return true, nil
+	}
+	return service.PermissionSdk.Check(ctx, user.ID, permission.LibraryResource(library), "push")
 }

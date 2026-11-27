@@ -154,7 +154,7 @@ app/registry/
 
 - 提供 `token` 时，验证 token 签名、有效期、issuer、audience，以及匹配的资源类型、路径和动作；不会再用 user_id 重新计算授权。
 - 未提供 token 时，按 user_id 获取用户，再调用 `Resource.Check`。`user_id=0` 表示匿名。
-- `Resource.Check` 沿用管理接口的管理员规则：创始人 / 超级管理员角色可直接通过。镜像 `/registry/auth` 的直接放行则只检查 `UserTypeSuperAdminForRegistry`，两种入口不要混用。
+- `Resource.Check` 不根据创始人或面板管理员角色直接放行，只校验资源公私状态与用户授权。制品 `formula/info` 和文档业务层各自处理业务管理员豁免；权限 SDK 仅负责请求。镜像 `/registry/auth` 仍仅对 `UserTypeSuperAdminForRegistry` 直接放行，保留原有镜像鉴权行为。
 - Registry token 使用 RS256，audience 为 `docker-registry`，当前有效期为 7 天。已签发 token 不会因数据库授权变化而立即失效。
 - 当前 Auth 会验证各 scope 声明的资源类型；非 repository 类型不再被直接忽略。镜像准备事件的处理器只处理 repository 类型。
 

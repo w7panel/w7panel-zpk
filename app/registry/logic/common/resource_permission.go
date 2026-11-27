@@ -45,15 +45,10 @@ type ResourcePermissionDecision struct {
 	Explicit bool `json:"explicit"`
 }
 
-type ResourcePermission struct {
-	Admin bool
-}
+type ResourcePermission struct{}
 
 // CheckPermission 只校验准备好的公共动作和用户授权，不查询或继承其他资源权限。
 func (l ResourcePermission) CheckPermission(resource ResourcePermissionResource, permission *entity.RegistryUserPermission, actions []string) ResourcePermissionDecision {
-	if l.Admin {
-		return ResourcePermissionDecision{Allowed: true}
-	}
 	if len(actions) > 0 && ValidatePermissionActions(actions, resource.PublicActions) {
 		return ResourcePermissionDecision{Allowed: true}
 	}
@@ -68,7 +63,7 @@ func (l ResourcePermission) CheckPermission(resource ResourcePermissionResource,
 
 // CheckResource 按资源完整路径组合精确授权和 namespace 授权。
 func (l ResourcePermission) CheckResource(ctx context.Context, user *entity.RegistryUser, resource ResourcePermissionResource, actions []string) (ResourcePermissionDecision, error) {
-	if l.Admin || user == nil || (len(actions) > 0 && ValidatePermissionActions(actions, resource.PublicActions)) {
+	if user == nil || (len(actions) > 0 && ValidatePermissionActions(actions, resource.PublicActions)) {
 		return l.CheckPermission(resource, nil, actions), nil
 	}
 	permission, err := l.GetUserPermission(ctx, user.ID, resource)

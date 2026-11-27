@@ -7,9 +7,8 @@ import (
 )
 
 type Namespace struct {
-	ID      int32  `json:"id"`
-	Name    string `json:"name"`
-	Visible bool   `json:"visible"`
+	ID   int32  `json:"id"`
+	Name string `json:"name"`
 }
 
 func (c *Client) GetNamespace(ctx context.Context, name string) (Namespace, error) {
@@ -21,7 +20,7 @@ func (c *Client) GetNamespace(ctx context.Context, name string) (Namespace, erro
 	return namespace, err
 }
 
-// EnsureNamespace registers a hidden namespace, preserving an existing namespace's settings.
+// EnsureNamespace registers a private namespace, preserving an existing namespace's settings.
 func (c *Client) EnsureNamespace(ctx context.Context, name string) error {
 	_, err := c.GetNamespace(ctx, name)
 	if err == nil {
@@ -31,5 +30,5 @@ func (c *Client) EnsureNamespace(ctx context.Context, name string) error {
 	if !errors.As(err, &responseError) || responseError.StatusCode != http.StatusNotFound {
 		return err
 	}
-	return c.call(ctx, "/namespace/create", map[string]any{"name": name, "visible": false, "visible_type": 1}, nil)
+	return c.call(ctx, "/namespace/create", map[string]any{"name": name, "visible_type": 1}, nil)
 }

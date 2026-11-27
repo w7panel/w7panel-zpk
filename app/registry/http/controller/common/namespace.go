@@ -29,7 +29,6 @@ func (c Namespace) Create(ctx *gin.Context) {
 	type ParamsValidate struct {
 		Name        string `json:"name" binding:"required"`
 		VisibleType uint8  `json:"visible_type" binding:"required,oneof=1 2 4"`
-		Visible     *bool  `json:"visible"`
 	}
 	params := ParamsValidate{}
 	if !c.Validate(ctx, &params) {
@@ -52,11 +51,6 @@ func (c Namespace) Create(ctx *gin.Context) {
 		err := tx.RegistryNamespace.Create(namespace)
 		if err != nil {
 			return err
-		}
-		if params.Visible != nil && !*params.Visible {
-			if _, err := tx.RegistryNamespace.Where(tx.RegistryNamespace.ID.Eq(namespace.ID)).Update(tx.RegistryNamespace.Visible, false); err != nil {
-				return err
-			}
 		}
 
 		if user != nil && !(logic2.User{}.IsAdminUser(user)) {
@@ -102,7 +96,6 @@ func (c Namespace) Info(ctx *gin.Context) {
 
 func (c Namespace) List(ctx *gin.Context) {
 	query := dao.Q.RegistryNamespace.Order(dao.Q.RegistryNamespace.CreatedAt.Desc())
-	query = query.Where(dao.Q.RegistryNamespace.Visible.Is(true))
 	user := logic2.User{}.GetUser(ctx)
 	if user != nil && !(logic2.User{}.IsAdminUser(user)) {
 		namespacePermissions, _ := dao.Q.RegistryUserPermission.
@@ -199,7 +192,6 @@ func (c Namespace) Edit(ctx *gin.Context) {
 		Id          int    `json:"id" binding:"required"`
 		Name        string `json:"name" binding:"required"`
 		VisibleType uint8  `json:"visible_type" binding:"required,oneof=1 2 4"`
-		Visible     *bool  `json:"visible"`
 	}
 	params := ParamsValidate{}
 	if !c.Validate(ctx, &params) {
@@ -227,9 +219,6 @@ func (c Namespace) Edit(ctx *gin.Context) {
 		curNamespace.Name = params.Name
 	}
 	curNamespace.VisibleType = int32(params.VisibleType)
-	if params.Visible != nil {
-		curNamespace.Visible = *params.Visible
-	}
 
 	err := dao.Q.Transaction(func(tx *dao.Query) error {
 		if namespaceRenamed {
@@ -239,8 +228,8 @@ func (c Namespace) Edit(ctx *gin.Context) {
 		}
 
 		query := tx.RegistryNamespace
-		_, err := query.Where(query.ID.Eq(curNamespace.ID)).Select(query.Name, query.VisibleType, query.Visible).Updates(entity.RegistryNamespace{
-			Name: curNamespace.Name, VisibleType: curNamespace.VisibleType, Visible: curNamespace.Visible,
+		_, err := query.Where(query.ID.Eq(curNamespace.ID)).Select(query.Name, query.VisibleType).Updates(entity.RegistryNamespace{
+			Name: curNamespace.Name, VisibleType: curNamespace.VisibleType,
 		})
 		return err
 	})

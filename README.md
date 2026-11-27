@@ -198,3 +198,5 @@ JWT 不包含面板 access token。制品前端对自有 ZPK origin/path 额外�
 旧实例升级时，在备份后执行 `respo:migrate-namespace`（可用 `--identifie` 限定制品）：命令直接操作数据库，先复制旧 `zpk_oci` 仓库的公私状态、逐仓库用户授权并补齐所有者的 `pull/push` 权限，再按数据库版本 ID 倒序复制每个制品的全部版本。没有 OCI 数据的版本跳过。已有 `app` 版本和权限设置不覆盖，源版本、源授权保留，不复制旧 namespace 的全量用户授权。
 
 新建、发布、读取与鉴权统一使用 `app`。运行时不再从 `zpk_oci` 读取或补齐版本，历史数据全部通过迁移命令复制。复制不会触发重新发布或清理编辑文件。迁移命令应在切换流量前执行；OCI 与数据库不共享事务，失败可重试，不删除源仓库。
+
+制品 namespace 迁移复用 GetDefaultRemoteOci 和配置的仓库账号密码，按 Registry challenge 走标准 token 认证。单个制品权限或版本迁移失败时记录错误并继续处理其他项，最后汇总失败数并返回非零退出码；可重试，已存在的目标版本不覆盖。资源列表沿用 setting.registry.list_ignore_namespaces 配置过滤，默认排除项包含 app、zpk_oci、app_doc 及配置的制品 namespace，不影响这些资源的实际鉴权和使用。

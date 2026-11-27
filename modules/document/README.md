@@ -114,9 +114,9 @@ npm run build -- --dest /private/tmp/zpk-document-ui-check/dist
 
 ## 公共命名空间
 
-公共命名空间继续存放在 ZPK 的 namespace 表中，新增 `visible` 字段，默认 `true`。它只控制现有镜像命名空间列表的展示，与表示镜像权限的 `visible_type`、文档库的 `public` 相互独立。namespace 列表固定只返回 `visible=true`，不接受显隐筛选参数，管理员也遵循该规则。已有命名空间加列后默认保持显示。
+公共命名空间继续存放在 ZPK 的 namespace 表中，不使用 `visible` 显隐字段。列表排除项统一通过 `setting.registry.list_ignore_namespaces` 配置，与公私权限 `visible_type`、文档库的 `public` 相互独立。
 
-文档不维护分类表和分类接口。手动新建文档默认使用公共命名空间 `app_doc`，制品推送使用 `app`。文档库保存 `namespace` 和 `identifie`，资源值为 `namespace/identifie`。创建文档库时通过权限 SDK 确认公共命名空间存在，不存在则创建隐藏的私有空间，已存在时保留其设置。命名空间只参与资源定位与权限，不提供文档侧管理页面。
+文档不维护分类表和分类接口。手动新建文档默认使用公共命名空间 `app_doc`，制品推送使用 `app`。文档库保存 `namespace` 和 `identifie`，资源值为 `namespace/identifie`。创建文档库时通过权限 SDK 确认公共命名空间存在，不存在则创建私有空间，已存在时保留其设置。命名空间只参与资源定位与权限，不提供文档侧管理页面。
 
 ## 独立服务配置
 
@@ -191,3 +191,5 @@ ZPK 的 OIDC 登录同样返回 JWT，不在服务端保存登录态。制品前
 ZPK 编辑文件和发布默认首页统一使用 `POST /doc/openapi/file/save`，请求体携带 ZPK 用户 ID，由 App 签名保护。App 中间件只负责验签，随后由 AppUser 中间件读取用户 ID 并设置用户身份，文件控制器使用既有保存逻辑和资源权限校验；文档系统不区分同步和编辑。浏览器登录与编辑继续使用文档 JWT。发布首页更新位于 ZPK 服务端的统一发布流程，CLI 本身不增加文档请求。
 
 文档库 `namespace` 的数据库默认值为 `app_doc`。已有 SQLite 表新增该非空字段时，旧记录使用此默认值，避免启动迁移报 `Cannot add a NOT NULL column with default value NULL`；显式传入的命名空间（例如制品文档的 `app`）保持原值。该默认值不迁移旧分类或旧引用地址。
+
+文档管理员的读取和维护豁免由 `logic.Library.CanRead/CanManage` 根据已认证用户的管理员标记处理；普通用户仍通过权限 SDK 校验资源的 pull/push。权限 SDK 和通用资源 Check 不判断创始人、面板管理员角色。库和文件的 protected 业务约束仍独立生效，管理员也不能绕过。

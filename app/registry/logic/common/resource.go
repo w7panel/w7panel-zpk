@@ -76,15 +76,11 @@ func (l Resource) Prepare(ctx context.Context, resource ResourcePermissionResour
 	return resource, nil
 }
 func (l Resource) Check(ctx context.Context, user *entity.RegistryUser, resource ResourcePermissionResource, actions []string) (ResourcePermissionDecision, error) {
-	permissions := ResourcePermission{Admin: user != nil && (userlogic.User{}).IsAdminUser(user)}
-	if permissions.Admin {
-		return ResourcePermissionDecision{Allowed: true}, nil
-	}
 	prepared, err := l.Prepare(ctx, resource)
 	if err != nil {
 		return ResourcePermissionDecision{}, err
 	}
-	return permissions.CheckResource(ctx, user, prepared, actions)
+	return (ResourcePermission{}).CheckResource(ctx, user, prepared, actions)
 }
 func renameResources(ctx context.Context, tx *dao.Query, oldName, newName string) error {
 	db := resourceDB(ctx, tx)

@@ -51,7 +51,7 @@ func (d Download) Export(ctx context.Context, user zpk.User, ref string) (*os.Fi
 	if e != nil {
 		return nil, e
 	}
-	if err := permission.Require(service.PermissionSdk.CanRead(ctx, user, s.Library)); err != nil {
+	if err := permission.Require((Library{}).CanRead(ctx, user, s.Library)); err != nil {
 		return nil, err
 	}
 	files := s.Files
@@ -98,7 +98,7 @@ func (d Download) Export(ctx context.Context, user zpk.User, ref string) (*os.Fi
 	if e != nil {
 		return nil, e
 	}
-	if err := permission.Require(service.PermissionSdk.CanRead(ctx, user, *current)); err != nil {
+	if err := permission.Require((Library{}).CanRead(ctx, user, *current)); err != nil {
 		return nil, err
 	}
 	if _, e = output.Seek(0, io.SeekStart); e != nil {

@@ -140,5 +140,5 @@ func (c *Client) EnsureNamespace(ctx context.Context, name string) error {
 	if !IsNotFound(err) {
 		return err
 	}
-	return c.call(ctx, "/namespace/create", map[string]any{"name": name, "visible_type": 1, "visible": false}, nil)
+	return c.call(ctx, "/namespace/create", map[string]any{"name": name, "visible_type": 1}, nil)
 }

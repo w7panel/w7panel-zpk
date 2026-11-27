@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"github.com/w7panel/w7panel-zpk/modules/document/common/entity"
-	"github.com/w7panel/w7panel-zpk/modules/document/common/service/zpk"
 )
 
 const (
@@ -61,14 +60,6 @@ func (c *Client) AddOwner(ctx context.Context, library entity.DocumentLibrary) e
 
 func (c *Client) ClearLibrary(ctx context.Context, library entity.DocumentLibrary) error {
 	return c.call(ctx, "/resource/delete", map[string]any{"resource": LibraryResource(library)}, nil)
-}
-
-func (c *Client) CanRead(ctx context.Context, user zpk.User, library entity.DocumentLibrary) (bool, error) {
-	return c.Check(ctx, user.ID, LibraryResource(library), "pull")
-}
-
-func (c *Client) CanManage(ctx context.Context, user zpk.User, library entity.DocumentLibrary) (bool, error) {
-	return c.Check(ctx, user.ID, LibraryResource(library), "push")
 }
 
 func Require(allowed bool, err error) error {

@@ -34,13 +34,12 @@ func (c NamespaceService) Create(ctx *gin.Context) {
 	type ParamsValidate struct {
 		Name        string `json:"name" binding:"required,max=96"`
 		VisibleType int32  `json:"visible_type" binding:"required,oneof=1 2 4"`
-		Visible     *bool  `json:"visible"`
 	}
 	params := ParamsValidate{}
 	if !c.Validate(ctx, &params) {
 		return
 	}
-	if err := (registrycommon.Namespace{}).Create(ctx.Request.Context(), params.Name, params.VisibleType, params.Visible); err != nil {
+	if err := (registrycommon.Namespace{}).Create(ctx.Request.Context(), params.Name, params.VisibleType); err != nil {
 		c.respondError(ctx, err)
 		return
 	}

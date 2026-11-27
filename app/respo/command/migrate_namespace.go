@@ -62,9 +62,15 @@ func (MigrateNamespace) run(cmd *cobra.Command, _ []string) error {
 	if err != nil {
 		return err
 	}
+	failed := 0
 	for _, item := range items {
 		if err := migrateNamespacePermission(cmd.Context(), item); err != nil {
-			return fmt.Errorf("迁移 %s 权限: %w", item.Name, err)
+			if cmd.Context().Err() != nil {
+				return cmd.Context().Err()
+			}
+			failed++
+			fmt.Fprintf(cmd.ErrOrStderr(), "迁移 %s 权限失败，跳过: %v\n", item.Name, err)
+			continue
 		}
 		versions := dao.Q.Version
 		rows, err := versions.WithContext(cmd.Context()).Where(versions.FormulaID.Eq(item.ID)).Order(versions.ID.Desc()).Find()
@@ -77,10 +83,18 @@ func (MigrateNamespace) run(cmd *cobra.Command, _ []string) error {
 					fmt.Fprintf(cmd.OutOrStdout(), "%s:%s: 无 OCI 数据，跳过\n", item.Name, version.Name)
 					continue
 				}
-				return fmt.Errorf("迁移 %s:%s: %w", item.Name, version.Name, err)
+				if cmd.Context().Err() != nil {
+					return cmd.Context().Err()
+				}
+				failed++
+				fmt.Fprintf(cmd.ErrOrStderr(), "迁移 %s:%s 失败，跳过: %v\n", item.Name, version.Name, err)
+				continue
 			}
 			fmt.Fprintf(cmd.OutOrStdout(), "%s:%s: app 版本就绪\n", item.Name, version.Name)
 		}
+	}
+	if failed > 0 {
+		return fmt.Errorf("迁移完成，%d 项失败，请查看日志后重试", failed)
 	}
 	return nil
 }
@@ -94,14 +108,7 @@ func ensureAppNamespace(ctx context.Context) error {
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return err
 	}
-	return dao.Q.Transaction(func(tx *dao.Query) error {
-		row := &entity.RegistryNamespace{Name: "app", VisibleType: 1}
-		if err := tx.RegistryNamespace.WithContext(ctx).Create(row); err != nil {
-			return err
-		}
-		_, err := tx.RegistryNamespace.WithContext(ctx).Where(tx.RegistryNamespace.ID.Eq(row.ID)).Update(tx.RegistryNamespace.Visible, false)
-		return err
-	})
+	return query.WithContext(ctx).Create(&entity.RegistryNamespace{Name: "app", VisibleType: 1})
 }
 func migrateNamespacePermission(ctx context.Context, item *entity.Formula) error {
 	name := strings.ToLower(strings.ReplaceAll(item.Name, "-", "_"))

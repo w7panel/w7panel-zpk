@@ -79,25 +79,14 @@ var ErrNamespaceConflict = errors.New("命名空间已存在或仍有资源")
 var ErrNamespaceProtected = errors.New("默认命名空间不可修改或删除")
 
 // Create creates system-owned namespaces without a user login dependency.
-func (l Namespace) Create(ctx context.Context, name string, visibleType int32, visible *bool) error {
+func (l Namespace) Create(ctx context.Context, name string, visibleType int32) error {
 	query := dao.Q.RegistryNamespace
 	if _, err := query.WithContext(ctx).Unscoped().Where(query.Name.Eq(name)).First(); err == nil {
 		return ErrNamespaceConflict
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return err
 	}
-	return dao.Q.Transaction(func(tx *dao.Query) error {
-		namespace := &entity.RegistryNamespace{Name: name, VisibleType: visibleType}
-		query := tx.RegistryNamespace
-		if err := query.WithContext(ctx).Create(namespace); err != nil {
-			return err
-		}
-		if visible != nil && !*visible {
-			_, err := query.WithContext(ctx).Where(query.ID.Eq(namespace.ID)).Update(query.Visible, false)
-			return err
-		}
-		return nil
-	})
+	return query.WithContext(ctx).Create(&entity.RegistryNamespace{Name: name, VisibleType: visibleType})
 }
 
 func (l Namespace) Rename(ctx context.Context, id int32, name string) error {

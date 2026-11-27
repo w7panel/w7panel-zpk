@@ -9,6 +9,7 @@ relation:
         tag:
           gorm:
             type: "varchar(96)"
+            default: "'app_doc'"
             index: "document_library_ref,unique"
       identifie:
         tag:

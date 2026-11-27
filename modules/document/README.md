@@ -189,3 +189,5 @@ ZPK 的 OIDC 登录同样返回 JWT，不在服务端保存登录态。制品前
 这次是服务接口协议变更，ZPK 与文档服务需要配套更新；需验签的服务接口不提供无签名降级，文档登录请求 ZPK 当前用户接口时仅要求面板 access_token。主、子应用必须实际注入 cloudnoauth 并属于同一 AppGroup，单独部署时也需提供对应的 Sidecar 凭据来源。未修改 Helm 打包规则或其他仓库。
 
 ZPK 编辑文件和发布默认首页统一使用 `POST /doc/openapi/file/save`，请求体携带 ZPK 用户 ID，由 App 签名保护。App 中间件只负责验签，随后由 AppUser 中间件读取用户 ID 并设置用户身份，文件控制器使用既有保存逻辑和资源权限校验；文档系统不区分同步和编辑。浏览器登录与编辑继续使用文档 JWT。发布首页更新位于 ZPK 服务端的统一发布流程，CLI 本身不增加文档请求。
+
+文档库 `namespace` 的数据库默认值为 `app_doc`。已有 SQLite 表新增该非空字段时，旧记录使用此默认值，避免启动迁移报 `Cannot add a NOT NULL column with default value NULL`；显式传入的命名空间（例如制品文档的 `app`）保持原值。该默认值不迁移旧分类或旧引用地址。

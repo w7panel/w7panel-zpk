@@ -1,6 +1,6 @@
 CREATE TABLE ims_document_library (
  id INTEGER PRIMARY KEY AUTOINCREMENT,
- namespace varchar(96) NOT NULL,
+ namespace varchar(96) NOT NULL DEFAULT 'app_doc',
  identifie varchar(96) NOT NULL,
  name varchar(255) NOT NULL,
  description text NOT NULL DEFAULT '',

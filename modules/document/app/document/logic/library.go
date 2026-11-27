@@ -29,9 +29,9 @@ type Page struct {
 }
 
 func (l Library) Get(ctx context.Context, ref string) (*entity.DocumentLibrary, error) {
-	category, identifie := SplitRef(ref)
+	namespace, identifie := SplitRef(ref)
 	query := dao.Q.DocumentLibrary
-	return query.WithContext(ctx).Where(query.Category.Eq(category), query.Identifie.Eq(identifie)).First()
+	return query.WithContext(ctx).Where(query.Namespace.Eq(namespace), query.Identifie.Eq(identifie)).First()
 }
 
 func (l Library) Info(ctx context.Context, user zpk.User, ref string) (*entity.DocumentLibrary, error) {
@@ -39,20 +39,17 @@ func (l Library) Info(ctx context.Context, user zpk.User, ref string) (*entity.D
 	if err != nil {
 		return nil, err
 	}
-	if err := permission.Require(service.PermissionSdk.CanRead(ctx, user, *library)); err != nil {
+	if err := permission.Require((Library{}).CanRead(ctx, user, *library)); err != nil {
 		return nil, err
 	}
 	return library, nil
 }
 
-func (l Library) List(ctx context.Context, user zpk.User, category string, page, limit int) (Page, error) {
+func (l Library) List(ctx context.Context, user zpk.User, page, limit int) (Page, error) {
 	library := dao.Q.DocumentLibrary
 	query := library.WithContext(ctx)
 	if !user.Admin {
 		query = query.Where(library.UserID.Eq(user.ID))
-	}
-	if category != "" {
-		query = query.Where(library.Category.Eq(category))
 	}
 	rows, total, err := query.Order(library.ID.Desc()).FindByPage((page-1)*limit, limit)
 	return Page{List: rows, Total: total}, err
@@ -65,8 +62,11 @@ func (l Library) Create(ctx context.Context, user zpk.User, library entity.Docum
 	if library.UserID != user.ID && !user.Admin {
 		return nil, permission.ErrDenied
 	}
-	if library.UserID == user.ID {
+	if library.UserID == user.ID && user.Username != "" {
 		library.Username = user.Username
+	}
+	if err := service.PermissionSdk.EnsureNamespace(ctx, library.Namespace); err != nil {
+		return nil, err
 	}
 	initialFiles := make([]*entity.DocumentFile, 0, len(files))
 	for position, file := range files {
@@ -80,11 +80,8 @@ func (l Library) Create(ctx context.Context, user zpk.User, library entity.Docum
 		initialFiles = append(initialFiles, &entity.DocumentFile{Path: file.Path, Title: file.Title, StorageKey: key, Size: int64(len(file.Content)), Position: int32(position), Protected: file.Protected})
 	}
 	err := dao.Q.Transaction(func(tx *dao.Query) error {
-		if _, err := tx.DocumentCategory.WithContext(ctx).Where(tx.DocumentCategory.Identifie.Eq(library.Category)).First(); err != nil {
-			return err
-		}
 		query := tx.DocumentLibrary
-		count, err := query.WithContext(ctx).Unscoped().Where(query.Category.Eq(library.Category), query.Identifie.Eq(library.Identifie)).Count()
+		count, err := query.WithContext(ctx).Unscoped().Where(query.Namespace.Eq(library.Namespace), query.Identifie.Eq(library.Identifie)).Count()
 		if err != nil {
 			return err
 		}
@@ -102,20 +99,23 @@ func (l Library) Create(ctx context.Context, user zpk.User, library entity.Docum
 				return err
 			}
 		}
-		return service.PermissionSdk.SetLibrary(ctx, library)
+		if err := service.PermissionSdk.SetResource(ctx, permission.LibraryResource(library), library.UserID, libraryVisibleType(library.Public)); err != nil {
+			return err
+		}
+		return service.PermissionSdk.AddOwner(ctx, library)
 	})
 	return &library, err
 }
 
 func (l Library) Edit(ctx context.Context, user zpk.User, ref, name, description string, public *int32) error {
-	category, identifie := SplitRef(ref)
+	namespace, identifie := SplitRef(ref)
 	return dao.Q.Transaction(func(tx *dao.Query) error {
 		query := tx.DocumentLibrary
-		library, err := query.WithContext(ctx).Where(query.Category.Eq(category), query.Identifie.Eq(identifie)).First()
+		library, err := query.WithContext(ctx).Where(query.Namespace.Eq(namespace), query.Identifie.Eq(identifie)).First()
 		if err != nil {
 			return err
 		}
-		if err := permission.Require(service.PermissionSdk.CanManage(ctx, user, *library)); err != nil {
+		if err := permission.Require((Library{}).CanManage(ctx, user, *library)); err != nil {
 			return err
 		}
 		updates := entity.DocumentLibrary{Name: name, Description: description, UpdatedAt: time.Now()}
@@ -130,24 +130,24 @@ func (l Library) Edit(ctx context.Context, user zpk.User, ref, name, description
 			_, err = query.WithContext(ctx).Select(query.ID).Where(query.ID.Eq(library.ID)).First()
 		}
 		if err == nil && public != nil {
-			err = service.PermissionSdk.SetLibrary(ctx, *library)
+			err = service.PermissionSdk.SetResource(ctx, permission.LibraryResource(*library), library.UserID, libraryVisibleType(library.Public))
 		}
 		return err
 	})
 }
 
 func (l Library) Delete(ctx context.Context, user zpk.User, ref string) error {
-	category, identifie := SplitRef(ref)
+	namespace, identifie := SplitRef(ref)
 	return dao.Q.Transaction(func(tx *dao.Query) error {
 		query := tx.DocumentLibrary
-		library, err := query.WithContext(ctx).Where(query.Category.Eq(category), query.Identifie.Eq(identifie)).First()
+		library, err := query.WithContext(ctx).Where(query.Namespace.Eq(namespace), query.Identifie.Eq(identifie)).First()
 		if err != nil {
 			return err
 		}
 		if library.Protected == 1 {
 			return permission.ErrDenied
 		}
-		if err := permission.Require(service.PermissionSdk.CanManage(ctx, user, *library)); err != nil {
+		if err := permission.Require((Library{}).CanManage(ctx, user, *library)); err != nil {
 			return err
 		}
 		result, err := query.WithContext(ctx).Where(query.ID.Eq(library.ID), query.Protected.Eq(0)).Delete()
@@ -167,11 +167,33 @@ func (l Library) Delete(ctx context.Context, user zpk.User, ref string) error {
 }
 
 func (l Library) touch(ctx context.Context, tx *dao.Query, ref string) (*entity.DocumentLibrary, error) {
-	category, identifie := SplitRef(ref)
+	namespace, identifie := SplitRef(ref)
 	query := tx.DocumentLibrary
-	_, err := query.WithContext(ctx).Where(query.Category.Eq(category), query.Identifie.Eq(identifie)).Update(query.UpdatedAt, time.Now())
+	_, err := query.WithContext(ctx).Where(query.Namespace.Eq(namespace), query.Identifie.Eq(identifie)).Update(query.UpdatedAt, time.Now())
 	if err != nil {
 		return nil, err
 	}
-	return query.WithContext(ctx).Where(query.Category.Eq(category), query.Identifie.Eq(identifie)).First()
+	return query.WithContext(ctx).Where(query.Namespace.Eq(namespace), query.Identifie.Eq(identifie)).First()
+}
+
+func libraryVisibleType(public int32) int32 {
+	if public == 1 {
+		return permission.VisibleTypePublicRead
+	}
+	return permission.VisibleTypePrivate
+}
+
+// CanRead keeps document administrator privileges in the document business layer.
+func (Library) CanRead(ctx context.Context, user zpk.User, library entity.DocumentLibrary) (bool, error) {
+	if user.ID > 0 && user.Admin {
+		return true, nil
+	}
+	return service.PermissionSdk.Check(ctx, user.ID, permission.LibraryResource(library), "pull")
+}
+
+func (Library) CanManage(ctx context.Context, user zpk.User, library entity.DocumentLibrary) (bool, error) {
+	if user.ID > 0 && user.Admin {
+		return true, nil
+	}
+	return service.PermissionSdk.Check(ctx, user.ID, permission.LibraryResource(library), "push")
 }

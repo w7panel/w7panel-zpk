@@ -69,19 +69,6 @@ func (c *Client) call(ctx context.Context, route string, body any, out any) erro
 	return nil
 }
 
-type CreateCategory struct {
-	Identifie   string `json:"identifie"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
-}
-
-func (c *Client) CreateCategory(ctx context.Context, userID int32, params CreateCategory) error {
-	return c.call(ctx, "/category/create", struct {
-		UserID int32 `json:"user_id"`
-		CreateCategory
-	}{UserID: userID, CreateCategory: params}, nil)
-}
-
 type CreateLibrary struct {
 	Ref         string        `json:"ref"`
 	Name        string        `json:"name"`

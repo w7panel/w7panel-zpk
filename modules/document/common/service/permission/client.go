@@ -14,6 +14,12 @@ import (
 	"github.com/w7panel/w7panel-zpk/modules/document/common/service/app"
 )
 
+type ResponseError struct {
+	StatusCode int
+}
+
+func (e *ResponseError) Error() string { return fmt.Sprintf("权限服务返回 %d", e.StatusCode) }
+
 type Client struct {
 	ServerURL string
 	HTTP      *http.Client
@@ -46,7 +52,7 @@ func (c *Client) call(ctx context.Context, path string, payload interface{}, out
 	}
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {
-		return fmt.Errorf("权限服务返回 %d", response.StatusCode)
+		return &ResponseError{StatusCode: response.StatusCode}
 	}
 	body, err := io.ReadAll(io.LimitReader(response.Body, (1<<20)+1))
 	if err != nil {

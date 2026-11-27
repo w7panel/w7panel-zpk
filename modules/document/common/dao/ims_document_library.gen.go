@@ -28,7 +28,7 @@ func newDocumentLibrary(db *gorm.DB, opts ...gen.DOOption) documentLibrary {
 	tableName := _documentLibrary.documentLibraryDo.TableName()
 	_documentLibrary.ALL = field.NewAsterisk(tableName)
 	_documentLibrary.ID = field.NewInt32(tableName, "id")
-	_documentLibrary.Category = field.NewString(tableName, "category")
+	_documentLibrary.Namespace = field.NewString(tableName, "namespace")
 	_documentLibrary.Identifie = field.NewString(tableName, "identifie")
 	_documentLibrary.Name = field.NewString(tableName, "name")
 	_documentLibrary.Description = field.NewString(tableName, "description")
@@ -50,7 +50,7 @@ type documentLibrary struct {
 
 	ALL         field.Asterisk
 	ID          field.Int32
-	Category    field.String
+	Namespace   field.String
 	Identifie   field.String
 	Name        field.String
 	Description field.String
@@ -78,7 +78,7 @@ func (d documentLibrary) As(alias string) *documentLibrary {
 func (d *documentLibrary) updateTableName(table string) *documentLibrary {
 	d.ALL = field.NewAsterisk(table)
 	d.ID = field.NewInt32(table, "id")
-	d.Category = field.NewString(table, "category")
+	d.Namespace = field.NewString(table, "namespace")
 	d.Identifie = field.NewString(table, "identifie")
 	d.Name = field.NewString(table, "name")
 	d.Description = field.NewString(table, "description")
@@ -107,7 +107,7 @@ func (d *documentLibrary) GetFieldByName(fieldName string) (field.OrderExpr, boo
 func (d *documentLibrary) fillFieldMap() {
 	d.fieldMap = make(map[string]field.Expr, 12)
 	d.fieldMap["id"] = d.ID
-	d.fieldMap["category"] = d.Category
+	d.fieldMap["namespace"] = d.Namespace
 	d.fieldMap["identifie"] = d.Identifie
 	d.fieldMap["name"] = d.Name
 	d.fieldMap["description"] = d.Description

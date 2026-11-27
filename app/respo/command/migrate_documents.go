@@ -117,12 +117,6 @@ func migrateFormulaDocuments(ctx context.Context, item *entity.Formula, assets m
 	}
 	if reference == "" {
 		reference = "app/" + item.Name
-		if err := w7.DocumentSdk.CreateCategory(ctx, item.UserID, documentsdk.CreateCategory{Identifie: "app", Name: "制品文档"}); err != nil {
-			var responseError *documentsdk.ResponseError
-			if !errors.As(err, &responseError) || responseError.StatusCode != http.StatusConflict {
-				return err
-			}
-		}
 		owner, err := (commonlogic.User{}).GetById(int(item.UserID))
 		if err != nil {
 			return err

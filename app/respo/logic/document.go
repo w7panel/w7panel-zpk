@@ -20,12 +20,6 @@ import (
 type FormulaDocument struct{}
 
 func (l FormulaDocument) Initialize(ctx context.Context, formula *entity.Formula) (string, error) {
-	if err := w7.DocumentSdk.CreateCategory(ctx, formula.UserID, documentsdk.CreateCategory{Identifie: "app", Name: "制品文档"}); err != nil {
-		var responseError *documentsdk.ResponseError
-		if !errors.As(err, &responseError) || responseError.StatusCode != http.StatusConflict {
-			return "", err
-		}
-	}
 	title := formula.Title
 	if title == "" {
 		title = formula.Name

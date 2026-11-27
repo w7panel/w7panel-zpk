@@ -1,18 +1,6 @@
-CREATE TABLE ims_document_category (
- id INTEGER PRIMARY KEY AUTOINCREMENT,
- identifie varchar(96) NOT NULL,
- name varchar(255) NOT NULL,
- description text NOT NULL DEFAULT '',
- user_id integer NOT NULL,
- deleted_at datetime,
- created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
- updated_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-CREATE UNIQUE INDEX document_category_identifie ON ims_document_category(identifie);
-CREATE INDEX document_category_deleted_at ON ims_document_category(deleted_at);
 CREATE TABLE ims_document_library (
  id INTEGER PRIMARY KEY AUTOINCREMENT,
- category varchar(96) NOT NULL,
+ namespace varchar(96) NOT NULL,
  identifie varchar(96) NOT NULL,
  name varchar(255) NOT NULL,
  description text NOT NULL DEFAULT '',
@@ -24,7 +12,7 @@ CREATE TABLE ims_document_library (
  created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
  updated_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-CREATE UNIQUE INDEX document_library_ref ON ims_document_library(category,identifie);
+CREATE UNIQUE INDEX document_library_ref ON ims_document_library(namespace,identifie);
 CREATE INDEX document_library_owner ON ims_document_library(user_id);
 CREATE INDEX document_library_deleted_at ON ims_document_library(deleted_at);
 CREATE TABLE ims_document_file (

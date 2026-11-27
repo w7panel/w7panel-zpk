@@ -19,20 +19,6 @@
                 <div class="document-toolbar-left">
                     <a-button v-if="user.id" type="primary" @click="openCreate">新建文档库</a-button>
                 </div>
-                <div class="document-toolbar-right">
-                    <span>分类：</span>
-                    <a-select
-                        v-model="category"
-                        placeholder="全部分类"
-                        allow-clear
-                        class="document-category-select"
-                        @change="loadLibraries(1)"
-                    >
-                        <a-option v-for="item in categories" :key="item.identifie" :value="item.identifie">{{
-                            item.name
-                        }}</a-option>
-                    </a-select>
-                </div>
             </div>
             <a-table :data="libraries" :loading="loading" :pagination="false" row-key="id">
                 <template #columns>
@@ -46,9 +32,6 @@
                                 </a-button>
                             </div>
                         </template>
-                    </a-table-column>
-                    <a-table-column title="分类">
-                        <template #cell="{ record }">{{ categoryName(record.category) }}</template>
                     </a-table-column>
                     <a-table-column title="标识"
                         ><template #cell="{ record }">{{ reference(record) }}</template></a-table-column
@@ -88,13 +71,6 @@
         </template>
         <a-modal v-model:visible="form.visible" :title="form.edit ? '编辑文档库' : '新建文档库'">
             <a-form :model="form" layout="vertical">
-                <a-form-item v-if="!form.edit" label="分类"
-                    ><a-select v-model="form.category"
-                        ><a-option v-for="item in categories" :key="item.identifie" :value="item.identifie">{{
-                            item.name
-                        }}</a-option></a-select
-                    ></a-form-item
-                >
                 <a-form-item label="标识"
                     ><a-input
                         v-model="form.identifie"
@@ -122,10 +98,8 @@ export default {
     components: { Workbench, IconArrowLeft, IconCopy },
     props: { client: { type: Object, required: true }, user: { type: Object, default: () => ({}) } },
     data: () => ({
-        categories: [],
         libraries: [],
         downloadBaseURL: '',
-        category: '',
         page: 1,
         total: 0,
         loading: false,
@@ -137,7 +111,6 @@ export default {
     async mounted() {
         if (!this.user.id) return;
         try {
-            this.categories = (await this.client.post('/category/list', {})) || [];
             await this.loadLibraries(1);
         } catch (error) {
             Message.error(error.message);
@@ -173,17 +146,13 @@ export default {
                 Message.error('复制失败，请手动复制下载地址');
             }
         },
-        categoryName(identifie) {
-            return this.categories.find((category) => category.identifie === identifie)?.name || identifie;
-        },
         reference(record) {
-            return record.category + '/' + record.identifie;
+            return record.namespace + '/' + record.identifie;
         },
         async loadLibraries(page = 1) {
             this.loading = true;
             try {
                 const result = await this.client.post('/library/list', {
-                    category: this.category || '',
                     page,
                     limit: 20,
                 });
@@ -207,7 +176,7 @@ export default {
             this.form = {
                 visible: true,
                 edit: false,
-                category: this.category || this.categories[0]?.identifie || '',
+                namespace: 'app_doc',
                 identifie: '',
                 name: '',
                 description: '',
@@ -221,10 +190,9 @@ export default {
             if (this.saving) return;
             if (
                 !this.form.name?.trim() ||
-                !this.form.category ||
                 !/^[a-z0-9][a-z0-9_-]{0,95}$/.test(this.form.identifie || '')
             ) {
-                Message.warning('请填写分类、名称及有效标识');
+                Message.warning('请填写名称及有效标识');
                 return;
             }
             this.saving = true;
@@ -325,25 +293,12 @@ export default {
     gap: 16px;
     margin-bottom: 20px;
 }
-.document-toolbar-left,
-.document-toolbar-right {
+.document-toolbar-left {
     display: flex;
     align-items: center;
     flex-wrap: wrap;
     gap: 10px;
     min-width: 0;
-}
-.document-toolbar-right {
-    flex-wrap: nowrap;
-    flex-shrink: 0;
-    justify-content: flex-end;
-    margin-left: auto;
-    color: var(--color-text-2);
-    font-size: 14px;
-}
-.document-toolbar-right :deep(.document-category-select) {
-    width: 180px;
-    flex-shrink: 0;
 }
 .document-pagination {
     margin-top: 24px;

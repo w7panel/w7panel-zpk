@@ -31,7 +31,7 @@ type Decision struct {
 }
 
 func LibraryResource(library entity.DocumentLibrary) Resource {
-	return Resource{Type: "document_library", Value: library.Category + "/" + library.Identifie}
+	return Resource{Type: "document_library", Value: library.Namespace + "/" + library.Identifie}
 }
 
 func (c *Client) Check(ctx context.Context, userID int32, resource Resource, action string) (bool, error) {

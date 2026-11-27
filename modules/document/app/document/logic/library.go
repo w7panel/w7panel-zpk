@@ -29,9 +29,9 @@ type Page struct {
 }
 
 func (l Library) Get(ctx context.Context, ref string) (*entity.DocumentLibrary, error) {
-	category, identifie := SplitRef(ref)
+	namespace, identifie := SplitRef(ref)
 	query := dao.Q.DocumentLibrary
-	return query.WithContext(ctx).Where(query.Category.Eq(category), query.Identifie.Eq(identifie)).First()
+	return query.WithContext(ctx).Where(query.Namespace.Eq(namespace), query.Identifie.Eq(identifie)).First()
 }
 
 func (l Library) Info(ctx context.Context, user zpk.User, ref string) (*entity.DocumentLibrary, error) {
@@ -45,14 +45,11 @@ func (l Library) Info(ctx context.Context, user zpk.User, ref string) (*entity.D
 	return library, nil
 }
 
-func (l Library) List(ctx context.Context, user zpk.User, category string, page, limit int) (Page, error) {
+func (l Library) List(ctx context.Context, user zpk.User, page, limit int) (Page, error) {
 	library := dao.Q.DocumentLibrary
 	query := library.WithContext(ctx)
 	if !user.Admin {
 		query = query.Where(library.UserID.Eq(user.ID))
-	}
-	if category != "" {
-		query = query.Where(library.Category.Eq(category))
 	}
 	rows, total, err := query.Order(library.ID.Desc()).FindByPage((page-1)*limit, limit)
 	return Page{List: rows, Total: total}, err
@@ -68,6 +65,9 @@ func (l Library) Create(ctx context.Context, user zpk.User, library entity.Docum
 	if library.UserID == user.ID && user.Username != "" {
 		library.Username = user.Username
 	}
+	if err := service.PermissionSdk.EnsureNamespace(ctx, library.Namespace); err != nil {
+		return nil, err
+	}
 	initialFiles := make([]*entity.DocumentFile, 0, len(files))
 	for position, file := range files {
 		key, err := service.DocumentStorage.Put(ctx, []byte(file.Content))
@@ -80,11 +80,8 @@ func (l Library) Create(ctx context.Context, user zpk.User, library entity.Docum
 		initialFiles = append(initialFiles, &entity.DocumentFile{Path: file.Path, Title: file.Title, StorageKey: key, Size: int64(len(file.Content)), Position: int32(position), Protected: file.Protected})
 	}
 	err := dao.Q.Transaction(func(tx *dao.Query) error {
-		if _, err := tx.DocumentCategory.WithContext(ctx).Where(tx.DocumentCategory.Identifie.Eq(library.Category)).First(); err != nil {
-			return err
-		}
 		query := tx.DocumentLibrary
-		count, err := query.WithContext(ctx).Unscoped().Where(query.Category.Eq(library.Category), query.Identifie.Eq(library.Identifie)).Count()
+		count, err := query.WithContext(ctx).Unscoped().Where(query.Namespace.Eq(library.Namespace), query.Identifie.Eq(library.Identifie)).Count()
 		if err != nil {
 			return err
 		}
@@ -111,10 +108,10 @@ func (l Library) Create(ctx context.Context, user zpk.User, library entity.Docum
 }
 
 func (l Library) Edit(ctx context.Context, user zpk.User, ref, name, description string, public *int32) error {
-	category, identifie := SplitRef(ref)
+	namespace, identifie := SplitRef(ref)
 	return dao.Q.Transaction(func(tx *dao.Query) error {
 		query := tx.DocumentLibrary
-		library, err := query.WithContext(ctx).Where(query.Category.Eq(category), query.Identifie.Eq(identifie)).First()
+		library, err := query.WithContext(ctx).Where(query.Namespace.Eq(namespace), query.Identifie.Eq(identifie)).First()
 		if err != nil {
 			return err
 		}
@@ -140,10 +137,10 @@ func (l Library) Edit(ctx context.Context, user zpk.User, ref, name, description
 }
 
 func (l Library) Delete(ctx context.Context, user zpk.User, ref string) error {
-	category, identifie := SplitRef(ref)
+	namespace, identifie := SplitRef(ref)
 	return dao.Q.Transaction(func(tx *dao.Query) error {
 		query := tx.DocumentLibrary
-		library, err := query.WithContext(ctx).Where(query.Category.Eq(category), query.Identifie.Eq(identifie)).First()
+		library, err := query.WithContext(ctx).Where(query.Namespace.Eq(namespace), query.Identifie.Eq(identifie)).First()
 		if err != nil {
 			return err
 		}
@@ -170,13 +167,13 @@ func (l Library) Delete(ctx context.Context, user zpk.User, ref string) error {
 }
 
 func (l Library) touch(ctx context.Context, tx *dao.Query, ref string) (*entity.DocumentLibrary, error) {
-	category, identifie := SplitRef(ref)
+	namespace, identifie := SplitRef(ref)
 	query := tx.DocumentLibrary
-	_, err := query.WithContext(ctx).Where(query.Category.Eq(category), query.Identifie.Eq(identifie)).Update(query.UpdatedAt, time.Now())
+	_, err := query.WithContext(ctx).Where(query.Namespace.Eq(namespace), query.Identifie.Eq(identifie)).Update(query.UpdatedAt, time.Now())
 	if err != nil {
 		return nil, err
 	}
-	return query.WithContext(ctx).Where(query.Category.Eq(category), query.Identifie.Eq(identifie)).First()
+	return query.WithContext(ctx).Where(query.Namespace.Eq(namespace), query.Identifie.Eq(identifie)).First()
 }
 
 func libraryVisibleType(public int32) int32 {

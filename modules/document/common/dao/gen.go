@@ -16,44 +16,39 @@ import (
 )
 
 var (
-	Q                = new(Query)
-	DocumentCategory *documentCategory
-	DocumentFile     *documentFile
-	DocumentLibrary  *documentLibrary
+	Q               = new(Query)
+	DocumentFile    *documentFile
+	DocumentLibrary *documentLibrary
 )
 
 func SetDefault(db *gorm.DB, opts ...gen.DOOption) {
 	*Q = *Use(db, opts...)
-	DocumentCategory = &Q.DocumentCategory
 	DocumentFile = &Q.DocumentFile
 	DocumentLibrary = &Q.DocumentLibrary
 }
 
 func Use(db *gorm.DB, opts ...gen.DOOption) *Query {
 	return &Query{
-		db:               db,
-		DocumentCategory: newDocumentCategory(db, opts...),
-		DocumentFile:     newDocumentFile(db, opts...),
-		DocumentLibrary:  newDocumentLibrary(db, opts...),
+		db:              db,
+		DocumentFile:    newDocumentFile(db, opts...),
+		DocumentLibrary: newDocumentLibrary(db, opts...),
 	}
 }
 
 type Query struct {
 	db *gorm.DB
 
-	DocumentCategory documentCategory
-	DocumentFile     documentFile
-	DocumentLibrary  documentLibrary
+	DocumentFile    documentFile
+	DocumentLibrary documentLibrary
 }
 
 func (q *Query) Available() bool { return q.db != nil }
 
 func (q *Query) clone(db *gorm.DB) *Query {
 	return &Query{
-		db:               db,
-		DocumentCategory: q.DocumentCategory.clone(db),
-		DocumentFile:     q.DocumentFile.clone(db),
-		DocumentLibrary:  q.DocumentLibrary.clone(db),
+		db:              db,
+		DocumentFile:    q.DocumentFile.clone(db),
+		DocumentLibrary: q.DocumentLibrary.clone(db),
 	}
 }
 
@@ -67,24 +62,21 @@ func (q *Query) WriteDB() *Query {
 
 func (q *Query) ReplaceDB(db *gorm.DB) *Query {
 	return &Query{
-		db:               db,
-		DocumentCategory: q.DocumentCategory.replaceDB(db),
-		DocumentFile:     q.DocumentFile.replaceDB(db),
-		DocumentLibrary:  q.DocumentLibrary.replaceDB(db),
+		db:              db,
+		DocumentFile:    q.DocumentFile.replaceDB(db),
+		DocumentLibrary: q.DocumentLibrary.replaceDB(db),
 	}
 }
 
 type queryCtx struct {
-	DocumentCategory IDocumentCategoryDo
-	DocumentFile     IDocumentFileDo
-	DocumentLibrary  IDocumentLibraryDo
+	DocumentFile    IDocumentFileDo
+	DocumentLibrary IDocumentLibraryDo
 }
 
 func (q *Query) WithContext(ctx context.Context) *queryCtx {
 	return &queryCtx{
-		DocumentCategory: q.DocumentCategory.WithContext(ctx),
-		DocumentFile:     q.DocumentFile.WithContext(ctx),
-		DocumentLibrary:  q.DocumentLibrary.WithContext(ctx),
+		DocumentFile:    q.DocumentFile.WithContext(ctx),
+		DocumentLibrary: q.DocumentLibrary.WithContext(ctx),
 	}
 }
 

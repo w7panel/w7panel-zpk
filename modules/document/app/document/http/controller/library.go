@@ -22,15 +22,14 @@ func (c Library) Info(ctx *gin.Context) {
 
 func (c Library) List(ctx *gin.Context) {
 	type ParamsValidate struct {
-		Category string `json:"category" binding:"omitempty,document_identifie"`
-		Page     int    `json:"page" binding:"min=1"`
-		Limit    int    `json:"limit" binding:"min=1,max=100"`
+		Page  int `json:"page" binding:"min=1"`
+		Limit int `json:"limit" binding:"min=1,max=100"`
 	}
 	params := ParamsValidate{Page: 1, Limit: 20}
 	if !c.Validate(ctx, &params) {
 		return
 	}
-	result, e := logic.Library{}.List(ctx.Request.Context(), currentUser(ctx), params.Category, params.Page, params.Limit)
+	result, e := logic.Library{}.List(ctx.Request.Context(), currentUser(ctx), params.Page, params.Limit)
 	c.Respond(ctx, result, e)
 }
 
@@ -55,8 +54,8 @@ func (c Library) Create(ctx *gin.Context) {
 	if !c.Validate(ctx, &params) {
 		return
 	}
-	category, identifie := logic.SplitRef(params.Ref)
-	library := entity.DocumentLibrary{Category: category, Identifie: identifie, Name: params.Name, Description: params.Description, Public: params.Public, UserID: params.OwnerID, Username: params.OwnerName, Protected: params.Protected}
+	namespace, identifie := logic.SplitRef(params.Ref)
+	library := entity.DocumentLibrary{Namespace: namespace, Identifie: identifie, Name: params.Name, Description: params.Description, Public: params.Public, UserID: params.OwnerID, Username: params.OwnerName, Protected: params.Protected}
 	files := make([]logic.CreateFile, 0, len(params.Files))
 	for _, file := range params.Files {
 		files = append(files, logic.CreateFile{Path: file.Path, Title: file.Title, Content: file.Content, Protected: file.Protected})

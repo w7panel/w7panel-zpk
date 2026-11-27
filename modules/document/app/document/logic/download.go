@@ -26,11 +26,11 @@ type Snapshot struct {
 
 // Read metadata in one transaction; immutable blob keys keep the snapshot stable.
 func (d Download) snapshot(ctx context.Context, ref string) (Snapshot, error) {
-	category, identifie := SplitRef(ref)
+	namespace, identifie := SplitRef(ref)
 	var snapshot Snapshot
 	err := dao.Q.Transaction(func(tx *dao.Query) error {
 		library := tx.DocumentLibrary
-		c, e := library.WithContext(ctx).Where(library.Category.Eq(category), library.Identifie.Eq(identifie)).First()
+		c, e := library.WithContext(ctx).Where(library.Namespace.Eq(namespace), library.Identifie.Eq(identifie)).First()
 		if e != nil {
 			return e
 		}

@@ -25,18 +25,11 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-          cache-dependency-path: modules/document/ui/package-lock.json
-
       - name: Set up Helm
         uses: azure/setup-helm@v4
 
       - name: Install build dependencies
-        run: sudo apt-get update && sudo apt-get install -y musl-tools zip
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
@@ -44,9 +37,6 @@ jobs:
           registry: ${{ env.IMAGE_PUSH_REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Install frontend dependencies
-        run: make -C modules/document ui-deps
 
       - name: Publish document image and build packages
         run: |
@@ -72,6 +62,5 @@ jobs:
           name: w7-zpkdocument
           path: |
             modules/document/builder/w7-zpkdocument-*.tgz
-            modules/document/builder/document-ui.zip
           if-no-files-found: error
           retention-days: 7

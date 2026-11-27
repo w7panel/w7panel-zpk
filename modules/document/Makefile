@@ -63,7 +63,7 @@ lint:
 test:
 	cd "$(DOCUMENT_DIR)" && go test . ./app/... ./common/...
 
-publish: dockerbuild webzip chart
+publish: dockerbuild chart
 	docker tag "$(LOCAL_IMAGE)" "$(PUBLISH_IMAGE)"
 	docker push "$(PUBLISH_IMAGE)"
 

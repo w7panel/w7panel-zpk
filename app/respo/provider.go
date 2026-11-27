@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/w7panel/w7panel-zpk/app/respo/command"
 	"github.com/w7panel/w7panel-zpk/app/respo/http/controller"
+	"github.com/w7panel/w7panel-zpk/app/respo/http/controller/proxy"
 	"github.com/w7panel/w7panel-zpk/app/respo/logic"
 	"github.com/w7panel/w7panel-zpk/app/respo/logic/formula"
 	"github.com/w7panel/w7panel-zpk/app/respo/logic/helm"
@@ -90,6 +91,7 @@ func (provider *Provider) Register(httpServer *http_server.Server, console conso
 
 	// 注册一些路由
 	httpServer.RegisterRouters(func(engine *gin.Engine) {
+		engine.Any("/doc/*path", proxy.NewDocument(facade.GetConfig().GetString("setting.document.base_url")))
 		root := engine.Group("/zpk")
 		root.GET("/", controller.Home{}.Index)
 

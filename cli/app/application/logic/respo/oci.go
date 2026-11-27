@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"net/http"
 	"os"
 	"path"
 	"path/filepath"
@@ -18,6 +19,8 @@ import (
 	commonlogic "github.com/w7panel/w7panel-zpk/common/logic"
 	"github.com/w7panel/w7panel-zpk/common/service/oci"
 	"oras.land/oras-go/v2/content"
+	"oras.land/oras-go/v2/errdef"
+	"oras.land/oras-go/v2/registry/remote/errcode"
 	"sigs.k8s.io/yaml"
 )
 
@@ -58,6 +61,23 @@ func Push(ctx context.Context, target clicommon.Target, session clicommon.Sessio
 		return nil, err
 	}
 	tags, err := clicommon.ListVersions(ctx, repository)
+	// Keep updates in the legacy repository when the current path is unavailable
+	// or empty. A genuinely new application still uses the configured namespace.
+	if strings.HasPrefix(target.Repository, "app/") && (err == nil && len(tags) == 0 || err != nil && canTryLegacyRepository(err)) && ctx.Err() == nil {
+		primaryErr := err
+		legacy := target
+		legacy.Repository = "zpk_oci/" + strings.TrimPrefix(target.Repository, "app/")
+		legacyRepository, legacyErr := clicommon.NewRepository(legacy, session)
+		if legacyErr != nil {
+			return nil, legacyErr
+		}
+		legacyTags, legacyErr := clicommon.ListVersions(ctx, legacyRepository)
+		if legacyErr == nil && (len(legacyTags) > 0 || primaryErr != nil) {
+			target, repository, tags, err = legacy, legacyRepository, legacyTags, nil
+		} else if primaryErr != nil {
+			return nil, fmt.Errorf("查询推送仓库失败：app 路径: %w；zpk_oci 路径: %w", primaryErr, legacyErr)
+		}
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -105,6 +125,21 @@ func Pull(ctx context.Context, target clicommon.Target, session clicommon.Sessio
 		return nil, err
 	}
 	version, descriptor, err := clicommon.ResolveVersion(ctx, repository, target.Version)
+	// Older ZPK servers store applications under zpk_oci. Each path must pass
+	// its own registry authentication; credentials remain on the same host.
+	if err != nil && strings.HasPrefix(target.Repository, "app/") && canTryLegacyRepository(err) && ctx.Err() == nil {
+		primaryErr := err
+		legacy := target
+		legacy.Repository = "zpk_oci/" + strings.TrimPrefix(target.Repository, "app/")
+		repository, err = clicommon.NewRepository(legacy, session)
+		if err == nil {
+			version, descriptor, err = clicommon.ResolveVersion(ctx, repository, target.Version)
+		}
+		if err != nil {
+			return nil, fmt.Errorf("拉取应用失败（非公开应用请先 login）：app 路径: %w；zpk_oci 路径: %w", primaryErr, err)
+		}
+		target = legacy
+	}
 	if err != nil {
 		return nil, fmt.Errorf("拉取应用失败（非公开应用请先 login）: %w", err)
 	}
@@ -520,4 +555,13 @@ func unpackAttachments(directory string, entry appManifest, attachments map[stri
 		commonlogic.SetManifestString(entry.raw, field.section, field.field, "./"+relative)
 	}
 	return nil
+}
+
+// Transport failures and server errors must not silently select an older package.
+func canTryLegacyRepository(err error) bool {
+	if errors.Is(err, errdef.ErrNotFound) || errors.Is(err, clicommon.ErrNoVersions) {
+		return true
+	}
+	var response *errcode.ErrorResponse
+	return errors.As(err, &response) && (response.StatusCode == http.StatusUnauthorized || response.StatusCode == http.StatusForbidden || response.StatusCode == http.StatusNotFound)
 }

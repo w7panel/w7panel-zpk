@@ -59,7 +59,7 @@ func (c Formula) authorizeFormulaInstallDetail(ctx *gin.Context, params *formula
 		c.JsonResponseWithError(ctx, errors.New("该制品未发布到制品市场"), http.StatusForbidden)
 		return zpk_market.FormulaUpgradeVersionResult{}, false
 	}
-	if !marketRequest && !checkFormulaPullPermission(ctx, formula.Name) {
+	if !marketRequest && !checkFormulaPullPermission(ctx, formula.Name, user) {
 		return zpk_market.FormulaUpgradeVersionResult{}, false
 	}
 	// 源站制品所有者、管理员沿用管理豁免；其他市场访问按以下场景验证。

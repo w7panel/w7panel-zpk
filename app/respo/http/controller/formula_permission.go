@@ -13,17 +13,15 @@ import (
 	"strings"
 )
 
-func checkFormulaPullPermission(ctx *gin.Context, name string) bool {
+func checkFormulaPullPermission(ctx *gin.Context, name string, user *entity.RegistryUser) bool {
 	repository := commonlogic.GetFormulaOciName(name)
-	// Only a source ZPK login establishes a local user; target panel IDs are never used.
-	user, _ := ctx.Get("user")
-	localUser, _ := user.(*entity.RegistryUser)
-	if localUser != nil && (commonlogic.User{}).IsAdminUser(localUser) {
+	// The caller supplies the source ZPK user; target panel IDs are never used.
+	if user != nil && (commonlogic.User{}).IsAdminUser(user) {
 		return true
 	}
 	userID := int32(0)
-	if localUser != nil {
-		userID = localUser.ID
+	if user != nil {
+		userID = user.ID
 	}
 	token := ""
 	if raw := ctx.GetHeader("Authorization"); strings.HasPrefix(raw, "Bearer ") {

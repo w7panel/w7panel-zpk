@@ -86,6 +86,7 @@ func (provider *Provider) Register(httpServer *http_server.Server, console conso
 	console.RegisterCommand(new(command.SetEnvironmentCategory))
 	console.RegisterCommand(new(command.MigrateDocuments))
 	console.RegisterCommand(new(command.CleanSharedTags))
+	console.RegisterCommand(new(command.MigrateNamespace))
 
 	// 注册一些路由
 	httpServer.RegisterRouters(func(engine *gin.Engine) {
@@ -120,6 +121,8 @@ func (provider *Provider) Register(httpServer *http_server.Server, console conso
 		group.Match([]string{"POST", "OPTIONS"}, "/status", middleware.DenyDomainReq{}.Process, middleware.Auth{}.Process, controller.Formula{}.Status)
 		group.Match([]string{"POST", "OPTIONS"}, "/setting/get", middleware.DenyDomainReq{}.Process, middleware.Auth{}.Process, controller.FormulaSetting{}.Get)
 		group.Match([]string{"POST", "OPTIONS"}, "/setting/set", middleware.DenyDomainReq{}.Process, middleware.Auth{}.Process, controller.FormulaSetting{}.Set)
+		group.Match([]string{"POST", "OPTIONS"}, "/permission/get", middleware.DenyDomainReq{}.Process, middleware.Auth{}.Process, controller.FormulaPermission{}.Get)
+		group.Match([]string{"POST", "OPTIONS"}, "/permission/set", middleware.DenyDomainReq{}.Process, middleware.Auth{}.Process, controller.FormulaPermission{}.Set)
 
 		//设置商品价格属性
 		group.Match([]string{"POST", "OPTIONS"}, "/goods/can-upgrade-versions", middleware.DenyDomainReq{}.Process, middleware.Auth{}.Process, controller.FormulaGoods{}.GetCanFeeUpgradeVersions)

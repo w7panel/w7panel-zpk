@@ -1,6 +1,6 @@
 应用发布工具的目录规范、`zpk app push/pull/update` 和 `zpk image push` 用法见 [CLI 发布工具](cli/README.md)。`app` 复用原有 respo OCI 格式；文档发布暂不支持。
 
-应用 OCI 仓库创建时沿用“跟随 namespace”，制品 namespace 的默认配置为公开读，因此未发布的应用也可匿名拉取。发布商品成功后，根据本次商品授权费用切换对应 repository 的权限：价格为 0 时为公有读私有写，否则为私有。修改价格后再次发布商品时同步，单独保存价格不改变仓库权限。不修改 namespace 和用户授权，私有应用仍需要目标仓库中具有 pull 权限的账号。公开读覆盖整个仓库的全部版本；既有 Registry token 的有效期保持原机制。
+新建制品通过 PermissionSdk 创建对应 OCI repository 资源，默认为公有读私有写，并给创建者授予 pull/push。基础信息中的公私设置作用于该 repository 的全部版本；普通 Info 访问验证源仓库 pull，携带市场订单或后台安装 token 时改走市场授权。完整流程见 [制品权限与安装详情](app/respo/README.md)，公共模型与继承规则见 [Registry 公共资源与权限](app/registry/README.md)。
 
 # 测试证书
 openssl genpkey -algorithm RSA -out registry-key.pem -pkeyopt rsa_keygen_bits:4096
@@ -128,7 +128,7 @@ unset REGISTRY_PASSWORD
 HTTPS 默认验证证书，自签名证书可用 `--ca /path/to/ca.pem`；
 账号可用 `--username` 指定。`--timeout` 默认为 `1m`，用于单次请求（含分页枚举）。
 沿用镜像版本列表的删除语义：tag 先解析为 digest，再删除 manifest，
-同一 manifest 的多个 tag 会一起删除。远程删除全部成功后，在数据库事务中删除指定 namespace（含子路径）的 namespace、镜像记录及关联 tag、部署规则、部署日志和权限；namespace 和镜像沿用现有软删除约定，默认 namespace 禁止删除。不主动清理 blob，
+同一 manifest 的多个 tag 会一起删除。远程删除全部成功后，在数据库事务中删除指定 namespace（含子路径）的 namespace、镜像记录及关联 tag、部署规则、部署日志和权限；仍被文档等其他资源类型使用的 namespace 及其授权会保留；namespace 和镜像沿用现有软删除约定，默认 namespace 禁止删除。不主动清理 blob，
 磁盘空间回收仍由 Registry GC 负责。列出 tag、解析 tag 或删除 manifest 时明确返回不存在（404），会记录并跳过，不影响其他删除或后续数据库清理；权限、网络及其他错误仍按失败处理。其他枚举或解析失败时不开始删除，
 删除阶段失败会继续处理其他项并返回错误，已成功删除的内容不会回滚。
 `--dry-run` 同时列出数据库清理范围，不写入数据库。远程删除失败时不清理数据库；数据库事务失败时回滚数据库修改，但无法恢复已删除的远程 tag，可重试命令。
@@ -145,7 +145,7 @@ HTTPS 默认验证证书，自签名证书可用 `--ca /path/to/ca.pem`；
 
 ## 镜像自动任务
 
-镜像仓库支持按上传事件执行多阶段部署与镜像重构任务。工作流业务统一位于 `app/workflow`，使用嵌入式 Helm 模板和保存时生成的 Helm 包，复用既有规则表、规则日志表；entity 和 DAO 仍由 `common` 统一维护。配置、部署权限、数据库字段升级及验证方法见 [镜像自动任务模块说明](app/workflow/README.md)。
+镜像仓库支持按上传事件执行多阶段部署与镜像重构任务。工作流业务统一位于 `app/workflow`，执行时使用数据库快照和嵌入式模板生成内存 Helm Chart，复用既有规则表、规则日志表；entity 和 DAO 仍由 `common` 统一维护。配置、部署权限、数据库字段升级及验证方法见 [镜像自动任务模块说明](app/workflow/README.md)。
 
 ## 数据库结构自动补齐
 
@@ -167,3 +167,34 @@ JWT 不包含面板 access token。制品前端对自有 ZPK origin/path 额外�
 制品简介保存在制品表 `readme` 字段，文档由独立文档服务维护，不再读写 `shared` OCI。旧数据使用 `respo:migrate-documents` 一次性迁移，确认后使用 `respo:clean-shared-tags --dry-run` 预检查，再手动清理旧 tag。两个命令均支持 `--identifie` 限定制品；清理命令不删除本地源文件，也不执行 blob 垃圾回收。
 
 运行条件、失败处理与命令示例见 [文档系统迁移说明](modules/document/README.md#一次性旧文档迁移)。
+
+### 公共资源与权限
+
+模块结构、鉴权原理与 SDK 使用见 [Registry 公共资源与权限说明](app/registry/README.md)。
+
+镜像和文档库共用现有 `ims_registry_repository` 表，新增 `resource_type` 区分 `repository`、`document_library` 及其他业务类型；历史行默认属于 `repository`。所有者仍用 `user_id`，公开状态仍用 `visible_type`，不新增资源表或重复存储公开 actions、继承开关。同一 namespace/name 下的不同资源类型相互独立。用户的明确授权仍存于 `ims_registry_user_permission`。
+
+| visible_type | 常量 | 含义 |
+| --- | --- | --- |
+| 1 | `VisibleTypePrivate` | 私有，公开 actions 为空 |
+| 2 | `VisibleTypePublicWrite` | 公开读写，允许 `pull/push` |
+| 3 | `VisibleTypeFollowNamespace` | 使用 namespace 的公开状态（namespace 本身不用此值） |
+| 4 | `VisibleTypePublicRead` | 公开只读，允许 `pull` |
+
+常量集中在 `app/registry/logic/common/visible_type.go`。公开状态与用户 actions 授权分开管理；切换公私不替换用户授权。用户精确授权、push 阻止 namespace 兜底、pull 继续允许 namespace 授权等规则沿用原实现。
+
+`app/registry/http/controller/common` 与 `logic/common` 维护资源、命名空间及通用认证；镜像 webhook、OCI 复制、tag 与远程删除位于对应的 `repository` 目录，删除实现合入 `image_repository.go`。清理、迁移镜像的命令及其专属辅助逻辑集中在 `app/registry/command`。
+
+开放接口均要求 App 签名：`/zpk/v2/openapi/resource/get,set,check,delete` 管理资源状态及验证；`/openapi/permission/add,delete,clear` 管理用户授权。资源 set 使用 `resource/type/value`、`user_id` 和 `visible_type`；已有资源不因改公私而更换所有者。旧通用授权 get/set 接口移除。`/zpk/v2/registry/auth` 保留 Docker Registry token 协议，按每个 scope 的实际资源类型验证，不再忽略非 repository 的 scope。
+
+镜像页面通过 `/zpk/v2/api/resource/list`、`/resource/info`、`/resource/create` 查询或创建资源，必须传 `resource_type: repository`。镜像编辑里的远程 OCI 复制和 tag/删除操作仍使用专属接口。需要配套更新 ZPK 前端、后端及文档服务；本次不改外部面板仓库。
+
+### 制品仓库公私权限与安装
+
+制品统一通过 Permission SDK 查询、设置和校验对应 OCI 资源，并维护用户授权。基础信息弹窗分别调用 `/respo/permission/get` 和 `/respo/permission/set`。新制品默认公有读，保留所有者 `pull/push` 授权，OCI 命名空间默认 `app`。资源状态、命名空间与用户授权统一使用 `setting.permission.server_url`（`PERMISSION_SERVER_URL`），默认请求本机 ZPK。远程权限与制品元数据不共享数据库事务，失败可重试。本地安装 `info` 校验对应资源的 `pull`；匿名请求返回标准 `WWW-Authenticate: Bearer`，客户端向 `/zpk/v2/registry/auth` 申请 token 后重试。面板安装页可选择匹配仓库地址和命名空间的镜像仓库 Secret，或输入源仓库账号密码。
+
+市场后台审核 / 测试安装使用带临时 token 的链接，由市场校验应用标识和有效期；普通购买用户携带订单号，由市场校验安装 / 升级资格及绑定。两者均走既有市场验证，订单号本身不授予权限；发布市场商品不再按价格覆盖本地仓库公私状态。权限统一在 `info` 校验，下载接口沿用原有地址和 token 流程，不另加下载签名或有效期；取得下载地址后可以直接下载。
+
+旧实例升级时，在备份后执行 `respo:migrate-namespace`（可用 `--identifie` 限定制品）：命令直接操作数据库，先复制旧 `zpk_oci` 仓库的公私状态、逐仓库用户授权并补齐所有者的 `pull/push` 权限，再按数据库版本 ID 倒序复制每个制品的全部版本。没有 OCI 数据的版本跳过。已有 `app` 版本和权限设置不覆盖，源版本、源授权保留，不复制旧 namespace 的全量用户授权。
+
+新建、发布、读取与鉴权统一使用 `app`。运行时不再从 `zpk_oci` 读取或补齐版本，历史数据全部通过迁移命令复制。复制不会触发重新发布或清理编辑文件。迁移命令应在切换流量前执行；OCI 与数据库不共享事务，失败可重试，不删除源仓库。

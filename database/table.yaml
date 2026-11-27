@@ -69,6 +69,15 @@ relation:
       action:
         type: PermissionActionOption
   - table: registry_repository
+    column:
+      resource_type:
+        type: string
+        tag:
+          gorm:
+            size: "64"
+            not null: ""
+            default: repository
+            index: ""
   # Workflow owns rule/log behavior; persisted models and DAO remain in common.
   - table: registry_repository_deploy_rule
   - table: registry_repository_tag

@@ -32,7 +32,7 @@ func (c *Client) call(ctx context.Context, path string, payload interface{}, out
 	if err != nil {
 		return err
 	}
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, c.ServerURL+"/zpk/v2/openapi/permission"+path, bytes.NewReader(data))
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, c.ServerURL+"/zpk/v2/openapi"+path, bytes.NewReader(data))
 	if err != nil {
 		return err
 	}

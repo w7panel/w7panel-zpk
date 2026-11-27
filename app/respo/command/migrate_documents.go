@@ -72,6 +72,7 @@ func (MigrateDocuments) run(cmd *cobra.Command, _ []string) error {
 	query := dao.Q.Formula
 	var lastID int32
 	total := 0
+	failed := 0
 	for {
 		rows := query.WithContext(cmd.Context()).Where(query.ID.Gt(lastID))
 		if identifie != "" {
@@ -85,22 +86,26 @@ func (MigrateDocuments) run(cmd *cobra.Command, _ []string) error {
 			break
 		}
 		for _, item := range batch {
+			lastID = item.ID
 			assets, err := readLegacyFormulaAssets(cmd.Context(), depot.GetBasePath(), item.Name)
 			if err != nil {
-				return fmt.Errorf("读取制品 %s 旧文档失败: %w", item.Name, err)
+				fmt.Fprintf(cmd.ErrOrStderr(), "读取制品 %s 旧文档失败，已跳过: %v\n", item.Name, err)
+				failed++
+				continue
 			}
 			if err := migrateFormulaDocuments(cmd.Context(), item, assets); err != nil {
-				return fmt.Errorf("迁移制品 %s 失败（可重试，已复制正文不会覆盖）: %w", item.Name, err)
+				fmt.Fprintf(cmd.ErrOrStderr(), "迁移制品 %s 失败，已跳过（可重试，已复制正文不会覆盖）: %v\n", item.Name, err)
+				failed++
+				continue
 			}
 			fmt.Fprintf(cmd.OutOrStdout(), "制品 %s 文档及简介迁移完成\n", item.Name)
 			total++
-			lastID = item.ID
 		}
 	}
-	if total == 0 && identifie != "" {
+	if total+failed == 0 && identifie != "" {
 		return fmt.Errorf("制品 %q 不存在", identifie)
 	}
-	fmt.Fprintf(cmd.OutOrStdout(), "文档迁移完成，共 %d 个制品\n", total)
+	fmt.Fprintf(cmd.OutOrStdout(), "文档迁移完成，成功 %d 个制品，失败跳过 %d 个\n", total, failed)
 	return nil
 }
 

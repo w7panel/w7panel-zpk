@@ -345,7 +345,8 @@ export default {
 
         getInfo() {
             this.loading = true;
-            myAxios.post("/v2/api/repository/info", {
+            myAxios.post("/v2/api/resource/info", {
+ resource_type:"repository",
                 id: this.id
             }).then(res => {
                 let data = res.data.data || {};

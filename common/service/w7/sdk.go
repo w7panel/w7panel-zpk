@@ -16,6 +16,7 @@ import (
 	"github.com/w7panel/w7panel-zpk/common/service/w7/devcenter"
 	"github.com/w7panel/w7panel-zpk/common/service/w7/document"
 	"github.com/w7panel/w7panel-zpk/common/service/w7/ip"
+	"github.com/w7panel/w7panel-zpk/common/service/w7/permission"
 	zpk_market "github.com/w7panel/w7panel-zpk/common/service/w7/zpk-market"
 )
 
@@ -26,6 +27,7 @@ var IpGoodsSdk *ip.GoodsService
 var ZpkMarketSdk *zpk_market.ZpkMarketService
 var OpenCloudSdk *opencloud.Client
 var DocumentSdk *document.Client
+var PermissionSdk *permission.Client
 var AppSdk *base.Base
 
 type appCredential struct {
@@ -89,6 +91,7 @@ func InitW7Sdk(config *viper.Viper) error {
 	})
 	AppSdk = &base.Base{Appid: credential.Appid, Secret: credential.Secret}
 	DocumentSdk = document.New(config.GetString("setting.document.base_url"), credential.Appid, credential.Secret)
+	PermissionSdk = permission.New(config.GetString("setting.permission.server_url"), credential.Appid, credential.Secret)
 
 	return nil
 }

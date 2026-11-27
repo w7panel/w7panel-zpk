@@ -138,7 +138,7 @@ func runAppPush(cmd *cobra.Command, args []string) error {
 	plainHTTP, _ := cmd.Flags().GetBool("plain-http")
 	namespace := facade.GetConfig().GetString("setting.depot.oci_namespace")
 	if namespace == "" {
-		namespace = "zpk_oci"
+		namespace = "app"
 	}
 	target, err := clicommon.ResolveTarget(reference, session.Host, namespace, plainHTTP)
 	if err != nil {
@@ -175,7 +175,7 @@ func runAppPull(cmd *cobra.Command, args []string) error {
 	plainHTTP, _ := cmd.Flags().GetBool("plain-http")
 	namespace := facade.GetConfig().GetString("setting.depot.oci_namespace")
 	if namespace == "" {
-		namespace = "zpk_oci"
+		namespace = "app"
 	}
 	target, err := clicommon.ResolveTarget(args[0], host, namespace, plainHTTP)
 	if err != nil {

@@ -47,12 +47,14 @@ setting:
   state_file: ${SQLITE_DIR}db_switch_state.json
   oidc:
     base_url: ${SYSTEM_OIDC_BASE_URL-http://w7panel-offline-agent.default.svc.cluster.local:8000}
+  permission:
+    server_url: ${PERMISSION_SERVER_URL-http://127.0.0.1:8000}
   document:
     base_url: ${DOCUMENT_BASE_URL-http://127.0.0.1:8001}
   depot:
     external_domain: ${REGISTRY_EXTERNAL_DOMAIN-172.16.1.161:8000}
     default_icon_path: ${USER_DEFAULT_PATH-/home/icon.png}
-    oci_namespace: ${DEPOT_OCI_NAMESPACE-zpk_oci}
+    oci_namespace: ${DEPOT_OCI_NAMESPACE-app}
     # 本地存放目录
     base_dir: ${DEPOT_BASE_DIR-/tmp/respo}
     # 需要将zip同步到的远程附件，方便构建时使用
@@ -71,8 +73,8 @@ setting:
     user_pwd_secret: ${USER_PASSWORD_SECRET-test}
     webhook_token: ${WEBHOOK_TOKEN-test}
     namespaces_default_visible:
-      ${DEPOT_OCI_NAMESPACE-zpk_oci}: 4
-    list_ignore_namespaces: ${DEPOT_OCI_NAMESPACE-zpk_oci}
+      ${DEPOT_OCI_NAMESPACE-app}: 4
+    list_ignore_namespaces: ${DEPOT_OCI_NAMESPACE-app}
 registry_cli:
   default:
     url: ${REGISTRY_NATIVE_URL-}

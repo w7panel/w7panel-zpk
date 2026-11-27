@@ -20,7 +20,6 @@ import (
 	logic2 "github.com/w7panel/w7panel-zpk/common/logic"
 	"github.com/w7panel/w7panel-zpk/common/service/w7"
 	"github.com/w7panel/w7panel-zpk/common/service/w7/devcenter"
-	zpk_market "github.com/w7panel/w7panel-zpk/common/service/w7/zpk-market"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/core/err_handler"
 	"gorm.io/gen/field"
@@ -132,23 +131,7 @@ func (c Formula) ImportRemoteChildApplications(ctx *gin.Context) {
 }
 
 func (c Formula) Info(ctx *gin.Context) {
-	type ParamsValidate struct {
-		Identifie      string `uri:"id" json:"identifie" binding:"required"`
-		Version        string `uri:"version" json:"version"`
-		CName          string `uri:"cid" json:"cname"`
-		IsUpgrade      int32  `form:"is_upgrade" json:"is_upgrade"`
-		CheckUpgrade   int32  `form:"check_upgrade" json:"check_upgrade"`
-		CurVersion     string `form:"cur_version" json:"cur_version"`
-		Token          string `form:"token" json:"token"`
-		OrderSn        string `form:"order_sn" json:"order_sn"`
-		ConsoleUid     int32  `form:"console_uid" json:"console_uid"`
-		Domain         string `form:"domain" json:"domain"`
-		AppIdentify    string `form:"app_identify" json:"app_identify"`
-		Reinstall      bool   `form:"reinstall" json:"reinstall"`
-		FullManifest   bool   `form:"full_manifest" json:"full_manifest"`
-		RuntimeContext bool   `form:"runtime_context" json:"runtime_context"`
-	}
-	params := ParamsValidate{}
+	params := formulaInstallDetailParams{}
 	if !c.Validate(ctx, &params) {
 		return
 	}
@@ -163,103 +146,18 @@ func (c Formula) Info(ctx *gin.Context) {
 	if consoleUid == 0 && ctx.GetString("appid") != "" {
 		consoleUid = params.ConsoleUid
 	}
-	canUpgradeVersion := ""
-	formulaExpire := false
-	targetFormulaIdentify := ""
-	dynamicValues := map[string]interface{}{
-		"order_status": "none",
-		"license_type": "paid",
-		"validate": map[string]interface{}{
-			"valid":   true,
-			"reason":  "not_required",
-			"message": "当前制品无需订单授权",
-		},
-	}
-
-	user := logic2.User{}.GetUser(ctx)
-	isAdminUser := false
-	userId := int32(0)
-	if user != nil {
-		isAdminUser = logic2.User{}.IsAdminUser(user)
-		userId = user.ID
-	}
-	//临时处理， 后续通过 apppid 查创始人 console_uid 来判断
-	if userId != formula.UserId && !isAdminUser {
-		if params.Token != "" {
-			if err := w7.ZpkMarketSdk.CheckToken(params.Token, formula.Name); err != nil {
-				c.JsonResponseWithServerError(ctx, err)
-				return
-			}
-		} else {
-			if params.RuntimeContext {
-				dynamicValues, err = zpkmarket.GetFormulaRuntimeDynamicValues(*formula, consoleUid, params.OrderSn)
-				if err != nil {
-					c.JsonResponseWithServerError(ctx, err)
-					return
-				}
-				c.JsonResponseWithoutError(ctx, formulaRuntimeContextResponse(formula.Title, dynamicValues))
-				return
-			}
-			checkResult, checkErr := zpkmarket.CheckFormulaCanInstallOrUpgrade(*formula, consoleUid, params.OrderSn, params.IsUpgrade > 0, params.Reinstall, params.Domain, params.AppIdentify)
-			if checkErr != nil {
-				if writeFormulaAccessError(ctx, formula.GoodsId, params.OrderSn, checkErr) {
-					return
-				}
-				c.JsonResponseWithError(ctx, checkErr, 500)
-				return
-			}
-			if checkResult.EntitlementStatus == zpk_market.EntitlementStatusTrialExpired {
-				writeFormulaAccessNotice(ctx, formula.GoodsId, checkResult, zpk_market.EntitlementStatusTrialExpired, "免费试用已到期，请购买或续费后继续使用")
-				return
-			}
-			if !checkResult.CanInstallOrUpgrade {
-				switch checkResult.ConflictReason {
-				case zpk_market.InstallConflictDomainMismatch, zpk_market.InstallConflictAppIdentifyExists:
-					writeFormulaInstallConflict(ctx, checkResult, params.IsUpgrade <= 0, formulaConflictNoticeContext{AppTitle: formula.Title, OrderSN: params.OrderSn, Domain: params.Domain})
-				case zpk_market.InstallConflictRefundPending:
-					writeFormulaAccessNotice(ctx, formula.GoodsId, checkResult, zpk_market.InstallConflictRefundPending, "订单退款处理中，暂不能安装或升级，请前往制品市场查看订单")
-				default:
-					writeFormulaAccessNotice(ctx, formula.GoodsId, checkResult, zpk_market.AccessReasonPurchaseRequired, "请先购买后再安装")
-				}
-				return
-			}
-			if checkResult.OrderSn != "" {
-				params.OrderSn = checkResult.OrderSn
-			}
-			upgradeResult, checkErr := zpkmarket.GetFormulaCanUpgradeVersion(*formula, consoleUid, params.OrderSn)
-			slog.Info("formula upgrade result resolved",
-				"upgrade_result", upgradeResult,
-				"err", checkErr,
-			)
-			if checkErr != nil {
-				if writeFormulaAccessError(ctx, formula.GoodsId, params.OrderSn, checkErr) {
-					return
-				}
-				c.JsonResponseWithError(ctx, checkErr, 500)
-				return
-			}
-			canUpgradeVersion = upgradeResult.Version
-			formulaExpire = upgradeResult.FormulaExpire
-			if upgradeResult.OrderSn != "" {
-				params.OrderSn = upgradeResult.OrderSn
-			}
-			if upgradeResult.FormulaIdentify != "" && upgradeResult.FormulaIdentify != formula.Name {
-				targetFormulaIdentify = upgradeResult.FormulaIdentify
-			}
-		}
-	}
-	if params.RuntimeContext {
-		c.JsonResponseWithoutError(ctx, formulaRuntimeContextResponse(formula.Title, dynamicValues))
+	marketInfo, ok := c.authorizeFormulaInstallDetail(ctx, &params, formula, consoleUid)
+	if !ok {
 		return
 	}
 
-	if targetFormulaIdentify != "" {
+	if marketInfo.FormulaIdentify != "" && marketInfo.FormulaIdentify != formula.Name {
 		slog.Info("switch formula by order binding",
 			"requested_formula_identify", formula.Name,
-			"target_formula_identify", targetFormulaIdentify,
+			"target_formula_identify", marketInfo.FormulaIdentify,
 			"order_sn", params.OrderSn,
 		)
-		formula, err = depotLogin.GetFormula(targetFormulaIdentify, params.Version, nil)
+		formula, err = depotLogin.GetFormula(marketInfo.FormulaIdentify, params.Version, nil)
 		if err != nil {
 			c.JsonResponseWithError(ctx, err, 500)
 			return
@@ -270,7 +168,7 @@ func (c Formula) Info(ctx *gin.Context) {
 	var version *entity.Version
 	if params.CurVersion != "" {
 		if params.IsUpgrade > 0 {
-			version, _ = logic.Version{}.FindNextUpgrade(formula, params.CurVersion, canUpgradeVersion)
+			version, _ = logic.Version{}.FindNextUpgrade(formula, params.CurVersion, marketInfo.Version)
 		} else {
 			version, _ = dao.Version.
 				Where(dao.Version.FormulaID.Eq(formula.ID)).
@@ -279,8 +177,8 @@ func (c Formula) Info(ctx *gin.Context) {
 				First()
 		}
 	}
-	if version == nil && canUpgradeVersion != "" {
-		version, _ = dao.Version.Where(dao.Version.Name.Eq(canUpgradeVersion)).First()
+	if version == nil && marketInfo.Version != "" {
+		version, _ = dao.Version.Where(dao.Version.Name.Eq(marketInfo.Version)).First()
 	}
 	if version == nil {
 		version, _ = dao.Version.Where(dao.Version.ID.Eq(formula.LatestVersionId)).First()
@@ -341,58 +239,7 @@ func (c Formula) Info(ctx *gin.Context) {
 	formula.AllManifest[responseManifestIndex] = &responseManifest
 	formula.Manifest = formula.AllManifest[0]
 
-	type FormulaInstallInfo struct {
-		Ingress     []logic2.Ingress     `json:"ingress"`
-		Name        string               `json:"name"`
-		Title       string               `json:"title"`
-		Required    bool                 `json:"required"`
-		StartParams []logic2.StartParams `json:"start_params"`
-		Ports       []v1.ContainerPort   `json:"ports"`
-		Volumes     []v1.Volume          `json:"volumes"`
-	}
-	installFormulas := make([]FormulaInstallInfo, 0)
-	if params.CName == "" {
-		formulaRequiredMap := make(map[string]bool)
-		for _, item := range formula.Manifest.Platform.Depends {
-			formulaRequiredMap[item.Identifie] = item.Required
-		}
-		for index, item := range formula.AllManifest {
-			if item == nil {
-				continue
-			}
-			startParams := formulalogic.ResolveStartParamAppReferencesCopy(
-				item.Platform.StartParams,
-				formula.AllManifest,
-				item.Application.Identifie,
-			)
-			hasStorageDevice := item.Platform.Storage != nil && item.Platform.Storage.Mode == logic2.StorageDevice
-			if !hasStorageDevice {
-				startParams = ensurePVCNameStartParam(startParams, item.Platform.Volumes)
-			}
-			// TODO: 移除旧安装端通过 values_text 读取候选项的临时兼容。
-			for index := range startParams {
-				if len(startParams[index].Options) > 0 {
-					startParams[index].ValuesText = strings.Join(startParams[index].Options, "|")
-				}
-			}
-			if startParams == nil {
-				startParams = make([]logic2.StartParams, 0)
-			}
-			volumes := item.Platform.Volumes
-			if volumes == nil {
-				volumes = make([]v1.Volume, 0)
-			}
-			installFormulas = append(installFormulas, FormulaInstallInfo{
-				Ingress:     installFormulaIngress(item.Platform),
-				Name:        item.Application.Identifie,
-				Title:       item.Application.Name,
-				Required:    index == 0 || formulaRequiredMap[item.Application.Identifie],
-				StartParams: startParams,
-				Ports:       installFormulaPorts(item.Platform),
-				Volumes:     volumes,
-			})
-		}
-	}
+	installFormulas := buildFormulaInstallInfos(formula, params.CName)
 
 	servicePackages := make([]devcenter.NotAppServicePackage, 0)
 	if formula.ServicePackages != nil && formula.ServicePackages.List != nil {
@@ -451,7 +298,7 @@ func (c Formula) Info(ctx *gin.Context) {
 		"version_prices":         versionPrices,
 		"cross_upgrade_formulas": crossUpgradeFormulas,
 		"ticket":                 ticket,
-		"service_expire":         formulaExpire,
+		"service_expire":         marketInfo.FormulaExpire,
 		"goods_id":               formula.GoodsId,
 		"helm_url":               helm.GetFormulaDynamicHelmDownloadURL(depotLogin, formula, zpkMarketHelmOptions...),
 		"tags":                   formula.Tags,
@@ -468,6 +315,7 @@ func (c Formula) Info(ctx *gin.Context) {
 		response["helm_urls"] = helmURLs
 		response["zip_urls"] = zipURLs
 	}
+	ctx.Header("Cache-Control", "no-store")
 	c.JsonResponseWithoutError(ctx, response)
 }
 

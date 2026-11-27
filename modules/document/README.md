@@ -128,7 +128,7 @@ npm run build -- --dest /private/tmp/zpk-document-ui-check/dist
 
 - ZPK Chart 默认注入 `DOCUMENT_BASE_URL=http://w7-zpkdocument.default.svc.cluster.local:8001`；直接运行后端时可通过此环境变量配置文档服务地址，未设置则使用开发默认值 `http://127.0.0.1:8001`。固定接口前缀 `/doc/openapi` 由文档 SDK 拼接。
 - 文档服务配置 `DOCUMENT_ZPK_URL`（ZPK 服务地址，默认 `http://127.0.0.1:8000`，固定 `/zpk` 前缀由 ZPK SDK 拼接）、`DOCUMENT_DB_PATH` 和 `DOCUMENT_STORAGE_PATH`。面板认证地址由 ZPK 配置。
-- 权限服务配置 `permission.server_url`，环境变量为 `DOCUMENT_PERMISSION_SERVER_URL`，默认 `http://127.0.0.1:8000`，固定接口前缀 `/zpk/v2/openapi/permission` 由权限 SDK 拼接。权限系统目前仍部署在 ZPK，文档只通过 HTTP SDK 访问，可单独配置服务地址。
+- 权限服务配置 `permission.server_url`，环境变量为 `DOCUMENT_PERMISSION_SERVER_URL`，默认 `http://127.0.0.1:8000`，固定接口前缀 `/zpk/v2/openapi` 由权限 SDK 拼接。权限系统目前仍部署在 ZPK，文档只通过 HTTP SDK 访问，可单独配置服务地址。
 - 文档前端独立维护请求工具：从宿主 frontend props / roleConfig 取得当前文档微应用的代理前缀，追加 `/doc`。登录与业务请求均只在匹配该代理 origin/path 时携带 `X-W7Panel-Token`（宿主 paneltoken，缺省读取 localStorage）；宿主 access_token 通过登录请求体换取文档 JWT，业务请求只向文档服务路径发送 `X-Document-Token`。文档 token 失效时合并并发登录，原请求只重试一次；面板代理拒绝和登录失败不会递归触发登录。不引用主项目 UI 代码。前端请求回归测试：在 `ui/` 中执行 `npm test`。
 - 文档登录返回 JWT 格式的 `data.token`，后续请求通过 `X-Document-Token` 携带；不创建或查询会话表，不使用 Cookie。`auth.token_ttl_seconds` 配置 token 的有效期，环境变量为 `DOCUMENT_TOKEN_TTL_SECONDS`（默认 86400 秒），到期后由前端使用宿主面板凭据重新登录。JWT 只保存 ZPK 返回的用户身份和签发、到期等字段，不保存面板访问凭据。使用 HS256，由 cloudnoauth 提供的 AppSecret 按文档登录用途派生签名密钥，同时验证 issuer、AppID audience 和时间字段；ZPK 与文档使用不同用途密钥及 issuer，登录 token 不能互换。
 - 两个系统各自部署、各自持久化数据库，不共享 SQLite 文件或目录。分类、文档库的 `user_id` 仍为 ZPK 的整数用户 ID，不复制用户表、不新增文档用户表。ZPK 用户接口按面板稳定 `sub` 解析或创建现有用户，不接受客户端指定用户 ID 或角色。
@@ -141,7 +141,8 @@ ZPK 的 OIDC 登录同样返回 JWT，不在服务端保存登录态。制品前
 
 文档登录时只请求 ZPK 用户接口，ZPK 再向面板验证凭据；已登录的文档请求在有效期内直接验证 JWT，不查询会话表，也不重复请求面板。文档 JWT 中的角色、管理员标记在重新登录后更新；无状态 token 不提供单个 token 的服务端撤销，轮换 AppSecret 会使对应 token 失效。切换前的会话 token 不再接受，用户需重新登录。
 
-权限服务只保留三个 POST 接口：`/check` 接收服务端认证后确定的 `user_id`、单个 `resource` 和 `action`，支持 `user_id=0` 校验匿名读取；`/set` 接收 `grants` 并整体替换一个资源的权限；`/get` 接收 `resource` 并返回原始权限记录（`id/user_id/resource_type/resource_value/action` 等），不转换为所有者、公有或私有等业务字段。三个接口统一验证 App 签名，`set/get` 不额外校验调用人的资源管理权限；`check` 仍执行实际资源授权判断。文档入口的用户认证、公私权限检查及默认文档保护继续保留，公有/私有界面不提供任意用户授权。
+文档库作为 `document_library` 类型的资源，以 `分类标识/文档库标识` 为资源值，与镜像共用 ZPK 的资源表和验证规则。App 签名保护的 `/zpk/v2/openapi/resource/get,set,check,delete` 负责资源状态；公私沿用 `visible_type`（1 私有、4 公开只读），不再写入匿名用户授权。新建时通过 `/openapi/permission/add` 给所有者授予 `push/pull`，修改公私只更新资源状态，不替换已有用户授权；删除库时删除对应资源及其授权。旧文档匿名授权会在 ZPK 启动迁移中转换为资源状态，已有新资源设置不覆盖。文档业务和正文存储仍独立，不导入主项目代码。
+
 
 权限服务失败会返回错误，不回退到本地权限判断；设置权限失败时文档数据库事务回滚。权限服务与文档数据库不共享事务，远程设置成功后本地提交失败仍可能留下需要重新设置的权限记录。
 
@@ -160,7 +161,7 @@ ZPK 的 OIDC 登录同样返回 JWT，不在服务端保存登录态。制品前
 ./server respo:migrate-documents --identifie demo-app
 ```
 
-省略 `--identifie` 时分批迁移全部制品。新文档库和默认首页通过文档 API 初始化；仅复制旧 `docs/` 下的 Markdown 文件，移除最外层 `docs/` 后保存到文档库，嵌套子路径保留；`docs/.order` 中的路径同步转换后恢复顺序。目标文档库已有 `index.md` 时保留原内容；没有时按当前制品配置和应用说明生成受保护首页并提交。应用说明优先使用数据库简介，尚未保存时使用本次迁移的 `readme.md`。旧 `docs/index.md` 不覆盖该首页。源数据先读取旧 `shared` OCI，再用本地 `<depot>/Formula/<name>/files` 覆盖同路径内容。根目录 `readme.md` 写入制品表，manifest 和图标不迁移；已保存的简介（包括主动清空的简介）不会被覆盖。复用已有文档标识，跳过目标中已有的正文，保留旧文件。单个制品的复制及排序成功后才保存其新文档标识和简介；失败会停止并指出制品，可以重试。重试时跳过已复制正文，排序会按旧顺序重新同步。
+省略 `--identifie` 时分批迁移全部制品。新文档库和默认首页通过文档 API 初始化；仅复制旧 `docs/` 下的 Markdown 文件，移除最外层 `docs/` 后保存到文档库，嵌套子路径保留；`docs/.order` 中的路径同步转换后恢复顺序。目标文档库已有 `index.md` 时保留原内容；没有时按当前制品配置和应用说明生成受保护首页并提交。应用说明优先使用数据库简介，尚未保存时使用本次迁移的 `readme.md`。旧 `docs/index.md` 不覆盖该首页。源数据先读取旧 `shared` OCI，再用本地 `<depot>/Formula/<name>/files` 覆盖同路径内容。根目录 `readme.md` 写入制品表，manifest 和图标不迁移；已保存的简介（包括主动清空的简介）不会被覆盖。复用已有文档标识，跳过目标中已有的正文，保留旧文件。单个制品的复制及排序成功后才保存其新文档标识和简介；单个制品读取或迁移失败时记录错误并跳过，继续迁移后续制品，最后汇总成功和失败数量。可以重试失败制品；重试时跳过已复制正文，排序会按旧顺序重新同步。
 
 该命令在旧文档切换使用前手动执行，数据库切换禁写期间拒绝执行。代码验证不运行真实迁移。
 
@@ -185,7 +186,7 @@ ZPK 的 OIDC 登录同样返回 JWT，不在服务端保存登录态。制品前
 | --- | --- |
 | ZPK → 文档 | 调用方 SDK 在 `common/service/w7/document`，复用 `w7/base.Base` 的签名；`/doc/openapi` 的路由验证 App 签名后，从签名请求体读取 `user_id`，再执行文档业务授权，不要求用户 token |
 | 文档 → ZPK | `/zpk/v2/openapi/user/current` 直接验证面板 access_token，不要求应用签名；公共 namespace 的 get/create/rename/delete 接口均验签 |
-| 文档 → 权限服务 | `/zpk/v2/openapi/permission/check`、`/set`、`/get` 均验签，业务数据中的 user_id 由已认证的文档服务提供 |
+| 文档 → 权限服务 | `/zpk/v2/openapi/resource/set,check,delete` 与 `/zpk/v2/openapi/permission/add` 均验签，业务数据中的 user_id 由已认证的文档服务提供 |
 
 请求沿用市场 SDK 的 body 封装方式：将完整业务 JSON 序列化为 `body` 字符串，外层仅携带字符串参数 `body`、`appid`、`timestamp`、`nonce`、`sign` 等。签名统一使用 `getSign`：排除 sign 后将外层参数按键排序并进行 URL 编码，拼接 AppSecret 后计算 MD5。接收端验签成功后，将 `body` 还原为请求体，控制器继续按原业务结构绑定参数，无需展开 files、grants 等嵌套字段。服务请求还签入 `request_method`、`request_uri` 和 `access_token_sha256`，分别绑定方法、完整请求路径/查询参数，以及面板访问凭据与文档会话凭据的摘要。时间戳允许前后 300 秒；nonce 使用随机值，本版不持久化 nonce 或维护重放去重缓存。同一签名只能在该时间窗口、原路径和原用户凭据下验证，不用于生成长期访问授权。
 

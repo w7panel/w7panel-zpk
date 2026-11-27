@@ -34,6 +34,7 @@ func (self *Depot) Copy(src *Formula, dest *Formula) error {
 		if errors.Is(err, logic.OciManifestNotFoundErr) {
 			return nil
 		}
+		return err
 	}
 
 	_, err = oras.Copy(context.Background(), srcRemoteOci, self.GetFormulaOciTag(src), destRemoteOci, self.GetFormulaOciTag(dest), oras.DefaultCopyOptions)
@@ -285,7 +286,6 @@ func (self *Depot) getOciManifest(formula *Formula) (*remote.Repository, *v1.Man
 	}
 
 	manifest, err := logic.GetOciManifest(context.Background(), remoteOci, ociTag)
-
 	return remoteOci, manifest, err
 }
 

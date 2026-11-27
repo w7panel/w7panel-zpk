@@ -14,17 +14,18 @@ const TableNameRegistryRepository = "ims_registry_repository"
 
 // RegistryRepository mapped from table <ims_registry_repository>
 type RegistryRepository struct {
-	ID          int32          `gorm:"column:id;primaryKey;autoIncrement:true" json:"id"`
-	UserID      int32          `gorm:"column:user_id" json:"user_id"`
-	Name        string         `gorm:"column:name;not null" json:"name"`
-	Registry    string         `gorm:"column:registry;not null" json:"registry"`
-	Namespace   string         `gorm:"column:namespace;not null" json:"namespace"`
-	VisibleType int32          `gorm:"column:visible_type;not null;default:1" json:"visible_type"`
-	PullNum     int32          `gorm:"column:pull_num;not null" json:"pull_num"`
-	Desc        string         `gorm:"column:desc;not null" json:"desc"`
-	CreatedAt   time.Time      `gorm:"column:created_at;not null;default:CURRENT_TIMESTAMP" json:"created_at"`
-	UpdatedAt   time.Time      `gorm:"column:updated_at" json:"updated_at"`
-	DeletedAt   gorm.DeletedAt `gorm:"column:deleted_at" json:"deleted_at"`
+	ResourceType string         `gorm:"column:resource_type;size:64;not null;default:repository;index" json:"resource_type"`
+	ID           int32          `gorm:"column:id;primaryKey;autoIncrement:true" json:"id"`
+	UserID       int32          `gorm:"column:user_id" json:"user_id"`
+	Name         string         `gorm:"column:name;not null" json:"name"`
+	Registry     string         `gorm:"column:registry;not null" json:"registry"`
+	Namespace    string         `gorm:"column:namespace;not null" json:"namespace"`
+	VisibleType  int32          `gorm:"column:visible_type;not null;default:1" json:"visible_type"`
+	PullNum      int32          `gorm:"column:pull_num;not null" json:"pull_num"`
+	Desc         string         `gorm:"column:desc;not null" json:"desc"`
+	CreatedAt    time.Time      `gorm:"column:created_at;not null;default:CURRENT_TIMESTAMP" json:"created_at"`
+	UpdatedAt    time.Time      `gorm:"column:updated_at" json:"updated_at"`
+	DeletedAt    gorm.DeletedAt `gorm:"column:deleted_at" json:"deleted_at"`
 }
 
 // TableName RegistryRepository's table name

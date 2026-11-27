@@ -1,25 +1,32 @@
-package logic
+package repository
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
-	"log/slog"
-	"slices"
-	"strings"
-	"sync"
-	"time"
-
 	"github.com/docker/distribution"
 	"github.com/docker/distribution/manifest/manifestlist"
 	"github.com/docker/distribution/manifest/ocischema"
 	"github.com/docker/distribution/manifest/schema2"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	registrycommon "github.com/w7panel/w7panel-zpk/app/registry/logic/common"
 	"github.com/w7panel/w7panel-zpk/common/dao"
 	"github.com/w7panel/w7panel-zpk/common/entity"
 	"github.com/w7panel/w7panel-zpk/common/logic"
 	"github.com/w7panel/w7panel-zpk/common/types/registry"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
+	"golang.org/x/sync/errgroup"
+	"io"
+	"log/slog"
+	"net/http"
+	"oras.land/oras-go/v2/errdef"
+	"oras.land/oras-go/v2/registry/remote/errcode"
+	"regexp"
+	"slices"
+	"strings"
+	"sync"
+	"time"
 )
 
 type TagInfo struct {
@@ -54,40 +61,16 @@ func lockRepositoryOperation(repository string) func() {
 	return mu.Unlock
 }
 
-func (l Repository) GetByIdWithUser(id int, user *entity.RegistryUser) (*entity.RegistryRepository, error) {
-	query := dao.Q.RegistryRepository.Where(dao.RegistryRepository.ID.Eq(int32(id)))
-	if user != nil && !(logic.User{}.IsAdminUser(user)) {
-		query = query.Where(dao.RegistryRepository.UserID.Eq(user.ID))
-	}
-	return query.First()
-}
-
-func (l Repository) GetByIdWithUserPermission(id int, user *entity.RegistryUser) (*entity.RegistryRepository, error) {
-	model, _ := dao.Q.RegistryRepository.Where(dao.RegistryRepository.ID.Eq(int32(id))).First()
-	if model == nil {
-		return nil, nil
-	}
-	if user != nil && !(logic.User{}.IsAdminUser(user)) && model.UserID != user.ID {
-		exists := ResourcePermission{}.UserHasPermissionByResource(int(user.ID), model.Namespace, PermissionResourceTypeNamespace)
-		if !exists {
-			return nil, errors.New("user no permission")
-		}
-	}
-
-	return model, nil
-}
-
-func (l Repository) GetByNameAndNamespace(repositoryName string, namespace string) (*entity.RegistryRepository, error) {
-	return dao.Q.RegistryRepository.Where(dao.RegistryRepository.Name.Eq(repositoryName)).Where(dao.RegistryRepository.Namespace.Eq(namespace)).First()
-}
-
 func (l Repository) OnRepositoryPrepareOperate(payload registry.RegistryRepositoryPayLoad) {
-	if !slices.Contains(payload.Scope.Actions, string(PermissionActionTypePush)) {
+	if payload.Scope.Type != "repository" {
+		return
+	}
+	if !slices.Contains(payload.Scope.Actions, string(registrycommon.PermissionActionTypePush)) {
 		return
 	}
 
 	_, namespace := logic.ParseRepositoryNameAndNamespace(payload.Scope.Name)
-	if namespaceModel, _ := (Namespace{}).GetByName(namespace); namespaceModel != nil {
+	if namespaceModel, _ := (registrycommon.Namespace{}).GetByName(namespace); namespaceModel != nil {
 		return
 	}
 
@@ -103,7 +86,7 @@ func (l Repository) OnRepositoryPrepareOperate(payload registry.RegistryReposito
 	}
 	namespaceVisibleType := facade.GetConfig().GetInt("setting.registry.namespaces_default_visible." + namespace)
 	if namespaceVisibleType <= 0 {
-		namespaceVisibleType = VisibleTypePrivate
+		namespaceVisibleType = registrycommon.VisibleTypePrivate
 	}
 	if err := dao.Q.RegistryNamespace.Create(&entity.RegistryNamespace{
 		Name:        namespace,
@@ -125,11 +108,11 @@ func (l Repository) OnRepositoryPushedCreate(payload registry.RegistryRepository
 	defer unlock()
 
 	repositoryName, namespace := logic.ParseRepositoryNameAndNamespace(payload.Event.Target.Repository)
-	if repositoryModel, _ := l.GetByNameAndNamespace(repositoryName, namespace); repositoryModel != nil {
+	if repositoryModel, _ := (registrycommon.Resource{}).GetByNameAndNamespace(context.Background(), "repository", repositoryName, namespace); repositoryModel != nil {
 		return
 	}
 
-	namespaceModel, _ := Namespace{}.GetByName(namespace)
+	namespaceModel, _ := registrycommon.Namespace{}.GetByName(namespace)
 	if namespaceModel == nil {
 		slog.Error("create registry repository after push", "namespace", namespace, "error", "namespace not found")
 		return
@@ -142,29 +125,32 @@ func (l Repository) OnRepositoryPushedCreate(payload registry.RegistryRepository
 		}
 	}
 
-	if err := dao.Q.RegistryRepository.Create(&entity.RegistryRepository{
+	if err := (registrycommon.Resource{}).Save(context.Background(), &entity.RegistryRepository{ResourceType: "repository",
 		Name:        repositoryName,
 		Namespace:   namespace,
-		VisibleType: int32(VisibleTypeFollowNamespace),
+		VisibleType: int32(registrycommon.VisibleTypeFollowNamespace),
 		Desc:        "",
 		UserID:      ownerUserID,
-	}); err != nil {
+	}, ""); err != nil {
 		slog.Error("create registry repository after push", "namespace", namespace, "repository", repositoryName, "error", err)
 	}
 }
 
 func (l Repository) OnUpdateRepositoryEvent(payload registry.UpdateRepositoryPayload) {
 	name, namespace := logic.ParseRepositoryNameAndNamespace(payload.Repository)
-	_, err := dao.Q.RegistryRepository.Where(dao.Q.RegistryRepository.Namespace.Eq(namespace)).
-		Where(dao.Q.RegistryRepository.Name.Eq(name)).Update(dao.Q.RegistryRepository.VisibleType, payload.VisibleType)
-	slog.Info("OnUpdateRepositoryEvent", "payload", payload, "err", err)
+	repository, err := (registrycommon.Resource{}).GetByNameAndNamespace(context.Background(), "repository", name, namespace)
+	if err == nil {
+		repository.VisibleType = int32(payload.VisibleType)
+		err = (registrycommon.Resource{}).Save(context.Background(), repository, "")
+	}
+	slog.Info("OnUpdateRepositoryEvent", "repository", payload.Repository, "err", err)
 }
 
 func (l Repository) OnRepositoryPushed(payload registry.RegistryRepositoryWebHookPayLoad) {
 	l.OnRepositoryPushedCreate(payload)
 
 	repositoryName, namespace := logic.ParseRepositoryNameAndNamespace(payload.Event.Target.Repository)
-	repositoryModel, _ := Repository{}.GetByNameAndNamespace(repositoryName, namespace)
+	repositoryModel, _ := (registrycommon.Resource{}).GetByNameAndNamespace(context.Background(), "repository", repositoryName, namespace)
 	if repositoryModel != nil {
 		tag, _ := dao.Q.RegistryRepositoryTag.Where(dao.Q.RegistryRepositoryTag.RepositoryID.Eq(repositoryModel.ID)).
 			Where(dao.Q.RegistryRepositoryTag.Name.Eq(payload.Event.Target.Tag)).First()
@@ -192,7 +178,7 @@ func (l Repository) OnRepositoryPushed(payload registry.RegistryRepositoryWebHoo
 
 func (l Repository) OnRepositoryPulled(payload registry.RegistryRepositoryWebHookPayLoad) {
 	repositoryName, namespace := logic.ParseRepositoryNameAndNamespace(payload.Event.Target.Repository)
-	repositoryModel, _ := Repository{}.GetByNameAndNamespace(repositoryName, namespace)
+	repositoryModel, _ := (registrycommon.Resource{}).GetByNameAndNamespace(context.Background(), "repository", repositoryName, namespace)
 	if repositoryModel != nil {
 		pullNum := repositoryModel.PullNum + 1
 		_, err := dao.Q.RegistryRepository.Where(dao.Q.RegistryRepository.ID.Eq(repositoryModel.ID)).Update(dao.Q.RegistryRepository.PullNum, pullNum)
@@ -348,4 +334,165 @@ func (l Repository) RebuiltImages(repositoryID int32) (map[string]bool, error) {
 		result[tag.Name] = true
 	}
 	return result, nil
+}
+
+type repositoryTagStore interface {
+	Tags(context.Context, string, func([]string) error) error
+	Resolve(context.Context, string) (ocispec.Descriptor, error)
+	Delete(context.Context, ocispec.Descriptor) error
+}
+
+const repositoryDeleteConcurrency = 4
+
+var repositoryTagNamePattern = regexp.MustCompile(`^[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,127}$`)
+
+type RepositoryTagDeleteFailure struct {
+	Tag   string `json:"tag"`
+	Error string `json:"error"`
+}
+
+type RepositoryTagDeleteResult struct {
+	DeletedTags []string                     `json:"deleted_tags"`
+	FailedTags  []RepositoryTagDeleteFailure `json:"failed_tags"`
+}
+
+// A nil selection means all tags; an explicitly empty selection is a no-op.
+// Resolve before deleting so shared manifests are deleted only once.
+func deleteRepositoryTags(ctx context.Context, store repositoryTagStore, tags []string) (*RepositoryTagDeleteResult, error) {
+	if tags == nil {
+		tags = []string{}
+		// Collect all pages before deleting: deleting while paging can skip tags.
+		if err := store.Tags(ctx, "", func(page []string) error {
+			tags = append(tags, page...)
+			return nil
+		}); err != nil && !repositoryNotFound(err) {
+			return nil, fmt.Errorf("读取仓库 tag 失败: %w", err)
+		}
+	}
+	tags = slices.Clone(tags)
+	slices.Sort(tags)
+	tags = slices.Compact(tags)
+	result := &RepositoryTagDeleteResult{
+		DeletedTags: []string{}, FailedTags: []RepositoryTagDeleteFailure{},
+	}
+	errs := make([]error, len(tags))
+	type manifestGroup struct {
+		descriptor ocispec.Descriptor
+		indexes    []int
+	}
+	manifests := map[string]*manifestGroup{}
+	var mu sync.Mutex
+	var resolveGroup errgroup.Group
+	resolveGroup.SetLimit(repositoryDeleteConcurrency)
+	for i, tag := range tags {
+		resolveGroup.Go(func() error {
+			desc, err := store.Resolve(ctx, tag)
+			if repositoryNotFound(err) {
+				return nil
+			}
+			if err != nil {
+				errs[i] = fmt.Errorf("读取 tag 失败: %w", err)
+				return nil
+			}
+			mu.Lock()
+			group := manifests[desc.Digest.String()]
+			if group == nil {
+				group = &manifestGroup{descriptor: desc}
+				manifests[desc.Digest.String()] = group
+			}
+			group.indexes = append(group.indexes, i)
+			mu.Unlock()
+			return nil
+		})
+	}
+	_ = resolveGroup.Wait()
+	var deleteGroup errgroup.Group
+	deleteGroup.SetLimit(repositoryDeleteConcurrency)
+	for _, group := range manifests {
+		deleteGroup.Go(func() error {
+			if err := store.Delete(ctx, group.descriptor); err != nil && !repositoryNotFound(err) {
+				for _, i := range group.indexes {
+					errs[i] = fmt.Errorf("删除 manifest 失败: %w", err)
+				}
+			}
+			return nil
+		})
+	}
+	_ = deleteGroup.Wait()
+	for i, tag := range tags {
+		if errs[i] != nil {
+			result.FailedTags = append(result.FailedTags, RepositoryTagDeleteFailure{Tag: tag, Error: errs[i].Error()})
+		} else {
+			result.DeletedTags = append(result.DeletedTags, tag)
+		}
+	}
+	return result, nil
+}
+
+// DeleteTags requires an explicit non-empty selection. It shares the repository
+// lock with deletion and webhook processing; remote and database writes are not atomic.
+func (l Repository) DeleteTags(ctx context.Context, repository *entity.RegistryRepository, tags []string) (*RepositoryTagDeleteResult, error) {
+	if len(tags) == 0 {
+		return nil, fmt.Errorf("请选择要删除的 tag")
+	}
+	for _, tag := range tags {
+		if !repositoryTagNamePattern.MatchString(tag) {
+			return nil, fmt.Errorf("tag 名称无效: %q", tag)
+		}
+	}
+	name := logic.BuildRepositoryName(repository.Name, repository.Namespace)
+	unlock := lockRepositoryOperation(name)
+	defer unlock()
+	store, err := logic.GetDefaultRemoteOci(name)
+	if err != nil {
+		return nil, err
+	}
+	result, err := deleteRepositoryTags(ctx, store, tags)
+	if err != nil {
+		return nil, err
+	}
+	if len(result.DeletedTags) > 0 {
+		if _, err := dao.Q.RegistryRepositoryTag.WithContext(ctx).
+			Where(dao.Q.RegistryRepositoryTag.RepositoryID.Eq(repository.ID), dao.Q.RegistryRepositoryTag.Name.In(result.DeletedTags...)).Delete(); err != nil {
+			return nil, fmt.Errorf("远程 tag 已删除，但本地记录清理失败，请刷新后重试: %w", err)
+		}
+	}
+	return result, nil
+}
+
+// Delete waits for remote deletion before removing local records. The two
+// storage stages are not atomic; retaining records on failure allows retries.
+func (l Repository) Delete(ctx context.Context, repository *entity.RegistryRepository) error {
+	name := logic.BuildRepositoryName(repository.Name, repository.Namespace)
+	unlock := lockRepositoryOperation(name)
+	defer unlock()
+	store, err := logic.GetDefaultRemoteOci(name)
+	if err != nil {
+		return err
+	}
+	result, err := deleteRepositoryTags(ctx, store, nil)
+	if err != nil {
+		return err
+	}
+	if len(result.FailedTags) > 0 {
+		return fmt.Errorf("%d 个 tag 删除失败，已删除的 tag 不会恢复；%s: %s", len(result.FailedTags), result.FailedTags[0].Tag, result.FailedTags[0].Error)
+	}
+	return dao.Q.Transaction(func(tx *dao.Query) error {
+		if _, err := tx.RegistryRepositoryTag.WithContext(ctx).Where(tx.RegistryRepositoryTag.RepositoryID.Eq(repository.ID)).Delete(); err != nil {
+			return err
+		}
+		if _, err := tx.RegistryRepository.WithContext(ctx).Delete(repository); err != nil {
+			return err
+		}
+
+		return (registrycommon.ResourcePermission{}).DelPermissionByResource(tx, name, registrycommon.PermissionResourceTypeRepository)
+	})
+}
+
+func repositoryNotFound(err error) bool {
+	if errors.Is(err, errdef.ErrNotFound) {
+		return true
+	}
+	var response *errcode.ErrorResponse
+	return errors.As(err, &response) && response.StatusCode == http.StatusNotFound
 }

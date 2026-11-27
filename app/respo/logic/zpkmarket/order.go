@@ -47,7 +47,7 @@ func CheckFormulaCanInstallOrUpgrade(formula formulalogic.Formula, consoleUid in
 	return ret, err
 }
 
-func GetFormulaRuntimeDynamicValues(formula formulalogic.Formula, consoleUid int32, orderSn string) (map[string]interface{}, error) {
+func GetFormulaLicenseInfo(formula formulalogic.Formula, consoleUid int32, orderSn string) (map[string]interface{}, error) {
 	if formula.GoodsId <= 0 || formula.ConsoleUid == consoleUid {
 		return map[string]interface{}{
 			"order_status": "none",
@@ -59,7 +59,7 @@ func GetFormulaRuntimeDynamicValues(formula formulalogic.Formula, consoleUid int
 			},
 		}, nil
 	}
-	return w7.ZpkMarketSdk.GetFormulaOrderInfo(formula.GoodsId, consoleUid, orderSn)
+	return w7.ZpkMarketSdk.GetOrderLicenseInfo(formula.GoodsId, consoleUid, orderSn)
 }
 
 func GetFormulaCanUpgradeVersion(formula formulalogic.Formula, consoleUid int32, orderSn string) (zpk_market.FormulaUpgradeVersionResult, error) {

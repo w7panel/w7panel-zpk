@@ -102,7 +102,10 @@ func (l Library) Create(ctx context.Context, user zpk.User, library entity.Docum
 				return err
 			}
 		}
-		return service.PermissionSdk.SetLibrary(ctx, library)
+		if err := service.PermissionSdk.SetResource(ctx, permission.LibraryResource(library), library.UserID, libraryVisibleType(library.Public)); err != nil {
+			return err
+		}
+		return service.PermissionSdk.AddOwner(ctx, library)
 	})
 	return &library, err
 }
@@ -130,7 +133,7 @@ func (l Library) Edit(ctx context.Context, user zpk.User, ref, name, description
 			_, err = query.WithContext(ctx).Select(query.ID).Where(query.ID.Eq(library.ID)).First()
 		}
 		if err == nil && public != nil {
-			err = service.PermissionSdk.SetLibrary(ctx, *library)
+			err = service.PermissionSdk.SetResource(ctx, permission.LibraryResource(*library), library.UserID, libraryVisibleType(library.Public))
 		}
 		return err
 	})
@@ -174,4 +177,11 @@ func (l Library) touch(ctx context.Context, tx *dao.Query, ref string) (*entity.
 		return nil, err
 	}
 	return query.WithContext(ctx).Where(query.Category.Eq(category), query.Identifie.Eq(identifie)).First()
+}
+
+func libraryVisibleType(public int32) int32 {
+	if public == 1 {
+		return permission.VisibleTypePublicRead
+	}
+	return permission.VisibleTypePrivate
 }

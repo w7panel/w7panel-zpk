@@ -27,6 +27,7 @@ func newRegistryRepository(db *gorm.DB, opts ...gen.DOOption) registryRepository
 
 	tableName := _registryRepository.registryRepositoryDo.TableName()
 	_registryRepository.ALL = field.NewAsterisk(tableName)
+	_registryRepository.ResourceType = field.NewString(tableName, "resource_type")
 	_registryRepository.ID = field.NewInt32(tableName, "id")
 	_registryRepository.UserID = field.NewInt32(tableName, "user_id")
 	_registryRepository.Name = field.NewString(tableName, "name")
@@ -47,18 +48,19 @@ func newRegistryRepository(db *gorm.DB, opts ...gen.DOOption) registryRepository
 type registryRepository struct {
 	registryRepositoryDo
 
-	ALL         field.Asterisk
-	ID          field.Int32
-	UserID      field.Int32
-	Name        field.String
-	Registry    field.String
-	Namespace   field.String
-	VisibleType field.Int32
-	PullNum     field.Int32
-	Desc        field.String
-	CreatedAt   field.Time
-	UpdatedAt   field.Time
-	DeletedAt   field.Field
+	ALL          field.Asterisk
+	ResourceType field.String
+	ID           field.Int32
+	UserID       field.Int32
+	Name         field.String
+	Registry     field.String
+	Namespace    field.String
+	VisibleType  field.Int32
+	PullNum      field.Int32
+	Desc         field.String
+	CreatedAt    field.Time
+	UpdatedAt    field.Time
+	DeletedAt    field.Field
 
 	fieldMap map[string]field.Expr
 }
@@ -75,6 +77,7 @@ func (r registryRepository) As(alias string) *registryRepository {
 
 func (r *registryRepository) updateTableName(table string) *registryRepository {
 	r.ALL = field.NewAsterisk(table)
+	r.ResourceType = field.NewString(table, "resource_type")
 	r.ID = field.NewInt32(table, "id")
 	r.UserID = field.NewInt32(table, "user_id")
 	r.Name = field.NewString(table, "name")
@@ -102,7 +105,8 @@ func (r *registryRepository) GetFieldByName(fieldName string) (field.OrderExpr, 
 }
 
 func (r *registryRepository) fillFieldMap() {
-	r.fieldMap = make(map[string]field.Expr, 11)
+	r.fieldMap = make(map[string]field.Expr, 12)
+	r.fieldMap["resource_type"] = r.ResourceType
 	r.fieldMap["id"] = r.ID
 	r.fieldMap["user_id"] = r.UserID
 	r.fieldMap["name"] = r.Name

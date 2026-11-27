@@ -35,6 +35,25 @@ func (p FormulaPublish) OnRepositoryPushed(payload registry.RegistryRepositoryWe
 			slog.Error("OnRepositoryPushed", "repository", payload.Event.Target.Repository, "tag", tag, "err", err)
 		}
 	}()
+	// CLI 已完成 OCI 打包，只在显式请求时触发后续发布。
+	remoteOci, err := commonlogic.GetDefaultRemoteOci(payload.Event.Target.Repository)
+	if err != nil {
+		return
+	}
+	descriptor, err := remoteOci.Resolve(context.Background(), tag)
+	if err != nil {
+		return
+	}
+	if payload.Event.Target.Digest != "" && payload.Event.Target.Digest != descriptor.Digest.String() {
+		return
+	}
+	manifest, err := commonlogic.GetOciManifest(context.Background(), remoteOci, descriptor.Digest.String())
+	// 迁移复制也会触发推送回调；带迁移标记的版本仅搬运 OCI 数据，
+	// 跳过后续版本创建、本地版本文件清理和自动发布，避免影响现有制品。
+	if err != nil || manifest.Annotations["w7.cc/migrated-from"] != "" {
+		return
+	}
+
 	depot, _ := formulalogic.NewDepot()
 	formula := formulalogic.GetFormulaByName(repositoryName)
 	if formula == nil {
@@ -69,20 +88,7 @@ func (p FormulaPublish) OnRepositoryPushed(payload registry.RegistryRepositoryWe
 		return
 	}
 
-	// CLI 已完成 OCI 打包，只在显式请求时触发后续发布。
-	remoteOci, err := commonlogic.GetDefaultRemoteOci(payload.Event.Target.Repository)
-	if err != nil {
-		return
-	}
-	descriptor, err := remoteOci.Resolve(context.Background(), tag)
-	if err != nil {
-		return
-	}
-	if payload.Event.Target.Digest != "" && payload.Event.Target.Digest != descriptor.Digest.String() {
-		return
-	}
-	manifest, err := commonlogic.GetOciManifest(context.Background(), remoteOci, descriptor.Digest.String())
-	if err != nil || manifest.Annotations["w7.cc/auto_publish"] != "true" {
+	if manifest.Annotations["w7.cc/auto_publish"] != "true" {
 		return
 	}
 	user, err := (commonlogic.User{}).GetByUsername(payload.Event.Actor.Name)

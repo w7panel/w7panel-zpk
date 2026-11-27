@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/w7panel/w7panel-zpk/app/registry/logic"
+
 	"github.com/we7coreteam/w7-rangine-go/v2/src/console"
 )
 
@@ -39,7 +39,7 @@ func (m Migrate) Configure(cmd *cobra.Command) {
 	cmd.RunE = m.run
 }
 
-func migrationEndpoint(cmd *cobra.Command, side, env string) logic.MigrationEndpoint {
+func migrationEndpoint(cmd *cobra.Command, side, env string) MigrationEndpoint {
 	f := cmd.Flags()
 	address, _ := f.GetString(side)
 	plainHTTP, _ := f.GetBool(side + "-http")
@@ -51,7 +51,7 @@ func migrationEndpoint(cmd *cobra.Command, side, env string) logic.MigrationEndp
 		}
 		return os.Getenv(env + suffix)
 	}
-	return logic.MigrationEndpoint{Address: address, PlainHTTP: plainHTTP, CAFile: ca,
+	return MigrationEndpoint{Address: address, PlainHTTP: plainHTTP, CAFile: ca,
 		Username: credential("username", "_USERNAME"), Password: credential("password", "_PASSWORD")}
 }
 
@@ -82,7 +82,7 @@ func (Migrate) run(cmd *cobra.Command, _ []string) (returnErr error) {
 		}
 	}()
 	fmt.Fprintln(cmd.OutOrStdout(), "迁移报告："+path)
-	return logic.MigrateRegistry(cmd.Context(), logic.MigrationOptions{
+	return MigrateRegistry(cmd.Context(), MigrationOptions{
 		Source: migrationEndpoint(cmd, "source", "SOURCE_REGISTRY"), Destination: migrationEndpoint(cmd, "destination", "DESTINATION_REGISTRY"),
 		DryRun: dryRun, Attempts: attempts, Concurrency: concurrency, Workers: workers, ItemTimeout: timeout,
 		Report: report, Progress: cmd.OutOrStdout(),

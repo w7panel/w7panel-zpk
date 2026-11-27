@@ -102,13 +102,13 @@ func (CleanSharedTags) run(cmd *cobra.Command, _ []string) error {
 				fmt.Fprintf(cmd.OutOrStdout(), "待清理 %s:shared\n", repositoryName)
 				continue
 			}
-			tag := dao.Q.RegistryRepositoryTag
-			repo := dao.Q.RegistryRepository
 			name, namespace := commonlogic.ParseRepositoryNameAndNamespace(repositoryName)
-			_, err = tag.WithContext(cmd.Context()).Where(tag.Name.Eq(legacySharedTag), tag.WithContext(cmd.Context()).Columns(tag.RepositoryID).In(repo.WithContext(cmd.Context()).Select(repo.ID).Where(repo.Name.Eq(name), repo.Namespace.Eq(namespace)))).Delete()
+			tags, repositories := dao.Q.RegistryRepositoryTag, dao.Q.RegistryRepository
+			_, err = tags.WithContext(cmd.Context()).Where(tags.Name.Eq(legacySharedTag), tags.WithContext(cmd.Context()).Columns(tags.RepositoryID).In(repositories.WithContext(cmd.Context()).Select(repositories.ID).Where(repositories.ResourceType.Eq("repository"), repositories.Name.Eq(name), repositories.Namespace.Eq(namespace)))).Delete()
 			if err != nil {
 				return fmt.Errorf("shared 已删除，本地 tag 记录清理失败: %w", err)
 			}
+
 			fmt.Fprintf(cmd.OutOrStdout(), "已清理 %s:shared\n", repositoryName)
 		}
 	}

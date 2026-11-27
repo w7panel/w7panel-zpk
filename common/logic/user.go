@@ -7,7 +7,6 @@ import (
 	"github.com/w7panel/w7panel-zpk/common/dao"
 	"github.com/w7panel/w7panel-zpk/common/entity"
 	"github.com/w7panel/w7panel-zpk/common/function"
-	"github.com/w7panel/w7panel-zpk/common/types/registry"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"gorm.io/gorm"
 )
@@ -107,12 +106,6 @@ func (l User) GetOrCreatePanelUser(userId string, username string, userRole stri
 			return nil, err
 		}
 
-		facade.GetEvent().Publish(registry.AddUserPermissionEvent, registry.AddUserPermissionPayload{
-			UserID:        user.ID,
-			ResourceType:  "namespace",
-			ResourceValue: facade.GetConfig().GetString("setting.depot.oci_namespace"),
-			Actions:       []string{"push", "pull"},
-		})
 	} else {
 		_, err := dao.Q.RegistryUser.Where(dao.RegistryUser.ID.Eq(user.ID)).Updates(entity.RegistryUser{
 			Role: userRole,

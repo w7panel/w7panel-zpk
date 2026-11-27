@@ -11,4 +11,4 @@ log:
     level: debug
 setting:
   depot:
-    oci_namespace: ${DEPOT_OCI_NAMESPACE-zpk_oci}
+    oci_namespace: ${DEPOT_OCI_NAMESPACE-app}

@@ -9,6 +9,11 @@ import (
 	"github.com/w7panel/w7panel-zpk/modules/document/common/service/zpk"
 )
 
+const (
+	VisibleTypePrivate    = 1 // 不公开，由用户授权决定。
+	VisibleTypePublicRead = 4 // 匿名可读取。
+)
+
 var ErrDenied = errors.New("无操作权限")
 
 type Resource struct {
@@ -19,13 +24,6 @@ type Grant struct {
 	UserID   int32    `json:"user_id"`
 	Resource Resource `json:"resource"`
 	Actions  []string `json:"actions"`
-}
-type Record struct {
-	ID            int32    `json:"id"`
-	UserID        int32    `json:"user_id"`
-	ResourceType  string   `json:"resource_type"`
-	ResourceValue string   `json:"resource_value"`
-	Action        []string `json:"action"`
 }
 type Decision struct {
 	Allowed  bool `json:"allowed"`
@@ -38,7 +36,7 @@ func LibraryResource(library entity.DocumentLibrary) Resource {
 
 func (c *Client) Check(ctx context.Context, userID int32, resource Resource, action string) (bool, error) {
 	var decision *Decision
-	err := c.call(ctx, "/check", struct {
+	err := c.call(ctx, "/resource/check", struct {
 		UserID   int32    `json:"user_id"`
 		Resource Resource `json:"resource"`
 		Action   string   `json:"action"`
@@ -52,31 +50,17 @@ func (c *Client) Check(ctx context.Context, userID int32, resource Resource, act
 	return decision.Allowed, nil
 }
 
-func (c *Client) Get(ctx context.Context, resource Resource) ([]Record, error) {
-	var records []Record
-	err := c.call(ctx, "/get", struct {
-		Resource Resource `json:"resource"`
-	}{resource}, &records)
-	return records, err
+// SetResource creates or updates a resource without replacing user grants.
+func (c *Client) SetResource(ctx context.Context, resource Resource, userID, visibleType int32) error {
+	return c.call(ctx, "/resource/set", map[string]any{"resource": resource, "user_id": userID, "visible_type": visibleType}, nil)
 }
 
-func (c *Client) Set(ctx context.Context, grants []Grant) error {
-	return c.call(ctx, "/set", struct {
-		Grants []Grant `json:"grants"`
-	}{grants}, nil)
-}
-
-func (c *Client) SetLibrary(ctx context.Context, library entity.DocumentLibrary) error {
-	resource := LibraryResource(library)
-	grants := []Grant{{UserID: library.UserID, Resource: resource, Actions: []string{"push", "pull"}}}
-	if library.Public == 1 {
-		grants = append(grants, Grant{UserID: 0, Resource: resource, Actions: []string{"pull"}})
-	}
-	return c.Set(ctx, grants)
+func (c *Client) AddOwner(ctx context.Context, library entity.DocumentLibrary) error {
+	return c.call(ctx, "/permission/add", Grant{UserID: library.UserID, Resource: LibraryResource(library), Actions: []string{"push", "pull"}}, nil)
 }
 
 func (c *Client) ClearLibrary(ctx context.Context, library entity.DocumentLibrary) error {
-	return c.Set(ctx, []Grant{{UserID: library.UserID, Resource: LibraryResource(library), Actions: []string{}}})
+	return c.call(ctx, "/resource/delete", map[string]any{"resource": LibraryResource(library)}, nil)
 }
 
 func (c *Client) CanRead(ctx context.Context, user zpk.User, library entity.DocumentLibrary) (bool, error) {

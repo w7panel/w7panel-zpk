@@ -479,6 +479,11 @@ func (hc *HelmPack) generateHelpersTpl(rootDir string, identify string) error {
 	helpersTemplate = renderHelmTemplatePlaceholders(helpersTemplate, map[string]string{
 		"__IDENTIFY__": identify,
 	})
+	resourceTemplate, err := loadHelmTemplate("_resource-params.tpl")
+	if err != nil {
+		return err
+	}
+	helpersTemplate += "\n" + resourceTemplate
 	return writeFile(filepath.Join(rootDir, "_helpers.tpl"), helpersTemplate)
 }
 
@@ -572,8 +577,13 @@ func (hc *HelmPack) generateValuesYaml(rootDir string, options helmValuesOptions
 		helmContainers = append(helmContainers, hc.generateContainerV2Values(container, hc.Manifest.Application))
 	}
 	values["containers"] = helmContainers
+	values["resourceConfig"] = installResourceConfig(hc.Manifest.Platform)
 
 	for _, item := range hc.Manifest.Platform.StartParams {
+		if strings.HasPrefix(item.Type, "resource-") {
+			values[item.Name] = ""
+			continue
+		}
 		if len(strings.Split(item.Name, ".")) > 1 {
 			continue
 		}
@@ -1402,6 +1412,9 @@ func (hc *HelmPack) getRuntimeClassValues(platform logic2.Platform) map[string]i
 func (hc *HelmPack) getStartParamsEnvValues(platform logic2.Platform) map[string]interface{} {
 	values := make(map[string]interface{})
 	for _, item := range platform.StartParams {
+		if strings.HasPrefix(item.Type, "resource-") {
+			continue
+		}
 		values[item.Name] = "{{ " + ".Values." + item.Name + " }}"
 	}
 

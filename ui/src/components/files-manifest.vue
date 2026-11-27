@@ -571,8 +571,21 @@
                                         <a-checkbox v-model="form.redis">redis</a-checkbox>
                                         <a-checkbox v-model="form.mongodb6">mongodb</a-checkbox>
                                     </div>
+                                    <a-button @click="openResourceSettings">资源配置</a-button>
                                     <a-button @click="openSpEdit">批量修改</a-button>
                                 </div>
+                                <a-button v-if="form.type === 'system-image'" @click="openResourceSettings">资源配置</a-button>
+                                <manifest-config-table v-if="resourceStartParams().length" class="mt-10" title="资源配置" :rows="resourceStartParams()">
+                                    <template #columns>
+                                        <manifest-config-table-column data-index="title" title="资源类型" />
+                                        <manifest-config-table-column title="默认值">
+                                            <template #cell="{ record }">{{ record.values_text || '不限制' }} {{ record.values_text ? record.unit : '' }}</template>
+                                        </manifest-config-table-column>
+                                        <manifest-config-table-column title="操作">
+                                            <template #cell><span class="c-blue cursor" @click="openResourceSettings">编辑</span></template>
+                                        </manifest-config-table-column>
+                                    </template>
+                                </manifest-config-table>
                                 <manifest-config-table v-for="section in startParamSections()" :key="section.key"
                                     class="mt-10" :title="section.title" :rows="section.rows"
                                     :add-text="section.key === 'custom' ? '添加启动参数' : ''"
@@ -750,6 +763,17 @@
             </div>
         </a-modal>
 
+        <a-modal v-model:visible="resourceSettings.show" title="资源配置" :width="620" :footer="false">
+            <a-alert class="mb-16">开启的类型会显示在安装界面；默认值可留空。安装时默认不限制资源，关闭“不限制资源”后才应用填写的值。</a-alert>
+            <div v-for="row in resourceSettings.rows" :key="row.type" class="df ai-c mt-16">
+                <a-checkbox v-model="row.enabled" :disabled="Boolean(option?.startParamsOnly) || row.fromContainer" style="width:120px">{{ row.title }}</a-checkbox>
+                <a-input v-model="row.value" :disabled="!row.enabled" placeholder="默认值，留空表示不限制">
+                    <template #append>{{ row.unit }}</template>
+                </a-input>
+            </div>
+            <p class="c-99 mt-16">容器已设置上限的类型会自动开启；如需关闭，请先清除容器配置中的对应限制。多容器默认值按普通容器上限合计，安装后在这些容器之间分配。</p>
+            <div class="df jc-e mt-20"><a-button @click="resourceSettings.show = false">取消</a-button><a-button class="ml-10" type="primary" @click="saveResourceSettings">确定</a-button></div>
+        </a-modal>
         <a-modal v-model:visible="storageSettings.show" title="存储设置" :width="620" @ok="saveStorageSettings">
             <div class="storage-settings-intro">为应用已有的持久化挂载选择存储方式。</div>
             <a-radio-group v-model="storageSettings.mode" direction="vertical" class="storage-mode-options">
@@ -876,6 +900,7 @@
 
 <script>
 import jsyaml from "js-yaml";
+import { resourceManifestState, resourceManifestMethods } from '@/components/manifest/resource-manifest';
 import filesUpload from './files-upload.vue';
 import formIngress from '@/components/form-ingress.vue';
 import w7Identifie from "@/components/w7-identifie.vue";
@@ -1022,6 +1047,7 @@ export default {
             ...appPluginManifestState(),
             ...gatewayPluginManifestState(),
             ...startParamsManifestState(),
+            ...resourceManifestState(),
             ...dependencyManifestState(),
             ...shellManifestState(),
             ...applicationConfigManifestState(),
@@ -1086,6 +1112,7 @@ export default {
         ...dockerManifestMethods,
         ...helmManifestMethods,
         ...startParamsManifestMethods,
+        ...resourceManifestMethods,
         ...dependencyManifestMethods,
         ...shellManifestMethods,
         ...applicationConfigManifestMethods,

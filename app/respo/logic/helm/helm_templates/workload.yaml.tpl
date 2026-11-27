@@ -1,4 +1,5 @@
 {{- $runtimeConfig := include "common.runtimeConfig" . | fromJson -}}
+{{- $resourceLimits := include "common.installResourceLimits" . | fromJson -}}
 {{- $rootCtx := dict "Values" (deepCopy .Values) "Chart" .Chart "Release" .Release "Capabilities" .Capabilities "Template" .Template "Files" .Files "Subcharts" .Subcharts -}}
 
 {{/* 传统应用和系统镜像的镜像版本切换处理：升级时保留运行中的 IMAGE_VERSION，
@@ -41,10 +42,13 @@ spec:
       {{- include "common.selectorLabels" . | nindent 6 }}
   template:
     metadata:
-      {{- $podAnnotations := include "w7panel.podAnnotations" $rootCtx }}
+      {{- $podAnnotations := include "w7panel.podAnnotations" $rootCtx | fromYaml | default dict }}
+      {{- if $resourceLimits.bandwidth }}
+        {{- $_ := set $podAnnotations "kubernetes.io/ingress-bandwidth" $resourceLimits.bandwidth }}
+        {{- $_ := set $podAnnotations "kubernetes.io/egress-bandwidth" $resourceLimits.bandwidth }}
+      {{- end }}
       {{- if $podAnnotations }}
-      annotations:
-        {{- $podAnnotations | nindent 8 }}
+      annotations: {{- toYaml $podAnnotations | nindent 8 }}
       {{- end }}
       labels:
         {{- include "common.selectorLabels" . | nindent 8 }}
@@ -133,7 +137,7 @@ spec:
               value: {{ tpl $qvalue $rootCtx | quote }}
             {{- end }}
             {{- end }}
-          {{- with .resources }}
+          {{- with (get $resourceLimits.containers .name | default .resources) }}
           resources: {{- toYaml . | nindent 12 }}
           {{- end }}
           {{- with .volumeMounts }}

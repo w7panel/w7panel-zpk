@@ -167,3 +167,7 @@ JWT 不包含面板 access token。制品前端对自有 ZPK origin/path 额外�
 制品简介保存在制品表 `readme` 字段，文档由独立文档服务维护，不再读写 `shared` OCI。旧数据使用 `respo:migrate-documents` 一次性迁移，确认后使用 `respo:clean-shared-tags --dry-run` 预检查，再手动清理旧 tag。两个命令均支持 `--identifie` 限定制品；清理命令不删除本地源文件，也不执行 blob 垃圾回收。
 
 运行条件、失败处理与命令示例见 [文档系统迁移说明](modules/document/README.md#一次性旧文档迁移)。
+
+## 资源启动参数
+
+启动参数编辑器提供独立资源配置（CPU、内存、GPU、带宽）。只有开启的类型才展示在安装表单，默认值可留空；原生应用的容器 limits 自动预填。安装时“不限制资源”首次默认开启，关闭后才应用填写值，空项仍不限制。协议及生成 Chart 行为见 [资源启动参数](APPLICATION_HELM_PACKAGING.md#资源启动参数2026-11-26)。

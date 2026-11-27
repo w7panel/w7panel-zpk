@@ -149,6 +149,7 @@ export const startParamsManifestMethods = {
     },
     syncApplicationBuiltInStartParams() {
         if (this.option?.startParamsOnly) return;
+        this.syncContainerResourceStartParams?.();
         if (this.form.type == 'app-plugin') {
             this.form.startParams = withPluginTraditionStartParams(
                 this.form.startParams,
@@ -329,7 +330,7 @@ export const startParamsManifestMethods = {
         return this.form.type == 'docker' && this.isDockerBuiltInStartParam(name);
     },
     isFixedStartParam(item) {
-        return this.isBuiltInStartParam(item) || Boolean(this.json?.platform?.storage?.mode && item.mark === 'storage');
+        return String(item.type || '').startsWith('resource-') || this.isBuiltInStartParam(item) || Boolean(this.json?.platform?.storage?.mode && item.mark === 'storage');
     },
     startParamSections() {
         const sections = [
@@ -339,6 +340,7 @@ export const startParamsManifestMethods = {
             { key: 'custom', title: '自定义参数', rows: [] },
         ];
         for (const item of this.form.startParams || []) {
+            if (String(item.type || '').startsWith('resource-')) continue;
             let section = 'custom';
             if (this.isDomainStartParam(item)) section = 'domain';
             else if (item.mark === 'storage' || (item.name === 'PVC_NAME' && this.isBuiltInStartParam(item))) section = 'storage';

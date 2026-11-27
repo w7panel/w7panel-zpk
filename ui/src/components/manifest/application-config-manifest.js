@@ -113,12 +113,14 @@ export const applicationConfigManifestMethods = {
             isTemplate: true,
             pluginData: this.containerPluginData,
         }, data => {
+            const previousContainers = this.json.platform['container-v2'];
             const nextInitContainers = data?.initContainers || [];
             nextInitContainers.forEach(item => { item.isInitContainer = true; });
             const nextContainers = data?.containers || [];
             const allContainers = nextContainers.concat(nextInitContainers);
             this.form.containers = allContainers;
             this.json.platform['container-v2'] = allContainers;
+            this.syncContainerResourceStartParams(previousContainers);
             this.json.platform.volumes = data.volumes;
             this.json.platform.volumeClaimTemplates = data.volumeClaimTemplates;
             this.fillDefaultShellContainer();

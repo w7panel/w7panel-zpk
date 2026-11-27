@@ -21,6 +21,13 @@
                 <a-form-item label="标识">
                     <a-input :model-value="identifie" disabled />
                 </a-form-item>
+                <a-form-item label="访问权限">
+                    <a-radio-group v-model="form.visibleType">
+                        <a-radio :value="4">公有</a-radio>
+                        <a-radio :value="1">私有</a-radio>
+                    </a-radio-group>
+                    <template #extra>公有允许任何人安装；私有需要源仓库的拉取权限。制品市场安装按订单授权。</template>
+                </a-form-item>
                 <a-form-item label="描述">
                     <a-textarea v-model="form.description" placeholder="请输入应用描述" :max-length="500"
                         show-word-limit :auto-size="{ minRows: 2, maxRows: 5 }" />
@@ -132,6 +139,7 @@ export default {
             applicationType: '',
             form: {
                 name: '',
+                visibleType: 4,
                 description: '',
                 introduction: '',
                 category: '',
@@ -233,15 +241,19 @@ export default {
             this.loadFailed = false;
             this.resetSelectedIcon();
             try {
-                let [infoRes, settingRes, categoriesRes] = await Promise.all([
+                let [infoRes, settingRes, categoriesRes, permissionRes] = await Promise.all([
                     myAxios.get('/respo/info/' + this.identifie),
                     myAxios.post('/respo/setting/get', { identifie: this.identifie }),
                     myAxios.post('/respo/category/list', { limit: 999 }),
+                    myAxios.post('/respo/permission/get', { identifie: this.identifie }),
                 ]);
                 let latestInfo = infoRes?.data?.data || this.info || {};
                 let baseInfo = settingRes?.data?.data?.base_info || {};
                 this.applicationType = this.getApplicationType(latestInfo);
                 this.form.name = baseInfo.name || '';
+                const visibleType = permissionRes?.data?.data?.visible_type;
+                if (![1, 4].includes(visibleType)) { throw new Error('获取权限失败'); }
+                this.form.visibleType = visibleType;
                 this.form.description = baseInfo.description || '';
                 let annotation = baseInfo.annotation || {};
                 this.form.annotations = Object.entries(annotation)
@@ -327,6 +339,12 @@ export default {
                         register_site: this.isRegisterSiteDisabled ? false : Boolean(this.form.registerSite),
                     },
                 });
+
+                const permissionRes = await myAxios.post('/respo/permission/set', {
+                    identifie: this.identifie,
+                    visible_type: this.form.visibleType,
+                });
+                if (permissionRes?.data?.data !== 'success') { throw new Error('保存权限失败'); }
 
                 let categoryName = this.requiredCategoryName || this.form.category;
                 if (!this.categories.some(category => category.name == categoryName)) {

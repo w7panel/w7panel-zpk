@@ -143,10 +143,9 @@ jobs:
           PUBLISH_DIRECTORY="$(mktemp -d "${RUNNER_TEMP}/zpk-release.XXXXXX")"
           DOCUMENT_PACKAGE_DIRECTORY="${RUNNER_TEMP}/document-release"
           DOCUMENT_HELM_PACKAGE="${DOCUMENT_PACKAGE_DIRECTORY}/w7-zpkdocument-${GITHUB_REF_NAME#v}.tgz"
-          mkdir -p "${PUBLISH_DIRECTORY}/helm" "${PUBLISH_DIRECTORY}/document-helm" "${PUBLISH_DIRECTORY}/document-ui"
+          mkdir -p "${PUBLISH_DIRECTORY}/helm" "${PUBLISH_DIRECTORY}/document-helm"
           tar -xzf "${HELM_PACKAGE}" -C "${PUBLISH_DIRECTORY}/helm"
           tar -xzf "${DOCUMENT_HELM_PACKAGE}" -C "${PUBLISH_DIRECTORY}/document-helm"
-          unzip -q "${DOCUMENT_PACKAGE_DIRECTORY}/document-ui.zip" -d "${PUBLISH_DIRECTORY}/document-ui"
 
           ZPK="./cli/bin/zpk_linux_amd64_v2"
           "${ZPK}" login --username="${ZPK_DOCKER_USERNAME}" --password="${ZPK_DOCKER_PASSWORD}" --host="${ZPK_HOST}"
@@ -155,5 +154,4 @@ jobs:
           "${ZPK}" app update helm --path="${PUBLISH_DIRECTORY}/app" --dir="${PUBLISH_DIRECTORY}/helm"
           "${ZPK}" app update frontend --path="${PUBLISH_DIRECTORY}/app" --dir="${FRONTEND_DIRECTORY}"
           "${ZPK}" app update helm --path="${PUBLISH_DIRECTORY}/app" --app=w7-zpkdocument --dir="${PUBLISH_DIRECTORY}/document-helm"
-          "${ZPK}" app update frontend --path="${PUBLISH_DIRECTORY}/app" --app=w7-zpkdocument --dir="${PUBLISH_DIRECTORY}/document-ui"
           "${ZPK}" app push --path="${PUBLISH_DIRECTORY}/app" --publish

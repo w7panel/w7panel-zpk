@@ -1,6 +1,8 @@
-package logic
+package repository
 
 import (
+	"context"
+	registrycommon "github.com/w7panel/w7panel-zpk/app/registry/logic/common"
 	workflow "github.com/w7panel/w7panel-zpk/app/workflow/logic"
 	"github.com/w7panel/w7panel-zpk/common/dao"
 	commonlogic "github.com/w7panel/w7panel-zpk/common/logic"
@@ -21,7 +23,7 @@ func (Deploy) OnRepositoryPushed(payload registry.RegistryRepositoryWebHookPayLo
 		return
 	}
 	name, namespace := commonlogic.ParseRepositoryNameAndNamespace(payload.Event.Target.Repository)
-	repository, err := (Repository{}).GetByNameAndNamespace(name, namespace)
+	repository, err := (registrycommon.Resource{}).GetByNameAndNamespace(context.Background(), "repository", name, namespace)
 	if err != nil || repository == nil {
 		return
 	}

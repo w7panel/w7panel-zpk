@@ -1,11 +1,10 @@
-package logic
+package common
 
 import (
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log/slog"
 	"slices"
 	"sort"
 	"strings"
@@ -20,13 +19,6 @@ import (
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 )
 
-const (
-	VisibleTypePrivate         = 1
-	VisibleTypePublicWrite     = 2
-	VisibleTypePublicRead      = 4
-	VisibleTypeFollowNamespace = 3
-)
-
 type PermissionScopeType string
 
 const (
@@ -36,20 +28,17 @@ const (
 var PermissionPrivateKey libtrust.PrivateKey
 var PermissionPublicKey libtrust.PublicKey
 
-type RegistryPermission struct {
+type Auth struct {
 	logic.Logic
 }
 
-// CheckRegistryScopes 按原有镜像规则准备权限，每个 scope 只调用一次通用校验。
-func (l RegistryPermission) CheckRegistryScopes(ctx context.Context, user *entity.RegistryUser, scopes []registry.PermissionScope) error {
+// CheckScopes 按原有镜像规则准备权限，每个 scope 只调用一次通用校验。
+func (l Auth) CheckScopes(ctx context.Context, user *entity.RegistryUser, scopes []registry.PermissionScope) error {
 	if user != nil && user.Type == logic.UserTypeSuperAdminForRegistry {
 		return nil
 	}
 	for _, scope := range scopes {
-		if scope.Type != string(ScopeRegistryType) {
-			continue
-		}
-		resource, err := l.prepareScopeResource(scope)
+		resource, err := l.prepareScopeResource(ctx, scope)
 		if err != nil {
 			return err
 		}
@@ -67,22 +56,13 @@ func (l RegistryPermission) CheckRegistryScopes(ctx context.Context, user *entit
 	return nil
 }
 
-func (l RegistryPermission) prepareScopeResource(scope registry.PermissionScope) (ResourcePermissionResource, error) {
-	repositoryName, namespace := logic.ParseRepositoryNameAndNamespace(scope.Name)
-	resource := ResourcePermissionResource{Type: string(PermissionResourceTypeRepository), Value: scope.Name}
-	repository, _ := (Repository{}).GetByNameAndNamespace(repositoryName, namespace)
-	visibleType := VisibleTypeFollowNamespace
-	if repository != nil {
-		visibleType = int(repository.VisibleType)
+func (l Auth) prepareScopeResource(ctx context.Context, scope registry.PermissionScope) (ResourcePermissionResource, error) {
+	resource, err := (Resource{}).Prepare(ctx, ResourcePermissionResource{Type: scope.Type, Value: scope.Name})
+	if err != nil {
+		return resource, err
 	}
-	if visibleType == VisibleTypeFollowNamespace {
-		namespaceModel, _ := (Namespace{}).GetByName(namespace)
-		if namespaceModel == nil {
-			return resource, errors.New("namespace not found")
-		}
-		visibleType = int(namespaceModel.VisibleType)
-	}
-	publicActions := registryPublicActions(visibleType)
+	publicActions := resource.PublicActions
+	resource.PublicActions = nil
 	publicAction := ""
 	if slices.Contains(scope.Actions, string(PermissionActionTypePush)) {
 		publicAction = string(PermissionActionTypePush)
@@ -96,18 +76,7 @@ func (l RegistryPermission) prepareScopeResource(scope registry.PermissionScope)
 	return resource, nil
 }
 
-func registryPublicActions(visibleType int) []string {
-	switch visibleType {
-	case VisibleTypePublicRead:
-		return []string{string(PermissionActionTypePull)}
-	case VisibleTypePublicWrite:
-		return []string{string(PermissionActionTypePush), string(PermissionActionTypePull)}
-	default:
-		return nil
-	}
-}
-
-func (l RegistryPermission) CreateToken(user *entity.RegistryUser, scopes []registry.PermissionScope) (string, error) {
+func (l Auth) CreateToken(user *entity.RegistryUser, scopes []registry.PermissionScope) (string, error) {
 	userName := ""
 	if user != nil {
 		userName = user.Username
@@ -157,27 +126,26 @@ func (l RegistryPermission) CreateToken(user *entity.RegistryUser, scopes []regi
 	return fmt.Sprintf("%s%s%s", payload, token.TokenSeparator, function.JoseBase64UrlEncode(sig)), nil
 }
 
-func (l RegistryPermission) OnAddUserPermissionEvent(payload registry.AddUserPermissionPayload) {
-	err := (ResourcePermission{}).AddUserPermission(payload.UserID, payload.ResourceValue, PermissionResourceType(payload.ResourceType), payload.Actions)
-	slog.Info("OnAddUserPermissionEvent", "payload", payload, "err", err)
-	if err != nil {
-		return
+// VerifyToken validates the signed token and exact resource type, path and actions.
+func (l Auth) VerifyToken(raw string, scope registry.PermissionScope) error {
+	if PermissionPublicKey == nil {
+		return errors.New("registry signing key is unavailable")
 	}
-}
-
-func (l RegistryPermission) OnDelUserPermissionEvent(payload registry.DelUserPermissionPayload) {
-	err := (ResourcePermission{}).DelUserPermission(payload.UserID, payload.ResourceValue, PermissionResourceType(payload.ResourceType))
-	slog.Info("OnDelUserPermissionEvent", "payload", payload, "err", err)
+	parsed, err := token.NewToken(raw)
 	if err != nil {
-		return
+		return err
 	}
-
-}
-
-func (l RegistryPermission) OnClearUserPermissionEvent(payload registry.ClearUserPermissionPayload) {
-	err := (ResourcePermission{}).ClearUserPermission(payload.UserID)
-	slog.Info("onClearUserPermissionEvent", "payload", payload, "err", err)
-	if err != nil {
-		return
+	if err := parsed.Verify(token.VerifyOptions{
+		TrustedIssuers:    []string{facade.GetConfig().GetString("registry_cli.default.oauth.issuer")},
+		AcceptedAudiences: []string{"docker-registry"},
+		TrustedKeys:       map[string]libtrust.PublicKey{PermissionPublicKey.KeyID(): PermissionPublicKey},
+	}); err != nil {
+		return err
 	}
+	for _, access := range parsed.Claims.Access {
+		if access.Type == scope.Type && access.Name == scope.Name && ValidatePermissionActions(scope.Actions, access.Actions) {
+			return nil
+		}
+	}
+	return errors.New("insufficient repository scope")
 }

@@ -7,9 +7,12 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/w7panel/w7panel-zpk/app/registry/command"
-	"github.com/w7panel/w7panel-zpk/app/registry/http/controller"
+	commoncontroller "github.com/w7panel/w7panel-zpk/app/registry/http/controller/common"
 	"github.com/w7panel/w7panel-zpk/app/registry/http/controller/openapi"
-	"github.com/w7panel/w7panel-zpk/app/registry/logic"
+	controller "github.com/w7panel/w7panel-zpk/app/registry/http/controller/repository"
+
+	registrycommon "github.com/w7panel/w7panel-zpk/app/registry/logic/common"
+	registryrepository "github.com/w7panel/w7panel-zpk/app/registry/logic/repository"
 	respologic "github.com/w7panel/w7panel-zpk/app/system/logic"
 	"github.com/w7panel/w7panel-zpk/common/accessor"
 	"github.com/w7panel/w7panel-zpk/common/dao"
@@ -30,13 +33,19 @@ func (p Provider) registerRoutes(httpServer *httpserver.Server) {
 	httpServer.RegisterRouters(func(engine *gin.Engine) {
 		root := engine.Group("/zpk/v2")
 
-		root.Any("/registry/auth", controller.Auth{}.Auth)
+		root.Any("/registry/auth", commoncontroller.Auth{}.Auth)
 		root.Any("/registry/webhook", controller.WebHook{}.Hook)
 
 		permissionService := root.Group("/openapi/permission", middleware.App{}.Process)
-		permissionService.POST("/check", openapi.ResourcePermission{}.Check)
-		permissionService.POST("/set", openapi.ResourcePermission{}.Set)
-		permissionService.POST("/get", openapi.ResourcePermission{}.Get)
+		permissionService.POST("/add", openapi.ResourcePermission{}.Add)
+		permissionService.POST("/delete", openapi.ResourcePermission{}.Delete)
+		permissionService.POST("/clear", openapi.ResourcePermission{}.Clear)
+
+		resourceService := root.Group("/openapi/resource", middleware.App{}.Process)
+		resourceService.POST("/get", openapi.Resource{}.Get)
+		resourceService.POST("/set", openapi.Resource{}.Set)
+		resourceService.POST("/check", openapi.Resource{}.Check)
+		resourceService.POST("/delete", openapi.Resource{}.Delete)
 
 		namespaceService := root.Group("/openapi/namespace", middleware.App{}.Process)
 		namespaceService.POST("/get", openapi.NamespaceService{}.Get)
@@ -45,39 +54,36 @@ func (p Provider) registerRoutes(httpServer *httpserver.Server) {
 		namespaceService.POST("/delete", openapi.NamespaceService{}.Delete)
 
 		namespaces := root.Group("/api/namespace", middleware.Cors{}.Process, middleware.DenyDomainReq{}.Process, middleware.Auth{}.Process)
-		namespaces.POST("/add", controller.Namespace{}.Create)
-		namespaces.POST("/info", controller.Namespace{}.Info)
-		namespaces.POST("/list", controller.Namespace{}.List)
-		namespaces.POST("/sub_namespace/list", controller.Namespace{}.SubNamespaceList)
-		namespaces.POST("/edit", controller.Namespace{}.Edit)
-		namespaces.POST("/del", controller.Namespace{}.Delete)
+		namespaces.POST("/add", commoncontroller.Namespace{}.Create)
+		namespaces.POST("/info", commoncontroller.Namespace{}.Info)
+		namespaces.POST("/list", commoncontroller.Namespace{}.List)
+		namespaces.POST("/sub_namespace/list", commoncontroller.Namespace{}.SubNamespaceList)
+		namespaces.POST("/edit", commoncontroller.Namespace{}.Edit)
+		namespaces.POST("/del", commoncontroller.Namespace{}.Delete)
 
 		api := root.Group("/api", middleware.Cors{}.Process, middleware.DenyDomainReq{}.Process, middleware.Auth{}.Process)
-		api.POST("/permission/namespace/set", middleware.AdminUser{}.Process, controller.RegistryPermission{}.SetNamespacePermission)
-		api.POST("/permission/namespace/get", middleware.AdminUser{}.Process, controller.RegistryPermission{}.GetNamespacePermission)
+		api.POST("/permission/namespace/set", middleware.AdminUser{}.Process, commoncontroller.NamespacePermission{}.SetNamespacePermission)
+		api.POST("/permission/namespace/get", middleware.AdminUser{}.Process, commoncontroller.NamespacePermission{}.GetNamespacePermission)
 
-		api.POST("/repository/add", controller.Repository{}.Create)
-		api.POST("/repository/info", controller.Repository{}.Info)
-		api.POST("/repository/list", controller.Repository{}.List)
+		api.POST("/resource/create", commoncontroller.Resource{}.Create)
+		api.POST("/resource/info", commoncontroller.Resource{}.Info)
+		api.POST("/resource/list", commoncontroller.Resource{}.List)
 		api.POST("/repository/edit", controller.Repository{}.Edit)
 		api.POST("/repository/del", controller.Repository{}.Delete)
 		api.POST("/repository/tags/list", controller.Repository{}.Tags)
 		api.POST("/repository/tags/del", controller.Repository{}.DelTag)
 		api.POST("/repository/tags/batch-del", controller.Repository{}.BatchDelTags)
 
-		api.GET("/registry/info", controller.Info{}.RegistryInfo)
+		api.GET("/registry/info", commoncontroller.Info{}.RegistryInfo)
 	})
 }
 
 func (p Provider) registerEvent() {
-	_ = facade.GetEvent().Subscribe(registry.RegistryRepositoryPrepareEvent, logic.Repository{}.OnRepositoryPrepareOperate)
-	_ = facade.GetEvent().Subscribe(registry.RegistryRepositoryPushedEvent, logic.Repository{}.OnRepositoryPushed)
-	_ = facade.GetEvent().Subscribe(registry.RegistryRepositoryPulledEvent, logic.Repository{}.OnRepositoryPulled)
-	_ = facade.GetEvent().Subscribe(registry.RegistryRepositoryAfterPushedEvent, logic.Deploy{}.OnRepositoryPushed)
-	_ = facade.GetEvent().Subscribe(registry.UpdateRepositoryEvent, logic.Repository{}.OnUpdateRepositoryEvent)
-	_ = facade.GetEvent().Subscribe(registry.ClearUserPermissionEvent, logic.RegistryPermission{}.OnClearUserPermissionEvent)
-	_ = facade.GetEvent().Subscribe(registry.AddUserPermissionEvent, logic.RegistryPermission{}.OnAddUserPermissionEvent)
-	_ = facade.GetEvent().Subscribe(registry.DeleteUserPermissionEvent, logic.RegistryPermission{}.OnDelUserPermissionEvent)
+	_ = facade.GetEvent().Subscribe(registry.RegistryRepositoryPrepareEvent, registryrepository.Repository{}.OnRepositoryPrepareOperate)
+	_ = facade.GetEvent().Subscribe(registry.RegistryRepositoryPushedEvent, registryrepository.Repository{}.OnRepositoryPushed)
+	_ = facade.GetEvent().Subscribe(registry.RegistryRepositoryPulledEvent, registryrepository.Repository{}.OnRepositoryPulled)
+	_ = facade.GetEvent().Subscribe(registry.RegistryRepositoryAfterPushedEvent, registryrepository.Deploy{}.OnRepositoryPushed)
+	_ = facade.GetEvent().Subscribe(registry.UpdateRepositoryEvent, registryrepository.Repository{}.OnUpdateRepositoryEvent)
 }
 
 func (p Provider) initJwtCert() {
@@ -93,8 +99,8 @@ func (p Provider) initJwtCert() {
 	if err != nil {
 		panic(err)
 	}
-	logic.PermissionPrivateKey = privateKey
-	logic.PermissionPublicKey = publicKey
+	registrycommon.PermissionPrivateKey = privateKey
+	registrycommon.PermissionPublicKey = publicKey
 }
 
 func (p Provider) initSuperAdmin() {
@@ -119,7 +125,7 @@ func (p Provider) initDefaultNamespace() {
 	if defaultNamespace == nil {
 		namespace := entity.RegistryNamespace{
 			Name:        logic2.DefaultNamespace,
-			VisibleType: int32(logic.VisibleTypePrivate),
+			VisibleType: int32(registrycommon.VisibleTypePrivate),
 		}
 		err := dao.Q.RegistryNamespace.Create(&namespace)
 		if err != nil {
@@ -150,6 +156,9 @@ func (p Provider) initDb() {
 		if err != nil {
 			panic(err)
 		}
+		if err := (registrycommon.Resource{}).MigrateLegacy(db); err != nil {
+			panic(err)
+		}
 	}
 
 	initLockFile := filepath.Join(facade.GetConfig().GetString("setting.db_dir"), ".initdb.lock")
@@ -174,31 +183,6 @@ func (provider *Provider) syncRegistryUserPermissions() error {
 	actions := accessor.PermissionActionOption{
 		"push",
 		"pull",
-	}
-
-	users, err := dao.Q.RegistryUser.Find()
-	if err != nil {
-		return err
-	}
-	userIDs := make([]int32, 0, len(users))
-	for _, user := range users {
-		userIDs = append(userIDs, user.ID)
-	}
-	if len(userIDs) > 0 {
-		newPermissions := make([]*entity.RegistryUserPermission, 0)
-		for _, user := range users {
-			newPermissions = append(newPermissions, &entity.RegistryUserPermission{
-				UserID:        user.ID,
-				ResourceType:  "namespace",
-				ResourceValue: ociNamespace,
-				Action:        &actions,
-			})
-		}
-		if len(newPermissions) > 0 {
-			if err := dao.Q.RegistryUserPermission.CreateInBatches(newPermissions, 100); err != nil {
-				return err
-			}
-		}
 	}
 
 	formulas, err := dao.Q.Formula.Find()

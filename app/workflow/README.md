@@ -1,109 +1,192 @@
-# 镜像自动任务
+# 镜像自动任务（Workflow）
 
-镜像仓库是工作流的首个调用方。模块集中管理规则、执行日志、Helm 包和执行流程；entity、DAO 仍统一放在 `common/entity`、`common/dao`，复用原规则表和日志表，没有新增表。镜像版本表只增加 `is_rebuilt` 保存当前重构状态。
+Workflow 负责保存任务、匹配触发条件、排队执行、归档结果。镜像仓库是当前调用方：仓库页面传入镜像地址，推送事件传入仓库路径、tag、digest 和事件 ID。日常配置与执行按工作流自身的数据处理，不再查询镜像仓库的所属用户。
 
-logic 沿用 respo 的结构体方法风格：`Workflow` 管理配置、触发及运行记录，`Helm` 管理模板打包及 release 安装、卸载和超时清理，`Executor` 管理 worker 队列、排队调度、运行参数及执行状态，`Deploy` 提供集群配置查询、校验与代理；配置校验和任务匹配分别放在 `Config`、`Task` 的方法中，日志和结果仍放在 workflow；控制器只处理参数、权限和响应，Kubernetes 查询、补丁及代理由 `common/service.Kubernetes` 调用。
+## 目录与职责
 
-workflow Provider 在主服务 `main.go` 中独立注册，放在 registry Provider 之后，沿用其初始化的仓库及签名配置；注册不传入业务回调。
+| 位置 | 职责 |
+| --- | --- |
+| [provider.go](provider.go) | 注册接口、补齐数据库字段、迁移旧规则、启动执行器 |
+| [http/controller/workflow.go](http/controller/workflow.go) | 配置、手动执行、分页记录与日志；按规则所有者校验访问 |
+| [http/controller/deploy.go](http/controller/deploy.go) | 集群命名空间、工作负载、容器查询及代理 |
+| [logic/config.go](logic/config.go) | Config / Task 模型、配置校验、自动匹配、手动选择整组任务 |
+| [logic/workflow.go](logic/workflow.go) | 规则读写、快照、入队、构建回推识别、记录和日志 |
+| [logic/executor.go](logic/executor.go) | 扫描队列、原子领取、执行参数、结果归档和中断超时处理 |
+| [logic/helm.go](logic/helm.go) | 生成内存 Chart、安装、阶段采集回调、卸载 |
+| [logic/helm_templates/](logic/helm_templates/) | Job、Dockerfile、认证 Secret、RBAC 与结果 ConfigMap 模板 |
+| [logic/deploy.go](logic/deploy.go) | KUBECONFIG 校验、加解密及集群操作 |
+| [logic/migrate.go](logic/migrate.go) | 旧规则 / 日志迁移和旧域名查询键规范化 |
+| [../../common/service/taskqueue/queue.go](../../common/service/taskqueue/queue.go) | 有界 channel、ants worker 池、进程内排队及执行去重 |
+| [../../ui/src/components/workflow/image-tasks.vue](../../ui/src/components/workflow/image-tasks.vue) | 任务配置、执行顺序、手动执行、分页记录和日志弹窗 |
 
-registry 通过 `ImagePushed` 向 `Workflow.OnImagePushed` 传递仓库名、tag、digest 等推送事件；workflow 根据自身规则读取仓库路径和任务配置。workflow 只维护规则、执行记录和构建结果日志，返回 `ImagePushResult.Rebuilt`，由 registry 单独更新镜像版本的重构标记。事件入口不包裹整体数据库事务；工作流入队保留短事务，Helm 安装在后台执行。规则保存时固定仓库路径及默认仓库账号密码，密码加密存储且不返回前端。触发时写入加密执行快照；执行时动态读取当前仓库域名及 HTTP 配置，凭据继续使用快照中的保存值，不签发专用令牌。没有 `Source` 适配器或仓库锁注入。保存和入队不加仓库锁；调度器在短事务内按执行记录 ID 和 pending 状态领取任务，防止同一轮被重复执行；同一仓库的不同轮次允许并发，Helm 执行期间不持锁。镜像表及 `IsRebuilt` 的迁移归 registry Provider，workflow Provider 只处理规则和执行日志。旧规则已在启动时迁移为工作流，内部构建回推不再次触发。
+Provider 在 [main.go](../../main.go) 中独立注册。模型及生成查询仍统一放在 `common/entity`、`common/dao`；不建立单独的 Workflow 主表。
 
-Helm 包根文件由 `helm_templates/Chart.yaml.tpl` 和 `values.yaml.tpl` 在执行阶段根据快照生成，默认镜像及运行参数结构统一在 values 模板维护；`serviceaccount.yaml.tpl`、`configmap.yaml.tpl`、`role.yaml.tpl`、`rolebinding.yaml.tpl`、`secret.yaml.tpl`、`job.yaml.tpl` 原样打包到 Chart 的 `templates/`，在触发安装时由 Helm 使用本轮 values 渲染。`GenerateChart` 将内置模板和生成的 values 直接组合为内存 Chart，交给 Helm 安装，不再生成或缓存本地 tgz 文件。
+## 保存任务：保存什么，何时读取
 
-## 配置与执行
+仓库页面使用 `image_repository` 传完整仓库地址，不含 tag、digest，例如 `registry.example.com/cache/oowy/systemd`。后端取路径 `cache/oowy/systemd` 作为规则查询键，域名不参与规则关联。
 
-仓库详情的“镜像自动任务”页面先填写任务名称，再配置触发方式和版本名称，再选择“部署应用”或“镜像重构”。执行时机合并为一个下拉框，直接选择“最先执行”“在某任务之后执行”或“和某任务一起执行”；列表显示对应关系，点击修改即可调整，新增、修改或删除任务时直接保存完整配置，无需再次保存列表。保存成功后更新列表；失败保留原列表和编辑内容。
+保存流程：
 
-只有触发方式、匹配方式和版本条件相同的任务才能设置先后、并行或引用构建结果；更新版本不比较无效的匹配方式字段，版本条件只忽略首尾空白。列表按这些条件归组，顺序调整只影响本组；不同前缀或正则即使可能命中同一版本，也不允许互相引用。旧配置中跨条件的镜像来源在保存和触发时会被拒绝，需要重新选择。
+1. 读取已有规则；不存在时使用当前登录用户作为所属用户。已有规则只能由所有者或管理员管理；全部任务删除后，仍可从历史执行快照恢复所属关系。
+2. 控制器把已确定的仓库配置写入 `config.repository`，客户端不能借此改所属用户或仓库凭据。
+3. 校验任务、阶段、镜像来源和部署目标；当前集群部署只允许管理员配置。
+4. 从服务配置读取默认仓库账号密码；含构建任务时要求凭据完整。密码、目标集群 KUBECONFIG 加密后保存。
+5. 在事务内按稳定任务标识更新 / 新增规则，删除本次配置中已移除的规则。保存空任务列表表示删除规则，不删除历史执行记录。
 
-“之后执行”等待所选任务所在组全部成功，“一起执行”加入所选任务的执行组。界面将选择转换为原有 stage 字段，已有数字顺序配置自动回显，不新增接口或数据库字段；这些关系用于配置分组，不是独立的任务依赖图。镜像来源可选择原始镜像或构建结果，不再单独选择来源任务：选“之后执行”时使用所选构建任务的输出，所选任务为部署时沿用其输入；选“一起执行”时沿用所选任务的输入。已有配置未调整时保留原来源，避免改变历史镜像语义。调整时同时校验已有任务的来源引用，禁止引用同组或后续任务的构建结果。
+| 数据 | 保存位置 / 获取时间 |
+| --- | --- |
+| 所属用户、目标仓库路径 | 规则的 `user_id`、`repository_name` |
+| 任务动作、触发条件、阶段、来源、Dockerfile、输出后缀、部署目标 | 每个任务对应一条规则 |
+| 仓库账号密码 | 保存配置时读取 `registry_cli.default.username/password`；密码加密落库 |
+| 目标 KUBECONFIG | 保存规则时加密；查询配置时为有权用户解密返回 |
+| 本轮任务配置、凭据及输入镜像 | 触发时写入加密执行快照；后续编辑规则不改变已入队快照 |
+| 本地仓库域名和 HTTP 配置 | 执行时读取当前 `registry_cli.default.external_domain` 与 `registry_cli.default.url` |
+| 执行镜像和 Helm 模板 | 执行时使用当前服务配置及当前程序内置模板 |
 
-- 相同顺序构成一个阶段，在同一个 Job 的不同容器中并行运行；不同阶段按 Helm hook 权重串行执行。
-- 当前阶段所有任务成功才进入下一阶段；失败后停止后续阶段，同阶段已启动任务继续运行。
-- 镜像来源为“原始镜像”或指定前面阶段的构建任务。自动触发使用推送事件中的 digest；手动触发直接使用输入镜像地址。引用构建任务产物时，使用该任务实际输出的 digest。
-- 来源任务必须匹配本次事件；来源缺失会记录失败，不自动改用原镜像。
-- 构建目标为原始 tag 加自定义后缀；留空覆盖原 tag。后缀始终相对触发 tag 计算。
-- 同阶段不能写同一个 tag 或同一个部署容器；不同阶段可以连续修改同一 tag。
-- 每个工作流最多 32 个任务，单阶段最长 30 分钟，一轮执行最长 2 小时；每个服务进程默认同时运行三轮，可通过配置调整。同一仓库的不同轮次可并发，数据库只负责防止同一轮被重复领取。
+改仓库域名不需要修改规则。排队中的自动输入地址和本轮输出仓库会使用执行时的本地域名；手动输入的外部源镜像保持原地址。账号密码使用保存值，调整服务默认凭据后，需要重新保存规则才能让新触发使用新凭据。
 
-例如：阶段 1 构建基础版；阶段 2 并行构建虚拟机版和开发版；阶段 3 的部署任务明确选择阶段 2 中某条任务的结果。
+## 触发与数据流
 
-保存规则只写入数据库。触发时在短事务中匹配任务，并保存加密的配置和凭据快照，不准备 Helm 文件。
-
-执行器参考售卖项目的 worker：分页扫描待执行记录的 ID，通过有界 channel 和 ants worker 池排队，进程内去重覆盖排队和执行。worker 真正开始时才按 ID 从数据库领取，数据库仍负责持久状态和同一执行记录的领取去重。`workflow.concurrency` 默认 3，`workflow.queue_size` 默认 100；环境变量为 `WORKFLOW_CONCURRENCY`、`WORKFLOW_QUEUE_SIZE`，服务 Chart 对应 `workflow.concurrency`、`workflow.queueSize`。这些设置控制每个进程的整轮执行并发，任务内的阶段与并行关系仍由规则控制。
-
-执行时直接按本轮数据库快照生成内存 Chart，不缓存本地包，不比较包摘要，也不扫描或清理本地运行包。
-
-构建参考面板现有 Kaniko 执行镜像，直接挂载 Dockerfile 片段，不要求源码压缩包。第一版不提供 `FROM`、`ONBUILD`、`ADD`、`COPY`，不提供自定义脚本动作。按当前约定不再执行镜像来源预检：不检查多平台索引，也不检查排队期间原 tag 是否发生变化。自动触发使用推送事件的 digest，手动触发直接使用输入的镜像地址；构建过程与外部上传之间没有跨系统事务，覆盖原 tag 时仍需避免并发外部上传。
-
-## 数据职责
-
-规则与执行记录以不包含域名的仓库路径关联，例如 `cache/oowy/systemd`；`default` 命名空间按 Registry 协议省略。接口仍接受完整镜像地址，但只取路径作为查询标识。访问镜像仓库时动态读取 `registry_cli.default.external_domain` 与 URL 协议，不依赖规则中旧的域名。排队期间修改域名，执行时也使用当前域名；手动指定的外部源镜像地址保持原样。账号密码仍在保存规则时固定，不随域名动态获取。
-
-规则表仅保留 `repository_name` 作为仓库标识，不再保存 `image_repository`、`image_host`、`plain_http`；现有数据库中的旧列不主动删除，也不再读写。启动迁移会将旧运行记录的完整地址查询键转为路径，保留原规则、日志 ID 和任务配置，不改写历史加密快照。已迁移且 RepositoryID 已清零的数据同样处理，重复启动不会新增记录。
-
-规则表保存动作、执行分组顺序和来源引用，不保存 Helm 包路径或二进制。旧规则在 workflow 初始化数据库后迁移，补齐所属用户、镜像配置和任务标识、顺序、动作、来源、名称，保留原规则 ID 并转换为部署任务；日常读写不再为旧字段补默认值。旧日志保留原 ID 和正文，历史结果标记为 unknown。迁移全部成功后清空旧 RepositoryID 关联；失败保留迁移标记供下次启动重试。旧规则增删改查接口和运行时旧部署分支已移除。
-
-日志表同时保存每轮执行记录（数据库 `workflow_task_key` 为空）和对应规则的任务记录。执行快照和 KUBECONFIG 使用项目已有 AES 机制加密；运行快照不随规则编辑变化，历史日志不因任务删除而删除。旧日志在启动迁移时补充运行标识和任务标识，保留原规则与日志 ID。
-
-规则和日志均删除 `workflow_chart_path`，也不保存包二进制和重复的 `selected` 列。选中任务从同仓库、同 `workflow_run_id` 的任务记录推导。初始化 SQL 和 DAO 已同步；未对真实数据库执行迁移或删除列。启动不会自动丢弃旧列数据。
-
-日志只保存构建输出 tag 和 digest；镜像版本表 `ims_registry_repository_tag.is_rebuilt` 保存当前 tag 是否为重构产物。构建任务使用保存的默认仓库管理员账号，经正常 Registry 鉴权。Webhook 根据执行快照中的账号、正在运行的任务及目标 tag 识别回推；使用同一个管理员账号并发向相同目标 tag 上传时，无法仅从 Webhook 用户名区分来源。内部推送标记重构状态，不另起自动任务；外部上传清除状态，即使 digest 相同也会清除，不修改历史构建产物记录。版本列表通过仓库模块 `Repository.RebuiltImages` 查询镜像版本表的状态，展示“重构”标签。工作流只负责在推送确认后更新状态。
-
-新增字段使用业务语义命名：规则中的 `workflow_task_key` 为稳定任务标识、`execution_order` 为并行分组顺序、`source_build_task_key` 为指定来源构建任务；日志中的 `trigger_*` 保存触发镜像，`build_output_*` 保存构建产物，`encrypted_config_snapshot` 保存加密配置。Go 字段与数据库列名同步优化，原 JSON 字段名保留，兼容现有页面和接口。规则和日志均不保存执行命名空间，任务执行、日志读取和资源清理统一使用 `default`。部署目标仍使用 `k8s_namespace`。这些新增字段尚未发布，若本地已试用旧命名，需要先转换数据；初始化只添加缺失列，不自动重命名或删除旧列。
-
-## 部署与权限
-
-实际执行使用当前集群 ServiceAccount，不读取开发机器的 kubeconfig。执行命名空间固定为 `default`，不提供环境变量或页面配置；服务 Helm Chart 将工作流 Role 和 RoleBinding 创建在 `default`，绑定 ZPK 所在命名空间的 ServiceAccount。
-
-服务 Chart 的 `workflow.enabled` 控制执行器及相关权限，`workflow.buildImage` / `workflow.deployImage` 可指定执行镜像。部署镜像默认使用 `registry.cdn.w7.cc/alpine/k8s:1.33.0`，包含 `/bin/sh` 和 kubectl；自定义部署镜像也需同时提供这两者。旧服务的 `WORKFLOW_DEPLOY_IMAGE` 或 Helm `workflow.deployImage` 若仍指向无 shell 的镜像，需更新后重新触发。构建 Job 不使用宿主 Docker socket。工作流的 Job、ConfigMap、ServiceAccount、Role、RoleBinding 以及认证 Secret 均由模板定义，执行端只准备本轮 values 并调用 Helm。规则中保存的账号密码通过本轮 `values.registryUsername/registryPassword` 传入，使用标准 Docker auth，模板生成仓库认证 Secret，挂载至构建容器 `/kaniko/.docker`；目标集群 KUBECONFIG 通过 `values.kubeconfigs[任务ID]` 传入，模板生成集群 Secret，挂载至部署容器 `/target/config`。两类 Secret 随 release 一起清理，后端不再单独创建或删除；可复用的模板包不包含凭证。Helm release 使用本轮独立的内存存储，安装、结果采集和卸载共享同一个配置，不创建 Helm release Secret；面板不会通过 Helm release Secret 将本轮工作流同步为应用。任务领取及防止重复执行仍由数据库状态控制。运行包在执行阶段按本轮快照生成，使用当前程序内置的 Helm 模板。
-
-当前集群部署仅管理员可以配置；其他用户必须提供目标集群 KUBECONFIG。目标集群配置只接受内嵌证书、Token 等，不执行外部认证程序，也不引用本地凭证文件。任务 ServiceAccount 仅获结果 ConfigMap 读取/更新权限，以及管理员明确配置的目标工作负载读取/更新权限。
-
-ZPK 的 ServiceAccount 需要在执行命名空间管理 Job、Secret、ServiceAccount 和读取 Pod 日志；还需创建、删除任务所需的 Role / RoleBinding。使用自定义 ServiceAccount 时需自行配置这些权限。Kubernetes 对 Role 创建/绑定的权限提升校验继续生效。
-
-每个阶段的 hook Job 完成后先归档已结束容器的结果和日志，再进入后续阶段；阶段采集不将后续任务标记为失败或跳过。Job 完成后保留 60 秒，与现有 ZPK Job 一致，然后由 Kubernetes TTL 清理。整轮结束时补齐最终结果，并保留已清理阶段的归档日志，再清理临时凭证、普通 Chart 资源和内存中的 release 记录。异常退出不会自动重放已有副作用；超过恢复窗口的运行记录标为失败，需要检查集群后重新触发。进程异常退出仍可能留下普通资源，Job TTL 不负责清理 Secret、ConfigMap 等资源；本次未增加异常资源回收流程。
-
-SQLite、MySQL 非 debug 启动沿用项目初始化规则，以增量方式添加字段。业务查询和更新统一使用生成 DAO 的字段表达式，保留 GORM 事务和行锁，不拼接数据库列名。数据库初始化统一由 provider 处理，只创建缺失表、添加缺失字段及索引，不改写旧列；debug 环境仍跳过自动补齐，数据库切换禁写期间也跳过结构变更，不提供额外迁移命令。本次开发没有对真实数据库执行迁移。
-
-## 接口与兼容
-
-新接口保留仓库调用路径，路由、控制器及业务实现由本模块管理：
-
-- `POST /zpk/v2/api/workflow/get`：读取配置。
-- `POST /zpk/v2/api/workflow/save`：保存整组任务。
-- `POST /zpk/v2/api/workflow/runs`：传 `task_id` 查询任务历史，省略时查询整轮历史。`page` 默认 1，`page_size` 默认 10、最大 100，返回 `list/total/page/limit`。
-- `POST /zpk/v2/api/workflow/logs`：读取指定执行的 Pod 日志，`tail_lines` 默认 100，范围 1～2000，返回 `log/archived/truncated/status`。
-- `POST /zpk/v2/api/workflow/run`：传入 `task_id` 和 `image`，手动执行该任务所在的整个触发条件组，返回 `run_id`。
-
-均传入完整镜像地址 `image_repository`；保存额外传 `config`，日志额外传 `run_id`。新增与编辑统一使用 save，每个任务对应原规则表中的一条记录，新增时由数据库生成 ID。规则按当前登录用户保存所属用户；后续按规则自身所有者校验，管理员可访问全部规则，不查询镜像表。前端提交的用户、账号密码不能覆盖保存配置。规则及日志都没有 WorkflowID；任务以规则 ID 关联，同一轮用 WorkflowRunID 关联。仓库页面只传入当前镜像地址。旧 deploy_rule 的 add/info/list/edit/del/deploy-log 已去除，Kubernetes 查询和代理接口仍由 workflow 注册。
-
-任务列表提供“手动执行”入口，输入公共镜像地址后，运行同一触发方式、匹配方式和版本条件下的整组任务。手动执行不要求输入镜像的 tag 命中自动触发条件，仍保留组内阶段、并行关系和镜像来源；构建结果推送到当前仓库，tag 使用输入镜像的 tag 加任务后缀；未写 tag 默认 latest，暂不接受 digest 引用。接口仅做参数和权限校验、保存任务快照并入队，立即返回 `run_id`，不请求源镜像仓库或提前解析 digest。输入镜像地址直接传给 Kaniko 或部署任务，拉取由对应任务处理；不增加源仓库授权或凭据。共用执行快照、worker 队列和日志流程。每次手动提交生成独立运行记录，内部构建推送继续避免重复触发自动任务。
-
-手动执行使用规则保存的所属用户校验；整组包含当前集群部署时，仅管理员可执行。执行器未启用、任务已删除时拒绝入队；源镜像拉取失败时由执行记录报告结果。成功提交后打开现有执行记录，实际执行结果以记录和日志为准。
-
-任务列表每行提供“执行记录”入口，弹窗分页显示该任务历史，每页默认 10 条，可调整每页条数，切换任务回到第一页，不再在页面底部展示仓库执行记录。“任务日志”使用记录的 `run_id` 和 `task_id`，只显示当前任务在该轮的日志。任务列表仅显示任务名称，执行记录显示流程 ID；日志窗口采用黑底终端和顶部控制栏，支持全屏。参照面板安装日志提供 50、100、200、500、1000、2000 行选择，以及“跟踪”开关。本模块沿用共享 JSON 请求入口，跟踪模式每次请求完成 3 秒后更新一次快照，并自动滚动；关闭跟踪后只读取一次。切换行数、关闭弹窗或组件卸载会取消旧请求并清理定时器，错误时暂停跟踪。
-
-已终结且归档完成的任务直接读取数据库，不请求 Kubernetes。其余任务在 Pod 尚在时按选择的行数读取，每个容器最多显示 1 MiB，达到上限时明确提示。Pod 已清理后的历史归档仍是每个容器末尾 100 行、最多 16 KiB；归档响应明确标记并停止跟踪，选择更多行不会恢复已丢弃日志。此功能不是全量日志存储。
-
-## 验证
-
-```sh
-go test ./app/workflow/... ./app/registry/http/controller
-go test -race ./app/workflow/...
-go vet ./app/workflow/... ./app/registry/http/controller ./common/dao ./common/entity
-go build ./...
+```mermaid
+flowchart TD
+    A[仓库推送事件] --> B[Registry 准备事件类型、仓库、tag、digest]
+    B --> C[Workflow.OnImagePushed]
+    C --> D{是否本轮构建回推}
+    D -- 是 --> E[返回 Rebuilt，不再触发工作流]
+    D -- 否 --> F[按 tag 和事件类型匹配任务]
+    M[手动执行：task_id + 公共镜像地址] --> N[选出同触发条件整组任务]
+    F --> Q[事务保存执行快照、整轮及任务记录]
+    N --> Q
+    Q --> P[pending]
+    P --> W[worker 按 ID 原子领取]
+    W --> R[running]
+    R --> H[内存 Chart / Helm 安装]
+    H --> S[按阶段执行并归档结果]
+    S --> T[记录最终状态、卸载临时资源]
 ```
 
-模块测试使用临时 SQLite 和实际 `helm template`，覆盖阶段并行、指定来源、输出冲突、旧规则/日志兼容、快照、事件去重及内部/外部推送识别。不连接真实集群；尚未进行真实 Kaniko 构建及集群安装验证。
+### 自动触发
 
-任务结果以容器退出状态为准，并用 Helm 已完成的 hook 结果保留前面执行组的成功状态。仅确认未启动的任务标记 skipped；无法采集或确认的结果标记 unknown，不把采集失败当作跳过。流程失败不覆盖已确认的任务成功结果。
+Registry 在自己的适配层查询仓库 / tag，区分新增和更新，再调用 `Workflow.OnImagePushed`。Workflow 读取自身规则，使用推送事件的 digest 作为源镜像引用。
 
-部署脚本读取构建结果和更新当前集群应用时，显式指定当前集群 API 地址、ServiceAccount CA 和 token；更新第三方集群应用时显式指定 `/target/config`。两条连接路径独立，不依赖工具镜像内的默认 kubeconfig，也不回退到 localhost:8080。该脚本模板更新后需重新保存任务配置，再触发新流程；已固定的运行包不自动替换。
+触发条件如下：
 
+| 字段 | 含义 |
+| --- | --- |
+| `deploy_type=1` | 更新版本；`tag_name` 按逗号分隔后精确匹配，忽略 `match_type` |
+| `deploy_type=2, match_type=1` | 新增版本；`tag_name` 按逗号分隔，支持精确或前缀匹配 |
+| `deploy_type=2, match_type=2` | 新增版本；按正则匹配 |
 
-### 列表统一调整执行时机与镜像来源
+没有命中任务不产生执行记录。事件 ID 与不含域名的仓库路径计算出稳定 `run_id`，数据库唯一约束防止同一事件重复入队。入队只持有短事务，不在事务中执行 Helm 或拉取镜像。
 
-任务编辑只配置触发条件和执行动作；新任务默认第 1 组、使用原始镜像。列表的“调整执行顺序”弹框按触发规则分别展示任务，集中修改执行分组和镜像来源。同组并行，后续组等待前面组全部成功；镜像来源可选择同一触发规则下任意前面分组的构建任务，不限于紧邻的上一组。
+构建回推按保存的账号、正在执行的目标 tag，以及已记录的输出 tag / digest 识别，避免构建结果再次触发自动任务。Workflow 返回 `ImagePushResult.Rebuilt`，由 Registry 更新 tag 表的 `is_rebuilt`。外部推送会清除当前 tag 的重构标记，历史产物记录保留。多个来源使用同一账号并发推送同一个目标 tag 时，仅凭 Webhook 用户名不能严格区分来源。
 
-弹框使用独立草稿，取消不改变已保存配置，统一保存成功后更新列表。调整任一任务分组后，失效的构建镜像引用自动切换为原始镜像并清空来源任务；保留仍有效的引用。自动切换仅作用于弹框草稿，保存后生效，取消不改变原配置。页面将镜像选择列显示为“使用镜像”。编辑已有任务保留执行分组和镜像来源；修改规则或动作若破坏已有引用，需先在“调整执行顺序”中解除或调整引用。沿用 stage/source/source_task 接口字段，不改变后端执行协议。
+### 手动触发
+
+任务行点击“手动执行”，弹框输入公共镜像地址，并列出本次整组任务。后端：
+
+1. 验证规则访问权限，解析输入地址；省略 tag 使用 `latest`，不接受 digest 引用。
+2. 根据所选 `task_id` 找到触发条件完全相同的任务组；输入 tag 无需匹配自动条件。
+3. 保留该组的阶段、并行及来源关系；组内有当前集群部署时，仍要求管理员执行。
+4. 保存快照并入队，立即返回 `run_id`。不提前请求源仓库、不解析源 digest、不等待实际执行。
+
+输入直接交给 Kaniko / 部署任务。当前界面不提供外部源仓库登录配置；只支持公共输入镜像。构建输出推送到当前规则的目标仓库，输出 tag 为“输入 tag + 任务后缀”；后缀为空时覆盖对应 tag。每次手动提交生成独立执行轮次。
+
+## 阶段、镜像来源与界面
+
+任务编辑负责名称、触发条件及执行动作；新任务默认第 1 组、使用原始镜像。列表通过“调整执行顺序”统一修改阶段和使用镜像：
+
+- 相同 `stage` 的任务在同一个 Job 的不同容器中并行；不同阶段按 Helm hook 权重串行。
+- 当前阶段全部成功才进入下一阶段；失败会停止后续阶段，同阶段已启动的任务继续执行。
+- `source=original` 使用触发输入。`source=task` 必须指定同触发条件下、更早阶段的构建任务，并使用其实际输出 digest。
+- 触发组按 `deploy_type`、有效的 `match_type` 和去除首尾空白后的 `tag_name` 比较；两个条件恰好命中同一 tag，不代表属于同一组。
+- 来源任务未命中时记录失败，不自动改用原始镜像。
+- 同阶段不能输出相同 tag，也不能修改同一部署容器；不同阶段可连续修改同一目标。输出后缀始终基于触发 tag，不逐层叠加。
+
+顺序弹框使用独立草稿，取消不改已保存配置。修改阶段后，已失效的构建来源会在草稿中改回原始镜像；保存成功后才生效。新增、修改、删除或调整顺序均提交完整配置。
+
+每个工作流最多 32 个任务。构建只接收 Dockerfile 片段，不支持 `FROM`、`ONBUILD`、`ADD`、`COPY` 或自定义 frontend；源镜像的 `FROM` 由执行模板生成。
+
+## 排队、并发与状态
+
+| 服务配置 | 环境变量 | 服务 Chart | 默认值 |
+| --- | --- | --- | --- |
+| `workflow.enabled` | `WORKFLOW_ENABLED` | `workflow.enabled` | `true` |
+| `workflow.concurrency` | `WORKFLOW_CONCURRENCY` | `workflow.concurrency` | `3` |
+| `workflow.queue_size` | `WORKFLOW_QUEUE_SIZE` | `workflow.queueSize` | `100` |
+| `workflow.build_image` | `WORKFLOW_BUILD_IMAGE` | `workflow.buildImage` | 模板默认 Kaniko 镜像 |
+| `workflow.deploy_image` | `WORKFLOW_DEPLOY_IMAGE` | `workflow.deployImage` | `registry.cdn.w7.cc/alpine/k8s:1.33.0` |
+
+执行器启动后扫描 pending 记录，随后约每 5 秒继续扫描。只有整轮记录的数据库 ID 进入有界队列，进程内去重覆盖排队和执行；worker 开始时以 `pending → running` 条件更新原子领取，避免多实例重复执行同一轮。
+
+`concurrency=3` 表示每个服务进程最多同时执行三轮，组内并行任务数由阶段配置决定。同一仓库的不同轮次允许并发，执行期间不持仓库锁。因此多轮同时写相同 tag 或部署目标仍可能互相覆盖。
+
+| 状态 | 含义 |
+| --- | --- |
+| `pending` | 已入库，等待领取 |
+| `running` | 已领取；任务记录在本轮领取时一并进入此状态，不代表容器已经启动 |
+| `succeeded` | 已确认成功 |
+| `failed` | 匹配、执行失败或超时中断 |
+| `skipped` | 最终采集确认任务未启动 |
+| `unknown` | 无法确认任务执行结果 |
+
+整轮以执行器结果收尾；任务以容器退出状态和已完成 hook 为依据，流程失败不会覆盖已确认成功的任务。单阶段最长 30 分钟，一轮最长 2 小时。超过 3 小时未更新的 running 记录标为失败，不自动重放已有副作用；pending 记录可在重启后重新发现。
+
+## Helm、凭据与资源清理
+
+执行时从快照生成内存 Chart，不生成或缓存本地 tgz。Helm 安装、采集、卸载共享同一轮的 `memory` release 存储，不创建 Helm release Secret，因此不会因该 Secret 被面板识别成应用。模板中的普通认证 Secret 仍会创建。
+
+- 执行命名空间固定为 `default`；部署目标使用任务的 `k8s_namespace`。
+- 执行器通过 `rest.InClusterConfig` 使用服务 ServiceAccount，不读取开发机器的 kubeconfig。
+- 仓库账号密码通过 values 交给模板生成 Docker auth Secret，挂载 `/kaniko/.docker`，走正常 Registry 认证；不签发专用拉取令牌，不使用宿主 Docker socket。
+- 远端 KUBECONFIG 通过模板生成 Secret，挂载 `/target/config`；只接受内嵌凭据，不执行外部认证程序、不引用本地凭据文件。
+- 当前集群部署使用显式 API 地址、ServiceAccount CA 和 token；第三方部署显式使用 `/target/config`，不依赖镜像内默认 kubeconfig。
+- 任务账号按模板获得结果 ConfigMap 及所需工作负载权限；ZPK 服务账号需具备创建、清理本轮 Job、Secret、ServiceAccount、Role、RoleBinding 等资源及读取 Pod 日志的权限。
+
+每阶段完成后先归档结果及日志，避免前面阶段的 Job 被 TTL 删除后丢失记录。Job 完成后保留 60 秒；整轮结束最终采集，再卸载普通资源及内存 release。进程异常退出可能留下 Secret、ConfigMap 等普通资源，Job TTL 不负责清理它们；现有流程不提供自动补偿回滚。
+
+## 数据与迁移
+
+复用 `RegistryRepositoryDeployRule` 和 `RegistryRepositoryDeployRuleMatchLog`：
+
+| 数据 | 关键字段 |
+| --- | --- |
+| 任务规则 | `workflow_task_key` 稳定任务标识；`execution_order` 阶段；`source_build_task_key` 来源构建任务 |
+| 整轮记录 | `workflow_run_id` 非空，`workflow_task_key` 为空；保存触发输入及加密快照 |
+| 任务记录 | 同一 `workflow_run_id`，非空 `workflow_task_key`；通过 `rule_id` 关联原规则 |
+| 构建产物 | `build_output_tag`、`build_output_digest` |
+| 当前 tag 重构状态 | Registry 自己维护的 `ims_registry_repository_tag.is_rebuilt` |
+
+不额外保存 WorkflowID、Chart 路径、包二进制或 selected 列；本轮选中任务由任务日志推导。规则不再读写历史 `image_repository`、`image_host`、`plain_http` 列。
+
+非 debug 且允许写入时，Provider 补齐缺失字段和索引，再执行 `MigrateWorkflowRules`。只有旧规则迁移会查镜像仓库表，补齐所属用户、路径、任务字段并迁移日志；成功后清零旧 RepositoryID，失败保留重试依据。已迁移日志的旧完整域名查询键也会转为路径，原规则 / 日志 ID 及历史快照保留。结构补齐不主动删除历史列；迁移失败会阻止 Provider 正常启动。
+
+密码、快照和 KUBECONFIG 使用现有加密机制。备份与多实例部署需保持 `setting.secret` 一致，密钥变化后的解密失败不会回退成当前集群或明文。
+
+## 接口与日志
+
+以下均为 POST，前缀 `/zpk/v2/api/workflow`，经过 CORS、域名限制和登录中间件；请求带 `image_repository`，后续按规则 / 历史快照的所有者校验，管理员可访问全部规则。
+
+| 路径 | 额外参数 | 返回内容 |
+| --- | --- | --- |
+| `/get` | 无 | `config` |
+| `/save` | `config` | 保存结果；新增、编辑、删除统一提交任务列表 |
+| `/run` | `task_id`、`image` | `run_id`，表示已入队 |
+| `/runs` | 可选 `task_id`、`page`、`page_size` | `list/total/page/limit`；省略 task_id 查询整轮记录 |
+| `/logs` | `run_id`、`task_id`、可选 `tail_lines` | `log/archived/truncated/status` |
+
+`page=1`、`page_size=10` 为默认值，单页最大 100；日志默认 100 行，最大 2000。集群查询仍在 `/zpk/v2/api/repository/deploy_rule/k8s/{namespaces,apps,app-containers}`，代理为 `/proxy/*path` 且限管理员。旧 deploy_rule 增删改查接口已移除。
+
+任务行的“执行记录”按任务分页；日志弹框使用该记录的 run_id + task_id，只看当前任务。界面支持行数选择、全屏及跟踪；跟踪在上次请求完成 3 秒后刷新，关闭弹窗、切换或卸载时取消旧请求和定时器，错误时暂停。
+
+终结且已归档的结果直接查数据库。Pod 尚在时实时读取每个容器最多 1 MiB 日志；归档仅保留每个容器末尾 100 行、最多 16 KiB，Pod 清理后不能通过选择更多行恢复。归档响应会标记 `archived` 并停止跟踪；这是执行摘要，不是全量日志服务。
+
+## 验证入口
+
+```sh
+go test ./app/workflow/... ./common/service/taskqueue ./app/registry/logic/repository
+go test -race ./app/workflow/... ./common/service/taskqueue
+go vet ./app/workflow/...
+```
+
+相关回归分布在 `logic/*_test.go`、`http/controller/manual_test.go`，覆盖手动整组选择、阶段、来源、输出冲突、快照、迁移、域名变化、领取并发与推送识别。模板相关测试需要本机 Helm。单测和模板渲染不等于真实 Kaniko 构建或集群部署验证。

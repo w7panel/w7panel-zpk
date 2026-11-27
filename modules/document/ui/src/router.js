@@ -4,6 +4,5 @@ export default createRouter({
     routes: [
         { path: '/', redirect: '/documents' },
         { path: '/documents', component: () => import('./views/libraries.vue') },
-        { path: '/categories', component: () => import('./views/categories.vue') },
     ],
 });

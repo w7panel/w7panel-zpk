@@ -35,21 +35,7 @@ func New(baseURL, appID, secret string) *Client {
 	}
 }
 
-type User struct {
-	ID    int32 `json:"id"`
-	Admin bool  `json:"admin"`
-}
-
-func (c *Client) CurrentUser(ctx context.Context, token string) (User, error) {
-	var user User
-	err := c.call(ctx, token, "/user", struct{}{}, &user)
-	return user, err
-}
-
-func (c *Client) call(ctx context.Context, token, route string, body any, out any) error {
-	if strings.TrimSpace(token) == "" {
-		return &ResponseError{StatusCode: http.StatusUnauthorized, Message: "token 错误，请通过面板重新登录"}
-	}
+func (c *Client) call(ctx context.Context, route string, body any, out any) error {
 	data, err := json.Marshal(body)
 	if err != nil {
 		return err
@@ -59,7 +45,6 @@ func (c *Client) call(ctx context.Context, token, route string, body any, out an
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-W7Panel-Access-Token", token)
 	if err := c.Base.Sign(req); err != nil {
 		return err
 	}
@@ -84,16 +69,6 @@ func (c *Client) call(ctx context.Context, token, route string, body any, out an
 	return nil
 }
 
-type CreateCategory struct {
-	Identifie   string `json:"identifie"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
-}
-
-func (c *Client) CreateCategory(ctx context.Context, token string, params CreateCategory) error {
-	return c.call(ctx, token, "/category/create", params, nil)
-}
-
 type CreateLibrary struct {
 	Ref         string        `json:"ref"`
 	Name        string        `json:"name"`
@@ -105,12 +80,15 @@ type CreateLibrary struct {
 	Files       []FileContent `json:"files"`
 }
 
-func (c *Client) Create(ctx context.Context, token string, params CreateLibrary) error {
-	return c.call(ctx, token, "/library/create", params, nil)
+func (c *Client) Create(ctx context.Context, userID int32, params CreateLibrary) error {
+	return c.call(ctx, "/library/create", struct {
+		UserID int32 `json:"user_id"`
+		CreateLibrary
+	}{UserID: userID, CreateLibrary: params}, nil)
 }
 
-func (c *Client) Save(ctx context.Context, token, ref, path, title, content string) error {
-	return c.call(ctx, token, "/file/save", map[string]any{"ref": ref, "path": path, "title": title, "content": content}, nil)
+func (c *Client) Save(ctx context.Context, userID int32, ref, path, title, content string) error {
+	return c.call(ctx, "/file/save", map[string]any{"user_id": userID, "ref": ref, "path": path, "title": title, "content": content, "protected": 2}, nil)
 }
 
 type File struct {
@@ -124,33 +102,34 @@ type FileContent struct {
 	Content string `json:"content"`
 }
 
-func (c *Client) SaveFile(ctx context.Context, token, ref string, file FileContent) error {
-	return c.call(ctx, token, "/file/save", struct {
-		Ref string `json:"ref"`
+func (c *Client) SaveFile(ctx context.Context, userID int32, ref string, file FileContent) error {
+	return c.call(ctx, "/file/save", struct {
+		UserID int32  `json:"user_id"`
+		Ref    string `json:"ref"`
 		FileContent
-	}{Ref: ref, FileContent: file}, nil)
+	}{UserID: userID, Ref: ref, FileContent: file}, nil)
 }
 
 type FileTree struct {
 	Files []File `json:"files"`
 }
 
-func (c *Client) Tree(ctx context.Context, token, reference string) (FileTree, error) {
+func (c *Client) Tree(ctx context.Context, userID int32, reference string) (FileTree, error) {
 	var result FileTree
-	err := c.call(ctx, token, "/file/list", map[string]interface{}{"ref": reference}, &result)
+	err := c.call(ctx, "/file/list", map[string]interface{}{"user_id": userID, "ref": reference}, &result)
 	return result, err
 }
 
-func (c *Client) Order(ctx context.Context, token, reference string, paths []string) error {
-	return c.call(ctx, token, "/file/order", map[string]interface{}{"ref": reference, "paths": paths}, nil)
+func (c *Client) Order(ctx context.Context, userID int32, reference string, paths []string) error {
+	return c.call(ctx, "/file/order", map[string]interface{}{"user_id": userID, "ref": reference, "paths": paths}, nil)
 }
 
-func (c *Client) Read(ctx context.Context, token, reference, path string) (FileContent, error) {
+func (c *Client) Read(ctx context.Context, userID int32, reference, path string) (FileContent, error) {
 	var result FileContent
-	err := c.call(ctx, token, "/file/read", map[string]any{"ref": reference, "path": path}, &result)
+	err := c.call(ctx, "/file/read", map[string]any{"user_id": userID, "ref": reference, "path": path}, &result)
 	return result, err
 }
 
-func (c *Client) Delete(ctx context.Context, token, reference, path string) error {
-	return c.call(ctx, token, "/file/delete", map[string]any{"ref": reference, "path": path}, nil)
+func (c *Client) Delete(ctx context.Context, userID int32, reference, path string) error {
+	return c.call(ctx, "/file/delete", map[string]any{"user_id": userID, "ref": reference, "path": path}, nil)
 }

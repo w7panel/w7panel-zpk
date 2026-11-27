@@ -14,6 +14,8 @@ import (
 	"oras.land/oras-go/v2/registry/remote"
 )
 
+var ErrNoVersions = errors.New("仓库没有符合版本规则的版本")
+
 // IsVersion accepts the existing three numeric components with an optional v.
 func IsVersion(value string) bool {
 	parts := strings.Split(strings.TrimPrefix(value, "v"), ".")
@@ -83,7 +85,7 @@ func ResolveVersion(ctx context.Context, repository *remote.Repository, requeste
 			return "", v1.Descriptor{}, err
 		}
 		if len(tags) == 0 {
-			return "", v1.Descriptor{}, fmt.Errorf("仓库没有符合版本规则的版本")
+			return "", v1.Descriptor{}, ErrNoVersions
 		}
 		requested = tags[0]
 	}

@@ -2,6 +2,13 @@ import { createRouter, createWebHashHistory } from 'vue-router';
 
 const routes = [
     {
+        path: "/documents",
+        component: () => import("@document-ui/App.vue"),
+        children: [
+            { path: "", component: () => import("@document-ui/views/libraries.vue") },
+        ],
+    },
+    {
         path: '/',
         name: 'home',
         redirect: "/zpk"

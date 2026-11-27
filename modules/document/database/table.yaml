@@ -1,38 +1,15 @@
 relation:
-  - table: document_category
-    column:
-      deleted_at:
-        type: gorm.DeletedAt
-        tag:
-          gorm:
-            index: "document_category_deleted_at"
-      id:
-        tag:
-          gorm:
-            autoIncrement: "true"
-      identifie:
-        tag:
-          gorm:
-            type: "varchar(96)"
-            index: "document_category_identifie,unique"
-      name:
-        tag:
-          gorm:
-            type: "varchar(255)"
-      description:
-        tag:
-          gorm:
-            type: "text"
   - table: document_library
     column:
       id:
         tag:
           gorm:
             autoIncrement: "true"
-      category:
+      namespace:
         tag:
           gorm:
             type: "varchar(96)"
+            default: "'app_doc'"
             index: "document_library_ref,unique"
       identifie:
         tag:

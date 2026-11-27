@@ -50,7 +50,7 @@ func (c File) save(ctx *gin.Context, fromApp bool) {
 		Path      string `json:"path" binding:"required,document_path"`
 		Title     string `json:"title" binding:"maxbytes=255"`
 		Content   string `json:"content" binding:"maxbytes=4194304"`
-		Protected *int32 `json:"protected" binding:"omitempty,oneof=0 1"`
+		Protected *int32 `json:"protected" binding:"omitempty,oneof=0 1 2"`
 	}
 	params := ParamsValidate{}
 	if !c.Validate(ctx, &params) {

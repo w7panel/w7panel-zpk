@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/w7panel/w7panel-zpk/app/registry/logic"
+
 	systemlogic "github.com/w7panel/w7panel-zpk/app/system/logic"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/console"
@@ -60,8 +60,8 @@ func (ClearImages) run(cmd *cobra.Command, _ []string) error {
 		}
 		return os.Getenv(env)
 	}
-	return logic.ClearImagesAndDatabase(cmd.Context(), db, logic.ClearImagesOptions{
-		Endpoint:  logic.MigrationEndpoint{Address: address, Username: credential("username", "REGISTRY_USERNAME"), Password: credential("password", "REGISTRY_PASSWORD"), PlainHTTP: plainHTTP, CAFile: ca},
+	return ClearImagesAndDatabase(cmd.Context(), db, ClearImagesOptions{
+		Endpoint:  MigrationEndpoint{Address: address, Username: credential("username", "REGISTRY_USERNAME"), Password: credential("password", "REGISTRY_PASSWORD"), PlainHTTP: plainHTTP, CAFile: ca},
 		Namespace: namespace, DryRun: dryRun, Timeout: timeout, Progress: cmd.OutOrStdout(),
 	})
 }

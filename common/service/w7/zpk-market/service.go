@@ -112,7 +112,7 @@ func (s ZpkMarketService) CheckFormulaCanInstallOrUpgrade(goodsId, consoleUid in
 	return ret, nil
 }
 
-func (s ZpkMarketService) GetFormulaOrderInfo(goodsId, consoleUid int32, orderSn string) (map[string]interface{}, error) {
+func (s ZpkMarketService) GetOrderLicenseInfo(goodsId, consoleUid int32, orderSn string) (map[string]interface{}, error) {
 	ret := make(map[string]interface{})
 	err := postSigned(s, "/zpk-market/order/install-info", map[string]interface{}{
 		"goods_id":    goodsId,

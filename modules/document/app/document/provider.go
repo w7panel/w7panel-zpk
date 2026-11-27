@@ -27,8 +27,8 @@ func (p *Provider) registerValidator() {
 			return identifiePattern.MatchString(field.Field().String())
 		},
 		"document_ref": func(field validator.FieldLevel) bool {
-			category, identifie, found := strings.Cut(field.Field().String(), "/")
-			return found && identifiePattern.MatchString(category) && identifiePattern.MatchString(identifie)
+			namespace, identifie, found := strings.Cut(field.Field().String(), "/")
+			return found && identifiePattern.MatchString(namespace) && identifiePattern.MatchString(identifie)
 		},
 		"document_path": func(field validator.FieldLevel) bool {
 			value := field.Field().String()
@@ -54,7 +54,7 @@ func (p *Provider) initDb() {
 	if err != nil {
 		panic(err)
 	}
-	if err := db.AutoMigrate(&entity.DocumentCategory{}, &entity.DocumentLibrary{}, &entity.DocumentFile{}); err != nil {
+	if err := db.AutoMigrate(&entity.DocumentLibrary{}, &entity.DocumentFile{}); err != nil {
 		panic(err)
 	}
 }
@@ -75,12 +75,6 @@ func (p *Provider) registerRoutes(engine *gin.Engine) {
 	auth := root.Group("", middleware.Auth{}.Process)
 	auth.POST("/user", controller.Login{}.CurrentUser)
 	auth.POST("/download-url", controller.Download{}.URL)
-	categoryRoutes := auth.Group("/category")
-	categoryRoutes.POST("/list", controller.Category{}.List)
-	categoryAdmin := categoryRoutes.Group("", middleware.Admin{}.Process)
-	categoryAdmin.POST("/create", controller.Category{}.Create)
-	categoryAdmin.POST("/edit", controller.Category{}.Edit)
-	categoryAdmin.POST("/delete", controller.Category{}.Delete)
 	auth.POST("/library/list", controller.Library{}.List)
 	auth.POST("/library/info", controller.Library{}.Info)
 	auth.POST("/library/create", controller.Library{}.Create)
@@ -91,14 +85,12 @@ func (p *Provider) registerRoutes(engine *gin.Engine) {
 	auth.POST("/file/delete", controller.File{}.Delete)
 	auth.POST("/file/order", controller.File{}.Order)
 
-	openapi := root.Group("/openapi", middleware.App{}.Process, middleware.Auth{}.Process)
-	openapi.POST("/user", controller.Login{}.CurrentUser)
-	openapi.POST("/category/create", controller.Category{}.Create)
+	openapi := root.Group("/openapi", middleware.App{}.Process, middleware.AppUser{}.Process)
+	openapi.POST("/file/save", controller.File{}.SaveFromApp)
 	openapi.POST("/library/info", controller.Library{}.Info)
 	openapi.POST("/library/create", controller.Library{}.Create)
 	openapi.POST("/file/list", controller.File{}.List)
 	openapi.POST("/file/read", controller.File{}.Read)
-	openapi.POST("/file/save", controller.File{}.SaveFromApp)
 	openapi.POST("/file/delete", controller.File{}.Delete)
 	openapi.POST("/file/order", controller.File{}.Order)
 }

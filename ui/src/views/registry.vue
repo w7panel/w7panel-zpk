@@ -257,7 +257,7 @@ export default {
       this.subNamespace = -1;
       this.subNamespaceData = [];
       if (this.activeNamespace !== -1) {
-        myAxios.post('/v2/api/namespace/sub_namespace/list', { namespace: this.activeNamespace }).then(res => {
+        myAxios.post('/v2/api/namespace/sub_namespace/list', { namespace: this.activeNamespace, resource_type: 'repository' }).then(res => {
           this.subNamespaceData = res.data?.data?.list || [];
         })
       }
@@ -305,7 +305,8 @@ export default {
         this.page = p
       }
       if (p === 1) {
-        return myAxios.post("/v2/api/repository/list", {
+        return myAxios.post("/v2/api/resource/list", {
+          resource_type: "repository",
           namespace: this.activeNamespace !== -1 ? this.activeNamespace : '',
           sub_namespace: this.subNamespace !== -1 ? this.subNamespace : '',
         }).then(res => {
@@ -342,7 +343,7 @@ export default {
           })
           return
         }
-        myAxios.post('/v2/api/repository/add', this.form).then(() => {
+        myAxios.post('/v2/api/resource/create', {resource_type:'repository',...this.form}).then(() => {
           messageSuccess('操作成功');
           this.getData(1, false);
           this.visible = false

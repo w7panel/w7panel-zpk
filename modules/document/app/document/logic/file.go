@@ -39,7 +39,7 @@ func (l File) List(ctx context.Context, user zpk.User, ref string) (Tree, error)
 	if e != nil {
 		return Tree{}, e
 	}
-	if err := permission.Require(service.PermissionSdk.CanRead(ctx, user, *c)); err != nil {
+	if err := permission.Require((Library{}).CanRead(ctx, user, *c)); err != nil {
 		return Tree{}, err
 	}
 	files, e := dao.Q.DocumentFile.WithContext(ctx).Where(dao.Q.DocumentFile.LibraryID.Eq(c.ID)).Order(dao.Q.DocumentFile.Position, dao.Q.DocumentFile.ID).Find()
@@ -47,13 +47,13 @@ func (l File) List(ctx context.Context, user zpk.User, ref string) (Tree, error)
 		return Tree{}, e
 	}
 	out := Tree{Files: []FileInfo{}, Name: c.Name}
-	out.CanCreate, e = service.PermissionSdk.CanManage(ctx, user, *c)
+	out.CanCreate, e = (Library{}).CanManage(ctx, user, *c)
 	if e != nil {
 		return Tree{}, e
 	}
 	for _, file := range files {
-		canChange := out.CanCreate && file.Protected == 0
-		out.Files = append(out.Files, FileInfo{file.Path, file.Title, file.Size, file.Position, file.Protected, canChange, canChange})
+		canChange := out.CanCreate && file.Protected != 1
+		out.Files = append(out.Files, FileInfo{file.Path, file.Title, file.Size, file.Position, file.Protected, canChange, out.CanCreate && file.Protected == 0})
 	}
 	return out, nil
 }
@@ -68,7 +68,7 @@ func (l File) Read(ctx context.Context, user zpk.User, ref, p string) (*entity.D
 	if e != nil {
 		return nil, nil, e
 	}
-	if err := permission.Require(service.PermissionSdk.CanRead(ctx, user, *c)); err != nil {
+	if err := permission.Require((Library{}).CanRead(ctx, user, *c)); err != nil {
 		return nil, nil, err
 	}
 	f, e := l.get(ctx, c.ID, p)
@@ -93,7 +93,7 @@ func (l File) Save(ctx context.Context, user zpk.User, ref, p, title string, con
 	if e != nil {
 		return nil, e
 	}
-	if err := permission.Require(service.PermissionSdk.CanManage(ctx, user, *c)); err != nil {
+	if err := permission.Require((Library{}).CanManage(ctx, user, *c)); err != nil {
 		return nil, err
 	}
 	key, e := service.DocumentStorage.Put(ctx, content)
@@ -109,7 +109,7 @@ func (l File) Save(ctx context.Context, user zpk.User, ref, p, title string, con
 		if err != nil {
 			return err
 		}
-		if err := permission.Require(service.PermissionSdk.CanManage(ctx, user, *library)); err != nil {
+		if err := permission.Require((Library{}).CanManage(ctx, user, *library)); err != nil {
 			return err
 		}
 		query := tx.DocumentFile
@@ -170,7 +170,7 @@ func (l File) Delete(ctx context.Context, user zpk.User, ref, p string) error {
 		if err != nil {
 			return err
 		}
-		if err := permission.Require(service.PermissionSdk.CanManage(ctx, user, *library)); err != nil {
+		if err := permission.Require((Library{}).CanManage(ctx, user, *library)); err != nil {
 			return err
 		}
 		q := tx.DocumentFile
@@ -178,7 +178,7 @@ func (l File) Delete(ctx context.Context, user zpk.User, ref, p string) error {
 		if err != nil {
 			return err
 		}
-		if file.Protected == 1 {
+		if file.Protected != 0 {
 			return permission.ErrDenied
 		}
 		r, err := q.WithContext(ctx).Where(q.ID.Eq(file.ID)).Delete()
@@ -199,7 +199,7 @@ func (l File) Rename(ctx context.Context, user zpk.User, ref, p, title string) e
 		if err != nil {
 			return err
 		}
-		if err := permission.Require(service.PermissionSdk.CanManage(ctx, user, *library)); err != nil {
+		if err := permission.Require((Library{}).CanManage(ctx, user, *library)); err != nil {
 			return err
 		}
 		q := tx.DocumentFile
@@ -224,7 +224,7 @@ func (l File) Order(ctx context.Context, user zpk.User, ref string, paths []stri
 		if err != nil {
 			return err
 		}
-		if err := permission.Require(service.PermissionSdk.CanManage(ctx, user, *library)); err != nil {
+		if err := permission.Require((Library{}).CanManage(ctx, user, *library)); err != nil {
 			return err
 		}
 		for i, p := range paths {

@@ -7,9 +7,8 @@ import (
 	"errors"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"io"
-	"net/url"
 	"os"
-	"strings"
+	"regexp"
 
 	"github.com/w7panel/w7panel-zpk/modules/document/common/dao"
 	"github.com/w7panel/w7panel-zpk/modules/document/common/entity"
@@ -27,11 +26,11 @@ type Snapshot struct {
 
 // Read metadata in one transaction; immutable blob keys keep the snapshot stable.
 func (d Download) snapshot(ctx context.Context, ref string) (Snapshot, error) {
-	category, identifie := SplitRef(ref)
+	namespace, identifie := SplitRef(ref)
 	var snapshot Snapshot
 	err := dao.Q.Transaction(func(tx *dao.Query) error {
 		library := tx.DocumentLibrary
-		c, e := library.WithContext(ctx).Where(library.Category.Eq(category), library.Identifie.Eq(identifie)).First()
+		c, e := library.WithContext(ctx).Where(library.Namespace.Eq(namespace), library.Identifie.Eq(identifie)).First()
 		if e != nil {
 			return e
 		}
@@ -52,7 +51,7 @@ func (d Download) Export(ctx context.Context, user zpk.User, ref string) (*os.Fi
 	if e != nil {
 		return nil, e
 	}
-	if err := permission.Require(service.PermissionSdk.CanRead(ctx, user, s.Library)); err != nil {
+	if err := permission.Require((Library{}).CanRead(ctx, user, s.Library)); err != nil {
 		return nil, err
 	}
 	files := s.Files
@@ -99,7 +98,7 @@ func (d Download) Export(ctx context.Context, user zpk.User, ref string) (*os.Fi
 	if e != nil {
 		return nil, e
 	}
-	if err := permission.Require(service.PermissionSdk.CanRead(ctx, user, *current)); err != nil {
+	if err := permission.Require((Library{}).CanRead(ctx, user, *current)); err != nil {
 		return nil, err
 	}
 	if _, e = output.Seek(0, io.SeekStart); e != nil {
@@ -126,11 +125,9 @@ func (d Download) copyBlob(ctx context.Context, w io.Writer, f *entity.DocumentF
 }
 
 func (Download) URL() (string, error) {
-	domain, err := url.Parse(strings.TrimSpace(facade.GetConfig().GetString("document.domain_url")))
-	if err != nil || domain.Host == "" || (domain.Scheme != "http" && domain.Scheme != "https") || domain.User != nil || (domain.Path != "" && domain.Path != "/") || domain.RawQuery != "" || domain.Fragment != "" {
-		return "", errors.New("文档 DOMAIN_URL 未配置为有效的 HTTP(S) 域名地址")
+	domain := facade.GetConfig().GetString("document.domain_url")
+	if len(domain) > 253 || !regexp.MustCompile(`^([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)*[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$`).MatchString(domain) {
+		return "", errors.New("文档 DOMAIN_URL 必须配置为纯域名")
 	}
-	domain.Path = "/doc/download"
-	domain.RawPath = ""
-	return domain.String(), nil
+	return "https://" + domain + "/doc/download", nil
 }

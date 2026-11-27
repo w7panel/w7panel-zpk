@@ -15,7 +15,7 @@ const TableNameDocumentLibrary = "ims_document_library"
 // DocumentLibrary mapped from table <ims_document_library>
 type DocumentLibrary struct {
 	ID          int32          `gorm:"column:id;primaryKey;autoIncrement:true" json:"id"`
-	Category    string         `gorm:"column:category;type:varchar(96);not null;index:document_library_ref,unique" json:"category"`
+	Namespace   string         `gorm:"column:namespace;type:varchar(96);not null;default:'app_doc';index:document_library_ref,unique" json:"namespace"`
 	Identifie   string         `gorm:"column:identifie;type:varchar(96);not null;index:document_library_ref,unique" json:"identifie"`
 	Name        string         `gorm:"column:name;type:varchar(255);not null" json:"name"`
 	Description string         `gorm:"column:description;type:text;not null" json:"description"`

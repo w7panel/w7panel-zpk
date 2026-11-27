@@ -1,4 +1,4 @@
-package logic
+package command
 
 import (
 	"context"
@@ -32,7 +32,7 @@ type ClearImagesOptions struct {
 
 // ClearImages follows the version-list deletion contract: resolve tags
 // and delete their manifests by digest. Shared tags are deleted together.
-func ClearImages(ctx context.Context, options ClearImagesOptions) error {
+func clearRegistryImages(ctx context.Context, options ClearImagesOptions) error {
 	if options.Namespace == "" || options.Namespace != strings.TrimSpace(options.Namespace) {
 		return errors.New("namespace 不能为空或包含首尾空白")
 	}
@@ -195,7 +195,7 @@ func ClearImagesAndDatabase(ctx context.Context, db *gorm.DB, options ClearImage
 	if err := clearImagesDatabase(ctx, db, options.Namespace, true, options.Progress); err != nil {
 		return err
 	}
-	if err := ClearImages(ctx, options); err != nil {
+	if err := clearRegistryImages(ctx, options); err != nil {
 		return err
 	}
 	if options.DryRun {
@@ -216,7 +216,7 @@ func clearImagesDatabase(ctx context.Context, db *gorm.DB, namespace string, dry
 		var repositories []entity.RegistryRepository
 		// The first path segment is stored as Namespace, remaining paths as Name.
 		root, _, _ := strings.Cut(namespace, "/")
-		if err := tx.Unscoped().Where(&entity.RegistryRepository{Namespace: root}).Find(&repositories).Error; err != nil {
+		if err := tx.Unscoped().Where(&entity.RegistryRepository{ResourceType: "repository", Namespace: root}).Find(&repositories).Error; err != nil {
 			return err
 		}
 		for _, repo := range repositories {
@@ -252,8 +252,24 @@ func clearImagesDatabase(ctx context.Context, db *gorm.DB, namespace string, dry
 				return err
 			}
 		}
+		var otherResources []entity.RegistryRepository
+		if err := tx.Where("resource_type <> ?", "repository").Find(&otherResources).Error; err != nil {
+			return err
+		}
 		for _, ns := range namespaces {
 			if ns.Name != namespace && !strings.HasPrefix(ns.Name, namespace+"/") {
+				continue
+			}
+			shared := false
+			for _, resource := range otherResources {
+				fullName := commonlogic.BuildRepositoryName(resource.Name, resource.Namespace)
+				if strings.HasPrefix(fullName, ns.Name+"/") {
+					shared = true
+					break
+				}
+			}
+			if shared {
+				fmt.Fprintf(out, "保留共用 namespace：%s（仍有其他类型的资源）\n", ns.Name)
 				continue
 			}
 			fmt.Fprintf(out, "数据库 namespace：%s (id=%d)\n", ns.Name, ns.ID)

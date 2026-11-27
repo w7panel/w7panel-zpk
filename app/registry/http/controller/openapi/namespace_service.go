@@ -4,7 +4,8 @@ import (
 	"errors"
 
 	"github.com/gin-gonic/gin"
-	"github.com/w7panel/w7panel-zpk/app/registry/logic"
+
+	registrycommon "github.com/w7panel/w7panel-zpk/app/registry/logic/common"
 	"github.com/w7panel/w7panel-zpk/common/dao"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/http/controller"
 	"gorm.io/gorm"
@@ -33,13 +34,12 @@ func (c NamespaceService) Create(ctx *gin.Context) {
 	type ParamsValidate struct {
 		Name        string `json:"name" binding:"required,max=96"`
 		VisibleType int32  `json:"visible_type" binding:"required,oneof=1 2 4"`
-		Visible     *bool  `json:"visible"`
 	}
 	params := ParamsValidate{}
 	if !c.Validate(ctx, &params) {
 		return
 	}
-	if err := (logic.Namespace{}).CreateShared(ctx.Request.Context(), params.Name, params.VisibleType, params.Visible); err != nil {
+	if err := (registrycommon.Namespace{}).Create(ctx.Request.Context(), params.Name, params.VisibleType); err != nil {
 		c.respondError(ctx, err)
 		return
 	}
@@ -55,7 +55,7 @@ func (c NamespaceService) Rename(ctx *gin.Context) {
 	if !c.Validate(ctx, &params) {
 		return
 	}
-	if err := (logic.Namespace{}).RenameShared(ctx.Request.Context(), params.ID, params.Name); err != nil {
+	if err := (registrycommon.Namespace{}).Rename(ctx.Request.Context(), params.ID, params.Name); err != nil {
 		c.respondError(ctx, err)
 		return
 	}
@@ -70,7 +70,7 @@ func (c NamespaceService) Delete(ctx *gin.Context) {
 	if !c.Validate(ctx, &params) {
 		return
 	}
-	if err := (logic.Namespace{}).DeleteShared(ctx.Request.Context(), params.ID); err != nil {
+	if err := (registrycommon.Namespace{}).Delete(ctx.Request.Context(), params.ID); err != nil {
 		c.respondError(ctx, err)
 		return
 	}
@@ -82,9 +82,9 @@ func (c NamespaceService) respondError(ctx *gin.Context, err error) {
 	switch {
 	case errors.Is(err, gorm.ErrRecordNotFound):
 		status = 404
-	case errors.Is(err, logic.ErrNamespaceConflict):
+	case errors.Is(err, registrycommon.ErrNamespaceConflict):
 		status = 409
-	case errors.Is(err, logic.ErrNamespaceProtected):
+	case errors.Is(err, registrycommon.ErrNamespaceProtected):
 		status = 400
 	}
 	c.JsonResponseWithError(ctx, err, status)

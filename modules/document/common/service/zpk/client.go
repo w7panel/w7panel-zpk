@@ -1,4 +1,4 @@
-// Package zpk provides the document system's client for the shared ZPK user and namespace APIs.
+// Package zpk provides the document system's client for the ZPK user API.
 package zpk
 
 import (

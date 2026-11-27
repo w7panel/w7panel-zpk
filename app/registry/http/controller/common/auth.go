@@ -1,4 +1,4 @@
-package controller
+package common
 
 import (
 	"errors"
@@ -9,7 +9,8 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/w7panel/w7panel-zpk/app/registry/logic"
+
+	registrycommon "github.com/w7panel/w7panel-zpk/app/registry/logic/common"
 	"github.com/w7panel/w7panel-zpk/common/entity"
 	logic2 "github.com/w7panel/w7panel-zpk/common/logic"
 	"github.com/w7panel/w7panel-zpk/common/types/registry"
@@ -18,7 +19,7 @@ import (
 )
 
 var (
-	scopeRegex = regexp.MustCompile(`([a-z0-9]+)(\([a-z0-9]+\))?`)
+	scopeRegex = regexp.MustCompile(`^([a-z0-9_]+)(\([a-z0-9_]+\))?$`)
 )
 
 func parseScope(scope string) (string, string, error) {
@@ -53,22 +54,20 @@ func (c Auth) Auth(ctx *gin.Context) {
 		c.JsonResponseWithServerError(ctx, err)
 		return
 	}
-	err = logic.RegistryPermission{}.CheckRegistryScopes(ctx.Request.Context(), user, scopes)
+	err = registrycommon.Auth{}.CheckScopes(ctx.Request.Context(), user, scopes)
 	if err != nil {
 		c.JsonResponseWithError(ctx, err, 401)
 		return
 	}
 
 	for _, scope := range scopes {
-		if scope.Type == string(logic.ScopeRegistryType) {
-			go facade.GetEvent().Publish(registry.RegistryRepositoryPrepareEvent, registry.RegistryRepositoryPayLoad{
-				User:  user,
-				Scope: scope,
-			})
-		}
+		go facade.GetEvent().Publish(registry.RegistryRepositoryPrepareEvent, registry.RegistryRepositoryPayLoad{
+			User:  user,
+			Scope: scope,
+		})
 	}
 
-	token, err := logic.RegistryPermission{}.CreateToken(user, scopes)
+	token, err := registrycommon.Auth{}.CreateToken(user, scopes)
 	if err != nil {
 		c.JsonResponseWithServerError(ctx, err)
 		return

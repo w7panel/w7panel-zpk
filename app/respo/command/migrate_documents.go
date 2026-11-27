@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"net/http"
 	"os"
 	"path"
 	"path/filepath"
@@ -22,6 +23,7 @@ import (
 	"github.com/w7panel/w7panel-zpk/common/entity"
 	commonlogic "github.com/w7panel/w7panel-zpk/common/logic"
 	"github.com/w7panel/w7panel-zpk/common/service/w7"
+	documentsdk "github.com/w7panel/w7panel-zpk/common/service/w7/document"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/console"
 	"gorm.io/gen/field"
@@ -53,10 +55,6 @@ func (MigrateDocuments) run(cmd *cobra.Command, _ []string) error {
 	if systemlogic.ShouldBlockWrites(config) {
 		return errors.New("数据库迁移进行中，当前已禁止写操作")
 	}
-	token := strings.TrimSpace(os.Getenv("W7PANEL_ACCESS_TOKEN"))
-	if token == "" {
-		return errors.New("请通过 W7PANEL_ACCESS_TOKEN 环境变量提供创始人的面板访问凭据")
-	}
 	identifie, err := cmd.Flags().GetString("identifie")
 	if err != nil {
 		return err
@@ -67,13 +65,6 @@ func (MigrateDocuments) run(cmd *cobra.Command, _ []string) error {
 			return err
 		}
 	}
-	user, err := w7.DocumentSdk.CurrentUser(cmd.Context(), token)
-	if err != nil {
-		return err
-	}
-	if user.ID <= 0 || !user.Admin {
-		return errors.New("文档迁移需要创始人权限")
-	}
 	depot, err := formula.NewDepot()
 	if err != nil {
 		return err
@@ -81,6 +72,7 @@ func (MigrateDocuments) run(cmd *cobra.Command, _ []string) error {
 	query := dao.Q.Formula
 	var lastID int32
 	total := 0
+	failed := 0
 	for {
 		rows := query.WithContext(cmd.Context()).Where(query.ID.Gt(lastID))
 		if identifie != "" {
@@ -94,37 +86,83 @@ func (MigrateDocuments) run(cmd *cobra.Command, _ []string) error {
 			break
 		}
 		for _, item := range batch {
+			lastID = item.ID
 			assets, err := readLegacyFormulaAssets(cmd.Context(), depot.GetBasePath(), item.Name)
 			if err != nil {
-				return fmt.Errorf("读取制品 %s 旧文档失败: %w", item.Name, err)
+				fmt.Fprintf(cmd.ErrOrStderr(), "读取制品 %s 旧文档失败，已跳过: %v\n", item.Name, err)
+				failed++
+				continue
 			}
-			if err := migrateFormulaDocuments(cmd.Context(), token, item, assets); err != nil {
-				return fmt.Errorf("迁移制品 %s 失败（可重试，已复制正文不会覆盖）: %w", item.Name, err)
+			if err := migrateFormulaDocuments(cmd.Context(), item, assets); err != nil {
+				fmt.Fprintf(cmd.ErrOrStderr(), "迁移制品 %s 失败，已跳过（可重试，已复制正文不会覆盖）: %v\n", item.Name, err)
+				failed++
+				continue
 			}
 			fmt.Fprintf(cmd.OutOrStdout(), "制品 %s 文档及简介迁移完成\n", item.Name)
 			total++
-			lastID = item.ID
 		}
 	}
-	if total == 0 && identifie != "" {
+	if total+failed == 0 && identifie != "" {
 		return fmt.Errorf("制品 %q 不存在", identifie)
 	}
-	fmt.Fprintf(cmd.OutOrStdout(), "文档迁移完成，共 %d 个制品\n", total)
+	fmt.Fprintf(cmd.OutOrStdout(), "文档迁移完成，成功 %d 个制品，失败跳过 %d 个\n", total, failed)
 	return nil
 }
 
 // Migration stays in this one-off command rather than the normal request flow.
-func migrateFormulaDocuments(ctx context.Context, token string, item *entity.Formula, assets map[string]string) error {
+func migrateFormulaDocuments(ctx context.Context, item *entity.Formula, assets map[string]string) error {
 	reference := ""
 	if item.Setting != nil {
 		reference = item.Setting.DocumentRef
 	}
 	if reference == "" {
-		var err error
-		reference, err = (respologic.FormulaDocument{}).Initialize(ctx, token, item)
+		reference = "app/" + item.Name
+		owner, err := (commonlogic.User{}).GetById(int(item.UserID))
 		if err != nil {
 			return err
 		}
+		title := item.Title
+		if title == "" {
+			title = item.Name
+		}
+		if err := w7.DocumentSdk.Create(ctx, item.UserID, documentsdk.CreateLibrary{Ref: reference, Name: title, OwnerID: item.UserID, OwnerName: owner.Username, Protected: 1}); err != nil {
+			var responseError *documentsdk.ResponseError
+			if !errors.As(err, &responseError) || responseError.StatusCode != http.StatusConflict {
+				return err
+			}
+		}
+	}
+	tree, err := w7.DocumentSdk.Tree(ctx, item.UserID, reference)
+	if err != nil {
+		return err
+	}
+	existing := make(map[string]bool, len(tree.Files))
+	for _, file := range tree.Files {
+		existing[file.Path] = true
+	}
+	if !existing["index.md"] {
+		depot, err := formula.NewDepot()
+		if err != nil {
+			return err
+		}
+		application, err := depot.GetFormula(item.Name, "", nil)
+		if err != nil {
+			return err
+		}
+		if application.Readme == nil {
+			readme := assets["readme.md"]
+			application.Readme = &readme
+		}
+		setting := accessor.FormulaSettingOption{}
+		if application.Setting != nil {
+			setting = *application.Setting
+		}
+		setting.DocumentRef = reference
+		application.Setting = &setting
+		if err := (respologic.FormulaDocument{}).SyncHomepage(ctx, application); err != nil {
+			return err
+		}
+		existing["index.md"] = true
 	}
 	filenames := make([]string, 0)
 	for filename := range assets {
@@ -134,28 +172,17 @@ func migrateFormulaDocuments(ctx context.Context, token string, item *entity.For
 	}
 	sort.Strings(filenames)
 	if len(filenames) > 0 {
-		tree, err := w7.DocumentSdk.Tree(ctx, token, reference)
-		if err != nil {
-			return err
-		}
-		existing := make(map[string]bool, len(tree.Files))
-		for _, file := range tree.Files {
-			existing[file.Path] = true
-		}
 		for _, filename := range filenames {
 			documentPath := strings.TrimPrefix(filename, "docs/")
-			if documentPath == "index.md" {
-				return errors.New("旧文档 docs/index.md 与默认首页冲突，请先重命名旧文档后再迁移")
-			}
 			if existing[documentPath] {
 				continue
 			}
 			title := strings.TrimSuffix(documentPath, path.Ext(documentPath))
-			if err := w7.DocumentSdk.Save(ctx, token, reference, documentPath, title, assets[filename]); err != nil {
+			if err := w7.DocumentSdk.Save(ctx, item.UserID, reference, documentPath, title, assets[filename]); err != nil {
 				return err
 			}
 		}
-		tree, err = w7.DocumentSdk.Tree(ctx, token, reference)
+		tree, err = w7.DocumentSdk.Tree(ctx, item.UserID, reference)
 		if err != nil {
 			return err
 		}
@@ -181,7 +208,7 @@ func migrateFormulaDocuments(ctx context.Context, token string, item *entity.For
 		for _, file := range tree.Files {
 			appendPath(file.Path)
 		}
-		if err := w7.DocumentSdk.Order(ctx, token, reference, order); err != nil {
+		if err := w7.DocumentSdk.Order(ctx, item.UserID, reference, order); err != nil {
 			return err
 		}
 	}

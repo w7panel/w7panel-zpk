@@ -21,7 +21,6 @@ type RegistryNamespace struct {
 	CreatedAt   time.Time      `gorm:"column:created_at;not null;default:CURRENT_TIMESTAMP" json:"created_at"`
 	UpdatedAt   time.Time      `gorm:"column:updated_at" json:"updated_at"`
 	DeletedAt   gorm.DeletedAt `gorm:"column:deleted_at" json:"deleted_at"`
-	Visible     bool           `gorm:"column:visible;not null;default:true" json:"visible"`
 }
 
 // TableName RegistryNamespace's table name

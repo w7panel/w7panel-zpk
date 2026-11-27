@@ -2,6 +2,7 @@ package formula
 
 import (
 	"archive/zip"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -22,7 +23,8 @@ import (
 	"github.com/w7panel/w7panel-zpk/common/function"
 	"github.com/w7panel/w7panel-zpk/common/logic"
 	"github.com/w7panel/w7panel-zpk/common/service"
-	"github.com/w7panel/w7panel-zpk/common/types/registry"
+	"github.com/w7panel/w7panel-zpk/common/service/w7"
+	permissionsdk "github.com/w7panel/w7panel-zpk/common/service/w7/permission"
 	"github.com/we7coreteam/w7-rangine-go/v2/pkg/support/facade"
 	"github.com/we7coreteam/w7-rangine-go/v2/src/core/err_handler"
 	"sigs.k8s.io/yaml"
@@ -116,6 +118,19 @@ func (self *Depot) AddFormula(name string, version string, user *entity.Registry
 		}
 	}
 
+	if formulaData == nil {
+		ctx := context.Background()
+		_, namespace := logic.ParseRepositoryNameAndNamespace(logic.GetFormulaOciName(name))
+		if err := w7.PermissionSdk.EnsureNamespace(ctx, namespace); err != nil {
+			return err
+		}
+		if err := w7.PermissionSdk.SetResource(ctx, permissionsdk.Resource{Type: "repository", Value: logic.GetFormulaOciName(name)}, user.ID, 4); err != nil {
+			return err
+		}
+		if err := w7.PermissionSdk.Add(ctx, permissionsdk.Grant{UserID: user.ID, Resource: permissionsdk.Resource{Type: "repository", Value: logic.GetFormulaOciName(name)}, Actions: []string{"pull", "push"}}); err != nil {
+			return err
+		}
+	}
 	newCreate := false
 	versionId := int32(0)
 	err := dao.Q.Transaction(func(tx *dao.Query) error {
@@ -175,12 +190,6 @@ func (self *Depot) AddFormula(name string, version string, user *entity.Registry
 			}, "manifest.yaml", string(content))
 		}
 
-		go facade.GetEvent().Publish(registry.AddUserPermissionEvent, registry.AddUserPermissionPayload{
-			UserID:        user.ID,
-			ResourceType:  "repository",
-			ResourceValue: facade.GetConfig().GetString("setting.depot.oci_namespace") + "/" + strings.ReplaceAll(name, "-", "_"),
-			Actions:       []string{"push", "pull"},
-		})
 	}
 
 	return nil
@@ -383,6 +392,9 @@ func (self *Depot) GetFormulaBackendZipDownloadUrlByApplication(application logi
 }
 
 func (self *Depot) DeleteFormula(formula *Formula) error {
+	if err := w7.PermissionSdk.Delete(context.Background(), formula.UserId, permissionsdk.Resource{Type: "repository", Value: logic.GetFormulaOciName(formula.Name)}); err != nil {
+		return err
+	}
 	err := dao.Q.Transaction(func(tx *dao.Query) error {
 		return deleteFormulaData(tx, formula.ID)
 	})
@@ -391,12 +403,6 @@ func (self *Depot) DeleteFormula(formula *Formula) error {
 	}
 
 	os.RemoveAll(filepath.Join(self.basePath, GetFormulaRelativeDir(formula.Name, 0)))
-
-	facade.GetEvent().Publish(registry.DeleteUserPermissionEvent, registry.DelUserPermissionPayload{
-		UserID:        formula.UserId,
-		ResourceType:  "repository",
-		ResourceValue: facade.GetConfig().GetString("setting.depot.oci_namespace") + "/" + strings.ReplaceAll(formula.Name, "-", "_"),
-	})
 
 	return nil
 }

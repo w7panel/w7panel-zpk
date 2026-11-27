@@ -11,6 +11,6 @@ var ErrInvalid = errors.New("参数无效")
 const MaxContentSize = 4 << 20
 
 func SplitRef(ref string) (string, string) {
-	category, identifie, _ := strings.Cut(ref, "/")
-	return category, identifie
+	namespace, identifie, _ := strings.Cut(ref, "/")
+	return namespace, identifie
 }

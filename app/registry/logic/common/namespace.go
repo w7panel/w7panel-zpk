@@ -1,4 +1,4 @@
-package logic
+package common
 
 import (
 	"context"
@@ -44,12 +44,12 @@ func (l Namespace) GetByName(name string) (*entity.RegistryNamespace, error) {
 	return dao.Q.RegistryNamespace.Where(dao.RegistryNamespace.Name.Eq(name)).First()
 }
 
-func (l Namespace) ListSubNamespacesByNamespace(namespace string) ([]string, error) {
+func (l Namespace) ListSubNamespacesByNamespace(namespace, resourceType string) ([]string, error) {
 	subNamespaceMap := make(map[string]struct{})
 	batchRows := make([]*entity.RegistryRepository, 0, 200)
 	err := dao.Q.RegistryRepository.
 		Select(dao.Q.RegistryRepository.Name, dao.Q.RegistryRepository.ID).
-		Where(dao.Q.RegistryRepository.Namespace.Eq(namespace)).
+		Where(dao.Q.RegistryRepository.Namespace.Eq(namespace), dao.Q.RegistryRepository.ResourceType.Eq(resourceType)).
 		Where(dao.Q.RegistryRepository.Name.Like("%/%")).
 		Order(dao.Q.RegistryRepository.ID.Asc()).
 		FindInBatches(&batchRows, 200, func(tx gen.Dao, batch int) error {
@@ -78,56 +78,45 @@ func (l Namespace) ListSubNamespacesByNamespace(namespace string) ([]string, err
 var ErrNamespaceConflict = errors.New("命名空间已存在或仍有资源")
 var ErrNamespaceProtected = errors.New("默认命名空间不可修改或删除")
 
-// CreateShared creates system-owned namespaces without a user login dependency.
-func (l Namespace) CreateShared(ctx context.Context, name string, visibleType int32, visible *bool) error {
+// Create creates system-owned namespaces without a user login dependency.
+func (l Namespace) Create(ctx context.Context, name string, visibleType int32) error {
 	query := dao.Q.RegistryNamespace
 	if _, err := query.WithContext(ctx).Unscoped().Where(query.Name.Eq(name)).First(); err == nil {
 		return ErrNamespaceConflict
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return err
 	}
-	return dao.Q.Transaction(func(tx *dao.Query) error {
-		namespace := &entity.RegistryNamespace{Name: name, VisibleType: visibleType}
-		query := tx.RegistryNamespace
-		if err := query.WithContext(ctx).Create(namespace); err != nil {
-			return err
-		}
-		if visible != nil && !*visible {
-			_, err := query.WithContext(ctx).Where(query.ID.Eq(namespace.ID)).Update(query.Visible, false)
-			return err
-		}
-		return nil
-	})
+	return query.WithContext(ctx).Create(&entity.RegistryNamespace{Name: name, VisibleType: visibleType})
 }
 
-func (l Namespace) RenameShared(ctx context.Context, id int32, name string) error {
-	return dao.Q.Transaction(func(tx *dao.Query) error {
-		query := tx.RegistryNamespace
-		namespace, err := query.WithContext(ctx).Where(query.ID.Eq(id)).First()
-		if err != nil || namespace.Name == name {
-			return err
-		}
-		if namespace.Name == logic.DefaultNamespace {
-			return ErrNamespaceProtected
-		}
-		if count, err := query.WithContext(ctx).Unscoped().Where(query.Name.Eq(name)).Count(); err != nil {
-			return err
-		} else if count != 0 {
-			return ErrNamespaceConflict
-		}
-		if err := l.renamePermissions(ctx, tx, namespace.Name, name); err != nil {
-			return err
-		}
-		repository := tx.RegistryRepository
-		if _, err := repository.WithContext(ctx).Where(repository.Namespace.Eq(namespace.Name)).Update(repository.Namespace, name); err != nil {
-			return err
-		}
-		_, err = query.WithContext(ctx).Where(query.ID.Eq(id)).Update(query.Name, name)
+func (l Namespace) Rename(ctx context.Context, id int32, name string) error {
+	return dao.Q.Transaction(func(tx *dao.Query) error { return l.RenameInTransaction(ctx, tx, id, name) })
+}
+func (l Namespace) RenameInTransaction(ctx context.Context, tx *dao.Query, id int32, name string) error {
+	query := tx.RegistryNamespace
+	namespace, err := query.WithContext(ctx).Where(query.ID.Eq(id)).First()
+	if err != nil || namespace.Name == name {
 		return err
-	})
+	}
+	if namespace.Name == logic.DefaultNamespace {
+		return ErrNamespaceProtected
+	}
+	if count, err := query.WithContext(ctx).Unscoped().Where(query.Name.Eq(name)).Count(); err != nil {
+		return err
+	} else if count != 0 {
+		return ErrNamespaceConflict
+	}
+	if err := renameResources(ctx, tx, namespace.Name, name); err != nil {
+		return err
+	}
+	if err := l.renamePermissions(ctx, tx, namespace.Name, name); err != nil {
+		return err
+	}
+	_, err = query.WithContext(ctx).Where(query.ID.Eq(id)).Update(query.Name, name)
+	return err
 }
 
-func (l Namespace) DeleteShared(ctx context.Context, id int32) error {
+func (l Namespace) Delete(ctx context.Context, id int32) error {
 	return dao.Q.Transaction(func(tx *dao.Query) error {
 		query := tx.RegistryNamespace
 		namespace, err := query.WithContext(ctx).Where(query.ID.Eq(id)).First()
@@ -178,6 +167,10 @@ func (l Namespace) renamePermissions(ctx context.Context, tx *dao.Query, oldName
 }
 
 func (l Namespace) hasResourcePermissions(ctx context.Context, tx *dao.Query, name string) (bool, error) {
+	if used, err := hasResources(ctx, tx, name); err != nil || used {
+		return used, err
+	}
+
 	query := tx.RegistryUserPermission
 	rows, err := query.WithContext(ctx).Where(query.ResourceType.Neq("namespace"), query.ResourceValue.Like(name+"/%")).Find()
 	if err != nil {
